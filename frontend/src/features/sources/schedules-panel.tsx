@@ -1,11 +1,9 @@
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { Link } from "@tanstack/react-router"
 import {
   CalendarClock,
   FlaskConical,
-  History,
   Pencil,
   Play,
   Plus,
@@ -95,12 +93,6 @@ export function SchedulesPanel() {
           When sweeps and checks run by themselves. Times are shown in your time
           zone ({tz}).
         </p>
-        <Button asChild variant="outline">
-          <Link to="/autopilot/runs">
-            <History aria-hidden="true" />
-            Run history
-          </Link>
-        </Button>
         <Button onClick={() => setEditing("new")}>
           <Plus aria-hidden="true" />
           Add schedule
