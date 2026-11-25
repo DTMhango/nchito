@@ -8,6 +8,7 @@ import type {
   ThemeInput,
 } from "@/lib/api/types"
 import { db } from "./db"
+import { sourcesHandlers } from "./handlers/sources"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -17,6 +18,7 @@ const notFound = (what: string) =>
   HttpResponse.json({ detail: `${what} not found.` }, { status: 404 })
 
 export const handlers = [
+  ...sourcesHandlers,
   http.get("*/api/health", () =>
     HttpResponse.json({ status: "ok", mock: true })
   ),
