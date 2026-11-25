@@ -1,0 +1,24 @@
+# Personal data never enters the repo
+Job Hunting.zip
+*.kit.zip
+/data/
+backend/data/
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+
+# Misc
+.DS_Store
+*.log

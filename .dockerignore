@@ -1,0 +1,21 @@
+# Personal data never enters an image
+Job Hunting.zip
+*.kit.zip
+data/
+**/data/
+
+.git
+.github
+.env
+.env.*
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/node_modules
+frontend/dist
+design/
+docs/
+kits/
+backend/tests

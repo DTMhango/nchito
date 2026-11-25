@@ -1,0 +1,330 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./themes/document.css";
+
+/*
+ * Tokens only. The theme engine (src/themes/engine.ts) writes `--t-*` on <html> and on any
+ * [data-theme-scope] element. This file maps them onto shadcn's variable contract and onto
+ * Tailwind utilities. No literal colours here or in any component (npm run lint checks).
+ */
+
+/* `dark:` follows the nearest theme scope, not just <html>. */
+@custom-variant dark (&:where([data-mode="dark"], [data-mode="dark"] *):not(:where([data-mode="dark"] [data-mode="light"], [data-mode="dark"] [data-mode="light"] *)));
+
+@theme {
+  /* The mockup sets type on a 14px root and spaces in 4px steps; keep both proportional. */
+  --spacing: calc(4rem / 14);
+  --text-2xs: 0.68rem;
+  --text-2xs--line-height: 1.35;
+  --text-xs: 0.76rem;
+  --text-xs--line-height: 1.4;
+  --text-sm: 0.86rem;
+  --text-sm--line-height: 1.45;
+  --text-base: 1rem;
+  --text-base--line-height: 1.45;
+  --text-md: 1.08rem;
+  --text-md--line-height: 1.3;
+  --text-lg: 1.3rem;
+  --text-lg--line-height: 1.2;
+  --text-xl: 1.6rem;
+  --text-xl--line-height: 1.15;
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: 1.1;
+  --animate-view-in: view-in 0.24s ease-out;
+  --animate-pulse-soft: pulse-soft 2.2s ease-in-out infinite;
+  --animate-draw: draw 0.9s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+
+  @keyframes view-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-soft {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--t-good-soft);
+    }
+    50% {
+      box-shadow: 0 0 0 5px transparent;
+      opacity: 0.55;
+    }
+  }
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 100;
+    }
+  }
+}
+
+@theme inline {
+  --font-sans: var(--t-font-body);
+  --font-heading: var(--t-font-display);
+  --font-display: var(--t-font-display);
+  --font-mono: var(--t-font-mono);
+  --font-data: var(--t-font-data);
+  --font-label: var(--t-font-label);
+
+  /* shadcn contract */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Extended contract (the mockup's extra tokens) */
+  --color-sunken: var(--t-bg-sunken);
+  --color-surface: var(--t-surface);
+  --color-surface-2: var(--t-surface-2);
+  --color-border-strong: var(--t-border-strong);
+  --color-panel-border: var(--t-panel-border);
+  --color-faint: var(--t-text-faint);
+  --color-primary-ink: var(--t-primary-ink);
+  --color-primary-soft: var(--t-primary-soft);
+  --color-highlight: var(--t-accent);
+  --color-highlight-ink: var(--t-accent-ink);
+  --color-highlight-soft: var(--t-accent-soft);
+  --color-good: var(--t-good);
+  --color-good-soft: var(--t-good-soft);
+  --color-warn: var(--t-warn);
+  --color-warn-soft: var(--t-warn-soft);
+  --color-danger: var(--t-danger);
+  --color-danger-soft: var(--t-danger-soft);
+  --color-info: var(--t-info);
+  --color-info-soft: var(--t-info-soft);
+  --color-score-low: var(--t-score-low);
+  --color-score-mid: var(--t-score-mid);
+  --color-score-high: var(--t-score-high);
+  --color-overlay: var(--t-overlay);
+  --color-paper: var(--paper);
+  --color-paper-ink: var(--paper-ink);
+  --color-paper-muted: var(--paper-muted);
+  --color-paper-rule: var(--paper-rule);
+
+  --radius-xs: var(--t-radius-sm);
+  --radius-sm: var(--t-radius-sm);
+  --radius-md: var(--t-radius-sm);
+  --radius-lg: var(--t-radius);
+  --radius-xl: var(--t-radius-lg);
+  --radius-2xl: var(--t-radius-lg);
+  --radius-3xl: var(--t-radius-lg);
+  --radius-4xl: var(--t-radius-lg);
+
+  --shadow-xs: var(--t-shadow-sm);
+  --shadow-sm: var(--t-shadow-sm);
+  --shadow-md: var(--t-shadow);
+  --shadow-lg: var(--t-shadow-pop);
+  --shadow-xl: var(--t-shadow-pop);
+  --shadow-elev: var(--t-shadow);
+  --shadow-pop: var(--t-shadow-pop);
+}
+
+/* Map the theme tokens onto shadcn's names. Re-declared on every theme scope so a nested
+   scope's `--t-*` values flow into these. */
+:root,
+[data-theme-scope] {
+  --background: var(--t-bg);
+  --foreground: var(--t-text);
+  --card: var(--t-surface);
+  --card-foreground: var(--t-text);
+  --popover: var(--t-surface);
+  --popover-foreground: var(--t-text);
+  --primary: var(--t-primary);
+  --primary-foreground: var(--t-primary-fg);
+  --secondary: var(--t-bg-sunken);
+  --secondary-foreground: var(--t-text);
+  --muted: var(--t-bg-sunken);
+  --muted-foreground: var(--t-text-muted);
+  /* shadcn's "accent" is the quiet hover fill; the theme's accent is `highlight`. */
+  --accent: var(--t-bg-sunken);
+  --accent-foreground: var(--t-text);
+  --destructive: var(--t-danger);
+  --border: var(--t-border);
+  --input: var(--t-border);
+  --ring: var(--t-primary-ink);
+  --chart-1: var(--t-chart-1);
+  --chart-2: var(--t-chart-2);
+  --chart-3: var(--t-chart-3);
+  --chart-4: var(--t-chart-4);
+  --chart-5: var(--t-chart-5);
+  --radius: var(--t-radius);
+  --sidebar: var(--t-bg);
+  --sidebar-foreground: var(--t-text-muted);
+  --sidebar-primary: var(--t-primary);
+  --sidebar-primary-foreground: var(--t-primary-fg);
+  --sidebar-accent: var(--t-bg-sunken);
+  --sidebar-accent-foreground: var(--t-text);
+  --sidebar-border: var(--t-border);
+  --sidebar-ring: var(--t-primary-ink);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    font-size: var(--t-font-size, 14px);
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    min-height: 100%;
+    background: var(--t-bg);
+    color: var(--t-text);
+    font-family: var(--t-font-body);
+    font-size: 1rem;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  #root {
+    min-height: 100dvh;
+  }
+  [data-theme-scope] {
+    font-family: var(--t-font-body);
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--t-font-display);
+    font-weight: var(--t-display-weight);
+    letter-spacing: var(--t-display-track);
+    text-wrap: balance;
+  }
+  a {
+    color: var(--t-primary-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--t-primary-ink);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--t-primary-soft);
+    color: var(--t-text);
+  }
+}
+
+/* Reduced motion: the owner's setting, or the device's. */
+[data-reduced-motion="true"] *,
+[data-reduced-motion="true"] *::before,
+[data-reduced-motion="true"] *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* ---------- Utilities shared by the components ---------- */
+
+/** Small caps-style label: theme decides the face, case and tracking. */
+@utility eyebrow {
+  font-family: var(--t-font-label);
+  text-transform: var(--t-label-case);
+  letter-spacing: var(--t-label-track);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--t-text-faint);
+}
+
+/** Figures: the theme's data face with tabular numerals. */
+@utility num {
+  font-family: var(--t-font-data);
+  font-variant-numeric: tabular-nums;
+}
+
+/** Display heading face, weight and tracking. */
+@utility heading {
+  font-family: var(--t-font-display);
+  font-weight: var(--t-display-weight);
+  letter-spacing: var(--t-display-track);
+}
+
+/** The one elevated surface on a view. */
+@utility elev {
+  background: var(--t-surface);
+  border: 1px solid var(--t-panel-border);
+  border-top: var(--t-elev-top) solid var(--t-elev-top-color);
+  border-radius: var(--t-radius-lg);
+  box-shadow: var(--t-shadow);
+}
+
+/** A flat panel. */
+@utility panel {
+  background: var(--t-surface);
+  border: 1px solid var(--t-panel-border);
+  border-radius: var(--t-radius);
+}
+
+/** Popover / menu surface. */
+@utility pop-surface {
+  background: var(--t-surface);
+  border: 1px solid var(--t-border);
+  border-radius: var(--t-radius);
+  box-shadow: var(--t-shadow-pop);
+}
+
+/** List row padding: density setting times the theme's spacing character. */
+@utility row-pad {
+  padding-block: calc(var(--t-dens) * var(--t-space-k));
+}
+@utility row-pad-lg {
+  padding-block: calc(var(--t-dens) * var(--t-space-k) + 2px);
+}
+@utility row-pad-sm {
+  padding-block: calc(var(--t-dens) * var(--t-space-k) - 2px);
+}
+
+/** Soft focus ring for text inputs (mockup: primary border + 3px ring). */
+@utility field-focus {
+  &:focus-visible,
+  &:focus-within {
+    outline: none;
+    border-color: var(--t-primary);
+    box-shadow: 0 0 0 3px var(--t-ring);
+  }
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

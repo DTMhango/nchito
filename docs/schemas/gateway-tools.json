@@ -1,0 +1,929 @@
+{
+  "next_task": {
+    "description": "Claim the next task for this runner.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "kinds": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "apply",
+                  "sweep_site",
+                  "check_posting"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Kinds"
+        }
+      },
+      "title": "NextTaskIn",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "AgentTaskState": {
+          "additionalProperties": false,
+          "description": "Checkpoint saved by a runner. Free-form fields go in ``data``.",
+          "properties": {
+            "step": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Step"
+            },
+            "fields_filled": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Fields Filled",
+              "type": "array"
+            },
+            "screenshot_ref": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Screenshot Ref"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Url"
+            },
+            "data": {
+              "additionalProperties": true,
+              "title": "Data",
+              "type": "object"
+            }
+          },
+          "title": "AgentTaskState",
+          "type": "object"
+        },
+        "TaskRules": {
+          "additionalProperties": false,
+          "properties": {
+            "stay_on_domain": {
+              "title": "Stay On Domain",
+              "type": "string"
+            },
+            "max_steps": {
+              "title": "Max Steps",
+              "type": "integer"
+            },
+            "never": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Never",
+              "type": "array"
+            }
+          },
+          "required": [
+            "stay_on_domain",
+            "max_steps"
+          ],
+          "title": "TaskRules",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "None when the queue is empty",
+          "title": "Task Id"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "enum": [
+                "apply",
+                "sweep_site",
+                "check_posting"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        },
+        "instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instructions"
+        },
+        "posting_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Posting Url"
+        },
+        "checkpoint": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AgentTaskState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rules": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TaskRules"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "title": "NextTaskOut",
+      "type": "object"
+    }
+  },
+  "get_packet": {
+    "description": "Field values, answers and signed file URLs for this task's form.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id"
+      ],
+      "title": "GetPacketIn",
+      "type": "object"
+    },
+    "output": {
+      "$defs": {
+        "PacketField": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "title": "Key",
+              "type": "string"
+            },
+            "label": {
+              "title": "Label",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "label",
+            "value"
+          ],
+          "title": "PacketField",
+          "type": "object"
+        },
+        "PacketFileOut": {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "title": "Name",
+              "type": "string"
+            },
+            "kind": {
+              "enum": [
+                "cv",
+                "letter",
+                "vault",
+                "other"
+              ],
+              "title": "Kind",
+              "type": "string"
+            },
+            "sha256": {
+              "title": "Sha256",
+              "type": "string"
+            },
+            "download_url": {
+              "description": "Short-lived signed URL",
+              "title": "Download Url",
+              "type": "string"
+            },
+            "attach_rule": {
+              "enum": [
+                "always",
+                "when_asked",
+                "never"
+              ],
+              "title": "Attach Rule",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "kind",
+            "sha256",
+            "download_url",
+            "attach_rule"
+          ],
+          "title": "PacketFileOut",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "packet_version": {
+          "title": "Packet Version",
+          "type": "integer"
+        },
+        "packet_hash": {
+          "title": "Packet Hash",
+          "type": "string"
+        },
+        "destination_domain": {
+          "title": "Destination Domain",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/PacketField"
+          },
+          "title": "Fields",
+          "type": "array"
+        },
+        "answers": {
+          "items": {
+            "$ref": "#/$defs/PacketField"
+          },
+          "title": "Answers",
+          "type": "array"
+        },
+        "files": {
+          "items": {
+            "$ref": "#/$defs/PacketFileOut"
+          },
+          "title": "Files",
+          "type": "array"
+        }
+      },
+      "required": [
+        "packet_version",
+        "packet_hash",
+        "destination_domain",
+        "fields",
+        "answers",
+        "files"
+      ],
+      "title": "GetPacketOut",
+      "type": "object"
+    }
+  },
+  "find_answer": {
+    "description": "Look up one form question in the answer bank.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        }
+      },
+      "required": [
+        "task_id",
+        "question"
+      ],
+      "title": "FindAnswerIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "enum": [
+            "value",
+            "ask_owner",
+            "do_not_answer"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "select": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "For do_not_answer: what to select, e.g. 'Prefer not to say'",
+          "title": "Select"
+        }
+      },
+      "required": [
+        "outcome"
+      ],
+      "title": "FindAnswerOut",
+      "type": "object"
+    }
+  },
+  "save_checkpoint": {
+    "description": "Record progress so the task can resume.",
+    "input": {
+      "$defs": {
+        "AgentTaskState": {
+          "additionalProperties": false,
+          "description": "Checkpoint saved by a runner. Free-form fields go in ``data``.",
+          "properties": {
+            "step": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Step"
+            },
+            "fields_filled": {
+              "items": {
+                "type": "string"
+              },
+              "title": "Fields Filled",
+              "type": "array"
+            },
+            "screenshot_ref": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Screenshot Ref"
+            },
+            "url": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Url"
+            },
+            "data": {
+              "additionalProperties": true,
+              "title": "Data",
+              "type": "object"
+            }
+          },
+          "title": "AgentTaskState",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/AgentTaskState"
+        }
+      },
+      "required": [
+        "task_id",
+        "state"
+      ],
+      "title": "SaveCheckpointIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "steps_used": {
+          "title": "Steps Used",
+          "type": "integer"
+        },
+        "steps_left": {
+          "title": "Steps Left",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ok",
+        "steps_used",
+        "steps_left"
+      ],
+      "title": "SaveCheckpointOut",
+      "type": "object"
+    }
+  },
+  "raise_blocker": {
+    "description": "Hand a step to the owner; move to the next task.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "sign_in",
+            "create_account",
+            "captcha",
+            "assessment",
+            "declaration",
+            "unsupported_form",
+            "redirect_off_domain",
+            "unknown_question",
+            "page_instruction"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "task_id",
+        "type",
+        "detail"
+      ],
+      "title": "RaiseBlockerIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "pending_action_id": {
+          "title": "Pending Action Id",
+          "type": "string"
+        },
+        "next": {
+          "enum": [
+            "move_on",
+            "wait"
+          ],
+          "title": "Next",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pending_action_id",
+        "next"
+      ],
+      "title": "RaiseBlockerOut",
+      "type": "object"
+    }
+  },
+  "request_submit_permit": {
+    "description": "Call immediately before Submit with what was actually entered.",
+    "input": {
+      "$defs": {
+        "EnteredAnswer": {
+          "additionalProperties": false,
+          "properties": {
+            "question": {
+              "title": "Question",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "question",
+            "value"
+          ],
+          "title": "EnteredAnswer",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "entered_answers": {
+          "items": {
+            "$ref": "#/$defs/EnteredAnswer"
+          },
+          "title": "Entered Answers",
+          "type": "array"
+        },
+        "attached_files_sha256": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Attached Files Sha256",
+          "type": "array"
+        },
+        "current_url": {
+          "title": "Current Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "summary",
+        "entered_answers",
+        "attached_files_sha256",
+        "current_url"
+      ],
+      "title": "RequestPermitIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "enum": [
+            "granted",
+            "wait_for_owner",
+            "denied"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "permit_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permit Id"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "changes": {
+          "description": "Differences from the approved packet",
+          "items": {
+            "type": "string"
+          },
+          "title": "Changes",
+          "type": "array"
+        }
+      },
+      "required": [
+        "decision"
+      ],
+      "title": "RequestPermitOut",
+      "type": "object"
+    }
+  },
+  "report_result": {
+    "description": "Report submitted / uncertain / failed with evidence.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "outcome": {
+          "enum": [
+            "submitted",
+            "uncertain",
+            "failed"
+          ],
+          "title": "Outcome",
+          "type": "string"
+        },
+        "permit_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Permit Id"
+        },
+        "confirmation_text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confirmation Text"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference"
+        },
+        "screenshot_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Screenshot Ref"
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        }
+      },
+      "required": [
+        "task_id",
+        "outcome"
+      ],
+      "title": "ReportResultIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "recorded": {
+          "title": "Recorded",
+          "type": "boolean"
+        },
+        "application_stage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Application Stage"
+        }
+      },
+      "required": [
+        "recorded"
+      ],
+      "title": "ReportResultOut",
+      "type": "object"
+    }
+  },
+  "report_jobs": {
+    "description": "Sweep tasks: postings found, with the URL actually visited.",
+    "input": {
+      "$defs": {
+        "ReportedJob": {
+          "additionalProperties": false,
+          "properties": {
+            "url_visited": {
+              "title": "Url Visited",
+              "type": "string"
+            },
+            "title": {
+              "title": "Title",
+              "type": "string"
+            },
+            "employer": {
+              "title": "Employer",
+              "type": "string"
+            },
+            "location": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Location"
+            },
+            "snippet": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Snippet"
+            }
+          },
+          "required": [
+            "url_visited",
+            "title",
+            "employer"
+          ],
+          "title": "ReportedJob",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "jobs": {
+          "items": {
+            "$ref": "#/$defs/ReportedJob"
+          },
+          "title": "Jobs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "task_id",
+        "jobs"
+      ],
+      "title": "ReportJobsIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "accepted": {
+          "title": "Accepted",
+          "type": "integer"
+        },
+        "duplicates": {
+          "title": "Duplicates",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "accepted",
+        "duplicates"
+      ],
+      "title": "ReportJobsOut",
+      "type": "object"
+    }
+  }
+}

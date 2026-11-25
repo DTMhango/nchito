@@ -1,0 +1,4 @@
+SAMPLE CERTIFICATE - FICTIONAL
+This certifies that Mutale Example completed the Example Institute course
+'Applied Forecasting with Python' in March 2024.
+This document is invented test data and refers to no real person or institution.

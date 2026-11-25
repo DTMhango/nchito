@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="A private job-hunting cockpit." />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Nchito</title>
+    <script>
+      // Paint the owner's last theme before any bundle loads (no flash). Values are the
+      // pre-computed CSS variables the theme engine cached; see src/themes/cache.ts.
+      ;(function () {
+        try {
+          var raw = localStorage.getItem("nchito.paint.v1")
+          if (!raw) return
+          var p = JSON.parse(raw)
+          var dark = p.mode === "dark" || (p.mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches)
+          var mode = dark ? "dark" : "light"
+          var vars = p[mode] || {}
+          var s = document.documentElement.style
+          for (var k in vars) s.setProperty(k, vars[k])
+          s.setProperty("--t-font-size", p.fontPx + "px")
+          s.colorScheme = mode
+          document.documentElement.dataset.mode = mode
+          document.documentElement.dataset.themeId = p.themeId
+          document.documentElement.dataset.reducedMotion = String(!!p.reducedMotion)
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

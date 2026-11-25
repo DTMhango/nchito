@@ -1,0 +1,2648 @@
+{
+  "$defs": {
+    "AnswerPatterns": {
+      "additionalProperties": false,
+      "properties": {
+        "canonical": {
+          "title": "Canonical",
+          "type": "string"
+        },
+        "variants": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Variants",
+          "type": "array"
+        }
+      },
+      "required": [
+        "canonical"
+      ],
+      "title": "AnswerPatterns",
+      "type": "object"
+    },
+    "AttachPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "attach_policy",
+          "default": "attach_policy",
+          "title": "Type",
+          "type": "string"
+        },
+        "document_type": {
+          "title": "Document Type",
+          "type": "string"
+        },
+        "when": {
+          "enum": [
+            "never",
+            "when_asked",
+            "after_offer"
+          ],
+          "title": "When",
+          "type": "string"
+        }
+      },
+      "required": [
+        "document_type",
+        "when"
+      ],
+      "title": "AttachPolicy",
+      "type": "object"
+    },
+    "AutomationPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "default": "prepare",
+          "enum": [
+            "save_only",
+            "prepare",
+            "ask_then_apply",
+            "auto_apply"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "per_channel": {
+          "additionalProperties": {
+            "enum": [
+              "save_only",
+              "prepare",
+              "ask_then_apply",
+              "auto_apply"
+            ],
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "email",
+              "browser",
+              "manual"
+            ]
+          },
+          "title": "Per Channel",
+          "type": "object"
+        }
+      },
+      "title": "AutomationPolicy",
+      "type": "object"
+    },
+    "CampaignCriteria": {
+      "additionalProperties": false,
+      "properties": {
+        "titles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Titles",
+          "type": "array"
+        },
+        "keywords": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Keywords",
+          "type": "array"
+        },
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/CampaignRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "locations": {
+          "items": {
+            "$ref": "#/$defs/LocationRule"
+          },
+          "title": "Locations",
+          "type": "array"
+        },
+        "work_models": {
+          "items": {
+            "enum": [
+              "on_site",
+              "hybrid",
+              "remote"
+            ],
+            "type": "string"
+          },
+          "title": "Work Models",
+          "type": "array"
+        },
+        "seniority": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Seniority",
+          "type": "array"
+        },
+        "pay_floors": {
+          "items": {
+            "$ref": "#/$defs/PayFloor"
+          },
+          "title": "Pay Floors",
+          "type": "array"
+        },
+        "deprioritise_themes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Deprioritise Themes",
+          "type": "array"
+        }
+      },
+      "title": "CampaignCriteria",
+      "type": "object"
+    },
+    "CampaignRule": {
+      "additionalProperties": false,
+      "description": "A condition set made binding on a campaign (\"Use as campaign rule\").",
+      "properties": {
+        "effect": {
+          "enum": [
+            "exclude",
+            "include",
+            "penalty",
+            "bonus"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "conditions": {
+          "$ref": "#/$defs/ConditionSet"
+        },
+        "points": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Points"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "effect",
+        "conditions"
+      ],
+      "title": "CampaignRule",
+      "type": "object"
+    },
+    "ConditionSet": {
+      "additionalProperties": false,
+      "description": "Root of a filter: facets combine with AND (the default), free text alongside.",
+      "properties": {
+        "version": {
+          "const": 1,
+          "default": 1,
+          "title": "Version",
+          "type": "integer"
+        },
+        "root": {
+          "$ref": "#/$defs/Group"
+        }
+      },
+      "title": "ConditionSet",
+      "type": "object"
+    },
+    "FormatRule": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "format",
+          "default": "format",
+          "title": "Type",
+          "type": "string"
+        },
+        "rule": {
+          "title": "Rule",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "rule"
+      ],
+      "title": "FormatRule",
+      "type": "object"
+    },
+    "Group": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "group",
+          "default": "group",
+          "title": "Type",
+          "type": "string"
+        },
+        "op": {
+          "default": "and",
+          "enum": [
+            "and",
+            "or"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "negate": {
+          "default": false,
+          "title": "Negate",
+          "type": "boolean"
+        },
+        "conditions": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "group": "#/$defs/Group",
+                "range": "#/$defs/RangeFilter",
+                "text": "#/$defs/TextFilter",
+                "values": "#/$defs/ValueFilter"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ValueFilter"
+              },
+              {
+                "$ref": "#/$defs/RangeFilter"
+              },
+              {
+                "$ref": "#/$defs/TextFilter"
+              },
+              {
+                "$ref": "#/$defs/Group"
+              }
+            ]
+          },
+          "title": "Conditions",
+          "type": "array"
+        }
+      },
+      "title": "Group",
+      "type": "object"
+    },
+    "KitAlias": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "title": "Alias",
+          "type": "string"
+        },
+        "canonical": {
+          "title": "Canonical",
+          "type": "string"
+        }
+      },
+      "required": [
+        "alias",
+        "canonical"
+      ],
+      "title": "KitAlias",
+      "type": "object"
+    },
+    "KitAnswer": {
+      "additionalProperties": false,
+      "properties": {
+        "patterns": {
+          "$ref": "#/$defs/AnswerPatterns"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "value_type": {
+          "default": "text",
+          "enum": [
+            "text",
+            "number",
+            "boolean",
+            "choice",
+            "date",
+            "money"
+          ],
+          "title": "Value Type",
+          "type": "string"
+        },
+        "conditions": {
+          "$ref": "#/$defs/ConditionSet"
+        },
+        "answer_class": {
+          "enum": [
+            "auto",
+            "ask_first",
+            "never",
+            "owner_only"
+          ],
+          "title": "Answer Class",
+          "type": "string"
+        },
+        "material": {
+          "default": false,
+          "title": "Material",
+          "type": "boolean"
+        },
+        "scope": {
+          "default": "all_matching",
+          "enum": [
+            "this_application",
+            "this_employer",
+            "this_country",
+            "all_matching"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "scope_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scope Ref"
+        },
+        "forced_choice": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Forced Choice"
+        },
+        "review_after": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review After"
+        }
+      },
+      "required": [
+        "patterns",
+        "answer_class"
+      ],
+      "title": "KitAnswer",
+      "type": "object"
+    },
+    "KitCampaign": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "track_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Track Key"
+        },
+        "priority": {
+          "default": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "criteria": {
+          "$ref": "#/$defs/CampaignCriteria"
+        },
+        "unknown_data_policy": {
+          "$ref": "#/$defs/UnknownDataPolicy"
+        },
+        "rubric_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rubric Name"
+        },
+        "automation": {
+          "$ref": "#/$defs/AutomationPolicy"
+        },
+        "source_names": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Names",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "criteria"
+      ],
+      "title": "KitCampaign",
+      "type": "object"
+    },
+    "KitCustomFacet": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "question": {
+          "title": "Question",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key",
+        "question"
+      ],
+      "title": "KitCustomFacet",
+      "type": "object"
+    },
+    "KitExperience": {
+      "additionalProperties": false,
+      "properties": {
+        "ref": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,59}$",
+          "title": "Ref",
+          "type": "string"
+        },
+        "org": {
+          "title": "Org",
+          "type": "string"
+        },
+        "titles": {
+          "items": {
+            "$ref": "#/$defs/TitleSpan"
+          },
+          "title": "Titles",
+          "type": "array"
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Location"
+        },
+        "start_date": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}(-\\d{2})?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Date"
+        },
+        "end_date": {
+          "anyOf": [
+            {
+              "pattern": "^\\d{4}-\\d{2}(-\\d{2})?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Date"
+        },
+        "title_variants": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Title Variants",
+          "type": "object"
+        },
+        "forbidden_titles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Forbidden Titles",
+          "type": "array"
+        }
+      },
+      "required": [
+        "ref",
+        "org",
+        "titles"
+      ],
+      "title": "KitExperience",
+      "type": "object"
+    },
+    "KitFact": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^F-\\d{1,6}$",
+          "title": "Code",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "bullet",
+            "achievement",
+            "metric",
+            "summary",
+            "education",
+            "cert",
+            "project",
+            "speaking"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "canonical_wording": {
+          "default": false,
+          "title": "Canonical Wording",
+          "type": "boolean"
+        },
+        "experience_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Experience Ref"
+        },
+        "tags": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "tracks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tracks",
+          "type": "array"
+        },
+        "status": {
+          "default": "draft",
+          "enum": [
+            "draft",
+            "approved",
+            "retired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "keep_out_of_prompts": {
+          "default": false,
+          "title": "Keep Out Of Prompts",
+          "type": "boolean"
+        },
+        "confidence_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Confidence Note"
+        }
+      },
+      "required": [
+        "code",
+        "kind",
+        "text"
+      ],
+      "title": "KitFact",
+      "type": "object"
+    },
+    "KitGuardrail": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "scope": {
+          "items": {
+            "enum": [
+              "cv",
+              "letter",
+              "email",
+              "form_answers",
+              "everywhere"
+            ],
+            "type": "string"
+          },
+          "title": "Scope",
+          "type": "array"
+        },
+        "severity": {
+          "default": "block",
+          "enum": [
+            "block",
+            "warn"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "strictness": {
+          "default": "always_block",
+          "enum": [
+            "always_block",
+            "block_waivable_once",
+            "advise"
+          ],
+          "title": "Strictness",
+          "type": "string"
+        },
+        "params": {
+          "discriminator": {
+            "mapping": {
+              "attach_policy": "#/$defs/AttachPolicy",
+              "format": "#/$defs/FormatRule",
+              "limit": "#/$defs/LimitRule",
+              "never_mention": "#/$defs/NeverMention",
+              "never_together": "#/$defs/NeverTogether",
+              "omit_field": "#/$defs/OmitField",
+              "positioning": "#/$defs/Positioning",
+              "reframe": "#/$defs/Reframe",
+              "require_wording": "#/$defs/RequireWording"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NeverMention"
+            },
+            {
+              "$ref": "#/$defs/NeverTogether"
+            },
+            {
+              "$ref": "#/$defs/RequireWording"
+            },
+            {
+              "$ref": "#/$defs/Reframe"
+            },
+            {
+              "$ref": "#/$defs/OmitField"
+            },
+            {
+              "$ref": "#/$defs/FormatRule"
+            },
+            {
+              "$ref": "#/$defs/Positioning"
+            },
+            {
+              "$ref": "#/$defs/LimitRule"
+            },
+            {
+              "$ref": "#/$defs/AttachPolicy"
+            }
+          ],
+          "title": "Params"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "name",
+        "scope",
+        "params"
+      ],
+      "title": "KitGuardrail",
+      "type": "object"
+    },
+    "KitHistoryItem": {
+      "additionalProperties": false,
+      "description": "Application history (personal backup only): blocks duplicates from day one.",
+      "properties": {
+        "employer": {
+          "title": "Employer",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "applied_on": {
+          "format": "date",
+          "title": "Applied On",
+          "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        },
+        "requisition_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requisition Id"
+        },
+        "stage": {
+          "default": "submitted",
+          "title": "Stage",
+          "type": "string"
+        },
+        "channel": {
+          "default": "manual",
+          "enum": [
+            "email",
+            "browser",
+            "manual"
+          ],
+          "title": "Channel",
+          "type": "string"
+        }
+      },
+      "required": [
+        "employer",
+        "title",
+        "applied_on"
+      ],
+      "title": "KitHistoryItem",
+      "type": "object"
+    },
+    "KitPerson": {
+      "additionalProperties": false,
+      "properties": {
+        "full_name": {
+          "$ref": "#/$defs/PersonField"
+        },
+        "preferred_name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PersonField"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "email": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PersonField"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "phone": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PersonField"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PersonField"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "home_country": {
+          "anyOf": [
+            {
+              "pattern": "^[A-Z]{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Home Country"
+        },
+        "timezone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timezone"
+        },
+        "links": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PersonField"
+          },
+          "title": "Links",
+          "type": "object"
+        },
+        "extra_fields": {
+          "additionalProperties": {
+            "$ref": "#/$defs/PersonField"
+          },
+          "title": "Extra Fields",
+          "type": "object"
+        }
+      },
+      "required": [
+        "full_name"
+      ],
+      "title": "KitPerson",
+      "type": "object"
+    },
+    "KitPrompt": {
+      "additionalProperties": false,
+      "properties": {
+        "stage": {
+          "title": "Stage",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        },
+        "version": {
+          "default": 1,
+          "title": "Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stage",
+        "text"
+      ],
+      "title": "KitPrompt",
+      "type": "object"
+    },
+    "KitReference": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role"
+        },
+        "organisation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Organisation"
+        },
+        "contact_email": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contact Email"
+        },
+        "contact_phone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contact Phone"
+        },
+        "consent": {
+          "default": false,
+          "title": "Consent",
+          "type": "boolean"
+        },
+        "share_policy": {
+          "default": "on_request",
+          "enum": [
+            "on_cv",
+            "on_request",
+            "forms_only"
+          ],
+          "title": "Share Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "KitReference",
+      "type": "object"
+    },
+    "KitRubric": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "body": {
+          "$ref": "#/$defs/RubricBody"
+        }
+      },
+      "required": [
+        "name",
+        "body"
+      ],
+      "title": "KitRubric",
+      "type": "object"
+    },
+    "KitSavedView": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "body": {
+          "$ref": "#/$defs/SavedViewBody"
+        },
+        "pinned": {
+          "default": false,
+          "title": "Pinned",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "body"
+      ],
+      "title": "KitSavedView",
+      "type": "object"
+    },
+    "KitSkill": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Level"
+        },
+        "claim": {
+          "default": "yes",
+          "enum": [
+            "yes",
+            "no",
+            "never"
+          ],
+          "title": "Claim",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "KitSkill",
+      "type": "object"
+    },
+    "KitSource": {
+      "additionalProperties": false,
+      "properties": {
+        "connector": {
+          "title": "Connector",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "access": {
+          "enum": [
+            "api",
+            "feed",
+            "html",
+            "agent",
+            "email"
+          ],
+          "title": "Access",
+          "type": "string"
+        },
+        "config": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "title": "Config",
+          "type": "object"
+        },
+        "access_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Access Notes"
+        },
+        "rate_limit": {
+          "$ref": "#/$defs/RateLimit"
+        },
+        "permitted_actions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Permitted Actions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "connector",
+        "name",
+        "access"
+      ],
+      "title": "KitSource",
+      "type": "object"
+    },
+    "KitTagRule": {
+      "additionalProperties": false,
+      "properties": {
+        "tag": {
+          "title": "Tag",
+          "type": "string"
+        },
+        "conditions": {
+          "$ref": "#/$defs/ConditionSet"
+        }
+      },
+      "required": [
+        "tag",
+        "conditions"
+      ],
+      "title": "KitTagRule",
+      "type": "object"
+    },
+    "KitTemplate": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "cv",
+            "letter",
+            "email"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "html": {
+          "title": "Html",
+          "type": "string"
+        },
+        "css": {
+          "default": "",
+          "title": "Css",
+          "type": "string"
+        },
+        "section_order": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Section Order",
+          "type": "array"
+        },
+        "limits": {
+          "$ref": "#/$defs/TemplateLimits"
+        },
+        "accent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accent"
+        }
+      },
+      "required": [
+        "key",
+        "kind",
+        "name",
+        "html"
+      ],
+      "title": "KitTemplate",
+      "type": "object"
+    },
+    "KitTheme": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "maxLength": 80,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "fonts": {
+          "$ref": "#/$defs/ThemeFonts"
+        },
+        "radius": {
+          "description": "Base radius in px; small/large derive from it",
+          "maximum": 32,
+          "minimum": 0,
+          "title": "Radius",
+          "type": "integer"
+        },
+        "density": {
+          "enum": [
+            "comfortable",
+            "compact"
+          ],
+          "title": "Density",
+          "type": "string"
+        },
+        "light": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Light",
+          "type": "object"
+        },
+        "dark": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Dark",
+          "type": "object"
+        },
+        "chart": {
+          "description": "Light-mode palette; fallback for chart-n",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Chart",
+          "type": "array"
+        },
+        "score": {
+          "$ref": "#/$defs/ScoreRamp",
+          "description": "Light-mode ramp; fallback for score-*"
+        }
+      },
+      "required": [
+        "name",
+        "fonts",
+        "radius",
+        "density",
+        "light",
+        "dark",
+        "chart",
+        "score"
+      ],
+      "title": "KitTheme",
+      "type": "object"
+    },
+    "KitTrack": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "pattern": "^[a-z0-9][a-z0-9_-]{0,59}$",
+          "title": "Key",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "priority": {
+          "default": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "example_titles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Example Titles",
+          "type": "array"
+        },
+        "lead_fact_codes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Lead Fact Codes",
+          "type": "array"
+        },
+        "summary_fact_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary Fact Code"
+        },
+        "tone_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tone Notes"
+        }
+      },
+      "required": [
+        "key",
+        "name"
+      ],
+      "title": "KitTrack",
+      "type": "object"
+    },
+    "KitVaultDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "description": "Path inside the zip, under vault/",
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "doc_type": {
+          "enum": [
+            "cv",
+            "degree",
+            "transcript",
+            "id",
+            "photo",
+            "cert",
+            "other"
+          ],
+          "title": "Doc Type",
+          "type": "string"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "sensitivity": {
+          "default": "normal",
+          "enum": [
+            "normal",
+            "on_request",
+            "after_offer_only"
+          ],
+          "title": "Sensitivity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "title",
+        "doc_type",
+        "sha256"
+      ],
+      "title": "KitVaultDocument",
+      "type": "object"
+    },
+    "KitWatchedEmployer": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "board_type": {
+          "title": "Board Type",
+          "type": "string"
+        },
+        "board_slug": {
+          "title": "Board Slug",
+          "type": "string"
+        },
+        "priority": {
+          "default": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "cooldown_days": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cooldown Days"
+        },
+        "always_ask_first": {
+          "default": false,
+          "title": "Always Ask First",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "board_type",
+        "board_slug"
+      ],
+      "title": "KitWatchedEmployer",
+      "type": "object"
+    },
+    "LimitRule": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "limit",
+          "default": "limit",
+          "title": "Type",
+          "type": "string"
+        },
+        "document": {
+          "enum": [
+            "cv",
+            "letter",
+            "email"
+          ],
+          "title": "Document",
+          "type": "string"
+        },
+        "pages": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pages"
+        },
+        "paragraphs": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paragraphs"
+        }
+      },
+      "required": [
+        "document"
+      ],
+      "title": "LimitRule",
+      "type": "object"
+    },
+    "LocationRule": {
+      "additionalProperties": false,
+      "properties": {
+        "place": {
+          "title": "Place",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "allow",
+            "deny",
+            "priority"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "place",
+        "kind"
+      ],
+      "title": "LocationRule",
+      "type": "object"
+    },
+    "NeverMention": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "never_mention",
+          "default": "never_mention",
+          "title": "Type",
+          "type": "string"
+        },
+        "terms": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Terms",
+          "type": "array"
+        },
+        "regex": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Regex",
+          "type": "array"
+        }
+      },
+      "title": "NeverMention",
+      "type": "object"
+    },
+    "NeverTogether": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "never_together",
+          "default": "never_together",
+          "title": "Type",
+          "type": "string"
+        },
+        "group_a": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Group A",
+          "type": "array"
+        },
+        "group_b": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Group B",
+          "type": "array"
+        }
+      },
+      "required": [
+        "group_a",
+        "group_b"
+      ],
+      "title": "NeverTogether",
+      "type": "object"
+    },
+    "OmitField": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "omit_field",
+          "default": "omit_field",
+          "title": "Type",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fields"
+      ],
+      "title": "OmitField",
+      "type": "object"
+    },
+    "PayFloor": {
+      "additionalProperties": false,
+      "properties": {
+        "employment_type": {
+          "enum": [
+            "permanent",
+            "fixed_term",
+            "contract",
+            "eor"
+          ],
+          "title": "Employment Type",
+          "type": "string"
+        },
+        "amount_minor": {
+          "minimum": 0,
+          "title": "Amount Minor",
+          "type": "integer"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "title": "Currency",
+          "type": "string"
+        },
+        "period": {
+          "default": "year",
+          "enum": [
+            "year",
+            "month",
+            "week",
+            "day",
+            "hour"
+          ],
+          "title": "Period",
+          "type": "string"
+        }
+      },
+      "required": [
+        "employment_type",
+        "amount_minor",
+        "currency"
+      ],
+      "title": "PayFloor",
+      "type": "object"
+    },
+    "PersonField": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "title": "Value",
+          "type": "string"
+        },
+        "visibility": {
+          "default": "show_on_cv",
+          "enum": [
+            "show_on_cv",
+            "forms_only",
+            "hidden"
+          ],
+          "title": "Visibility",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "title": "PersonField",
+      "type": "object"
+    },
+    "Positioning": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "positioning",
+          "default": "positioning",
+          "title": "Type",
+          "type": "string"
+        },
+        "instruction": {
+          "title": "Instruction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "instruction"
+      ],
+      "title": "Positioning",
+      "type": "object"
+    },
+    "RangeFilter": {
+      "additionalProperties": false,
+      "description": "Numeric range on a facet (years asked, pay, posted age). ``not_stated`` says what a\nmissing value does: ``exclude`` (default) fails the record, ``include`` passes it.",
+      "properties": {
+        "type": {
+          "const": "range",
+          "default": "range",
+          "title": "Type",
+          "type": "string"
+        },
+        "facet": {
+          "minLength": 1,
+          "title": "Facet",
+          "type": "string"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "not_stated": {
+          "default": "exclude",
+          "enum": [
+            "include",
+            "exclude"
+          ],
+          "title": "Not Stated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "facet"
+      ],
+      "title": "RangeFilter",
+      "type": "object"
+    },
+    "RateLimit": {
+      "additionalProperties": false,
+      "properties": {
+        "requests_per_minute": {
+          "default": 30,
+          "minimum": 1,
+          "title": "Requests Per Minute",
+          "type": "integer"
+        },
+        "burst": {
+          "default": 5,
+          "minimum": 1,
+          "title": "Burst",
+          "type": "integer"
+        }
+      },
+      "title": "RateLimit",
+      "type": "object"
+    },
+    "Reframe": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "reframe",
+          "default": "reframe",
+          "title": "Type",
+          "type": "string"
+        },
+        "prefer": {
+          "title": "Prefer",
+          "type": "string"
+        },
+        "over": {
+          "title": "Over",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prefer",
+        "over"
+      ],
+      "title": "Reframe",
+      "type": "object"
+    },
+    "RequireWording": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "require_wording",
+          "default": "require_wording",
+          "title": "Type",
+          "type": "string"
+        },
+        "use": {
+          "title": "Use",
+          "type": "string"
+        },
+        "instead_of": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Instead Of",
+          "type": "array"
+        }
+      },
+      "required": [
+        "use",
+        "instead_of"
+      ],
+      "title": "RequireWording",
+      "type": "object"
+    },
+    "RubricBody": {
+      "additionalProperties": false,
+      "properties": {
+        "criteria": {
+          "items": {
+            "$ref": "#/$defs/RubricCriterion"
+          },
+          "title": "Criteria",
+          "type": "array"
+        },
+        "penalties": {
+          "items": {
+            "$ref": "#/$defs/RubricPenalty"
+          },
+          "title": "Penalties",
+          "type": "array"
+        },
+        "thresholds": {
+          "$ref": "#/$defs/RubricThresholds"
+        }
+      },
+      "required": [
+        "criteria"
+      ],
+      "title": "RubricBody",
+      "type": "object"
+    },
+    "RubricCriterion": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "weight": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Weight",
+          "type": "integer"
+        },
+        "anchors": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "propertyNames": {
+            "enum": [
+              "0",
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ]
+          },
+          "title": "Anchors",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "weight"
+      ],
+      "title": "RubricCriterion",
+      "type": "object"
+    },
+    "RubricPenalty": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "points": {
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Points",
+          "type": "integer"
+        },
+        "conditions": {
+          "$ref": "#/$defs/ConditionSet"
+        }
+      },
+      "required": [
+        "name",
+        "points",
+        "conditions"
+      ],
+      "title": "RubricPenalty",
+      "type": "object"
+    },
+    "RubricThresholds": {
+      "additionalProperties": false,
+      "properties": {
+        "shortlist": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Shortlist"
+        },
+        "tailor": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tailor"
+        },
+        "auto_apply": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Auto Apply"
+        }
+      },
+      "title": "RubricThresholds",
+      "type": "object"
+    },
+    "SavedViewBody": {
+      "additionalProperties": false,
+      "properties": {
+        "conditions": {
+          "$ref": "#/$defs/ConditionSet"
+        },
+        "group_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group By"
+        },
+        "sort": {
+          "items": {
+            "$ref": "#/$defs/SortSpec"
+          },
+          "title": "Sort",
+          "type": "array"
+        },
+        "scope": {
+          "default": "matches",
+          "enum": [
+            "matches",
+            "applications"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "title": "SavedViewBody",
+      "type": "object"
+    },
+    "ScoreRamp": {
+      "additionalProperties": false,
+      "properties": {
+        "low": {
+          "title": "Low",
+          "type": "string"
+        },
+        "mid": {
+          "title": "Mid",
+          "type": "string"
+        },
+        "high": {
+          "title": "High",
+          "type": "string"
+        }
+      },
+      "required": [
+        "low",
+        "mid",
+        "high"
+      ],
+      "title": "ScoreRamp",
+      "type": "object"
+    },
+    "SortSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "direction": {
+          "default": "desc",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "SortSpec",
+      "type": "object"
+    },
+    "TemplateLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "pages": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pages"
+        },
+        "paragraphs": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Paragraphs"
+        },
+        "bullets_per_role": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bullets Per Role"
+        }
+      },
+      "title": "TemplateLimits",
+      "type": "object"
+    },
+    "TextFilter": {
+      "additionalProperties": false,
+      "description": "Case-insensitive substring search over the named fields (all words must appear).",
+      "properties": {
+        "type": {
+          "const": "text",
+          "default": "text",
+          "title": "Type",
+          "type": "string"
+        },
+        "query": {
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "TextFilter",
+      "type": "object"
+    },
+    "ThemeFonts": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "title": "Display",
+          "type": "string"
+        },
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "mono": {
+          "title": "Mono",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "required": [
+        "display",
+        "body",
+        "mono"
+      ],
+      "title": "ThemeFonts",
+      "type": "object"
+    },
+    "TitleSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "start": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "end": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "TitleSpan",
+      "type": "object"
+    },
+    "UnknownDataPolicy": {
+      "additionalProperties": false,
+      "description": "None means: use the global setting (scoring.unknown_*).",
+      "properties": {
+        "pay": {
+          "anyOf": [
+            {
+              "enum": [
+                "review",
+                "pass_with_penalty",
+                "pass_blocks_auto",
+                "fail"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay"
+        },
+        "eligibility": {
+          "anyOf": [
+            {
+              "enum": [
+                "review",
+                "pass_with_penalty",
+                "pass_blocks_auto",
+                "fail"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eligibility"
+        },
+        "deadline": {
+          "anyOf": [
+            {
+              "enum": [
+                "review",
+                "pass_with_penalty",
+                "pass_blocks_auto",
+                "fail"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Deadline"
+        }
+      },
+      "title": "UnknownDataPolicy",
+      "type": "object"
+    },
+    "ValueFilter": {
+      "additionalProperties": false,
+      "description": "A facet chip set: include values, exclude values, ``any``/``all`` within the facet.",
+      "properties": {
+        "type": {
+          "const": "values",
+          "default": "values",
+          "title": "Type",
+          "type": "string"
+        },
+        "facet": {
+          "minLength": 1,
+          "title": "Facet",
+          "type": "string"
+        },
+        "include": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Include",
+          "type": "array"
+        },
+        "exclude": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Exclude",
+          "type": "array"
+        },
+        "match": {
+          "default": "any",
+          "enum": [
+            "any",
+            "all"
+          ],
+          "title": "Match",
+          "type": "string"
+        }
+      },
+      "required": [
+        "facet"
+      ],
+      "title": "ValueFilter",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "kind": {
+      "enum": [
+        "share_setup",
+        "personal_backup"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "exported_at": {
+      "format": "date-time",
+      "title": "Exported At",
+      "type": "string"
+    },
+    "app_version": {
+      "title": "App Version",
+      "type": "string"
+    },
+    "person": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/KitPerson"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "experiences": {
+      "items": {
+        "$ref": "#/$defs/KitExperience"
+      },
+      "title": "Experiences",
+      "type": "array"
+    },
+    "facts": {
+      "items": {
+        "$ref": "#/$defs/KitFact"
+      },
+      "title": "Facts",
+      "type": "array"
+    },
+    "skills": {
+      "items": {
+        "$ref": "#/$defs/KitSkill"
+      },
+      "title": "Skills",
+      "type": "array"
+    },
+    "references": {
+      "items": {
+        "$ref": "#/$defs/KitReference"
+      },
+      "title": "References",
+      "type": "array"
+    },
+    "tracks": {
+      "items": {
+        "$ref": "#/$defs/KitTrack"
+      },
+      "title": "Tracks",
+      "type": "array"
+    },
+    "guardrails": {
+      "items": {
+        "$ref": "#/$defs/KitGuardrail"
+      },
+      "title": "Guardrails",
+      "type": "array"
+    },
+    "answers": {
+      "items": {
+        "$ref": "#/$defs/KitAnswer"
+      },
+      "title": "Answers",
+      "type": "array"
+    },
+    "vault": {
+      "items": {
+        "$ref": "#/$defs/KitVaultDocument"
+      },
+      "title": "Vault",
+      "type": "array"
+    },
+    "templates": {
+      "items": {
+        "$ref": "#/$defs/KitTemplate"
+      },
+      "title": "Templates",
+      "type": "array"
+    },
+    "prompts": {
+      "items": {
+        "$ref": "#/$defs/KitPrompt"
+      },
+      "title": "Prompts",
+      "type": "array"
+    },
+    "rubrics": {
+      "items": {
+        "$ref": "#/$defs/KitRubric"
+      },
+      "title": "Rubrics",
+      "type": "array"
+    },
+    "campaigns": {
+      "items": {
+        "$ref": "#/$defs/KitCampaign"
+      },
+      "title": "Campaigns",
+      "type": "array"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/KitSource"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "watched_employers": {
+      "items": {
+        "$ref": "#/$defs/KitWatchedEmployer"
+      },
+      "title": "Watched Employers",
+      "type": "array"
+    },
+    "employer_aliases": {
+      "items": {
+        "$ref": "#/$defs/KitAlias"
+      },
+      "title": "Employer Aliases",
+      "type": "array"
+    },
+    "skill_aliases": {
+      "items": {
+        "$ref": "#/$defs/KitAlias"
+      },
+      "title": "Skill Aliases",
+      "type": "array"
+    },
+    "tag_rules": {
+      "items": {
+        "$ref": "#/$defs/KitTagRule"
+      },
+      "title": "Tag Rules",
+      "type": "array"
+    },
+    "custom_facets": {
+      "items": {
+        "$ref": "#/$defs/KitCustomFacet"
+      },
+      "title": "Custom Facets",
+      "type": "array"
+    },
+    "saved_views": {
+      "items": {
+        "$ref": "#/$defs/KitSavedView"
+      },
+      "title": "Saved Views",
+      "type": "array"
+    },
+    "themes": {
+      "items": {
+        "$ref": "#/$defs/KitTheme"
+      },
+      "title": "Themes",
+      "type": "array"
+    },
+    "history": {
+      "items": {
+        "$ref": "#/$defs/KitHistoryItem"
+      },
+      "title": "History",
+      "type": "array"
+    }
+  },
+  "required": [
+    "kind",
+    "exported_at",
+    "app_version"
+  ],
+  "title": "KitFile",
+  "type": "object"
+}

@@ -1,0 +1,72 @@
+# Local stack: PostgreSQL 16, a one-shot migration, web (API + SPA) and worker.
+#   cp .env.example .env    # optional locally; set real secrets for anything but a trial
+#   docker compose up -d --build
+#   open http://localhost:8000
+name: nchito
+
+x-app: &app
+  build: .
+  restart: unless-stopped
+  environment: &app-env
+    ENVIRONMENT: ${ENVIRONMENT:-development}
+    DATABASE_URL: postgresql://nchito:${POSTGRES_PASSWORD:-nchito}@db:5432/nchito
+    SECRET_KEY: ${SECRET_KEY:-local-dev-secret-change-me}
+    ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+    BASE_URL: ${BASE_URL:-http://localhost:8000}
+    APP_NAME: ${APP_NAME:-Nchito}
+    FILES_DIR: /data/files
+    LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  volumes:
+    - files:/data/files
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nchito
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nchito}
+      POSTGRES_DB: nchito
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nchito -d nchito"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *app
+    restart: "no"
+    command: ["nchito", "migrate"]
+    healthcheck:
+      disable: true
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    <<: *app
+    command: ["nchito", "web"]
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  worker:
+    <<: *app
+    command: ["nchito", "worker"]
+    healthcheck:
+      test: ["CMD", "nchito", "worker-alive"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:
+  files:

@@ -1,0 +1,156 @@
+{
+  "$defs": {
+    "ScoreRamp": {
+      "additionalProperties": false,
+      "properties": {
+        "low": {
+          "title": "Low",
+          "type": "string"
+        },
+        "mid": {
+          "title": "Mid",
+          "type": "string"
+        },
+        "high": {
+          "title": "High",
+          "type": "string"
+        }
+      },
+      "required": [
+        "low",
+        "mid",
+        "high"
+      ],
+      "title": "ScoreRamp",
+      "type": "object"
+    },
+    "ThemeFonts": {
+      "additionalProperties": false,
+      "properties": {
+        "display": {
+          "title": "Display",
+          "type": "string"
+        },
+        "body": {
+          "title": "Body",
+          "type": "string"
+        },
+        "mono": {
+          "title": "Mono",
+          "type": "string"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        }
+      },
+      "required": [
+        "display",
+        "body",
+        "mono"
+      ],
+      "title": "ThemeFonts",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "fonts": {
+      "$ref": "#/$defs/ThemeFonts"
+    },
+    "radius": {
+      "description": "Base radius in px; small/large derive from it",
+      "maximum": 32,
+      "minimum": 0,
+      "title": "Radius",
+      "type": "integer"
+    },
+    "density": {
+      "enum": [
+        "comfortable",
+        "compact"
+      ],
+      "title": "Density",
+      "type": "string"
+    },
+    "light": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Light",
+      "type": "object"
+    },
+    "dark": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Dark",
+      "type": "object"
+    },
+    "chart": {
+      "description": "Light-mode palette; fallback for chart-n",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 12,
+      "minItems": 1,
+      "title": "Chart",
+      "type": "array"
+    },
+    "score": {
+      "$ref": "#/$defs/ScoreRamp",
+      "description": "Light-mode ramp; fallback for score-*"
+    }
+  },
+  "required": [
+    "name",
+    "fonts",
+    "radius",
+    "density",
+    "light",
+    "dark",
+    "chart",
+    "score"
+  ],
+  "title": "ThemeBody",
+  "type": "object"
+}

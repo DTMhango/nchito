@@ -1,0 +1,15 @@
+/*
+ * Theme-independent document tokens. A CV or letter preview is a printed page,
+ * so it stays white paper with dark ink in every theme and mode.
+ * This file lives in src/themes/ because it is the one place literal colours may appear.
+ */
+:root {
+  --paper: #ffffff;
+  --paper-ink: #1b1d21;
+  --paper-muted: #5a5f69;
+  --paper-rule: #d8dadf;
+  --paper-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.18), 0 12px 32px -12px rgba(0, 0, 0, 0.35);
+  --paper-font-body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --paper-font-display: "Newsreader Variable", "Newsreader", Georgia, serif;
+}

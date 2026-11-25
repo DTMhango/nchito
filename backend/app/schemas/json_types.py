@@ -1,0 +1,446 @@
+"""Pydantic shapes for every JSONB column. Columns use ``PydanticJSON(<model>)`` so a bad
+shape is rejected on write and a stored value loads back as the model."""
+
+from __future__ import annotations
+
+from typing import Annotated, Any, Generic, Literal, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.core.conditions import CampaignRule, ConditionSet
+
+T = TypeVar("T")
+
+
+class Shape(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+YesNo = Literal["yes", "no", "not_stated"]
+MoneyPeriod = Literal["year", "month", "week", "day", "hour"]
+UnknownPolicy = Literal["review", "pass_with_penalty", "pass_blocks_auto", "fail"]
+AutomationMode = Literal["save_only", "prepare", "ask_then_apply", "auto_apply"]
+ChannelName = Literal["email", "browser", "manual"]
+
+
+# ----- Job facets (6.1) ---------------------------------------------------------------------
+
+
+class Evidenced(Shape, Generic[T]):
+    """A facet value with the sentence from the posting that supports it."""
+
+    value: T
+    evidence: str | None = None
+
+
+class WhereMustLive(Shape):
+    kind: Literal["places", "anywhere", "not_stated"] = "not_stated"
+    places: list[str] = Field(default_factory=list)
+
+
+class TimezoneOverlap(Shape):
+    hours: float | None = None
+    zone: str | None = None
+
+
+class Education(Shape):
+    level: Literal["none_stated", "bachelors", "masters", "doctorate"] = "none_stated"
+    required: bool = False
+
+
+class JobFacets(Shape):
+    relocation_required: Evidenced[YesNo] = Field(default_factory=lambda: Evidenced[YesNo](value="not_stated"))
+    visa_sponsorship: Evidenced[YesNo] = Field(default_factory=lambda: Evidenced[YesNo](value="not_stated"))
+    relocation_assistance: Evidenced[YesNo] = Field(default_factory=lambda: Evidenced[YesNo](value="not_stated"))
+    needs_account: Evidenced[YesNo] = Field(default_factory=lambda: Evidenced[YesNo](value="not_stated"))
+    work_model: Evidenced[Literal["on_site", "hybrid", "remote", "not_stated"]] | None = None
+    remote_scope: Evidenced[Literal["worldwide", "regions", "country_only", "not_stated"]] | None = None
+    remote_regions: list[str] = Field(default_factory=list)
+    where_must_live: Evidenced[WhereMustLive] | None = None
+    work_rights: Evidenced[Literal["existing_right_required", "sponsorship_possible", "not_stated"]] | None = None
+    timezone_overlap: Evidenced[TimezoneOverlap] | None = None
+    hiring_arrangement: Evidenced[Literal["employee", "contractor", "eor", "not_stated"]] | None = None
+    employment_type: Evidenced[Literal["permanent", "fixed_term", "contract", "eor", "not_stated"]] | None = None
+    required_skills: list[str] = Field(default_factory=list)
+    preferred_skills: list[str] = Field(default_factory=list)
+    min_education: Evidenced[Education] | None = None
+    required_qualifications: list[str] = Field(default_factory=list)
+    years_experience: Evidenced[int | None] | None = None
+    languages: list[str] = Field(default_factory=list)
+    travel_percent: Evidenced[int | None] | None = None
+    industry: str | None = None
+
+
+class CustomFacetValue(Shape):
+    value: YesNo
+    evidence: str | None = None
+    model: str | None = None
+
+
+class StructuredLocation(Shape):
+    country: str | None = None
+    region: str | None = None
+    city: str | None = None
+    raw: str | None = None
+
+
+class Requirement(Shape):
+    text: str
+    kind: Literal["required", "preferred"] = "required"
+    skill: str | None = None
+
+
+# ----- Campaign ---------------------------------------------------------------------------
+
+
+class LocationRule(Shape):
+    place: str
+    kind: Literal["allow", "deny", "priority"]
+
+
+class PayFloor(Shape):
+    employment_type: Literal["permanent", "fixed_term", "contract", "eor"]
+    amount_minor: int = Field(ge=0)
+    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    period: MoneyPeriod = "year"
+
+
+class CampaignCriteria(Shape):
+    titles: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
+    rules: list[CampaignRule] = Field(default_factory=list)
+    locations: list[LocationRule] = Field(default_factory=list)
+    work_models: list[Literal["on_site", "hybrid", "remote"]] = Field(default_factory=list)
+    seniority: list[str] = Field(default_factory=list)
+    pay_floors: list[PayFloor] = Field(default_factory=list)
+    deprioritise_themes: list[str] = Field(default_factory=list)
+
+
+class UnknownDataPolicy(Shape):
+    """None means: use the global setting (scoring.unknown_*)."""
+
+    pay: UnknownPolicy | None = None
+    eligibility: UnknownPolicy | None = None
+    deadline: UnknownPolicy | None = None
+
+
+class AutomationPolicy(Shape):
+    mode: AutomationMode = "prepare"
+    per_channel: dict[ChannelName, AutomationMode] = Field(default_factory=dict)
+
+
+class CampaignBudget(Shape):
+    monthly_cap_minor: int | None = Field(default=None, ge=0)
+    per_run_cap_minor: int | None = Field(default=None, ge=0)
+
+
+# ----- Rubric -----------------------------------------------------------------------------
+
+
+class RubricCriterion(Shape):
+    name: str
+    weight: int = Field(ge=0, le=100)
+    anchors: dict[Literal["0", "1", "2", "3", "4", "5"], str] = Field(default_factory=dict)
+
+
+class RubricPenalty(Shape):
+    name: str
+    points: int = Field(ge=1, le=100)
+    conditions: ConditionSet
+
+
+class RubricThresholds(Shape):
+    shortlist: int | None = Field(default=None, ge=0, le=100)
+    tailor: int | None = Field(default=None, ge=0, le=100)
+    auto_apply: int | None = Field(default=None, ge=0, le=100)
+
+
+class RubricBody(Shape):
+    criteria: list[RubricCriterion]
+    penalties: list[RubricPenalty] = Field(default_factory=list)
+    thresholds: RubricThresholds = Field(default_factory=RubricThresholds)
+
+    @model_validator(mode="after")
+    def _weights(self) -> RubricBody:
+        if sum(c.weight for c in self.criteria) != 100:
+            raise ValueError("rubric weights must sum to 100")
+        return self
+
+
+# ----- Sources ----------------------------------------------------------------------------
+
+
+class RateLimit(Shape):
+    requests_per_minute: int = Field(default=30, ge=1)
+    burst: int = Field(default=5, ge=1)
+
+
+class SourceHealth(Shape):
+    status: Literal["ok", "degraded", "failing", "unknown"] = "unknown"
+    consecutive_failures: int = 0
+    last_error: str | None = None
+
+
+# ----- Assessment -------------------------------------------------------------------------
+
+
+class FilterResult(Shape):
+    name: str
+    result: Literal["pass", "fail", "unknown"]
+    reason: str
+    mandatory: bool = True
+
+
+class CriterionRating(Shape):
+    criterion: str
+    rating: int = Field(ge=0, le=5)
+    evidence_fact_ids: list[str] = Field(default_factory=list)
+    note: str | None = None
+
+
+class Override(Shape):
+    by: str
+    reason: str
+    at: str
+    score: int | None = None
+
+
+# ----- Run --------------------------------------------------------------------------------
+
+
+class SourceRunResult(Shape):
+    source_id: str
+    status: Literal["ok", "failed", "skipped"]
+    found: int = 0
+    new: int = 0
+    error: str | None = None
+
+
+# ----- Applications -----------------------------------------------------------------------
+
+
+class SpecItem(Shape):
+    text: str
+    fact_ids: list[str] = Field(default_factory=list)
+
+
+class SpecExperience(Shape):
+    experience_id: str
+    title: str | None = None
+    bullets: list[SpecItem] = Field(default_factory=list)
+
+
+class RequirementMatch(Shape):
+    requirement: str
+    strength: Literal["strong", "partial", "gap"]
+    evidence_fact_ids: list[str] = Field(default_factory=list)
+    note: str | None = None
+
+
+class ApplicationSpec(Shape):
+    headline: SpecItem | None = None
+    summary: SpecItem | None = None
+    competencies: list[SpecItem] = Field(default_factory=list)
+    experience: list[SpecExperience] = Field(default_factory=list)
+    skills: list[str] = Field(default_factory=list)
+    letter: list[SpecItem] = Field(default_factory=list)
+    requirement_match: list[RequirementMatch] = Field(default_factory=list)
+
+
+class CheckResult(Shape):
+    check: str
+    status: Literal["pass", "warn", "block"]
+    detail: str | None = None
+    guardrail_id: str | None = None
+    waived: bool = False
+
+
+class GateResult(Shape):
+    gate: str
+    passed: bool
+    detail: str | None = None
+
+
+class PacketDestination(Shape):
+    url: str
+    domain: str
+    verified: bool = False
+    trusted: bool = False
+
+
+class PacketAnswer(Shape):
+    question: str
+    value: str
+    answer_id: str | None = None
+    material: bool = False
+
+
+class PacketEmail(Shape):
+    to: list[str]
+    cc: list[str] = Field(default_factory=list)
+    subject: str
+    body: str
+
+
+class PacketFile(Shape):
+    name: str
+    kind: Literal["cv", "letter", "vault", "other"]
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    document_id: str | None = None
+    share_link: str | None = None
+
+
+class PacketContents(Shape):
+    """Everything an approval or permit binds to (18.2). Hashed canonically."""
+
+    requisition: str | None = None
+    destination: PacketDestination
+    sending_identity: str
+    answers: list[PacketAnswer] = Field(default_factory=list)
+    email: PacketEmail | None = None
+    files: list[PacketFile] = Field(default_factory=list)
+    link_permissions: list[str] = Field(default_factory=list)
+
+
+class SubmittedSnapshot(Shape):
+    packet_hash: str
+    files: list[PacketFile]
+    answers: list[PacketAnswer]
+    submitted_at: str
+
+
+class Evidence(Shape):
+    kind: Literal["confirmation_page", "reference", "sent_mail_id", "confirmation_email", "owner_marked"]
+    value: str
+    screenshot_ref: str | None = None
+    at: str | None = None
+
+
+# ----- Kit --------------------------------------------------------------------------------
+
+FieldVisibility = Literal["show_on_cv", "forms_only", "hidden"]
+
+
+class PersonField(Shape):
+    value: str
+    visibility: FieldVisibility = "show_on_cv"
+
+
+class TitleSpan(Shape):
+    title: str
+    start: str | None = None  # ISO date or YYYY-MM
+    end: str | None = None
+
+
+class AnswerPatterns(Shape):
+    canonical: str
+    variants: list[str] = Field(default_factory=list)
+
+
+class TemplateLimits(Shape):
+    pages: int | None = Field(default=None, ge=1)
+    paragraphs: int | None = Field(default=None, ge=1)
+    bullets_per_role: int | None = Field(default=None, ge=1)
+
+
+# Guardrail parameters, one shape per type (5.3).
+class NeverMention(Shape):
+    type: Literal["never_mention"] = "never_mention"
+    terms: list[str] = Field(default_factory=list)
+    regex: list[str] = Field(default_factory=list)
+
+
+class NeverTogether(Shape):
+    type: Literal["never_together"] = "never_together"
+    group_a: list[str]
+    group_b: list[str]
+
+
+class RequireWording(Shape):
+    type: Literal["require_wording"] = "require_wording"
+    use: str
+    instead_of: list[str]
+
+
+class Reframe(Shape):
+    type: Literal["reframe"] = "reframe"
+    prefer: str
+    over: str
+
+
+class OmitField(Shape):
+    type: Literal["omit_field"] = "omit_field"
+    fields: list[str]
+
+
+class FormatRule(Shape):
+    type: Literal["format"] = "format"
+    rule: str
+    params: dict[str, str | int | float] = Field(default_factory=dict)
+
+
+class Positioning(Shape):
+    type: Literal["positioning"] = "positioning"
+    instruction: str
+
+
+class LimitRule(Shape):
+    type: Literal["limit"] = "limit"
+    document: Literal["cv", "letter", "email"]
+    pages: int | None = None
+    paragraphs: int | None = None
+
+
+class AttachPolicy(Shape):
+    type: Literal["attach_policy"] = "attach_policy"
+    document_type: str
+    when: Literal["never", "when_asked", "after_offer"]
+
+
+GuardrailParams = Annotated[
+    NeverMention | NeverTogether | RequireWording | Reframe | OmitField | FormatRule | Positioning
+    | LimitRule | AttachPolicy,
+    Field(discriminator="type"),
+]
+
+
+# ----- Views, rules, platform -------------------------------------------------------------
+
+
+class SortSpec(Shape):
+    field: str
+    direction: Literal["asc", "desc"] = "desc"
+
+
+class SavedViewBody(Shape):
+    conditions: ConditionSet = Field(default_factory=ConditionSet)
+    group_by: str | None = None
+    sort: list[SortSpec] = Field(default_factory=list)
+    scope: Literal["matches", "applications"] = "matches"
+
+
+class ThemeFonts(Shape):
+    display: str
+    body: str
+    mono: str
+    data: str | None = None
+    label: str | None = None
+
+
+class ScoreRamp(Shape):
+    low: str
+    mid: str
+    high: str
+
+
+class AgentTaskState(Shape):
+    """Checkpoint saved by a runner. Free-form fields go in ``data``."""
+
+    step: str | None = None
+    fields_filled: list[str] = Field(default_factory=list)
+    screenshot_ref: str | None = None
+    url: str | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+JsonDict = dict[str, Any]

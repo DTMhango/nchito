@@ -1,0 +1,230 @@
+{
+  "$defs": {
+    "Group": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "group",
+          "default": "group",
+          "title": "Type",
+          "type": "string"
+        },
+        "op": {
+          "default": "and",
+          "enum": [
+            "and",
+            "or"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "negate": {
+          "default": false,
+          "title": "Negate",
+          "type": "boolean"
+        },
+        "conditions": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "group": "#/$defs/Group",
+                "range": "#/$defs/RangeFilter",
+                "text": "#/$defs/TextFilter",
+                "values": "#/$defs/ValueFilter"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ValueFilter"
+              },
+              {
+                "$ref": "#/$defs/RangeFilter"
+              },
+              {
+                "$ref": "#/$defs/TextFilter"
+              },
+              {
+                "$ref": "#/$defs/Group"
+              }
+            ]
+          },
+          "title": "Conditions",
+          "type": "array"
+        }
+      },
+      "title": "Group",
+      "type": "object"
+    },
+    "RangeFilter": {
+      "additionalProperties": false,
+      "description": "Numeric range on a facet (years asked, pay, posted age). ``not_stated`` says what a\nmissing value does: ``exclude`` (default) fails the record, ``include`` passes it.",
+      "properties": {
+        "type": {
+          "const": "range",
+          "default": "range",
+          "title": "Type",
+          "type": "string"
+        },
+        "facet": {
+          "minLength": 1,
+          "title": "Facet",
+          "type": "string"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "not_stated": {
+          "default": "exclude",
+          "enum": [
+            "include",
+            "exclude"
+          ],
+          "title": "Not Stated",
+          "type": "string"
+        }
+      },
+      "required": [
+        "facet"
+      ],
+      "title": "RangeFilter",
+      "type": "object"
+    },
+    "TextFilter": {
+      "additionalProperties": false,
+      "description": "Case-insensitive substring search over the named fields (all words must appear).",
+      "properties": {
+        "type": {
+          "const": "text",
+          "default": "text",
+          "title": "Type",
+          "type": "string"
+        },
+        "query": {
+          "minLength": 1,
+          "title": "Query",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "title": "TextFilter",
+      "type": "object"
+    },
+    "ValueFilter": {
+      "additionalProperties": false,
+      "description": "A facet chip set: include values, exclude values, ``any``/``all`` within the facet.",
+      "properties": {
+        "type": {
+          "const": "values",
+          "default": "values",
+          "title": "Type",
+          "type": "string"
+        },
+        "facet": {
+          "minLength": 1,
+          "title": "Facet",
+          "type": "string"
+        },
+        "include": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Include",
+          "type": "array"
+        },
+        "exclude": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "title": "Exclude",
+          "type": "array"
+        },
+        "match": {
+          "default": "any",
+          "enum": [
+            "any",
+            "all"
+          ],
+          "title": "Match",
+          "type": "string"
+        }
+      },
+      "required": [
+        "facet"
+      ],
+      "title": "ValueFilter",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Root of a filter: facets combine with AND (the default), free text alongside.",
+  "properties": {
+    "version": {
+      "const": 1,
+      "default": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "root": {
+      "$ref": "#/$defs/Group"
+    }
+  },
+  "title": "ConditionSet",
+  "type": "object"
+}

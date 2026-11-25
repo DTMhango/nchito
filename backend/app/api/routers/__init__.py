@@ -1,0 +1,41 @@
+"""All API routers, in registration order."""
+
+from fastapi import APIRouter
+
+from app.api.routers import (
+    applications,
+    assessments,
+    auth,
+    campaigns,
+    connections,
+    data,
+    insights,
+    jobs,
+    kit,
+    pending_actions,
+    runs,
+    settings,
+    sources,
+    system,
+    themes,
+)
+
+ALL_ROUTERS: list[APIRouter] = [
+    auth.setup_router,
+    auth.router,
+    settings.router,
+    themes.router,
+    system.router,
+    kit.router,
+    campaigns.router,
+    sources.router,
+    jobs.router,
+    assessments.router,
+    applications.router,
+    pending_actions.router,
+    runs.router,
+    connections.connections_router,
+    connections.tokens_router,
+    insights.router,
+    data.router,
+]

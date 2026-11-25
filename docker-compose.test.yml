@@ -1,0 +1,23 @@
+# Throwaway PostgreSQL for the backend test suite.
+#   docker compose -f docker-compose.test.yml up -d
+# Listens on 127.0.0.1:55442 (non-default, so it never clashes with a local Postgres).
+# Data lives in tmpfs: stopping the container discards it.
+name: nchito-test
+
+services:
+  testdb:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: nchito
+      POSTGRES_PASSWORD: nchito
+      POSTGRES_DB: nchito_test
+    command: ["postgres", "-c", "fsync=off", "-c", "full_page_writes=off", "-c", "max_connections=300"]
+    ports:
+      - "127.0.0.1:55442:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nchito -d nchito_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
