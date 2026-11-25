@@ -291,9 +291,16 @@ class JobSighting(Base, Entity):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class AssessmentState(enum.StrEnum):
+    pending = "pending"
+    filtered_out = "filtered_out"
+    scored = "scored"
+    parked = "parked"
+
+
 class Assessment(Base, Entity):
     __tablename__ = "assessment"
-    __table_args__ = (Index("ix_assessment_job_campaign", "job_id", "campaign_id"),)
+    __table_args__ = (UniqueConstraint("job_id", "campaign_id", name="job_campaign"),)
 
     job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("job.id", ondelete="CASCADE"), nullable=False)
     campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campaign.id", ondelete="CASCADE"), nullable=False)
@@ -303,6 +310,11 @@ class Assessment(Base, Entity):
                                                                default=list)
     ratings: Mapped[list[CriterionRating]] = mapped_column(PydanticJSON(list[CriterionRating]), nullable=False,
                                                            default=list)
+    state: Mapped[AssessmentState] = mapped_column(str_enum(AssessmentState), nullable=False,
+                                                   default=AssessmentState.pending,
+                                                   doc="filtered_out: failed a hard filter, never scored; "
+                                                       "parked: budget exhausted, resumable")
+    base_score: Mapped[int | None] = mapped_column(Integer, doc="Rubric score before campaign adjustments")
     score: Mapped[int | None] = mapped_column(Integer)
     gaps: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     model: Mapped[str | None] = mapped_column(String(128))
