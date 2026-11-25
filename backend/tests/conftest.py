@@ -19,7 +19,7 @@ import pytest
 
 ADMIN_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://nchito:nchito@127.0.0.1:55442/nchito_test")
 WORKER = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
-DB_NAME = f"nchito_t_{WORKER}"
+DB_NAME = f"nchito_t_{WORKER}{os.environ.get('TEST_DB_SUFFIX', '')}"
 BASE = ADMIN_URL.rsplit("/", 1)[0]
 TEST_DB_URL = f"{BASE}/{DB_NAME}"
 
