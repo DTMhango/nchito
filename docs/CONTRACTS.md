@@ -126,6 +126,8 @@ data)` inside their transaction; the event is delivered only after commit (Postg
 |---|---|---|
 | `settings.changed` | `{key, version}` | settings service |
 | `run.started` / `run.finished` | `{run_id[, status]}` | worker |
+| `spend.updated` | `{stage}` | ledger (every reservation and closing row; the spend meter refetches `GET /api/ai/spend/meter`) |
+| `budget.warning` / `budget.exhausted` | `{month, ...}` (`scope` on exhausted) | ledger, at most once per month each |
 | (wave 1+) `job.created`, `job.updated`, `assessment.updated`, `pending_action.created`, `pending_action.resolved`, `application.updated`, `dispatch.updated`, `notification.created` | `{<entity>_id, ...}` | owning stream |
 
 New event names follow `<entity>.<past tense verb>` and are added to this table.
@@ -133,7 +135,7 @@ New event names follow `<entity>.<past tense verb>` and are added to this table.
 ## 4. Settings registry
 
 `backend/app/core/settings/registry.py` is the **only** place a business setting and its
-default exist. 72 settings in groups `general, appearance, schedule, scoring, matching,
+default exist. 77 settings in groups `general, appearance, schedule, scoring, matching,
 automation, answers, reconcile, ai, budget, documents, retention, backups, notifications,
 runners`. Read them with `await settings_service.values(session)` (one query) or
 `get_value(session, key)`; write with `set_value(session, key, value, actor=..., reason=...)`,
@@ -280,7 +282,7 @@ themselves; nothing else imports a concrete implementation directly.
 |---|---|---|
 | `SourceConnector` | `backend/app/sources/base.py` | `validate_config`, `search(ctx, since) -> list[RawJob]`, `fetch(url) -> RawJob`, `check_open(url) -> open\|closed\|unknown`; class vars `connector, access, default_rate_limit, permitted_actions`; `register_connector`. Read-only, rate limited, failing source never fails a run, unknown stays unknown, network via injected `HttpFetcher` (fixtures in tests) |
 | `Channel` | `backend/app/apply/channels/base.py` | `dispatch(DispatchRequest) -> DispatchOutcome`, `cancel`, `reconcile`; `name`, `enforcement` (server / instructed / owner). Never creates attempts, sends exactly the hashed packet, never resends, evidence required for `sent` |
-| `LLMClient` | `backend/app/llm/client.py` | `complete(stage, messages, schema, *, max_cost_minor, model=None) -> (result, Usage)`, `estimate_cost_minor`. Ledger reservation first, structured output only, untrusted content only in `DataBlock`, no secrets or keep-out facts in prompts, tests use a fake |
+| `LLMClient` | `backend/app/llm/client.py` | `complete(stage, messages, schema, *, max_cost_minor, model=None) -> (result, Usage)`, `estimate_cost_minor`. Ledger reservation first, structured output only, untrusted content only in `DataBlock`, no secrets or keep-out facts in prompts, tests use a fake. Production client: `app.llm.service.LLMService` (`.for_run(run_id)` for the per-run cap). Refusals raise `BudgetExhausted(scope)` (subclass of `BudgetExceeded`; park the work as resumable); route problems raise `LLMConfigError`. Tests import `app.llm.fake.FakeLLMClient`. Stage prompts: `app.llm.prompts.active_prompt(session, stage)`. Score escalation: `app.llm.routing.escalation_model(values, score)`. Untrusted text: `app.llm.untrusted.wrap_untrusted(text, label)` |
 | `Mailbox` | `backend/app/connect/mailbox.py` | `send(OutgoingMail) -> provider id \| None`, `list_messages(since)`, `find_sent(idempotency_key)`, `check()`. Narrowest read, send only from the email channel, no retries, reconcile from sent items |
 | `FileStore` | `backend/app/connect/filestore.py` | `put -> StoredFile(sha256)`, `get`, `delete`, `exists`, `share_link`. App-folder scope, explicit share links recorded in the packet, never deletes duplicate-protection history |
 | `RunHandler` | `backend/app/pipeline/runs.py` | `async (session, run) -> RunStatus`, registered per `RunKind` with `register()`. The worker's `run_pipeline` task calls it; a kind without a handler is recorded `skipped`, never `succeeded`. Idempotent per run; a failed sweep does not move the checkpoint |
