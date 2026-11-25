@@ -5,15 +5,39 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import Select, or_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
-from app.api.crud import add_crud
-from app.api.deps import RequireOwner
+from app.api.deps import Principal, PrincipalDep, RequireOwner, SessionDep
+from app.core import audit
+from app.core.clock import utcnow
 from app.core.conditions import ConditionSet
+from app.core.config import get_config
+from app.core.settings import service as settings_service
+from app.kit import answers as answer_matcher
+from app.kit import crud, guardrails, service, vault
+from app.kit.crud import Resource, add_kit_crud
+from app.models.base import Origin, ReviewState
+from app.models.kit import (
+    Answer,
+    Experience,
+    Fact,
+    FactStatus,
+    Guardrail,
+    Person,
+    Reference,
+    Skill,
+    SkillClaim,
+    Template,
+    Track,
+    VaultDocument,
+)
 from app.schemas.json_types import (
     AnswerPatterns,
     CheckResult,
@@ -26,6 +50,7 @@ from app.schemas.json_types import (
 router = APIRouter(prefix="/api/kit", tags=["kit"], dependencies=[RequireOwner],
                    responses=NOT_IMPLEMENTED_RESPONSES)
 WAVE, AREA = 1, "kit"
+CODE_ENFORCED = frozenset({"never_mention", "never_together", "require_wording", "omit_field", "format", "limit"})
 
 ReviewStateT = Literal["needs_review", "confirmed"]
 OriginT = Literal["import", "owner", "system"]
@@ -264,47 +289,174 @@ class ReviewDecision(BaseModel):
 
 
 @router.get("/person", response_model=PersonOut, name="kit_person_get")
-async def get_person() -> PersonOut:
-    not_implemented(WAVE, AREA)
+async def get_person(session: SessionDep) -> PersonOut:
+    row = await service.get_person(session)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="person not set up yet")
+    return PersonOut.model_validate(row)
 
 
 @router.put("/person", response_model=PersonOut, name="kit_person_put")
-async def put_person(body: PersonIn) -> PersonOut:
-    not_implemented(WAVE, AREA)
+async def put_person(body: PersonIn, principal: PrincipalDep, session: SessionDep) -> PersonOut:
+    row = await service.get_person(session)
+    cols = body.model_dump()
+    if row is None:
+        row = Person(**cols, origin=Origin.owner, review_state=ReviewState.confirmed, confirmed_at=utcnow())
+        session.add(row)
+        action = "kit.person.created"
+    else:
+        for key, value in cols.items():
+            setattr(row, key, value)
+        action = "kit.person.updated"
+    await session.flush()
+    await session.refresh(row)
+    await audit.record(session, actor=principal.actor, action=action, subject_type="person", subject_id=row.id,
+                       detail={"fields": sorted(cols)})
+    return PersonOut.model_validate(row)
 
 
 # ----- library and the rest (CRUD) -------------------------------------------------------
 
-add_crud(router, "/experiences", "kit_experiences", ExperienceIn, ExperienceOut, wave=WAVE, area=AREA)
-add_crud(router, "/facts", "kit_facts", FactIn, FactOut, wave=WAVE, area=AREA, list_params=FactListParams)
-add_crud(router, "/skills", "kit_skills", SkillIn, SkillOut, wave=WAVE, area=AREA)
-add_crud(router, "/references", "kit_references", ReferenceIn, ReferenceOut, wave=WAVE, area=AREA)
-add_crud(router, "/tracks", "kit_tracks", TrackIn, TrackOut, wave=WAVE, area=AREA)
-add_crud(router, "/guardrails", "kit_guardrails", GuardrailIn, GuardrailOut, wave=WAVE, area=AREA)
-add_crud(router, "/answers", "kit_answers", AnswerIn, AnswerOut, wave=WAVE, area=AREA)
-add_crud(router, "/templates", "kit_templates", TemplateIn, TemplateOut, wave=WAVE, area=AREA)
-add_crud(router, "/vault", "kit_vault", VaultDocumentUpdate, VaultDocumentOut, wave=WAVE, area=AREA,
-         ops=("list", "get", "update", "delete"))
+
+async def _fact_on_create(session: AsyncSession, cols: dict[str, Any]) -> None:
+    if cols.get("code") is None:
+        cols["code"] = await service.next_fact_code(session)
+
+
+async def _retire(session: AsyncSession, row: Fact) -> None:
+    """Facts are never deleted: their codes are cited by tracks, packets and the audit trail."""
+    row.status = FactStatus.retired
+
+
+def _fact_filters(stmt: Select[Any], p: FactListParams) -> Select[Any]:
+    if p.status:
+        stmt = stmt.where(Fact.status == p.status)
+    if p.review_state:
+        stmt = stmt.where(Fact.review_state == p.review_state)
+    if p.kind:
+        stmt = stmt.where(Fact.kind == p.kind)
+    if p.tag:
+        stmt = stmt.where(Fact.tags.any(p.tag))
+    if p.track:
+        stmt = stmt.where(Fact.tracks.any(p.track))
+    if p.q:
+        like = f"%{p.q}%"
+        stmt = stmt.where(or_(Fact.text.ilike(like), Fact.code.ilike(like)))
+    return stmt
+
+
+def _guardrail_columns(body: GuardrailIn) -> dict[str, Any]:
+    return {**body.model_dump(), "type": body.params.type}
+
+
+async def _drop_template(session: AsyncSession, row: Template) -> None:
+    if row.builtin:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="built-in templates cannot be deleted")
+    await session.delete(row)
+
+
+async def _drop_vault(session: AsyncSession, row: VaultDocument) -> None:
+    await session.delete(row)
+    await vault.remove(get_config().files_dir, row.file_path)
+
+
+def _res(entity: str, model: Any, m_in: Any, m_out: Any, **kw: Any) -> Resource:
+    return Resource(entity=entity, model=model, model_in=m_in, model_out=m_out, **kw)
+
+
+add_kit_crud(router, "/experiences", "kit_experiences",
+             _res("experience", Experience, ExperienceIn, ExperienceOut,
+                  order_by=(Experience.sort_order, Experience.start_date.desc().nulls_last()),
+                  subject=lambda r: r.org))
+add_kit_crud(router, "/facts", "kit_facts",
+             _res("fact", Fact, FactIn, FactOut, on_create=_fact_on_create,
+                  order_by=(Fact.created_at, Fact.code), delete=_retire, subject=lambda r: r.code),
+             list_params=FactListParams, apply_filters=_fact_filters)
+add_kit_crud(router, "/skills", "kit_skills",
+             _res("skill", Skill, SkillIn, SkillOut, order_by=(Skill.group, Skill.name), subject=lambda r: r.name))
+add_kit_crud(router, "/references", "kit_references",
+             _res("reference", Reference, ReferenceIn, ReferenceOut, order_by=(Reference.name,),
+                  subject=lambda r: r.name))
+add_kit_crud(router, "/tracks", "kit_tracks",
+             _res("track", Track, TrackIn, TrackOut, order_by=(Track.priority.desc(), Track.key),
+                  subject=lambda r: r.key))
+add_kit_crud(router, "/guardrails", "kit_guardrails",
+             _res("guardrail", Guardrail, GuardrailIn, GuardrailOut, to_columns=_guardrail_columns,
+                  order_by=(Guardrail.created_at,), subject=lambda r: r.name))
+add_kit_crud(router, "/answers", "kit_answers",
+             _res("answer", Answer, AnswerIn, AnswerOut, order_by=(Answer.created_at,),
+                  subject=lambda r: r.patterns.canonical))
+add_kit_crud(router, "/templates", "kit_templates",
+             _res("template", Template, TemplateIn, TemplateOut, order_by=(Template.kind, Template.key),
+                  delete=_drop_template, subject=lambda r: r.key))
+add_kit_crud(router, "/vault", "kit_vault",
+             _res("vault_document", VaultDocument, VaultDocumentUpdate, VaultDocumentOut,
+                  order_by=(VaultDocument.created_at,), delete=_drop_vault, subject=lambda r: r.title),
+             ops=("list", "get", "update", "delete"))
+
+
+async def _set_fact_status(session: AsyncSession, principal: Principal, item_id: uuid.UUID,
+                           new: FactStatus, action: str) -> FactOut:
+    fact = await session.get(Fact, item_id)
+    if fact is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="fact not found")
+    fact.status = new
+    if new == FactStatus.approved:  # approving is an explicit owner decision: it also confirms
+        fact.review_state = ReviewState.confirmed
+        fact.confirmed_at = utcnow()
+    await session.flush()
+    await session.refresh(fact)
+    await audit.record(session, actor=principal.actor, action=action, subject_type="fact",
+                       subject_id=fact.id, detail={"code": fact.code})
+    return FactOut.model_validate(fact)
 
 
 @router.post("/facts/{item_id}/approve", response_model=FactOut, name="kit_facts_approve")
-async def approve_fact(item_id: uuid.UUID) -> FactOut:
-    not_implemented(WAVE, AREA)
+async def approve_fact(item_id: uuid.UUID, principal: PrincipalDep, session: SessionDep) -> FactOut:
+    return await _set_fact_status(session, principal, item_id, FactStatus.approved, "kit.fact.approved")
 
 
 @router.post("/facts/{item_id}/retire", response_model=FactOut, name="kit_facts_retire")
-async def retire_fact(item_id: uuid.UUID) -> FactOut:
-    not_implemented(WAVE, AREA)
+async def retire_fact(item_id: uuid.UUID, principal: PrincipalDep, session: SessionDep) -> FactOut:
+    return await _set_fact_status(session, principal, item_id, FactStatus.retired, "kit.fact.retired")
 
 
 @router.post("/guardrails/check", response_model=GuardrailCheckOut, name="kit_guardrails_check")
-async def check_guardrails(body: GuardrailCheckIn) -> GuardrailCheckOut:
-    not_implemented(WAVE, AREA)
+async def check_guardrails(body: GuardrailCheckIn, session: SessionDep) -> GuardrailCheckOut:
+    rows = (await session.scalars(select(Guardrail).where(Guardrail.enabled.is_(True)))).all()
+    never = (await session.scalars(select(Skill.name).where(Skill.claim == SkillClaim.never))).all()
+    rules = [
+        guardrails.Rule(id=str(g.id), name=g.name, params=g.params, scope=tuple(g.scope),
+                        severity=g.severity.value, strictness=g.strictness.value, reason=g.reason)
+        for g in rows
+    ] + guardrails.never_skill_rules(never)
+    docs = [guardrails.Document(scope=scope, text=text) for scope, text in body.texts.items()]
+    violations = guardrails.check(rules, docs, file_names=body.file_names)
+    failed = {v.guardrail_id for v in violations}
+    results = [
+        CheckResult(check=v.name, status=v.status, detail=v.detail, guardrail_id=v.guardrail_id)
+        for v in violations
+    ] + [CheckResult(check=r.name, status="pass", guardrail_id=r.id) for r in rules
+         if r.id not in failed and r.params.type in CODE_ENFORCED]
+    return GuardrailCheckOut(results=results, blocked=guardrails.blocked(violations))
 
 
 @router.post("/answers/match", response_model=AnswerMatchOut, name="kit_answers_match")
-async def match_answer(body: AnswerMatchIn) -> AnswerMatchOut:
-    not_implemented(WAVE, AREA)
+async def match_answer(body: AnswerMatchIn, session: SessionDep) -> AnswerMatchOut:
+    rows = (await session.scalars(select(Answer))).all()
+    records = [
+        answer_matcher.AnswerRecord(
+            id=a.id, patterns=(a.patterns.canonical, *a.patterns.variants), value=a.value,
+            answer_class=a.answer_class.value, conditions=a.conditions, scope=a.scope.value,
+            scope_ref=a.scope_ref, settled=a.settled, confirmed=a.review_state == ReviewState.confirmed,
+            forced_choice=a.forced_choice, review_after=a.review_after)
+        for a in rows
+    ]
+    threshold = await settings_service.get_value(session, "answers.match_similarity")
+    result = answer_matcher.match(body.question, records, threshold=threshold, context=body.context,
+                                  options=body.options, today=utcnow().date())
+    return AnswerMatchOut(outcome=result.outcome, answer_id=result.answer_id, value=result.value,
+                          select=result.select, similarity=result.similarity)
 
 
 @router.post("/vault", response_model=VaultDocumentOut, status_code=status.HTTP_201_CREATED,
@@ -313,15 +465,39 @@ async def upload_vault_document(
     file: Annotated[UploadFile, File()],
     title: Annotated[str, Form()],
     doc_type: Annotated[Literal["cv", "degree", "transcript", "id", "photo", "cert", "other"], Form()],
+    principal: PrincipalDep,
+    session: SessionDep,
     sensitivity: Annotated[Literal["normal", "on_request", "after_offer_only"], Form()] = "normal",
 ) -> VaultDocumentOut:
-    not_implemented(WAVE, AREA)
+    mb = await settings_service.get_value(session, "documents.vault_max_upload_mb")
+    limit = mb * 1024 * 1024
+    content = await file.read(limit + 1)
+    if len(content) > limit:
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="file is larger than the vault limit")
+    if not content:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="file is empty")
+    row = await service.store_vault_file(
+        session, filename=file.filename or title, content=content, declared_mime=file.content_type,
+        title=title, doc_type=doc_type, sensitivity=sensitivity)
+    await audit.record(session, actor=principal.actor, action="kit.vault_document.created",
+                       subject_type="vault_document", subject_id=row.id,
+                       detail={"title": title, "doc_type": doc_type, "sha256": row.sha256,
+                               "size_bytes": row.size_bytes})
+    return VaultDocumentOut.model_validate(row)
 
 
 @router.get("/vault/{item_id}/download", name="kit_vault_download",
             responses={200: {"content": {"application/octet-stream": {}}}})
-async def download_vault_document(item_id: uuid.UUID) -> None:
-    not_implemented(WAVE, AREA)
+async def download_vault_document(item_id: uuid.UUID, principal: PrincipalDep, session: SessionDep) -> FileResponse:
+    row = await session.get(VaultDocument, item_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="vault document not found")
+    path = vault.resolve(get_config().files_dir, row.file_path)
+    if not path.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="vault file is missing from the files directory")
+    await audit.record(session, actor=principal.actor, action="kit.vault_document.downloaded",
+                       subject_type="vault_document", subject_id=row.id, detail={"title": row.title})
+    return FileResponse(path, media_type=row.mime_type, filename=vault.safe_name(row.title + path.suffix))
 
 
 @router.get("/prompts", response_model=list[PromptOut], name="kit_prompts_list")
@@ -342,11 +518,40 @@ async def activate_prompt(item_id: uuid.UUID) -> PromptOut:
 
 
 @router.get("/review", response_model=Page[ReviewItem], name="kit_review_list")
-async def list_review(entity: Annotated[ReviewEntity | None, Query()] = None) -> Page[ReviewItem]:
+async def list_review(session: SessionDep,
+                      entity: Annotated[ReviewEntity | None, Query()] = None) -> Page[ReviewItem]:
     """Everything marked needs_review, stale items first (DESIGN.md 13 step 4)."""
-    not_implemented(WAVE, AREA)
+    rows = await service.review_queue(session, entity)
+    items = [ReviewItem(entity=r.entity, id=r.id, title=r.title, group=r.group, stale_first_rank=i,  # type: ignore[arg-type]
+                        conflicts_with=r.conflicts_with) for i, r in enumerate(rows)]
+    return Page[ReviewItem](items=items, total=len(items))
 
 
 @router.post("/review/{entity}/{item_id}", response_model=Ok, name="kit_review_decide")
-async def decide_review(entity: ReviewEntity, item_id: uuid.UUID, body: ReviewDecision) -> Ok:
-    not_implemented(WAVE, AREA)
+async def decide_review(entity: ReviewEntity, item_id: uuid.UUID, body: ReviewDecision, principal: PrincipalDep,
+                        session: SessionDep) -> Ok:
+    """Confirm keeps the record; drop removes it (facts are retired so their code is never reused).
+    Edit a record with its own PUT: it stays in the queue until confirmed."""
+    model = service.REVIEW_MODELS[entity]
+    row = await session.get(model, item_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"{entity} not found")
+    if row.review_state != ReviewState.needs_review:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"{entity} is not waiting for review")
+    if body.decision == "confirm":
+        row.review_state = ReviewState.confirmed
+        row.confirmed_at = utcnow()
+    elif entity == "fact":
+        row.status = FactStatus.retired
+        row.review_state = ReviewState.confirmed
+        row.confirmed_at = utcnow()
+    else:
+        if entity == "template" and row.builtin:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail="built-in templates cannot be dropped")
+        await session.delete(row)
+        if entity == "vault_document":
+            await vault.remove(get_config().files_dir, row.file_path)
+    await crud.flush_or_409(session, f"{entity} is still in use")
+    await audit.record(session, actor=principal.actor, action=f"kit.{entity}.review_{body.decision}",
+                       subject_type=entity, subject_id=item_id, detail={"note": body.note})
+    return Ok()
