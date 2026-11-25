@@ -8,6 +8,7 @@ import type {
   ThemeInput,
 } from "@/lib/api/types"
 import { db } from "./db"
+import { applicationsHandlers } from "./handlers/applications"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -187,4 +188,7 @@ export const handlers = [
     })
     return HttpResponse.json(db.get().autopilot)
   }),
+
+  // Today, applications, pending actions (wave 1). Last, so other streams' handlers win on overlap.
+  ...applicationsHandlers,
 ]
