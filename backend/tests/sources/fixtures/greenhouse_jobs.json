@@ -1,0 +1,77 @@
+{
+ "jobs": [
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8940982002",
+   "internal_job_id": 6582801002,
+   "location": {
+    "name": "Bangalore, India"
+   },
+   "id": 8940982002,
+   "updated_at": "2026-11-23T17:02:31-05:00",
+   "requisition_id": "7426",
+   "title": "Applied AI Engineer, Enterprise AI",
+   "company_name": "GitLab",
+   "first_published": "2026-11-23T17:02:31-05:00",
+   "language": "en",
+   "application_deadline": null,
+   "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;GitLab is the intelligent orchestration platform for DevSecOps. GitLab enables organizations to increase developer productivity, improve operational efficiency, reduce security and compliance risk, and accelerate digital transformation. More than 50 million registered users and more than 50% of the Fortune 100* trust GitLab to ship better, more secure software faster.&lt;/p&gt;\n&lt;p&gt;The same principles built into our products are reflected in how our team works: we embrace AI as a core productivity multiplier, with all team members expected to incorporate AI into their daily workflows to drive efficiency, innovation, and impact. GitLab is where careers accelerate, innovation flourishes, and every voice is valued. Our high-performance culture is driven by our values&amp;nbsp;and continuous knowledge exchange, enabling our team members to reach their full potential while collaborating with industry leaders to solve complex problems. &lt;a href=&quot;https://www.youtube.com/watch?v=OuZIb5zszQI&quot;&gt;Co-create the future with us&lt;/a&gt; as we build technology that transforms how the world develops software.&lt;/p&gt;\n&lt;p&gt;*&lt;em&gt;Fortune 500® is a registered trademark of Fortune Media IP Limited, used under license. Claim based on GitLab data. Fortune 100 refers to the top 20% ranked companies in the 2025 Fortune 500 list, published in June 2025. Fortune and Fortune Media IP Limited are not affiliated with, and d",
+   "departments": [
+    {
+     "id": 4069215002,
+     "name": "Enterprise Applications",
+     "child_ids": [],
+     "parent_id": null
+    }
+   ],
+   "offices": [
+    {
+     "id": 4112140002,
+     "name": "India",
+     "location": null,
+     "child_ids": [],
+     "parent_id": 4019590002
+    }
+   ],
+   "ai_disclaimer": null,
+   "include_ai_disclaimer": null
+  },
+  {
+   "absolute_url": "https://job-boards.greenhouse.io/gitlab/jobs/8771512002",
+   "internal_job_id": 6509478002,
+   "location": {
+    "name": "Remote, Canada; Remote, United States"
+   },
+   "id": 8771512002,
+   "updated_at": "2026-11-20T11:49:04-05:00",
+   "requisition_id": "6918",
+   "title": "Backend Engineer, GitLab Orbit",
+   "company_name": "GitLab",
+   "first_published": "2026-10-23T18:47:07-04:00",
+   "language": "en",
+   "application_deadline": null,
+   "content": "&lt;div class=&quot;content-intro&quot;&gt;&lt;p&gt;GitLab is the intelligent orchestration platform for DevSecOps. GitLab enables organizations to increase developer productivity, improve operational efficiency, reduce security and compliance risk, and accelerate digital transformation. More than 50 million registered users and more than 50% of the Fortune 100* trust GitLab to ship better, more secure software faster.&lt;/p&gt;\n&lt;p&gt;The same principles built into our products are reflected in how our team works: we embrace AI as a core productivity multiplier, with all team members expected to incorporate AI into their daily workflows to drive efficiency, innovation, and impact. GitLab is where careers accelerate, innovation flourishes, and every voice is valued. Our high-performance culture is driven by our values&amp;nbsp;and continuous knowledge exchange, enabling our team members to reach their full potential while collaborating with industry leaders to solve complex problems. &lt;a href=&quot;https://www.youtube.com/watch?v=OuZIb5zszQI&quot;&gt;Co-create the future with us&lt;/a&gt; as we build technology that transforms how the world develops software.&lt;/p&gt;\n&lt;p&gt;*&lt;em&gt;Fortune 500® is a registered trademark of Fortune Media IP Limited, used under license. Claim based on GitLab data. Fortune 100 refers to the top 20% ranked companies in the 2025 Fortune 500 list, published in June 2025. Fortune and Fortune Media IP Limited are not affiliated with, and d",
+   "departments": [
+    {
+     "id": 4115239002,
+     "name": "Data Engineering",
+     "child_ids": [],
+     "parent_id": null
+    }
+   ],
+   "offices": [
+    {
+     "id": 4040904002,
+     "name": "United States of America",
+     "location": null,
+     "child_ids": [],
+     "parent_id": 4019551002
+    }
+   ],
+   "ai_disclaimer": null,
+   "include_ai_disclaimer": null
+  }
+ ],
+ "meta": {
+  "total": 2
+ }
+}

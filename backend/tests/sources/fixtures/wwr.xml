@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss">
+  <channel>
+    <title>We Work Remotely: Remote jobs in design, programming, marketing and more</title>
+    <link>https://weworkremotely.com/remote-jobs.rss</link>
+    <description>We Work Remotely: Remote jobs in design, programming, marketing and more</description>
+    <language>en-US</language>
+    <ttl>60</ttl>
+    <item>
+      <media:content url="https://wwr-pro.s3.amazonaws.com/logos/0171/7068/logo.gif" type="image/png"/>
+      <title>GitLab: Renewals Manager - Italy/ Spain</title>
+      <region>EMEA Only</region>
+      <country></country>
+      <state></state>
+      <skills></skills>
+      <category>Management and Finance</category>
+      <type>Full-Time</type>
+      <description>&lt;img src="https://we-work-remotely.imgix.net/logos/0171/7068/logo.gif?ixlib=rails-4.0.0&amp;w=50&amp;h=50&amp;dpr=2&amp;fit=fill&amp;auto=compress" /&gt;
+
+&lt;p&gt;
+  &lt;strong&gt;Headquarters:&lt;/strong&gt; Remote Ireland; Remote, France; Remote, Germany; Remote, Italy; Remote, Spain; Remote, United Kingdom
+&lt;/p&gt;
+
+&lt;div&gt;&lt;p&gt;GitLab is the intelligent orchestration platform for DevSecOps. GitLab enables organizations to increase developer productivity, improve operational efficiency, reduce security and compliance risk, and accelerate digital transformation. More than 50 million registered users and more than 50% of the Fortune 100* trust GitLab to ship better, more secure software faster.&lt;/p&gt;
+&lt;p</description>
+      <pubDate>Wed, 25 Nov 2026 22:40:10 +0000</pubDate>
+      <expires_at>Fri, 25 Dec 2026 22:40:07 +0000</expires_at>
+      <guid>https://weworkremotely.com/remote-jobs/gitlab-renewals-manager-italy-spain</guid>
+      <link>https://weworkremotely.com/remote-jobs/gitlab-renewals-manager-italy-spain</link>
+    </item>
+<item>
+      <title>GitLab: Senior Engagement Manager - Professional Services Sales,  EMEA</title>
+      <region>EMEA Only</region>
+      <country></country>
+      <state></state>
+      <skills></skills>
+      <category>Product</category>
+      <type>Full-Time</type>
+      <description>
+
+&lt;p&gt;
+  &lt;strong&gt;Headquarters:&lt;/strong&gt; Remote Ireland; Remote, France; Remote, Germany; Remote, Spain; Remote, United Kingdom
+&lt;/p&gt;
+
+&lt;div&gt;&lt;p&gt;GitLab is the intelligent orchestration platform for DevSecOps. GitLab enables organizations to increase developer productivity, improve operational efficiency, reduce security and compliance risk, and accelerate digital transformation. More than 50 million registered users and more than 50% of the Fortune 100* trust GitLab to ship better, more secure software faster.&lt;/p&gt;
+&lt;p</description>
+      <pubDate>Wed, 25 Nov 2026 22:20:10 +0000</pubDate>
+      <expires_at>Fri, 25 Dec 2026 22:20:07 +0000</expires_at>
+      <guid>https://weworkremotely.com/remote-jobs/gitlab-senior-engagement-manager-professional-services-sales-emea</guid>
+      <link>https://weworkremotely.com/remote-jobs/gitlab-senior-engagement-manager-professional-services-sales-emea</link>
+    </item>
+</channel>
+</rss>
