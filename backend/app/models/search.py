@@ -263,6 +263,8 @@ class Job(Base, Entity):
     notes: Mapped[str | None] = mapped_column(Text)
     repost_of_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("job.id", ondelete="SET NULL"))
     merged_into_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("job.id", ondelete="SET NULL"))
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, default="system", server_default="system",
+                                        doc="system (sweep or capture), owner (typed in) or import (history CSV)")
 
 
 class PayEstimate(Base, Entity):

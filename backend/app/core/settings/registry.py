@@ -42,6 +42,7 @@ GROUPS: dict[str, str] = {
     "scoring": "Scoring",
     "matching": "Matching",
     "automation": "Automation",
+    "tracking": "Tracking",
     "answers": "Answer bank",
     "reconcile": "Reconciliation",
     "ai": "AI",
@@ -238,6 +239,13 @@ _int("automation.open_check_max_age_hours", "Open-check freshness",
      "A role must have been confirmed open within this many hours to be applied to automatically.",
      24, 12, 1, 168, "hours")
 _int("automation.agent_max_steps", "Agent step limit", "Maximum steps an agent task may take.", 80, 120, 5, 500)
+
+# Tracking (4, 18.4)
+_int("tracking.imminent_deadline_days", "Imminent deadline",
+     "A snooze is ignored when a role's deadline or a pending action's deadline is this close.", 3, 5, 0, 30,
+     "days")
+_int("tracking.stale_pending_days", "Stale pending action",
+     "Remind the owner when an open pending action has waited this long.", 3, 7, 1, 90, "days")
 
 # Answer bank (5.4)
 _enum("answers.routine_default_scope", "Default scope: routine answers",

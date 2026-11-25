@@ -89,6 +89,17 @@ class Application(Base, Entity):
     next_due: Mapped[date | None] = mapped_column(Date)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False)
     snoozed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, default="system", server_default="system",
+                                        doc="system, owner (logged by hand) or import (history CSV)")
+    owner_attested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false",
+                                                 doc="Submission known only from the owner's word; no evidence")
+    reference: Mapped[str | None] = mapped_column(String(200), doc="Reference number given by the employer")
+    notes: Mapped[str | None] = mapped_column(Text)
+    legacy_fit: Mapped[int | None] = mapped_column(Integer, doc="Imported 1-5 fit; never a rubric score")
+    import_key: Mapped[str | None] = mapped_column(String(200), unique=True,
+                                                   doc="Stable key of an imported history row (re-import updates)")
+    import_meta: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}",
+                                                        doc="Imported columns with no home of their own")
 
 
 class ApplicationEvent(Base, IdMixin):
@@ -119,6 +130,7 @@ class PendingActionType(enum.StrEnum):
     review_import = "review_import"
     conflict_choice = "conflict_choice"
     answer_review_due = "answer_review_due"
+    follow_up = "follow_up"
 
 
 class PendingStatus(enum.StrEnum):
@@ -144,6 +156,7 @@ class PendingAction(Base, Entity):
                                                   default=PendingStatus.open)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     resolution: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    snoozed_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ApplicationPacket(Base, Entity):
