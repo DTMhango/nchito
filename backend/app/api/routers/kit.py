@@ -7,13 +7,14 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
 from app.api.crud import add_crud
-from app.api.deps import RequireOwner
+from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.core.conditions import ConditionSet
+from app.llm import prompts as prompt_registry
 from app.schemas.json_types import (
     AnswerPatterns,
     CheckResult,
@@ -325,20 +326,30 @@ async def download_vault_document(item_id: uuid.UUID) -> None:
 
 
 @router.get("/prompts", response_model=list[PromptOut], name="kit_prompts_list")
-async def list_prompts(stage: str | None = None) -> list[PromptOut]:
-    not_implemented(WAVE, "llm")
+async def list_prompts(session: SessionDep, stage: str | None = None) -> list[PromptOut]:
+    """Every version, newest first per stage. Defaults are loaded on first read."""
+    return [PromptOut.model_validate(p) for p in await prompt_registry.list_prompts(session, stage)]
 
 
 @router.post("/prompts", response_model=PromptOut, status_code=status.HTTP_201_CREATED,
              name="kit_prompts_create_version")
-async def create_prompt_version(body: PromptIn) -> PromptOut:
+async def create_prompt_version(body: PromptIn, session: SessionDep, principal: PrincipalDep) -> PromptOut:
     """Each save is a new version; activating one records a ConfigRevision."""
-    not_implemented(WAVE, "llm")
+    try:
+        prompt = await prompt_registry.create_version(session, stage=body.stage, text=body.text, note=body.note,
+                                                      actor=principal.actor)
+    except prompt_registry.PromptError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    await session.refresh(prompt)
+    return PromptOut.model_validate(prompt)
 
 
 @router.post("/prompts/{item_id}/activate", response_model=PromptOut, name="kit_prompts_activate")
-async def activate_prompt(item_id: uuid.UUID) -> PromptOut:
-    not_implemented(WAVE, "llm")
+async def activate_prompt(item_id: uuid.UUID, session: SessionDep, principal: PrincipalDep) -> PromptOut:
+    prompt = await prompt_registry.activate(session, item_id, actor=principal.actor)
+    if prompt is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="prompt not found")
+    return PromptOut.model_validate(prompt)
 
 
 @router.get("/review", response_model=Page[ReviewItem], name="kit_review_list")

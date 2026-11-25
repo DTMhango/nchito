@@ -37,6 +37,30 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+class BudgetExhausted(BudgetExceeded):
+    """A paid call was refused by the ledger. Callers park the work as resumable and move on.
+
+    ``scope`` is ``no_cap`` (no monthly cap set, so paid work stays off), ``monthly``, ``per_run``
+    or ``call`` (the call's own estimate is above ``max_cost_minor``).
+    """
+
+    def __init__(self, scope: str, *, needed_minor: int, available_minor: int | None, currency: str) -> None:
+        self.scope = scope
+        self.needed_minor = needed_minor
+        self.available_minor = available_minor
+        self.currency = currency
+        super().__init__(f"budget exhausted ({scope}): needs {needed_minor} {currency} minor units, "
+                         f"{'no cap set' if available_minor is None else f'{available_minor} available'}")
+
+
+class LLMError(RuntimeError):
+    """A model call failed after its retries, or the route is not usable (no provider, no price)."""
+
+
+class LLMConfigError(LLMError):
+    """The route cannot be used as configured: no provider record, no price, CLI disabled."""
+
+
 @dataclass(frozen=True)
 class TextPart:
     text: str
