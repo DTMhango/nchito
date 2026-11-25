@@ -1,0 +1,606 @@
+/**
+ * Fictional Kit for the mock backend. Everyone and everything here is invented
+ * (example.com addresses only). Shapes follow `docs/openapi.json`.
+ */
+import type { Resource } from "@/features/kit/api"
+
+type Row = Record<string, unknown> & { id: string }
+
+const T0 = "2026-11-01T09:00:00Z"
+const base = (
+  id: string,
+  extra: { review?: boolean; origin?: string } = {}
+) => ({
+  id,
+  created_at: T0,
+  updated_at: T0,
+  review_state: extra.review ? "needs_review" : "confirmed",
+  origin: extra.origin ?? (extra.review ? "import" : "owner"),
+  confirmed_at: extra.review ? null : T0,
+})
+
+const fact = (
+  n: number,
+  kind: string,
+  text: string,
+  o: {
+    exp?: string
+    tags?: string[]
+    tracks?: string[]
+    status?: string
+    canon?: boolean
+    keepOut?: boolean
+    review?: boolean
+  } = {}
+) => ({
+  ...base(`fact-${n}`, { review: o.review }),
+  code: `F-${100 + n}`,
+  kind,
+  text,
+  canonical_wording: o.canon ?? false,
+  experience_id: o.exp ?? null,
+  tags: o.tags ?? [],
+  tracks: o.tracks ?? [],
+  keep_out_of_prompts: o.keepOut ?? false,
+  confidence_note: null,
+  status: o.status ?? "approved",
+})
+
+export function kitSeed(): Record<Resource, Row[]> {
+  return {
+    experiences: [
+      {
+        ...base("exp-1"),
+        org: "Copperline Mining Services",
+        titles: [
+          { title: "Head of Finance Operations", start: "2021-03", end: null },
+          { title: "Senior Finance Manager", start: "2018-02", end: "2021-02" },
+        ],
+        location: "Kitwe, Zambia",
+        start_date: "2018-02-01",
+        end_date: null,
+        title_variants: {
+          finance: ["Head of Finance", "Finance Operations Lead"],
+          ops: ["Head of Operations Finance"],
+        },
+        forbidden_titles: ["Chief Financial Officer"],
+        sort_order: 0,
+      },
+      {
+        ...base("exp-2"),
+        org: "Kafue Agro Finance",
+        titles: [
+          { title: "Credit Risk Analyst", start: "2014-06", end: "2018-01" },
+        ],
+        location: "Lusaka, Zambia",
+        start_date: "2014-06-01",
+        end_date: "2018-01-31",
+        title_variants: { finance: ["Risk Analyst"] },
+        forbidden_titles: [],
+        sort_order: 1,
+      },
+      {
+        ...base("exp-3", { review: true }),
+        org: "Luangwa Grain Cooperative",
+        titles: [{ title: "Finance Intern", start: "2013-01", end: "2013-12" }],
+        location: "Chipata, Zambia",
+        start_date: "2013-01-01",
+        end_date: "2013-12-31",
+        title_variants: {},
+        forbidden_titles: [],
+        sort_order: 2,
+      },
+    ],
+    facts: [
+      fact(
+        12,
+        "achievement",
+        "Cut month-end close from 12 working days to 5 across four mine sites.",
+        {
+          exp: "exp-1",
+          tags: ["close", "process"],
+          tracks: ["finance"],
+          canon: true,
+        }
+      ),
+      fact(13, "metric", "Managed a ZMW 480 million annual operating budget.", {
+        exp: "exp-1",
+        tags: ["budget"],
+        tracks: ["finance", "ops"],
+        canon: true,
+      }),
+      fact(
+        14,
+        "bullet",
+        "Led a team of 14 accountants and analysts across three locations.",
+        { exp: "exp-1", tags: ["leadership"], tracks: ["ops"] }
+      ),
+      fact(
+        15,
+        "bullet",
+        "Introduced supplier payment runs on a fixed weekly calendar.",
+        { exp: "exp-1", tags: ["process"], status: "draft", keepOut: true }
+      ),
+      fact(
+        21,
+        "achievement",
+        "Built the scorecard used to approve 300 smallholder loans a year.",
+        { exp: "exp-2", tags: ["credit"], tracks: ["finance"] }
+      ),
+      fact(
+        22,
+        "bullet",
+        "Reduced loan default reporting delays from three weeks to four days.",
+        { exp: "exp-2", tags: ["reporting"], status: "retired" }
+      ),
+      fact(
+        31,
+        "bullet",
+        "Reconciled weekly grain-purchase ledgers for 40 depots.",
+        { exp: "exp-3", tags: ["ledger"], review: true, status: "draft" }
+      ),
+      fact(
+        41,
+        "education",
+        "BSc Accounting and Finance, University of Zambia, 2012.",
+        { tags: ["degree"] }
+      ),
+      fact(42, "cert", "ACCA qualified member, 2016.", {
+        tags: ["acca"],
+        tracks: ["finance"],
+      }),
+      fact(
+        43,
+        "cert",
+        "Certificate in Mine Finance, Copperbelt University, 2019.",
+        { tags: ["mining"], review: true, status: "draft" }
+      ),
+      fact(
+        51,
+        "summary",
+        "Finance leader with ten years across mining and agriculture in Zambia.",
+        { tracks: ["finance"] }
+      ),
+    ],
+    skills: [
+      {
+        ...base("sk-1"),
+        name: "IFRS reporting",
+        group: "Finance",
+        level: "Expert",
+        claim: "yes",
+        note: null,
+      },
+      {
+        ...base("sk-2"),
+        name: "Financial modelling",
+        group: "Finance",
+        level: "Advanced",
+        claim: "yes",
+        note: null,
+      },
+      {
+        ...base("sk-3"),
+        name: "SAP",
+        group: "Systems",
+        level: "Working",
+        claim: "yes",
+        note: "S/4HANA finance module only",
+      },
+      {
+        ...base("sk-4"),
+        name: "Python",
+        group: "Systems",
+        level: "Basic",
+        claim: "no",
+        note: null,
+      },
+      {
+        ...base("sk-5"),
+        name: "Oracle ERP",
+        group: "Systems",
+        level: null,
+        claim: "never",
+        note: "Never used it.",
+      },
+      {
+        ...base("sk-6", { review: true }),
+        name: "Power BI",
+        group: "Systems",
+        level: null,
+        claim: "yes",
+        note: null,
+      },
+    ],
+    "skill-aliases": [
+      {
+        id: "al-1",
+        created_at: T0,
+        updated_at: T0,
+        alias: "IFRS",
+        canonical: "IFRS reporting",
+      },
+      {
+        id: "al-2",
+        created_at: T0,
+        updated_at: T0,
+        alias: "Financial modeling",
+        canonical: "Financial modelling",
+      },
+    ],
+    references: [
+      {
+        ...base("ref-1"),
+        name: "Natasha Phiri",
+        role: "Managing Director",
+        organisation: "Copperline Mining Services",
+        contact_email: "natasha.phiri@example.com",
+        contact_phone: "+260970000001",
+        consent: true,
+        share_policy: "on_request",
+      },
+      {
+        ...base("ref-2", { review: true }),
+        name: "Joseph Mulenga",
+        role: "Credit Director",
+        organisation: "Kafue Agro Finance",
+        contact_email: "joseph.mulenga@example.com",
+        contact_phone: null,
+        consent: false,
+        share_policy: "forms_only",
+      },
+    ],
+    tracks: [
+      {
+        ...base("tr-1"),
+        key: "finance",
+        name: "Finance leadership",
+        priority: 1,
+        example_titles: [
+          "Head of Finance",
+          "Finance Director",
+          "Group Financial Controller",
+        ],
+        lead_fact_codes: ["F-112", "F-113"],
+        summary_fact_code: "F-151",
+        tone_notes: "Plain and numerate. Lead with scope and control.",
+      },
+      {
+        ...base("tr-2"),
+        key: "ops",
+        name: "Operations finance",
+        priority: 2,
+        example_titles: [
+          "Head of Operations Finance",
+          "Commercial Finance Manager",
+        ],
+        lead_fact_codes: ["F-114"],
+        summary_fact_code: null,
+        tone_notes: null,
+      },
+      {
+        ...base("tr-3", { review: true }),
+        key: "risk",
+        name: "Credit risk",
+        priority: 3,
+        example_titles: ["Credit Risk Manager"],
+        lead_fact_codes: [],
+        summary_fact_code: null,
+        tone_notes: null,
+      },
+    ],
+    guardrails: [
+      {
+        ...base("gr-1"),
+        name: "Confidential headcount ratio",
+        type: "never_mention",
+        scope: ["cv", "letter"],
+        severity: "block",
+        strictness: "always_block",
+        params: {
+          type: "never_mention",
+          terms: ["headcount ratio", "staff-to-site ratio"],
+          regex: [],
+        },
+        reason: "Client confidential.",
+        enabled: true,
+      },
+      {
+        ...base("gr-2"),
+        name: "Never used Oracle",
+        type: "never_mention",
+        scope: ["everywhere"],
+        severity: "block",
+        strictness: "block_waivable_once",
+        params: { type: "never_mention", terms: ["Oracle ERP"], regex: [] },
+        reason: "Not true.",
+        enabled: true,
+      },
+      {
+        ...base("gr-3"),
+        name: "Budget and headcount together",
+        type: "never_together",
+        scope: ["everywhere"],
+        severity: "block",
+        strictness: "always_block",
+        params: {
+          type: "never_together",
+          group_a: ["480 million"],
+          group_b: ["14 accountants"],
+        },
+        reason: "Together they reveal the cost per head.",
+        enabled: true,
+      },
+      {
+        ...base("gr-4"),
+        name: "Official title",
+        type: "require_wording",
+        scope: ["cv"],
+        severity: "block",
+        strictness: "block_waivable_once",
+        params: {
+          type: "require_wording",
+          use: "Head of Finance Operations",
+          instead_of: ["Finance Head", "Head of Finance Ops"],
+        },
+        reason: null,
+        enabled: true,
+      },
+      {
+        ...base("gr-5"),
+        name: "CV length",
+        type: "limit",
+        scope: ["cv"],
+        severity: "warn",
+        strictness: "advise",
+        params: { type: "limit", document: "cv", pages: 2, paragraphs: null },
+        reason: null,
+        enabled: true,
+      },
+      {
+        ...base("gr-6"),
+        name: "ID numbers",
+        type: "omit_field",
+        scope: ["cv"],
+        severity: "block",
+        strictness: "always_block",
+        params: { type: "omit_field", fields: ["NRC number", "date of birth"] },
+        reason: null,
+        enabled: true,
+      },
+      {
+        ...base("gr-7"),
+        name: "Degree on request",
+        type: "attach_policy",
+        scope: ["everywhere"],
+        severity: "block",
+        strictness: "always_block",
+        params: {
+          type: "attach_policy",
+          document_type: "degree",
+          when: "when_asked",
+        },
+        reason: null,
+        enabled: true,
+      },
+      {
+        ...base("gr-8", { review: true }),
+        name: "Lead with scope",
+        type: "positioning",
+        scope: ["cv"],
+        severity: "warn",
+        strictness: "advise",
+        params: {
+          type: "positioning",
+          instruction: "Do not lead with audit or compliance work.",
+        },
+        reason: null,
+        enabled: true,
+      },
+    ],
+    answers: [
+      {
+        ...base("an-1"),
+        patterns: {
+          canonical: "What is your notice period?",
+          variants: ["How much notice do you need to give?", "Notice period"],
+        },
+        value: "One month",
+        value_type: "text",
+        conditions: {
+          version: 1,
+          root: { type: "group", op: "and", negate: false, conditions: [] },
+        },
+        answer_class: "auto",
+        material: false,
+        settled: true,
+        scope: "all_matching",
+        scope_ref: null,
+        forced_choice: null,
+        review_after: "2027-01-15",
+        confirmed_at: "2026-07-01T09:00:00Z",
+        pending_applications_using: 0,
+      },
+      {
+        ...base("an-2"),
+        patterns: {
+          canonical: "Do you require visa sponsorship?",
+          variants: ["Will you now or in the future require sponsorship?"],
+        },
+        value: "No",
+        value_type: "boolean",
+        conditions: {
+          version: 1,
+          root: {
+            type: "group",
+            op: "and",
+            negate: false,
+            conditions: [
+              {
+                type: "values",
+                facet: "country",
+                include: ["ZM"],
+                exclude: [],
+                match: "any",
+              },
+            ],
+          },
+        },
+        answer_class: "ask_first",
+        material: true,
+        settled: false,
+        scope: "this_application",
+        scope_ref: null,
+        forced_choice: null,
+        review_after: "2026-11-20",
+        confirmed_at: "2026-05-01T09:00:00Z",
+        pending_applications_using: 2,
+      },
+      {
+        ...base("an-3"),
+        patterns: { canonical: "What is your gender?", variants: [] },
+        value: null,
+        value_type: "choice",
+        conditions: {
+          version: 1,
+          root: { type: "group", op: "and", negate: false, conditions: [] },
+        },
+        answer_class: "never",
+        material: false,
+        settled: false,
+        scope: "all_matching",
+        scope_ref: null,
+        forced_choice: "Prefer not to say",
+        review_after: null,
+        confirmed_at: "2026-05-01T09:00:00Z",
+        pending_applications_using: 0,
+      },
+      {
+        ...base("an-4"),
+        patterns: {
+          canonical: "Please sign the declaration below.",
+          variants: [],
+        },
+        value: null,
+        value_type: "text",
+        conditions: {
+          version: 1,
+          root: { type: "group", op: "and", negate: false, conditions: [] },
+        },
+        answer_class: "owner_only",
+        material: true,
+        settled: false,
+        scope: "this_application",
+        scope_ref: null,
+        forced_choice: null,
+        review_after: null,
+        confirmed_at: "2026-05-01T09:00:00Z",
+        pending_applications_using: 0,
+      },
+      {
+        ...base("an-5", { review: true }),
+        patterns: {
+          canonical: "How many years of finance experience do you have?",
+          variants: [],
+        },
+        value: "12",
+        value_type: "number",
+        conditions: {
+          version: 1,
+          root: { type: "group", op: "and", negate: false, conditions: [] },
+        },
+        answer_class: "auto",
+        material: false,
+        settled: true,
+        scope: "all_matching",
+        scope_ref: null,
+        forced_choice: null,
+        review_after: null,
+        confirmed_at: null,
+        pending_applications_using: 0,
+      },
+    ],
+    templates: [
+      {
+        ...base("tp-1", { origin: "system" }),
+        key: "classic",
+        kind: "cv",
+        name: "Classic",
+        html: "<main></main>",
+        css: "",
+        section_order: ["summary", "experience", "education", "skills"],
+        limits: { pages: 2, paragraphs: null, bullets_per_role: 6 },
+        accent: null,
+        builtin: true,
+      },
+      {
+        ...base("tp-2", { origin: "system" }),
+        key: "compact",
+        kind: "cv",
+        name: "Compact",
+        html: "<main></main>",
+        css: "",
+        section_order: ["summary", "skills", "experience", "education"],
+        limits: { pages: 1, paragraphs: null, bullets_per_role: 4 },
+        accent: null,
+        builtin: true,
+      },
+      {
+        ...base("tp-3", { origin: "system" }),
+        key: "modern",
+        kind: "cv",
+        name: "Modern",
+        html: "<main></main>",
+        css: "",
+        section_order: ["summary", "experience", "skills", "education"],
+        limits: { pages: 2, paragraphs: null, bullets_per_role: 5 },
+        accent: null,
+        builtin: true,
+      },
+      {
+        ...base("tp-4"),
+        key: "letter-short",
+        kind: "letter",
+        name: "Short letter",
+        html: "<main></main>",
+        css: "",
+        section_order: [],
+        limits: { pages: 1, paragraphs: 4, bullets_per_role: null },
+        accent: null,
+        builtin: false,
+      },
+    ],
+    vault: [
+      {
+        ...base("va-1"),
+        doc_type: "degree",
+        title: "BSc Accounting and Finance",
+        sha256: "a1".repeat(32),
+        mime_type: "application/pdf",
+        size_bytes: 482_113,
+        sensitivity: "on_request",
+        has_text_layer: true,
+      },
+      {
+        ...base("va-2"),
+        doc_type: "id",
+        title: "National registration card",
+        sha256: "b2".repeat(32),
+        mime_type: "image/jpeg",
+        size_bytes: 1_204_552,
+        sensitivity: "after_offer_only",
+        has_text_layer: false,
+      },
+      {
+        ...base("va-3", { review: true }),
+        doc_type: "cv",
+        title: "CV, 2025 version",
+        sha256: "c3".repeat(32),
+        mime_type: "application/pdf",
+        size_bytes: 96_320,
+        sensitivity: "normal",
+        has_text_layer: true,
+      },
+    ],
+  }
+}
