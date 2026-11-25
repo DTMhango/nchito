@@ -32,6 +32,9 @@ const plainDate = (iso: string | null | undefined) =>
       }).format(new Date(iso))
     : null
 
+const count = (n: number | undefined, word: string) =>
+  `${n ?? 0} ${word}${n === 1 ? "" : "s"}`
+
 export function statusWords(c: Campaign): string {
   if (c.status === "paused" && c.paused_until)
     return `Paused until ${plainDate(c.paused_until)}`
@@ -130,9 +133,9 @@ export function CampaignsPage() {
       hideBelow: "lg",
       cell: (c) => (
         <span className="text-sm text-muted-foreground">
-          {c.criteria?.titles?.length ?? 0} titles,{" "}
-          {c.criteria?.rules?.length ?? 0} rules, {c.source_ids?.length ?? 0}{" "}
-          sources
+          {count(c.criteria?.titles?.length, "title")},{" "}
+          {count(c.criteria?.rules?.length, "rule")},{" "}
+          {count(c.source_ids?.length, "source")}
         </span>
       ),
     },

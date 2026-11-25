@@ -247,12 +247,14 @@ function Editor({ initial }: { initial: Campaign }) {
       </nav>
 
       {needsReview && (
-        <ConfirmationBanner
-          items={items}
-          confirmed={effectiveConfirmed}
-          onConfirm={(i) => void confirmItem(i)}
-          onEdit={(i) => editItem(i.section)}
-        />
+        <div className="max-w-[860px]">
+          <ConfirmationBanner
+            items={items}
+            confirmed={effectiveConfirmed}
+            onConfirm={(i) => void confirmItem(i)}
+            onEdit={(i) => editItem(i.section)}
+          />
+        </div>
       )}
 
       <div className="max-w-[860px]">
