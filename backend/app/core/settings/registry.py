@@ -178,6 +178,9 @@ _int("schedule.overlap_days", "Sweep overlap",
      "Each incremental sweep searches from the last successful sweep minus this many days.", 2, 3, 0, 14, "days")
 _cron("schedule.expiry_check_cron", "Expiry check schedule",
       "When open roles are rechecked for closure.", "0 12 * * *", "0 */6 * * *")
+_int("schedule.expiry_check_batch", "Expiry check batch",
+     "At most this many open or unconfirmed roles are rechecked in one expiry run (oldest check first).",
+     200, 50, 1, 2000, "roles")
 
 # Scoring
 _int("scoring.threshold_shortlist", "Shortlist threshold", "Minimum score to shortlist.", 60, 55, 0, 100, "points")
