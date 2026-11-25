@@ -40,6 +40,7 @@ import { StudioPage } from "@/features/studio/studio-page"
 import { AutopilotPage } from "@/features/autopilot/autopilot-page"
 import { KitLayout, KitSection } from "@/features/kit/kit-pages"
 import { CampaignsPage } from "@/features/campaigns/campaigns-page"
+import { CampaignEditorPage } from "@/features/campaigns/campaign-editor-page"
 import { SourcesPage } from "@/features/sources/sources-page"
 import { InsightsPage } from "@/features/insights/insights-page"
 import {
@@ -140,6 +141,14 @@ const applicationsRoute = page(
 const studioRoute = page("/studio", "Studio", StudioPage)
 const autopilotRoute = page("/autopilot", "Autopilot", AutopilotPage)
 const campaignsRoute = page("/campaigns", "Campaigns", CampaignsPage)
+const campaignEditorRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/campaigns/$id",
+  staticData: { title: "Campaign" },
+  component: function CampaignEditorRoute() {
+    return <CampaignEditorPage id={campaignEditorRoute.useParams().id} />
+  },
+})
 const sourcesRoute = page("/sources", "Sources", SourcesPage)
 const insightsRoute = page("/insights", "Insights", InsightsPage)
 
@@ -265,6 +274,7 @@ export const routeTree = rootRoute.addChildren([
       autopilotRoute,
       kitRoute.addChildren([kitIndex, ...kitChildren]),
       campaignsRoute,
+      campaignEditorRoute,
       sourcesRoute,
       insightsRoute,
       settingsRoute.addChildren([
