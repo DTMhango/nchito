@@ -2707,30 +2707,30 @@ export interface components {
              * @default text
              * @enum {string}
              */
-            value_type: "text" | "number" | "boolean" | "choice" | "date" | "money";
+            value_type?: "text" | "number" | "boolean" | "choice" | "date" | "money";
             conditions?: components["schemas"]["ConditionSet-Input"];
             /**
              * Answer Class
              * @default ask_first
              * @enum {string}
              */
-            answer_class: "auto" | "ask_first" | "never" | "owner_only";
+            answer_class?: "auto" | "ask_first" | "never" | "owner_only";
             /**
              * Material
              * @default false
              */
-            material: boolean;
+            material?: boolean;
             /**
              * Settled
              * @default false
              */
-            settled: boolean;
+            settled?: boolean;
             /**
              * Scope
              * @default all_matching
              * @enum {string}
              */
-            scope: "this_application" | "this_employer" | "this_country" | "all_matching";
+            scope?: "this_application" | "this_employer" | "this_country" | "all_matching";
             /** Scope Ref */
             scope_ref?: string | null;
             /** Forced Choice */
@@ -2808,30 +2808,30 @@ export interface components {
              * @default text
              * @enum {string}
              */
-            value_type: "text" | "number" | "boolean" | "choice" | "date" | "money";
+            value_type?: "text" | "number" | "boolean" | "choice" | "date" | "money";
             conditions?: components["schemas"]["ConditionSet-Output"];
             /**
              * Answer Class
              * @default ask_first
              * @enum {string}
              */
-            answer_class: "auto" | "ask_first" | "never" | "owner_only";
+            answer_class?: "auto" | "ask_first" | "never" | "owner_only";
             /**
              * Material
              * @default false
              */
-            material: boolean;
+            material?: boolean;
             /**
              * Settled
              * @default false
              */
-            settled: boolean;
+            settled?: boolean;
             /**
              * Scope
              * @default all_matching
              * @enum {string}
              */
-            scope: "this_application" | "this_employer" | "this_country" | "all_matching";
+            scope?: "this_application" | "this_employer" | "this_country" | "all_matching";
             /** Scope Ref */
             scope_ref?: string | null;
             /** Forced Choice */
@@ -2843,7 +2843,7 @@ export interface components {
              * @description Pending applications using this value
              * @default 0
              */
-            pending_applications_using: number;
+            pending_applications_using?: number;
         };
         /** AnswerPatterns */
         AnswerPatterns: {
@@ -3043,7 +3043,7 @@ export interface components {
              * @default manual
              * @enum {string}
              */
-            channel: "email" | "browser" | "manual";
+            channel?: "email" | "browser" | "manual";
             /** Reference */
             reference?: string | null;
             /** Note */
@@ -3173,7 +3173,7 @@ export interface components {
              * @default prepare
              * @enum {string}
              */
-            mode: "save_only" | "prepare" | "ask_then_apply" | "auto_apply";
+            mode?: "save_only" | "prepare" | "ask_then_apply" | "auto_apply";
             /** Per Channel */
             per_channel?: {
                 [key: string]: "save_only" | "prepare" | "ask_then_apply" | "auto_apply";
@@ -3297,7 +3297,7 @@ export interface components {
              * @default normal
              * @enum {string}
              */
-            sensitivity: "normal" | "on_request" | "after_offer_only";
+            sensitivity?: "normal" | "on_request" | "after_offer_only";
         };
         /** BulkActionIn */
         BulkActionIn: {
@@ -3316,7 +3316,7 @@ export interface components {
              * Preview
              * @default true
              */
-            preview: boolean;
+            preview?: boolean;
         };
         /** BulkActionOut */
         BulkActionOut: {
@@ -3382,7 +3382,7 @@ export interface components {
              * Priority
              * @default 0
              */
-            priority: number;
+            priority?: number;
             criteria?: components["schemas"]["CampaignCriteria-Input"];
             unknown_data_policy?: components["schemas"]["UnknownDataPolicy"];
             /** Rubric Id */
@@ -3424,7 +3424,7 @@ export interface components {
              * Priority
              * @default 0
              */
-            priority: number;
+            priority?: number;
             criteria?: components["schemas"]["CampaignCriteria-Output"];
             unknown_data_policy?: components["schemas"]["UnknownDataPolicy"];
             /** Rubric Id */
@@ -3547,7 +3547,7 @@ export interface components {
              * Waived
              * @default false
              */
-            waived: boolean;
+            waived?: boolean;
         };
         /** CompareOut */
         CompareOut: {
@@ -3590,7 +3590,7 @@ export interface components {
              * @default 1
              * @constant
              */
-            version: 1;
+            version?: 1;
             root?: components["schemas"]["Group-Input"];
         };
         /**
@@ -3603,7 +3603,7 @@ export interface components {
              * @default 1
              * @constant
              */
-            version: 1;
+            version?: 1;
             root?: components["schemas"]["Group-Output"];
         };
         /** ConfigRevisionOut */
@@ -3721,7 +3721,7 @@ export interface components {
              * Cost Minor
              * @default 0
              */
-            cost_minor: number;
+            cost_minor?: number;
         };
         /** ConnectionUpdate */
         ConnectionUpdate: {
@@ -3812,7 +3812,7 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
         };
         /** CustomFacetOut */
         CustomFacetOut: {
@@ -3839,7 +3839,7 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
         };
         /** CustomFacetValue */
         CustomFacetValue: {
@@ -3967,12 +3967,12 @@ export interface components {
              * @default none_stated
              * @enum {string}
              */
-            level: "none_stated" | "bachelors" | "masters" | "doctorate";
+            level?: "none_stated" | "bachelors" | "masters" | "doctorate";
             /**
              * Required
              * @default false
              */
-            required: boolean;
+            required?: boolean;
         };
         /** EmployerFixIn */
         EmployerFixIn: {
@@ -3982,7 +3982,7 @@ export interface components {
              * Remember Alias
              * @default true
              */
-            remember_alias: boolean;
+            remember_alias?: boolean;
         };
         /** ErrorOut */
         ErrorOut: {
@@ -4110,7 +4110,7 @@ export interface components {
              * Sort Order
              * @default 0
              */
-            sort_order: number;
+            sort_order?: number;
         };
         /** ExperienceOut */
         ExperienceOut: {
@@ -4161,7 +4161,7 @@ export interface components {
              * Sort Order
              * @default 0
              */
-            sort_order: number;
+            sort_order?: number;
         };
         /** ExportIn */
         ExportIn: {
@@ -4241,7 +4241,7 @@ export interface components {
              * Canonical Wording
              * @default false
              */
-            canonical_wording: boolean;
+            canonical_wording?: boolean;
             /** Experience Id */
             experience_id?: string | null;
             /** Tags */
@@ -4252,7 +4252,7 @@ export interface components {
              * Keep Out Of Prompts
              * @default false
              */
-            keep_out_of_prompts: boolean;
+            keep_out_of_prompts?: boolean;
             /** Confidence Note */
             confidence_note?: string | null;
         };
@@ -4298,7 +4298,7 @@ export interface components {
              * Canonical Wording
              * @default false
              */
-            canonical_wording: boolean;
+            canonical_wording?: boolean;
             /** Experience Id */
             experience_id?: string | null;
             /** Tags */
@@ -4309,7 +4309,7 @@ export interface components {
              * Keep Out Of Prompts
              * @default false
              */
-            keep_out_of_prompts: boolean;
+            keep_out_of_prompts?: boolean;
             /** Confidence Note */
             confidence_note?: string | null;
             /**
@@ -4333,7 +4333,7 @@ export interface components {
              * Mandatory
              * @default true
              */
-            mandatory: boolean;
+            mandatory?: boolean;
         };
         /** FormatRule */
         FormatRule: {
@@ -4377,12 +4377,12 @@ export interface components {
              * @default and
              * @enum {string}
              */
-            op: "and" | "or";
+            op?: "and" | "or";
             /**
              * Negate
              * @default false
              */
-            negate: boolean;
+            negate?: boolean;
             /** Conditions */
             conditions?: (components["schemas"]["ValueFilter"] | components["schemas"]["RangeFilter"] | components["schemas"]["TextFilter"] | components["schemas"]["Group-Input"])[];
         };
@@ -4398,12 +4398,12 @@ export interface components {
              * @default and
              * @enum {string}
              */
-            op: "and" | "or";
+            op?: "and" | "or";
             /**
              * Negate
              * @default false
              */
-            negate: boolean;
+            negate?: boolean;
             /** Conditions */
             conditions?: (components["schemas"]["ValueFilter"] | components["schemas"]["RangeFilter"] | components["schemas"]["TextFilter"] | components["schemas"]["Group-Output"])[];
         };
@@ -4437,13 +4437,13 @@ export interface components {
              * @default block
              * @enum {string}
              */
-            severity: "block" | "warn";
+            severity?: "block" | "warn";
             /**
              * Strictness
              * @default always_block
              * @enum {string}
              */
-            strictness: "always_block" | "block_waivable_once" | "advise";
+            strictness?: "always_block" | "block_waivable_once" | "advise";
             /** Params */
             params: components["schemas"]["NeverMention"] | components["schemas"]["NeverTogether"] | components["schemas"]["RequireWording"] | components["schemas"]["Reframe"] | components["schemas"]["OmitField"] | components["schemas"]["FormatRule"] | components["schemas"]["Positioning"] | components["schemas"]["LimitRule"] | components["schemas"]["AttachPolicy"];
             /** Reason */
@@ -4452,7 +4452,7 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
         };
         /** GuardrailOut */
         GuardrailOut: {
@@ -4492,13 +4492,13 @@ export interface components {
              * @default block
              * @enum {string}
              */
-            severity: "block" | "warn";
+            severity?: "block" | "warn";
             /**
              * Strictness
              * @default always_block
              * @enum {string}
              */
-            strictness: "always_block" | "block_waivable_once" | "advise";
+            strictness?: "always_block" | "block_waivable_once" | "advise";
             /** Params */
             params: components["schemas"]["NeverMention"] | components["schemas"]["NeverTogether"] | components["schemas"]["RequireWording"] | components["schemas"]["Reframe"] | components["schemas"]["OmitField"] | components["schemas"]["FormatRule"] | components["schemas"]["Positioning"] | components["schemas"]["LimitRule"] | components["schemas"]["AttachPolicy"];
             /** Reason */
@@ -4507,7 +4507,7 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
             /** Type */
             type: string;
         };
@@ -5003,7 +5003,7 @@ export interface components {
              * Totp Enabled
              * @default false
              */
-            totp_enabled: boolean;
+            totp_enabled?: boolean;
         };
         /** MergeIn */
         MergeIn: {
@@ -5045,7 +5045,7 @@ export interface components {
              * Ok
              * @default true
              */
-            ok: boolean;
+            ok?: boolean;
         };
         /** OmitField */
         OmitField: {
@@ -5104,7 +5104,7 @@ export interface components {
              * Material
              * @default false
              */
-            material: boolean;
+            material?: boolean;
         };
         /** PacketChange */
         PacketChange: {
@@ -5145,12 +5145,12 @@ export interface components {
              * Verified
              * @default false
              */
-            verified: boolean;
+            verified?: boolean;
             /**
              * Trusted
              * @default false
              */
-            trusted: boolean;
+            trusted?: boolean;
         };
         /** PacketEmail */
         PacketEmail: {
@@ -5601,7 +5601,7 @@ export interface components {
              * @default year
              * @enum {string}
              */
-            period: "year" | "month" | "week" | "day" | "hour";
+            period?: "year" | "month" | "week" | "day" | "hour";
         };
         /** PayOut */
         PayOut: {
@@ -5677,7 +5677,7 @@ export interface components {
              * @default show_on_cv
              * @enum {string}
              */
-            visibility: "show_on_cv" | "forms_only" | "hidden";
+            visibility?: "show_on_cv" | "forms_only" | "hidden";
         };
         /** PersonIn */
         PersonIn: {
@@ -5827,7 +5827,7 @@ export interface components {
              * @default exclude
              * @enum {string}
              */
-            not_stated: "include" | "exclude";
+            not_stated?: "include" | "exclude";
         };
         /** RateLimit */
         RateLimit: {
@@ -5835,12 +5835,12 @@ export interface components {
              * Requests Per Minute
              * @default 30
              */
-            requests_per_minute: number;
+            requests_per_minute?: number;
             /**
              * Burst
              * @default 5
              */
-            burst: number;
+            burst?: number;
         };
         /**
          * ReceiptOut
@@ -5893,13 +5893,13 @@ export interface components {
              * Consent
              * @default false
              */
-            consent: boolean;
+            consent?: boolean;
             /**
              * Share Policy
              * @default on_request
              * @enum {string}
              */
-            share_policy: "on_cv" | "on_request" | "forms_only";
+            share_policy?: "on_cv" | "on_request" | "forms_only";
         };
         /** ReferenceOut */
         ReferenceOut: {
@@ -5944,13 +5944,13 @@ export interface components {
              * Consent
              * @default false
              */
-            consent: boolean;
+            consent?: boolean;
             /**
              * Share Policy
              * @default on_request
              * @enum {string}
              */
-            share_policy: "on_cv" | "on_request" | "forms_only";
+            share_policy?: "on_cv" | "on_request" | "forms_only";
         };
         /** Reframe */
         Reframe: {
@@ -6009,7 +6009,7 @@ export interface components {
              * @default required
              * @enum {string}
              */
-            kind: "required" | "preferred";
+            kind?: "required" | "preferred";
             /** Skill */
             skill?: string | null;
         };
@@ -6201,7 +6201,7 @@ export interface components {
              * Limit
              * @default 50
              */
-            limit: number;
+            limit?: number;
         };
         /** RulePreviewOut */
         RulePreviewOut: {
@@ -6225,7 +6225,7 @@ export interface components {
              * Dry Run
              * @default false
              */
-            dry_run: boolean;
+            dry_run?: boolean;
         };
         /** RunOut */
         RunOut: {
@@ -6316,7 +6316,7 @@ export interface components {
              * @default matches
              * @enum {string}
              */
-            scope: "matches" | "applications";
+            scope?: "matches" | "applications";
         };
         /** SavedViewBody */
         "SavedViewBody-Output": {
@@ -6330,7 +6330,7 @@ export interface components {
              * @default matches
              * @enum {string}
              */
-            scope: "matches" | "applications";
+            scope?: "matches" | "applications";
         };
         /** SavedViewIn */
         SavedViewIn: {
@@ -6341,12 +6341,12 @@ export interface components {
              * Pinned
              * @default false
              */
-            pinned: boolean;
+            pinned?: boolean;
             /**
              * Sort Order
              * @default 0
              */
-            sort_order: number;
+            sort_order?: number;
         };
         /** SavedViewOut */
         SavedViewOut: {
@@ -6372,12 +6372,12 @@ export interface components {
              * Pinned
              * @default false
              */
-            pinned: boolean;
+            pinned?: boolean;
             /**
              * Sort Order
              * @default 0
              */
-            sort_order: number;
+            sort_order?: number;
             /**
              * Count
              * @description Live count
@@ -6409,12 +6409,12 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
             /**
              * Dry Run
              * @default false
              */
-            dry_run: boolean;
+            dry_run?: boolean;
         };
         /** ScheduleOut */
         ScheduleOut: {
@@ -6456,12 +6456,12 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
             /**
              * Dry Run
              * @default false
              */
-            dry_run: boolean;
+            dry_run?: boolean;
             /** Next Run At */
             next_run_at: string | null;
             /** Last Enqueued At */
@@ -6629,7 +6629,7 @@ export interface components {
              * @default yes
              * @enum {string}
              */
-            claim: "yes" | "no" | "never";
+            claim?: "yes" | "no" | "never";
             /** Note */
             note?: string | null;
         };
@@ -6673,7 +6673,7 @@ export interface components {
              * @default yes
              * @enum {string}
              */
-            claim: "yes" | "no" | "never";
+            claim?: "yes" | "no" | "never";
             /** Note */
             note?: string | null;
         };
@@ -6686,7 +6686,7 @@ export interface components {
              * @default desc
              * @enum {string}
              */
-            direction: "asc" | "desc";
+            direction?: "asc" | "desc";
         };
         /** SourceHealth */
         SourceHealth: {
@@ -6695,12 +6695,12 @@ export interface components {
              * @default unknown
              * @enum {string}
              */
-            status: "ok" | "degraded" | "failing" | "unknown";
+            status?: "ok" | "degraded" | "failing" | "unknown";
             /**
              * Consecutive Failures
              * @default 0
              */
-            consecutive_failures: number;
+            consecutive_failures?: number;
             /** Last Error */
             last_error?: string | null;
         };
@@ -6751,7 +6751,7 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
         };
         /** SourceOut */
         SourceOut: {
@@ -6798,7 +6798,7 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
             health: components["schemas"]["SourceHealth"];
             /** Last Success At */
             last_success_at?: string | null;
@@ -6816,12 +6816,12 @@ export interface components {
              * Found
              * @default 0
              */
-            found: number;
+            found?: number;
             /**
              * New
              * @default 0
              */
-            new: number;
+            new?: number;
             /** Error */
             error?: string | null;
         };
@@ -6921,7 +6921,7 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
         };
         /** TagRuleOut */
         TagRuleOut: {
@@ -6947,7 +6947,7 @@ export interface components {
              * Enabled
              * @default true
              */
-            enabled: boolean;
+            enabled?: boolean;
         };
         /** TailorOut */
         TailorOut: {
@@ -6973,7 +6973,7 @@ export interface components {
              * Css
              * @default
              */
-            css: string;
+            css?: string;
             /** Section Order */
             section_order?: string[];
             limits?: components["schemas"]["TemplateLimits"];
@@ -7033,7 +7033,7 @@ export interface components {
              * Css
              * @default
              */
-            css: string;
+            css?: string;
             /** Section Order */
             section_order?: string[];
             limits?: components["schemas"]["TemplateLimits"];
@@ -7210,7 +7210,7 @@ export interface components {
              * @default pc
              * @enum {string}
              */
-            runner_kind: "pc" | "server";
+            runner_kind?: "pc" | "server";
             /** Scopes */
             scopes?: ("gateway:tasks" | "gateway:packets" | "gateway:permits" | "gateway:sweep")[];
         };
@@ -7322,7 +7322,7 @@ export interface components {
              * Priority
              * @default 0
              */
-            priority: number;
+            priority?: number;
             /** Example Titles */
             example_titles?: string[];
             /** Lead Fact Codes */
@@ -7369,7 +7369,7 @@ export interface components {
              * Priority
              * @default 0
              */
-            priority: number;
+            priority?: number;
             /** Example Titles */
             example_titles?: string[];
             /** Lead Fact Codes */
@@ -7476,7 +7476,7 @@ export interface components {
              * @default any
              * @enum {string}
              */
-            match: "any" | "all";
+            match?: "any" | "all";
         };
         /** VaultDocumentOut */
         VaultDocumentOut: {
@@ -7552,14 +7552,14 @@ export interface components {
              * Priority
              * @default 0
              */
-            priority: number;
+            priority?: number;
             /** Cooldown Days */
             cooldown_days?: number | null;
             /**
              * Always Ask First
              * @default false
              */
-            always_ask_first: boolean;
+            always_ask_first?: boolean;
         };
         /** WatchedEmployerOut */
         WatchedEmployerOut: {
@@ -7588,14 +7588,14 @@ export interface components {
              * Priority
              * @default 0
              */
-            priority: number;
+            priority?: number;
             /** Cooldown Days */
             cooldown_days?: number | null;
             /**
              * Always Ask First
              * @default false
              */
-            always_ask_first: boolean;
+            always_ask_first?: boolean;
         };
         /** WhereMustLive */
         WhereMustLive: {
@@ -7604,7 +7604,7 @@ export interface components {
              * @default not_stated
              * @enum {string}
              */
-            kind: "places" | "anywhere" | "not_stated";
+            kind?: "places" | "anywhere" | "not_stated";
             /** Places */
             places?: string[];
         };
@@ -7655,7 +7655,7 @@ export interface components {
              * Workers
              * @default 0
              */
-            workers: number;
+            workers?: number;
         };
     };
     responses: never;
