@@ -976,6 +976,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -1645,6 +1647,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -1921,6 +1925,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -2197,6 +2203,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -2473,6 +2481,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -2749,6 +2759,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -3025,6 +3037,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -3301,6 +3315,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -4052,6 +4068,7 @@
           "kit"
         ],
         "summary": "Kit Review Decide",
+        "description": "Confirm keeps the record; drop removes it (facts are retired so their code is never reused).\nEdit a record with its own PUT: it stays in the queue until confirmed.",
         "operationId": "kit_review_decide",
         "parameters": [
           {
@@ -13001,7 +13018,7 @@
             "title": "Applied At"
           },
           "spec": {
-            "$ref": "#/components/schemas/ApplicationSpec"
+            "$ref": "#/components/schemas/ApplicationSpec-Output"
           },
           "check_results": {
             "items": {
@@ -13138,7 +13155,69 @@
         "type": "object",
         "title": "ApplicationPatch"
       },
-      "ApplicationSpec": {
+      "ApplicationSpec-Input": {
+        "properties": {
+          "headline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "competencies": {
+            "items": {
+              "$ref": "#/components/schemas/SpecItem"
+            },
+            "type": "array",
+            "title": "Competencies"
+          },
+          "experience": {
+            "items": {
+              "$ref": "#/components/schemas/SpecExperience"
+            },
+            "type": "array",
+            "title": "Experience"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "letter": {
+            "items": {
+              "$ref": "#/components/schemas/SpecItem"
+            },
+            "type": "array",
+            "title": "Letter"
+          },
+          "requirement_match": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementMatch"
+            },
+            "type": "array",
+            "title": "Requirement Match"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ApplicationSpec"
+      },
+      "ApplicationSpec-Output": {
         "properties": {
           "headline": {
             "anyOf": [
@@ -14019,7 +14098,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "source": {
@@ -14044,7 +14123,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "title": {
@@ -23934,7 +24013,7 @@
       "SpecUpdate": {
         "properties": {
           "spec": {
-            "$ref": "#/components/schemas/ApplicationSpec"
+            "$ref": "#/components/schemas/ApplicationSpec-Input"
           }
         },
         "type": "object",
@@ -25573,13 +25652,6 @@
           "type": {
             "type": "string",
             "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
           }
         },
         "type": "object",
