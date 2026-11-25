@@ -47,6 +47,13 @@ import {
   SettingsSection,
 } from "@/features/settings/settings-pages"
 import { AppearancePage } from "@/features/settings/appearance-page"
+import {
+  SettingsGroupPage,
+  type SettingsPageKey,
+} from "@/features/settings/settings-group-page"
+import { ActivityPage } from "@/features/settings/activity-page"
+import { HistoryPage } from "@/features/settings/history-page"
+import { SecurityPage } from "@/features/settings/security-page"
 import { OnboardingPage } from "@/features/onboarding/onboarding-page"
 
 declare module "@tanstack/react-router" {
@@ -210,15 +217,30 @@ const appearanceRoute = createRoute({
   staticData: { title: "Appearance" },
   component: AppearancePage,
 })
-type SettingsKey =
-  | "ai"
-  | "connections"
-  | "notifications"
-  | "runners"
-  | "data"
-  | "security"
-  | "activity"
-  | "history"
+type SettingsKey = "ai" | "connections" | "runners" | "data"
+const groupRoute = (path: SettingsPageKey) =>
+  createRoute({
+    getParentRoute: () => settingsRoute,
+    path,
+    component: () => <SettingsGroupPage page={path} />,
+  })
+const groupRoutes = [
+  groupRoute("general"),
+  groupRoute("schedule"),
+  groupRoute("scoring"),
+  groupRoute("automation"),
+  groupRoute("documents"),
+  groupRoute("retention"),
+  groupRoute("reconcile"),
+  groupRoute("notifications"),
+] as const
+const ownRoute = (path: "security" | "activity" | "history", C: () => React.ReactNode) =>
+  createRoute({ getParentRoute: () => settingsRoute, path, component: C })
+const ownRoutes = [
+  ownRoute("security", SecurityPage),
+  ownRoute("activity", ActivityPage),
+  ownRoute("history", HistoryPage),
+] as const
 const settingsChild = (path: SettingsKey) =>
   createRoute({
     getParentRoute: () => settingsRoute,
@@ -228,12 +250,8 @@ const settingsChild = (path: SettingsKey) =>
 const settingsChildren = [
   settingsChild("ai"),
   settingsChild("connections"),
-  settingsChild("notifications"),
   settingsChild("runners"),
   settingsChild("data"),
-  settingsChild("security"),
-  settingsChild("activity"),
-  settingsChild("history"),
 ] as const
 
 // ---- dev ----
@@ -270,6 +288,8 @@ export const routeTree = rootRoute.addChildren([
       settingsRoute.addChildren([
         settingsIndex,
         appearanceRoute,
+        ...groupRoutes,
+        ...ownRoutes,
         ...settingsChildren,
       ]),
       devComponentsRoute,

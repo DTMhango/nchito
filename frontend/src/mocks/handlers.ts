@@ -8,6 +8,8 @@ import type {
   ThemeInput,
 } from "@/lib/api/types"
 import { db } from "./db"
+import { jobHandlers } from "./handlers/jobs"
+import { settingsHandlers } from "./handlers/settings"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -82,6 +84,7 @@ export const handlers = [
       display_name: owner.display_name,
       timezone: owner.timezone,
       app_name: "Nchito",
+      totp_enabled: owner.totp_secret !== null,
     })
   }),
 
@@ -187,4 +190,6 @@ export const handlers = [
     })
     return HttpResponse.json(db.get().autopilot)
   }),
+  ...jobHandlers,
+  ...settingsHandlers,
 ]
