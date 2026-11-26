@@ -19,7 +19,7 @@ from __future__ import annotations
 import base64
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Literal
 
@@ -39,6 +39,7 @@ from app.core.conditions import (
 )
 from app.kit import work_rights
 from app.kit.answers import AnswerRecord
+from app.models.bulk import EmployerPolicy
 from app.models.search import (
     Assessment,
     Campaign,
@@ -86,6 +87,7 @@ def job_record(
     employer_aliases: Mapping[str, str] | None = None,
     best_score: int | None = None,
     always_ask_first: bool = False,
+    never_apply: str | None = None,
     kit_answers: Sequence[AnswerRecord] | None = None,
 ) -> dict[str, Any]:
     """The plain-dict view of a job for conditions and the decision table. ``kit_answers`` (matcher
@@ -141,6 +143,7 @@ def job_record(
         "conflict_state": _val(job.conflict_state),
         "best_score": best_score,
         "always_ask_first": always_ask_first,
+        "never_apply": never_apply,
         "requisition_id": job.requisition_id,
     }
 
@@ -169,6 +172,7 @@ class Lookups:
     skill_aliases: dict[str, str]
     employer_aliases: dict[str, str]
     always_ask: set[str]
+    never_apply: dict[str, str] = field(default_factory=dict)
 
 
 async def load_lookups(session: AsyncSession) -> Lookups:
@@ -177,7 +181,19 @@ async def load_lookups(session: AsyncSession) -> Lookups:
                  for a in (await session.scalars(select(EmployerAlias))).all()}
     ask = {w.name.strip().casefold() for w in (await session.scalars(
         select(WatchedEmployer).where(WatchedEmployer.always_ask_first.is_(True)))).all()}
-    return Lookups(skills, employers, ask)
+    never: dict[str, str] = {}
+    for pol in (await session.scalars(select(EmployerPolicy))).all():  # per-employer overrides (7.1, 8.1)
+        if pol.always_ask_first:
+            ask.add(pol.employer_key)
+        if pol.never_apply:
+            never[pol.employer_key] = pol.never_reason or ""
+    return Lookups(skills, employers, ask, never)
+
+
+def _ekey(job: Job, lk: Lookups) -> str:
+    """The alias-resolved, casefolded employer, the key of watched employers and employer policies."""
+    name = job.canonical_employer.strip().casefold()
+    return (lk.employer_aliases.get(name) or name).strip().casefold()
 
 
 async def load_records(session: AsyncSession, *, now: datetime, job_ids: Sequence[uuid.UUID] | None = None,
@@ -211,7 +227,8 @@ async def load_records(session: AsyncSession, *, now: datetime, job_ids: Sequenc
         record = job_record(job, now=now, estimate=estimates.get(job.id), sources=sources.get(job.id, ()),
                             skill_aliases=lk.skill_aliases, employer_aliases=lk.employer_aliases,
                             best_score=best.get(job.id),
-                            always_ask_first=job.canonical_employer.strip().casefold() in lk.always_ask,
+                            always_ask_first=_ekey(job, lk) in lk.always_ask,
+                            never_apply=lk.never_apply.get(_ekey(job, lk)),
                             kit_answers=kit_answers)
         out.append((job, record))
     return out

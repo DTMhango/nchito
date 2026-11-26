@@ -476,3 +476,14 @@ class AgentTaskState(Shape):
 AgentTaskTypeName = Literal["apply", "sweep_site", "check_posting"]
 
 JsonDict = dict[str, Any]
+
+
+# ----- wave 4 bulk: one spelling each (equal Literals share a typing cache entry) ------------------------
+BulkSubject = Literal["jobs", "applications"]
+BulkActionName = Literal["tag", "untag", "skip", "snooze", "move_stage", "assign_campaign", "queue_tailoring",
+                         "send_for_approval", "approve_reviewed", "archive", "recheck", "export_csv"]
+BulkStatus = Literal["previewed", "queued", "running", "done", "partial", "failed", "undone"]
+BulkItemOutcome = Literal["pending", "changed", "unchanged", "refused", "failed", "undone", "undo_skipped"]
+BulkVerdict = Literal["change", "unchanged", "refused"]
+EmployerStateName = Literal["free", "role_in_progress", "cooling_down", "always_ask_first", "blocked"]
+CooldownKind = Literal["end_state", "applied_date"]

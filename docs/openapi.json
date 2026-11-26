@@ -7260,57 +7260,6 @@
         }
       }
     },
-    "/api/jobs/bulk": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Bulk",
-        "operationId": "jobs_bulk",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BulkActionIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BulkActionOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/jobs/{job_id}/why": {
       "get": {
         "tags": [
@@ -8966,7 +8915,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/MergeIn"
+                "$ref": "#/components/schemas/app__api__routers__jobs_corrections__MergeIn"
               }
             }
           }
@@ -9030,7 +8979,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SplitIn"
+                "$ref": "#/components/schemas/app__api__routers__jobs_corrections__SplitIn"
               }
             }
           }
@@ -9116,6 +9065,764 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bulk/options": {
+      "get": {
+        "tags": [
+          "bulk"
+        ],
+        "summary": "Bulk Options",
+        "description": "What the bulk bars may offer, from settings.",
+        "operationId": "bulk_options",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkOptionsOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bulk/preview": {
+      "post": {
+        "tags": [
+          "bulk"
+        ],
+        "summary": "Bulk Preview",
+        "description": "What would happen to each selected item. Nothing changes; the count to confirm is ``selected``.",
+        "operationId": "bulk_preview",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bad selection or parameters, or over the size cap ({code, reason})"
+          }
+        }
+      }
+    },
+    "/api/bulk/{operation_id}/run": {
+      "post": {
+        "tags": [
+          "bulk"
+        ],
+        "summary": "Bulk Run",
+        "description": "Confirm the previewed count and run it in the background. Running a failed or partial operation\nagain retries only what failed.",
+        "operationId": "bulk_run",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Count does not match, or already run ({code, reason})"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bulk": {
+      "get": {
+        "tags": [
+          "bulk"
+        ],
+        "summary": "Bulk List",
+        "operationId": "bulk_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OperationOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bulk/{operation_id}": {
+      "get": {
+        "tags": [
+          "bulk"
+        ],
+        "summary": "Bulk Get",
+        "operationId": "bulk_get",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bulk/{operation_id}/items": {
+      "get": {
+        "tags": [
+          "bulk"
+        ],
+        "summary": "Bulk Items",
+        "description": "Per-item results (what each did, or why it could not).",
+        "operationId": "bulk_items",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Operation Id"
+            }
+          },
+          {
+            "name": "outcome",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "pending",
+                    "changed",
+                    "unchanged",
+                    "refused",
+                    "failed",
+                    "undone",
+                    "undo_skipped"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Outcome"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ItemOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bulk/{operation_id}/undo": {
+      "post": {
+        "tags": [
+          "bulk"
+        ],
+        "summary": "Bulk Undo",
+        "operationId": "bulk_undo",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot be undone, or the window has passed ({code, reason})"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/bulk/{operation_id}/csv": {
+      "get": {
+        "tags": [
+          "bulk"
+        ],
+        "summary": "Bulk Csv",
+        "description": "The export action's file: the operation's selection as CSV (read only).",
+        "operationId": "bulk_csv",
+        "parameters": [
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/csv": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/employers": {
+      "get": {
+        "tags": [
+          "employers"
+        ],
+        "summary": "Employers List",
+        "operationId": "employers_list",
+        "parameters": [
+          {
+            "name": "state",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "free",
+                    "role_in_progress",
+                    "cooling_down",
+                    "always_ask_first",
+                    "blocked"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "State"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/EmployerRowOut"
+                  },
+                  "title": "Response Employers List"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/employers/states": {
+      "post": {
+        "tags": [
+          "employers"
+        ],
+        "summary": "Employers States",
+        "description": "The employer chip for each job (Matches and Applications), read only.",
+        "operationId": "employers_states",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatesIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/employers/detail": {
+      "get": {
+        "tags": [
+          "employers"
+        ],
+        "summary": "Employers Get",
+        "operationId": "employers_get",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "The employer key (casefolded canonical name)",
+              "title": "Key"
+            },
+            "description": "The employer key (casefolded canonical name)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployerDetailOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/employers/policy": {
+      "patch": {
+        "tags": [
+          "employers"
+        ],
+        "summary": "Employers Set Policy",
+        "description": "Per-employer overrides (audited). 'Never apply' blocks tailoring and sending for every role there.",
+        "operationId": "employers_set_policy",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "The employer key (casefolded canonical name)",
+              "title": "Key"
+            },
+            "description": "The employer key (casefolded canonical name)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployerRowOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A reason is required to never apply ({code, reason})"
+          }
+        }
+      }
+    },
+    "/api/employers/end-cooldown": {
+      "post": {
+        "tags": [
+          "employers"
+        ],
+        "summary": "Employers End Cooldown",
+        "description": "End the running cooldown early, with a reason (audited).",
+        "operationId": "employers_end_cooldown",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "The employer key (casefolded canonical name)",
+              "title": "Key"
+            },
+            "description": "The employer key (casefolded canonical name)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndCooldownIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmployerRowOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No cooldown is running ({code, reason})"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/employers/merge": {
+      "post": {
+        "tags": [
+          "employers"
+        ],
+        "summary": "Employers Merge",
+        "description": "Merge this employer into another (every role posted under it moves; the alias can be remembered).",
+        "operationId": "employers_merge",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "The employer key (casefolded canonical name)",
+              "title": "Key"
+            },
+            "description": "The employer key (casefolded canonical name)"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__routers__employers__MergeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/employers/split": {
+      "post": {
+        "tags": [
+          "employers"
+        ],
+        "summary": "Employers Split",
+        "description": "Undo a merge: the name stops being an alias and its roles go back under their own employer.",
+        "operationId": "employers_split",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__routers__employers__SplitIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeOut"
                 }
               }
             }
@@ -18951,93 +19658,81 @@
         ],
         "title": "Body_kit_vault_upload"
       },
-      "BulkActionIn": {
+      "BulkOptionsOut": {
         "properties": {
-          "job_ids": {
+          "max_selection": {
+            "type": "integer",
+            "title": "Max Selection"
+          },
+          "undo_window_minutes": {
+            "type": "integer",
+            "title": "Undo Window Minutes"
+          },
+          "approve_reviewed_enabled": {
+            "type": "boolean",
+            "title": "Approve Reviewed Enabled"
+          },
+          "reversible": {
             "items": {
               "type": "string",
-              "format": "uuid"
+              "enum": [
+                "tag",
+                "untag",
+                "skip",
+                "snooze",
+                "move_stage",
+                "assign_campaign",
+                "queue_tailoring",
+                "send_for_approval",
+                "approve_reviewed",
+                "archive",
+                "recheck",
+                "export_csv"
+              ]
             },
             "type": "array",
-            "maxItems": 500,
-            "minItems": 1,
-            "title": "Job Ids"
+            "title": "Reversible"
           },
-          "action": {
-            "type": "string",
-            "enum": [
-              "skip",
-              "archive",
-              "shortlist",
-              "tag",
-              "untag",
-              "pin",
-              "unpin",
-              "snooze"
-            ],
-            "title": "Action"
-          },
-          "tag": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tag"
-          },
-          "until": {
-            "anyOf": [
-              {
+          "actions": {
+            "additionalProperties": {
+              "items": {
                 "type": "string",
-                "format": "date-time"
+                "enum": [
+                  "tag",
+                  "untag",
+                  "skip",
+                  "snooze",
+                  "move_stage",
+                  "assign_campaign",
+                  "queue_tailoring",
+                  "send_for_approval",
+                  "approve_reviewed",
+                  "archive",
+                  "recheck",
+                  "export_csv"
+                ]
               },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Until"
-          },
-          "preview": {
-            "type": "boolean",
-            "title": "Preview",
-            "default": true
-          }
-        },
-        "type": "object",
-        "required": [
-          "job_ids",
-          "action"
-        ],
-        "title": "BulkActionIn"
-      },
-      "BulkActionOut": {
-        "properties": {
-          "affected": {
-            "type": "integer",
-            "title": "Affected"
-          },
-          "preview": {
-            "type": "boolean",
-            "title": "Preview"
-          },
-          "detail": {
-            "items": {
-              "type": "string"
+              "type": "array"
             },
-            "type": "array",
-            "title": "Detail"
+            "propertyNames": {
+              "enum": [
+                "jobs",
+                "applications"
+              ]
+            },
+            "type": "object",
+            "title": "Actions"
           }
         },
         "type": "object",
         "required": [
-          "affected",
-          "preview",
-          "detail"
+          "max_selection",
+          "undo_window_minutes",
+          "approve_reviewed_enabled",
+          "reversible",
+          "actions"
         ],
-        "title": "BulkActionOut"
+        "title": "BulkOptionsOut"
       },
       "CampaignBudget": {
         "properties": {
@@ -19753,6 +20448,31 @@
           "status"
         ],
         "title": "CheckResult"
+      },
+      "ChipOut": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "free",
+              "role_in_progress",
+              "cooling_down",
+              "always_ask_first",
+              "blocked"
+            ],
+            "title": "State"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state",
+          "text"
+        ],
+        "title": "ChipOut"
       },
       "CompareCell": {
         "properties": {
@@ -20802,6 +21522,119 @@
         ],
         "title": "ContactOut"
       },
+      "ContactRowOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_id",
+          "name",
+          "role",
+          "email",
+          "link"
+        ],
+        "title": "ContactRowOut"
+      },
+      "CooldownOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "end_state",
+              "applied_date"
+            ],
+            "title": "Kind",
+            "description": "end_state: from the end state; applied_date: from the applied date, because there has been no reply"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "starts_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Starts On"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "ends_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Ends On"
+          },
+          "running": {
+            "type": "boolean",
+            "title": "Running"
+          },
+          "rule": {
+            "type": "string",
+            "title": "Rule",
+            "description": "The rule in words, with the dates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "application_id",
+          "starts_on",
+          "days",
+          "ends_on",
+          "running",
+          "rule"
+        ],
+        "title": "CooldownOut"
+      },
       "CriterionRating": {
         "properties": {
           "criterion": {
@@ -21702,6 +22535,134 @@
         "type": "object",
         "title": "Education"
       },
+      "EmployerDetailOut": {
+        "properties": {
+          "employer": {
+            "$ref": "#/components/schemas/EmployerRowOut"
+          },
+          "cooldown": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CooldownOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cooldown_days": {
+            "type": "integer",
+            "title": "Cooldown Days",
+            "description": "The length in force"
+          },
+          "cooldown_days_source": {
+            "type": "string",
+            "title": "Cooldown Days Source"
+          },
+          "cooldown_ended_early_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Ended Early At"
+          },
+          "cooldown_ended_early_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Ended Early By"
+          },
+          "cooldown_ended_early_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Ended Early Reason"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/RoleOut"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "conflict_groups": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/RoleOut"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Conflict Groups",
+            "description": "Roles that compete (winner and held)"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryOut"
+            },
+            "type": "array",
+            "title": "History"
+          },
+          "contacts": {
+            "items": {
+              "$ref": "#/components/schemas/ContactRowOut"
+            },
+            "type": "array",
+            "title": "Contacts"
+          },
+          "aliases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Aliases",
+            "description": "Names merged into this employer"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "employer",
+          "cooldown",
+          "cooldown_days",
+          "cooldown_days_source",
+          "cooldown_ended_early_at",
+          "cooldown_ended_early_by",
+          "cooldown_ended_early_reason",
+          "roles",
+          "conflict_groups",
+          "history",
+          "contacts",
+          "aliases",
+          "notes"
+        ],
+        "title": "EmployerDetailOut"
+      },
       "EmployerFixIn": {
         "properties": {
           "canonical_employer": {
@@ -21721,6 +22682,147 @@
           "canonical_employer"
         ],
         "title": "EmployerFixIn"
+      },
+      "EmployerRowOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "free",
+              "role_in_progress",
+              "cooling_down",
+              "always_ask_first",
+              "blocked"
+            ],
+            "title": "State"
+          },
+          "state_text": {
+            "type": "string",
+            "title": "State Text"
+          },
+          "applications": {
+            "type": "integer",
+            "title": "Applications"
+          },
+          "live": {
+            "type": "integer",
+            "title": "Live"
+          },
+          "last_applied_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Applied At"
+          },
+          "roles_seen": {
+            "type": "integer",
+            "title": "Roles Seen"
+          },
+          "held_roles": {
+            "type": "integer",
+            "title": "Held Roles"
+          },
+          "cooldown_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Until"
+          },
+          "always_ask_first": {
+            "type": "boolean",
+            "title": "Always Ask First"
+          },
+          "never_apply": {
+            "type": "boolean",
+            "title": "Never Apply"
+          },
+          "never_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Never Reason"
+          },
+          "watched": {
+            "type": "boolean",
+            "title": "Watched"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          },
+          "cooldown_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Days",
+            "description": "This employer's override; null uses the default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "state",
+          "state_text",
+          "applications",
+          "live",
+          "last_applied_at",
+          "roles_seen",
+          "held_roles",
+          "cooldown_until",
+          "always_ask_first",
+          "never_apply",
+          "never_reason",
+          "watched",
+          "priority",
+          "cooldown_days"
+        ],
+        "title": "EmployerRowOut"
+      },
+      "EndCooldownIn": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 1,
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reason"
+        ],
+        "title": "EndCooldownIn"
       },
       "ErrorOut": {
         "properties": {
@@ -23409,6 +24511,67 @@
         ],
         "title": "Health"
       },
+      "HistoryOut": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "applied_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "counts_toward_cooldown": {
+            "type": "boolean",
+            "title": "Counts Toward Cooldown"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "job_id",
+          "title",
+          "stage",
+          "applied_at",
+          "ended_at",
+          "counts_toward_cooldown"
+        ],
+        "title": "HistoryOut"
+      },
       "ImportCommitIn": {
         "properties": {
           "import_id": {
@@ -24268,6 +25431,103 @@
           "created_by"
         ],
         "title": "InterviewSectionOut"
+      },
+      "ItemOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "planned": {
+            "type": "string",
+            "enum": [
+              "change",
+              "unchanged",
+              "refused"
+            ],
+            "title": "Planned"
+          },
+          "planned_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Code"
+          },
+          "planned_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Reason"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "changed",
+              "unchanged",
+              "refused",
+              "failed",
+              "undone",
+              "undo_skipped"
+            ],
+            "title": "Outcome"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject_id",
+          "label",
+          "planned",
+          "planned_code",
+          "planned_reason",
+          "outcome",
+          "code",
+          "reason"
+        ],
+        "title": "ItemOut"
       },
       "JobChangeOut": {
         "properties": {
@@ -25716,23 +26976,18 @@
         ],
         "title": "Me"
       },
-      "MergeIn": {
+      "MergeOut": {
         "properties": {
-          "duplicate_ids": {
-            "items": {
-              "type": "string",
-              "format": "uuid"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Duplicate Ids"
+          "jobs": {
+            "type": "integer",
+            "title": "Jobs"
           }
         },
         "type": "object",
         "required": [
-          "duplicate_ids"
+          "jobs"
         ],
-        "title": "MergeIn"
+        "title": "MergeOut"
       },
       "NeverMention": {
         "properties": {
@@ -25900,6 +27155,160 @@
           "detail"
         ],
         "title": "OnboardingStepOut"
+      },
+      "OperationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "subject": {
+            "type": "string",
+            "enum": [
+              "jobs",
+              "applications"
+            ],
+            "title": "Subject"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "tag",
+              "untag",
+              "skip",
+              "snooze",
+              "move_stage",
+              "assign_campaign",
+              "queue_tailoring",
+              "send_for_approval",
+              "approve_reviewed",
+              "archive",
+              "recheck",
+              "export_csv"
+            ],
+            "title": "Action"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "previewed",
+              "queued",
+              "running",
+              "done",
+              "partial",
+              "failed",
+              "undone"
+            ],
+            "title": "Status"
+          },
+          "selected": {
+            "type": "integer",
+            "title": "Selected"
+          },
+          "params": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Params"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts",
+            "description": "Items per outcome"
+          },
+          "done": {
+            "type": "integer",
+            "title": "Done",
+            "description": "Items finished (any outcome but pending)"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "undo_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undo Until"
+          },
+          "can_undo": {
+            "type": "boolean",
+            "title": "Can Undo"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "subject",
+          "action",
+          "status",
+          "selected",
+          "params",
+          "counts",
+          "done",
+          "created_by",
+          "started_at",
+          "finished_at",
+          "undo_until",
+          "can_undo"
+        ],
+        "title": "OperationOut"
       },
       "Override": {
         "properties": {
@@ -27031,6 +28440,45 @@
         ],
         "title": "Page[GuardrailOut]"
       },
+      "Page_ItemOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque; pass back as ?cursor="
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[ItemOut]"
+      },
       "Page_MailThreadOut_": {
         "properties": {
           "items": {
@@ -27069,6 +28517,45 @@
           "items"
         ],
         "title": "Page[MailThreadOut]"
+      },
+      "Page_OperationOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OperationOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque; pass back as ?cursor="
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[OperationOut]"
       },
       "Page_PendingActionOut_": {
         "properties": {
@@ -27771,6 +29258,83 @@
           "items"
         ],
         "title": "Page[WatchedEmployerOut]"
+      },
+      "ParamsIn": {
+        "properties": {
+          "tag": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tag"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until",
+            "description": "Snooze until"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Required to skip"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage",
+            "description": "Target stage of move_stage"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "ParamsIn"
       },
       "PasswordChange": {
         "properties": {
@@ -28548,6 +30112,97 @@
         ],
         "title": "PersonalDetailHit"
       },
+      "PolicyIn": {
+        "properties": {
+          "cooldown_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3650.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Days",
+            "description": "null clears the override"
+          },
+          "always_ask_first": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Always Ask First"
+          },
+          "never_apply": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Never Apply"
+          },
+          "never_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 1000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Never Reason"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": -100.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priority"
+          },
+          "watched": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watched"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "title": "PolicyIn",
+        "description": "Only the fields sent change. ``never_apply`` needs ``never_reason``."
+      },
       "PortalAccountOut": {
         "properties": {
           "id": {
@@ -29003,6 +30658,132 @@
           "error"
         ],
         "title": "PracticeOut"
+      },
+      "PreviewIn": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "enum": [
+              "jobs",
+              "applications"
+            ],
+            "title": "Subject"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "tag",
+              "untag",
+              "skip",
+              "snooze",
+              "move_stage",
+              "assign_campaign",
+              "queue_tailoring",
+              "send_for_approval",
+              "approve_reviewed",
+              "archive",
+              "recheck",
+              "export_csv"
+            ],
+            "title": "Action"
+          },
+          "params": {
+            "$ref": "#/components/schemas/ParamsIn"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/SelectionIn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "action",
+          "selection"
+        ],
+        "title": "PreviewIn"
+      },
+      "PreviewOut": {
+        "properties": {
+          "operation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Operation Id"
+          },
+          "subject": {
+            "type": "string",
+            "enum": [
+              "jobs",
+              "applications"
+            ],
+            "title": "Subject"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "tag",
+              "untag",
+              "skip",
+              "snooze",
+              "move_stage",
+              "assign_campaign",
+              "queue_tailoring",
+              "send_for_approval",
+              "approve_reviewed",
+              "archive",
+              "recheck",
+              "export_csv"
+            ],
+            "title": "Action"
+          },
+          "selected": {
+            "type": "integer",
+            "title": "Selected",
+            "description": "Confirm this count to run"
+          },
+          "will_change": {
+            "type": "integer",
+            "title": "Will Change"
+          },
+          "unchanged": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReasonGroupOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Already as asked"
+          },
+          "refused": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonGroupOut"
+            },
+            "type": "array",
+            "title": "Refused",
+            "description": "Cannot be changed, grouped by reason"
+          },
+          "refused_total": {
+            "type": "integer",
+            "title": "Refused Total"
+          },
+          "reversible": {
+            "type": "boolean",
+            "title": "Reversible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "operation_id",
+          "subject",
+          "action",
+          "selected",
+          "will_change",
+          "refused",
+          "refused_total",
+          "reversible"
+        ],
+        "title": "PreviewOut"
       },
       "PriceIn": {
         "properties": {
@@ -29553,6 +31334,37 @@
           "migrated"
         ],
         "title": "Ready"
+      },
+      "ReasonGroupOut": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/SampleOut"
+            },
+            "type": "array",
+            "title": "Samples"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "title",
+          "count",
+          "samples"
+        ],
+        "title": "ReasonGroupOut"
       },
       "ReceiptOut": {
         "properties": {
@@ -30601,6 +32413,97 @@
         ],
         "title": "ReviewItem"
       },
+      "RoleOut": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "triage": {
+            "type": "string",
+            "title": "Triage"
+          },
+          "conflict_state": {
+            "type": "string",
+            "title": "Conflict State"
+          },
+          "conflict_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conflict Note"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "posted_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Posted At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "title",
+          "triage",
+          "conflict_state",
+          "conflict_note",
+          "score",
+          "application_id",
+          "stage",
+          "posted_at"
+        ],
+        "title": "RoleOut"
+      },
       "RollbackIn": {
         "properties": {
           "note": {
@@ -31195,6 +33098,24 @@
         ],
         "title": "RunCreate"
       },
+      "RunIn": {
+        "properties": {
+          "confirm_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirm Count",
+            "description": "Must equal the previewed count"
+          }
+        },
+        "type": "object",
+        "title": "RunIn"
+      },
       "RunOut": {
         "properties": {
           "id": {
@@ -31583,6 +33504,30 @@
         ],
         "title": "RunnerTaskOut"
       },
+      "SampleOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "reason"
+        ],
+        "title": "SampleOut"
+      },
       "SavedViewBody-Input": {
         "properties": {
           "conditions": {
@@ -31953,6 +33898,39 @@
           "high"
         ],
         "title": "ScoreRamp"
+      },
+      "SelectionIn": {
+        "properties": {
+          "ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ids",
+            "description": "The ticked rows"
+          },
+          "view": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ViewSelectionIn"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Or everything matching this view"
+          }
+        },
+        "type": "object",
+        "title": "SelectionIn"
       },
       "Series": {
         "properties": {
@@ -33466,24 +35444,6 @@
         ],
         "title": "SpendSummary"
       },
-      "SplitIn": {
-        "properties": {
-          "sighting_urls": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "minItems": 1,
-            "title": "Sighting Urls",
-            "description": "Sightings to move to a new job"
-          }
-        },
-        "type": "object",
-        "required": [
-          "sighting_urls"
-        ],
-        "title": "SplitIn"
-      },
       "StageChangeIn": {
         "properties": {
           "stage": {
@@ -33524,6 +35484,41 @@
         ],
         "title": "StageChangeIn",
         "description": "Dragging to `submitted` never creates evidence: use 'I applied myself' instead."
+      },
+      "StatesIn": {
+        "properties": {
+          "job_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "title": "Job Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_ids"
+        ],
+        "title": "StatesIn"
+      },
+      "StatesOut": {
+        "properties": {
+          "states": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ChipOut"
+            },
+            "type": "object",
+            "title": "States",
+            "description": "By job id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "states"
+        ],
+        "title": "StatesOut"
       },
       "StoryEditIn": {
         "properties": {
@@ -35666,6 +37661,107 @@
         ],
         "title": "VaultDocumentUpdate"
       },
+      "ViewSelectionIn": {
+        "properties": {
+          "view_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "View Id"
+          },
+          "conditions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditions",
+            "description": "JSON ConditionSet, as in the Matches list"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q"
+          },
+          "triage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Triage",
+            "description": "Matches only: new, shortlisted, ..."
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage",
+            "description": "Applications only"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel",
+            "description": "Applications only"
+          },
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          }
+        },
+        "type": "object",
+        "title": "ViewSelectionIn",
+        "description": "Everything matching a view, resolved on the server (the same filter as the list)."
+      },
       "WaiverIn": {
         "properties": {
           "application_id": {
@@ -36179,6 +38275,79 @@
           "notices"
         ],
         "title": "ImportPreviewOut"
+      },
+      "app__api__routers__employers__MergeIn": {
+        "properties": {
+          "into": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Into",
+            "description": "The canonical employer to merge this one into"
+          },
+          "remember_alias": {
+            "type": "boolean",
+            "title": "Remember Alias",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "into"
+        ],
+        "title": "MergeIn"
+      },
+      "app__api__routers__employers__SplitIn": {
+        "properties": {
+          "alias": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Alias",
+            "description": "A name that was merged into another employer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alias"
+        ],
+        "title": "SplitIn"
+      },
+      "app__api__routers__jobs_corrections__MergeIn": {
+        "properties": {
+          "duplicate_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Duplicate Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "duplicate_ids"
+        ],
+        "title": "MergeIn"
+      },
+      "app__api__routers__jobs_corrections__SplitIn": {
+        "properties": {
+          "sighting_urls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Sighting Urls",
+            "description": "Sightings to move to a new job"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sighting_urls"
+        ],
+        "title": "SplitIn"
       },
       "app__api__routers__kit__AnswerIn": {
         "properties": {

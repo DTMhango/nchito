@@ -55,7 +55,6 @@ from app.models.search import (
     EmployerAlias,
     Job,
     Rubric,
-    WatchedEmployer,
 )
 from app.pipeline.decisions import GateDecision, RuleRef
 
@@ -155,13 +154,14 @@ def cooldown_anchor(app: Application) -> datetime | None:
     return None
 
 
-def employer_state(apps: Sequence[Application], cooldown_days: int, *, exclude: uuid.UUID | None = None
-                   ) -> EmployerState:
+def employer_state(apps: Sequence[Application], cooldown_days: int, *, exclude: uuid.UUID | None = None,
+                   released_at: datetime | None = None) -> EmployerState:
+    """``released_at``: the owner ended the cooldown early then; earlier anchors no longer count."""
     live = [a for a in apps if a.stage in LIVE_STAGES and a.id != exclude]
     until, source = None, None
     for app in apps:
         anchor = None if app.id == exclude else cooldown_anchor(app)
-        if anchor is None:
+        if anchor is None or (released_at is not None and anchor <= released_at):
             continue
         end = (anchor + timedelta(days=cooldown_days)).date()
         if until is None or end > until:
@@ -170,10 +170,17 @@ def employer_state(apps: Sequence[Application], cooldown_days: int, *, exclude: 
 
 
 async def _cooldown_days(session: AsyncSession, employer: str, settings: Mapping[str, Any]) -> int:
-    watched = await session.scalar(select(WatchedEmployer).where(func.lower(WatchedEmployer.name) == employer))
-    if watched is not None and watched.cooldown_days is not None:
-        return watched.cooldown_days
-    return int(settings["matching.employer_cooldown_days"])
+    """The owner's per-employer override, else a watched employer's own, else the setting."""
+    from app.pipeline import employers
+
+    return (await employers.effective_days(session, employer, settings))[0]
+
+
+async def _released_at(session: AsyncSession, employer: str) -> datetime | None:
+    from app.pipeline import employers
+
+    policy = await employers.policy_for(session, employer)
+    return policy.cooldown_released_at if policy is not None else None
 
 
 async def _employer_jobs(session: AsyncSession, key: str, aliases: Mapping[str, str]) -> list[Job]:
@@ -195,7 +202,8 @@ async def employer_counters(session: AsyncSession, job: Job, *, now: datetime | 
     key = employer_key(job, aliases)
     jobs = await _employer_jobs(session, key, aliases)
     apps = (await session.scalars(select(Application).where(Application.job_id.in_([j.id for j in jobs])))).all()
-    state = employer_state(apps, await _cooldown_days(session, key, settings))
+    state = employer_state(apps, await _cooldown_days(session, key, settings),
+                           released_at=await _released_at(session, key))
     return state.counters(now.date())
 
 
@@ -485,7 +493,8 @@ async def check_conflict_at_submit(session: AsyncSession, application: Applicati
     jobs = await _employer_jobs(session, key, aliases)
     apps = list((await session.scalars(select(Application).where(
         Application.job_id.in_([j.id for j in jobs])).execution_options(populate_existing=True))).all())
-    state = employer_state(apps, await _cooldown_days(session, key, settings), exclude=application.id)
+    state = employer_state(apps, await _cooldown_days(session, key, settings), exclude=application.id,
+                           released_at=await _released_at(session, key))
     refs = (RuleRef("matching.roles_per_employer_scope", scope, "setting",
                     f"v{states['matching.roles_per_employer_scope'].version}"),
             RuleRef("matching.max_live_per_employer", max_live, "setting",
@@ -496,6 +505,11 @@ async def check_conflict_at_submit(session: AsyncSession, application: Applicati
     def fail(reason: str) -> GateDecision:
         return GateDecision("employer_conflict", "automation", "fail", reason, refs)
 
+    from app.pipeline import employers
+
+    never = await employers.never_apply_reason(session, job)
+    if never is not None:
+        return fail(never)
     if scope != "off" and job.conflict_state not in (ConflictState.winner, ConflictState.released):
         return fail(job.conflict_note or f"role is {job.conflict_state.value} in its employer group")
     if len(state.live) >= max_live:

@@ -1642,23 +1642,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/bulk": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Jobs Bulk */
-        post: operations["jobs_bulk"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/jobs/{job_id}/why": {
         parameters: {
             query?: never;
@@ -2044,6 +2027,292 @@ export interface paths {
          *     it as an alias, then re-evaluate the conflict groups involved.
          */
         post: operations["jobs_fix_employer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bulk Options
+         * @description What the bulk bars may offer, from settings.
+         */
+        get: operations["bulk_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Preview
+         * @description What would happen to each selected item. Nothing changes; the count to confirm is ``selected``.
+         */
+        post: operations["bulk_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Run
+         * @description Confirm the previewed count and run it in the background. Running a failed or partial operation
+         *     again retries only what failed.
+         */
+        post: operations["bulk_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bulk List */
+        get: operations["bulk_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bulk Get */
+        get: operations["bulk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bulk Items
+         * @description Per-item results (what each did, or why it could not).
+         */
+        get: operations["bulk_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Undo */
+        post: operations["bulk_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bulk Csv
+         * @description The export action's file: the operation's selection as CSV (read only).
+         */
+        get: operations["bulk_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Employers List */
+        get: operations["employers_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Employers States
+         * @description The employer chip for each job (Matches and Applications), read only.
+         */
+        post: operations["employers_states"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Employers Get */
+        get: operations["employers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Employers Set Policy
+         * @description Per-employer overrides (audited). 'Never apply' blocks tailoring and sending for every role there.
+         */
+        patch: operations["employers_set_policy"];
+        trace?: never;
+    };
+    "/api/employers/end-cooldown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Employers End Cooldown
+         * @description End the running cooldown early, with a reason (audited).
+         */
+        post: operations["employers_end_cooldown"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Employers Merge
+         * @description Merge this employer into another (every role posted under it moves; the alias can be remembered).
+         */
+        post: operations["employers_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Employers Split
+         * @description Undo a merge: the name stops being an alias and its roles go back under their own employer.
+         */
+        post: operations["employers_split"];
         delete?: never;
         options?: never;
         head?: never;
@@ -5045,33 +5314,20 @@ export interface components {
              */
             sensitivity?: "normal" | "on_request" | "after_offer_only";
         };
-        /** BulkActionIn */
-        BulkActionIn: {
-            /** Job Ids */
-            job_ids: string[];
-            /**
-             * Action
-             * @enum {string}
-             */
-            action: "skip" | "archive" | "shortlist" | "tag" | "untag" | "pin" | "unpin" | "snooze";
-            /** Tag */
-            tag?: string | null;
-            /** Until */
-            until?: string | null;
-            /**
-             * Preview
-             * @default true
-             */
-            preview?: boolean;
-        };
-        /** BulkActionOut */
-        BulkActionOut: {
-            /** Affected */
-            affected: number;
-            /** Preview */
-            preview: boolean;
-            /** Detail */
-            detail: string[];
+        /** BulkOptionsOut */
+        BulkOptionsOut: {
+            /** Max Selection */
+            max_selection: number;
+            /** Undo Window Minutes */
+            undo_window_minutes: number;
+            /** Approve Reviewed Enabled */
+            approve_reviewed_enabled: boolean;
+            /** Reversible */
+            reversible: ("tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv")[];
+            /** Actions */
+            actions: {
+                [key: string]: ("tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv")[];
+            };
         };
         /** CampaignBudget */
         CampaignBudget: {
@@ -5321,6 +5577,16 @@ export interface components {
              * @default false
              */
             waived: boolean;
+        };
+        /** ChipOut */
+        ChipOut: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "free" | "role_in_progress" | "cooling_down" | "always_ask_first" | "blocked";
+            /** Text */
+            text: string;
         };
         /** CompareCell */
         CompareCell: {
@@ -5707,6 +5973,60 @@ export interface components {
             /** Origin */
             origin: string;
         };
+        /** ContactRowOut */
+        ContactRowOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string | null;
+            /** Email */
+            email: string | null;
+            /** Link */
+            link: string | null;
+        };
+        /** CooldownOut */
+        CooldownOut: {
+            /**
+             * Kind
+             * @description end_state: from the end state; applied_date: from the applied date, because there has been no reply
+             * @enum {string}
+             */
+            kind: "end_state" | "applied_date";
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /** Days */
+            days: number;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Running */
+            running: boolean;
+            /**
+             * Rule
+             * @description The rule in words, with the dates
+             */
+            rule: string;
+        };
         /** CriterionRating */
         CriterionRating: {
             /** Criterion */
@@ -6068,6 +6388,42 @@ export interface components {
              */
             required: boolean;
         };
+        /** EmployerDetailOut */
+        EmployerDetailOut: {
+            employer: components["schemas"]["EmployerRowOut"];
+            cooldown: components["schemas"]["CooldownOut"] | null;
+            /**
+             * Cooldown Days
+             * @description The length in force
+             */
+            cooldown_days: number;
+            /** Cooldown Days Source */
+            cooldown_days_source: string;
+            /** Cooldown Ended Early At */
+            cooldown_ended_early_at: string | null;
+            /** Cooldown Ended Early By */
+            cooldown_ended_early_by: string | null;
+            /** Cooldown Ended Early Reason */
+            cooldown_ended_early_reason: string | null;
+            /** Roles */
+            roles: components["schemas"]["RoleOut"][];
+            /**
+             * Conflict Groups
+             * @description Roles that compete (winner and held)
+             */
+            conflict_groups: components["schemas"]["RoleOut"][][];
+            /** History */
+            history: components["schemas"]["HistoryOut"][];
+            /** Contacts */
+            contacts: components["schemas"]["ContactRowOut"][];
+            /**
+             * Aliases
+             * @description Names merged into this employer
+             */
+            aliases: string[];
+            /** Notes */
+            notes: string | null;
+        };
         /** EmployerFixIn */
         EmployerFixIn: {
             /** Canonical Employer */
@@ -6077,6 +6433,52 @@ export interface components {
              * @default true
              */
             remember_alias?: boolean;
+        };
+        /** EmployerRowOut */
+        EmployerRowOut: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "free" | "role_in_progress" | "cooling_down" | "always_ask_first" | "blocked";
+            /** State Text */
+            state_text: string;
+            /** Applications */
+            applications: number;
+            /** Live */
+            live: number;
+            /** Last Applied At */
+            last_applied_at: string | null;
+            /** Roles Seen */
+            roles_seen: number;
+            /** Held Roles */
+            held_roles: number;
+            /** Cooldown Until */
+            cooldown_until: string | null;
+            /** Always Ask First */
+            always_ask_first: boolean;
+            /** Never Apply */
+            never_apply: boolean;
+            /** Never Reason */
+            never_reason: string | null;
+            /** Watched */
+            watched: boolean;
+            /** Priority */
+            priority: number;
+            /**
+             * Cooldown Days
+             * @description This employer's override; null uses the default
+             */
+            cooldown_days: number | null;
+        };
+        /** EndCooldownIn */
+        EndCooldownIn: {
+            /** Reason */
+            reason: string;
         };
         /** ErrorOut */
         ErrorOut: {
@@ -6697,6 +7099,29 @@ export interface components {
             db: components["schemas"]["DbHealth"];
             worker: components["schemas"]["WorkerHealth"];
         };
+        /** HistoryOut */
+        HistoryOut: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Title */
+            title: string;
+            /** Stage */
+            stage: string;
+            /** Applied At */
+            applied_at: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** Counts Toward Cooldown */
+            counts_toward_cooldown: boolean;
+        };
         /** ImportCommitIn */
         ImportCommitIn: {
             /**
@@ -7025,6 +7450,39 @@ export interface components {
             model: string | null;
             /** Created By */
             created_by: string;
+        };
+        /** ItemOut */
+        ItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Subject Id
+             * Format: uuid
+             */
+            subject_id: string;
+            /** Label */
+            label: string;
+            /**
+             * Planned
+             * @enum {string}
+             */
+            planned: "change" | "unchanged" | "refused";
+            /** Planned Code */
+            planned_code: string | null;
+            /** Planned Reason */
+            planned_reason: string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "pending" | "changed" | "unchanged" | "refused" | "failed" | "undone" | "undo_skipped";
+            /** Code */
+            code: string | null;
+            /** Reason */
+            reason: string | null;
         };
         /** JobChangeOut */
         JobChangeOut: {
@@ -7495,10 +7953,10 @@ export interface components {
              */
             totp_enabled: boolean;
         };
-        /** MergeIn */
-        MergeIn: {
-            /** Duplicate Ids */
-            duplicate_ids: string[];
+        /** MergeOut */
+        MergeOut: {
+            /** Jobs */
+            jobs: number;
         };
         /** NeverMention */
         NeverMention: {
@@ -7569,6 +8027,69 @@ export interface components {
             done: boolean;
             /** Detail */
             detail: string;
+        };
+        /** OperationOut */
+        OperationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Subject
+             * @enum {string}
+             */
+            subject: "jobs" | "applications";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "previewed" | "queued" | "running" | "done" | "partial" | "failed" | "undone";
+            /** Selected */
+            selected: number;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /**
+             * Counts
+             * @description Items per outcome
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Done
+             * @description Items finished (any outcome but pending)
+             */
+            done: number;
+            /** Created By */
+            created_by: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Undo Until */
+            undo_until: string | null;
+            /** Can Undo */
+            can_undo: boolean;
+            /** Error */
+            error: string | null;
         };
         /** Override */
         Override: {
@@ -7966,10 +8487,34 @@ export interface components {
              */
             next_cursor: string | null;
         };
+        /** Page[ItemOut] */
+        Page_ItemOut_: {
+            /** Items */
+            items: components["schemas"]["ItemOut"][];
+            /** Total */
+            total: number | null;
+            /**
+             * Next Cursor
+             * @description Opaque; pass back as ?cursor=
+             */
+            next_cursor: string | null;
+        };
         /** Page[MailThreadOut] */
         Page_MailThreadOut_: {
             /** Items */
             items: components["schemas"]["MailThreadOut"][];
+            /** Total */
+            total: number | null;
+            /**
+             * Next Cursor
+             * @description Opaque; pass back as ?cursor=
+             */
+            next_cursor: string | null;
+        };
+        /** Page[OperationOut] */
+        Page_OperationOut_: {
+            /** Items */
+            items: components["schemas"]["OperationOut"][];
             /** Total */
             total: number | null;
             /**
@@ -8193,6 +8738,30 @@ export interface components {
              * @description Opaque; pass back as ?cursor=
              */
             next_cursor: string | null;
+        };
+        /** ParamsIn */
+        ParamsIn: {
+            /** Tag */
+            tag?: string | null;
+            /**
+             * Until
+             * @description Snooze until
+             */
+            until?: string | null;
+            /**
+             * Reason
+             * @description Required to skip
+             */
+            reason?: string | null;
+            /**
+             * Stage
+             * @description Target stage of move_stage
+             */
+            stage?: string | null;
+            /** Campaign Id */
+            campaign_id?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /** PasswordChange */
         PasswordChange: {
@@ -8456,6 +9025,29 @@ export interface components {
             /** Excerpt */
             excerpt: string;
         };
+        /**
+         * PolicyIn
+         * @description Only the fields sent change. ``never_apply`` needs ``never_reason``.
+         */
+        PolicyIn: {
+            /**
+             * Cooldown Days
+             * @description null clears the override
+             */
+            cooldown_days?: number | null;
+            /** Always Ask First */
+            always_ask_first?: boolean | null;
+            /** Never Apply */
+            never_apply?: boolean | null;
+            /** Never Reason */
+            never_reason?: string | null;
+            /** Priority */
+            priority?: number | null;
+            /** Watched */
+            watched?: boolean | null;
+            /** Notes */
+            notes?: string | null;
+        };
         /** PortalAccountOut */
         PortalAccountOut: {
             /**
@@ -8609,6 +9201,57 @@ export interface components {
             cost_micros: number;
             /** Error */
             error: string | null;
+        };
+        /** PreviewIn */
+        PreviewIn: {
+            /**
+             * Subject
+             * @enum {string}
+             */
+            subject: "jobs" | "applications";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv";
+            params?: components["schemas"]["ParamsIn"];
+            selection: components["schemas"]["SelectionIn"];
+        };
+        /** PreviewOut */
+        PreviewOut: {
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            /**
+             * Subject
+             * @enum {string}
+             */
+            subject: "jobs" | "applications";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv";
+            /**
+             * Selected
+             * @description Confirm this count to run
+             */
+            selected: number;
+            /** Will Change */
+            will_change: number;
+            /** @description Already as asked */
+            unchanged: components["schemas"]["ReasonGroupOut"] | null;
+            /**
+             * Refused
+             * @description Cannot be changed, grouped by reason
+             */
+            refused: components["schemas"]["ReasonGroupOut"][];
+            /** Refused Total */
+            refused_total: number;
+            /** Reversible */
+            reversible: boolean;
         };
         /** PriceIn */
         PriceIn: {
@@ -8806,6 +9449,17 @@ export interface components {
             database: boolean;
             /** Migrated */
             migrated: boolean;
+        };
+        /** ReasonGroupOut */
+        ReasonGroupOut: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Count */
+            count: number;
+            /** Samples */
+            samples: components["schemas"]["SampleOut"][];
         };
         /**
          * ReceiptOut
@@ -9222,6 +9876,30 @@ export interface components {
             /** Conflicts With */
             conflicts_with: string[];
         };
+        /** RoleOut */
+        RoleOut: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Title */
+            title: string;
+            /** Triage */
+            triage: string;
+            /** Conflict State */
+            conflict_state: string;
+            /** Conflict Note */
+            conflict_note: string | null;
+            /** Score */
+            score: number | null;
+            /** Application Id */
+            application_id: string | null;
+            /** Stage */
+            stage: string | null;
+            /** Posted At */
+            posted_at: string | null;
+        };
         /** RollbackIn */
         RollbackIn: {
             /** Note */
@@ -9431,6 +10109,14 @@ export interface components {
              */
             dry_run?: boolean;
         };
+        /** RunIn */
+        RunIn: {
+            /**
+             * Confirm Count
+             * @description Must equal the previewed count
+             */
+            confirm_count?: number | null;
+        };
         /** RunOut */
         RunOut: {
             /**
@@ -9568,6 +10254,18 @@ export interface components {
              * @description Screenshots and files the runner uploaded or cited (``evidence:<task>/<id>``)
              */
             evidence_refs: string[];
+        };
+        /** SampleOut */
+        SampleOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+            /** Reason */
+            reason: string;
         };
         /** SavedViewBody */
         "SavedViewBody-Input": {
@@ -9742,6 +10440,16 @@ export interface components {
             mid: string;
             /** High */
             high: string;
+        };
+        /** SelectionIn */
+        SelectionIn: {
+            /**
+             * Ids
+             * @description The ticked rows
+             */
+            ids?: string[] | null;
+            /** @description Or everything matching this view */
+            view?: components["schemas"]["ViewSelectionIn"] | null;
         };
         /** Series */
         Series: {
@@ -10369,14 +11077,6 @@ export interface components {
             /** Daily */
             daily: components["schemas"]["SpendDay"][];
         };
-        /** SplitIn */
-        SplitIn: {
-            /**
-             * Sighting Urls
-             * @description Sightings to move to a new job
-             */
-            sighting_urls: string[];
-        };
         /**
          * StageChangeIn
          * @description Dragging to `submitted` never creates evidence: use 'I applied myself' instead.
@@ -10389,6 +11089,21 @@ export interface components {
             stage: "shortlisted" | "tailoring" | "ready" | "applying" | "submitted_unconfirmed" | "submitted" | "screening" | "interview" | "offer" | "accepted" | "rejected" | "withdrawn" | "closed" | "skipped";
             /** Note */
             note?: string | null;
+        };
+        /** StatesIn */
+        StatesIn: {
+            /** Job Ids */
+            job_ids: string[];
+        };
+        /** StatesOut */
+        StatesOut: {
+            /**
+             * States
+             * @description By job id
+             */
+            states: {
+                [key: string]: components["schemas"]["ChipOut"];
+            };
         };
         /**
          * StoryEditIn
@@ -11174,6 +11889,40 @@ export interface components {
              */
             sensitivity: "normal" | "on_request" | "after_offer_only";
         };
+        /**
+         * ViewSelectionIn
+         * @description Everything matching a view, resolved on the server (the same filter as the list).
+         */
+        ViewSelectionIn: {
+            /** View Id */
+            view_id?: string | null;
+            /**
+             * Conditions
+             * @description JSON ConditionSet, as in the Matches list
+             */
+            conditions?: string | null;
+            /** Q */
+            q?: string | null;
+            /**
+             * Triage
+             * @description Matches only: new, shortlisted, ...
+             */
+            triage?: string | null;
+            /**
+             * Stage
+             * @description Applications only
+             */
+            stage?: string | null;
+            /** Campaign Id */
+            campaign_id?: string | null;
+            /**
+             * Channel
+             * @description Applications only
+             */
+            channel?: string | null;
+            /** Pinned */
+            pinned?: boolean | null;
+        };
         /** WaiverIn */
         WaiverIn: {
             /**
@@ -11418,6 +12167,40 @@ export interface components {
              * @description e.g. 'free-form text will be sent to <provider>'
              */
             notices: string[];
+        };
+        /** MergeIn */
+        app__api__routers__employers__MergeIn: {
+            /**
+             * Into
+             * @description The canonical employer to merge this one into
+             */
+            into: string;
+            /**
+             * Remember Alias
+             * @default true
+             */
+            remember_alias?: boolean;
+        };
+        /** SplitIn */
+        app__api__routers__employers__SplitIn: {
+            /**
+             * Alias
+             * @description A name that was merged into another employer
+             */
+            alias: string;
+        };
+        /** MergeIn */
+        app__api__routers__jobs_corrections__MergeIn: {
+            /** Duplicate Ids */
+            duplicate_ids: string[];
+        };
+        /** SplitIn */
+        app__api__routers__jobs_corrections__SplitIn: {
+            /**
+             * Sighting Urls
+             * @description Sightings to move to a new job
+             */
+            sighting_urls: string[];
         };
         /** AnswerIn */
         app__api__routers__kit__AnswerIn: {
@@ -16735,48 +17518,6 @@ export interface operations {
             };
         };
     };
-    jobs_bulk: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BulkActionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BulkActionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Specified; implemented in a later wave */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorOut"];
-                };
-            };
-        };
-    };
     jobs_why: {
         parameters: {
             query?: {
@@ -17951,7 +18692,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MergeIn"];
+                "application/json": components["schemas"]["app__api__routers__jobs_corrections__MergeIn"];
             };
         };
         responses: {
@@ -17995,7 +18736,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SplitIn"];
+                "application/json": components["schemas"]["app__api__routers__jobs_corrections__SplitIn"];
             };
         };
         responses: {
@@ -18068,6 +18809,508 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    bulk_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkOptionsOut"];
+                };
+            };
+        };
+    };
+    bulk_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOut"];
+                };
+            };
+            /** @description Bad selection or parameters, or over the size cap ({code, reason}) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Count does not match, or already run ({code, reason}) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_list: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_OperationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_items: {
+        parameters: {
+            query?: {
+                outcome?: ("pending" | "changed" | "unchanged" | "refused" | "failed" | "undone" | "undo_skipped") | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ItemOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Cannot be undone, or the window has passed ({code, reason}) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_list: {
+        parameters: {
+            query?: {
+                state?: ("free" | "role_in_progress" | "cooling_down" | "always_ask_first" | "blocked") | null;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerRowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_states: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_get: {
+        parameters: {
+            query: {
+                /** @description The employer key (casefolded canonical name) */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_set_policy: {
+        parameters: {
+            query: {
+                /** @description The employer key (casefolded canonical name) */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerRowOut"];
+                };
+            };
+            /** @description A reason is required to never apply ({code, reason}) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    employers_end_cooldown: {
+        parameters: {
+            query: {
+                /** @description The employer key (casefolded canonical name) */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndCooldownIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerRowOut"];
+                };
+            };
+            /** @description No cooldown is running ({code, reason}) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_merge: {
+        parameters: {
+            query: {
+                /** @description The employer key (casefolded canonical name) */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routers__employers__MergeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_split: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routers__employers__SplitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

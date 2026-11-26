@@ -15,6 +15,7 @@ from app.models.applications import (
     SubmitPermit,
 )
 from app.models.base import Base
+from app.models.bulk import BulkItem, BulkOperation, EmployerPolicy
 from app.models.changes import JobChange, JobVersion, JobWatch
 from app.models.documents import ApplicationDocument
 from app.models.kit import (
@@ -69,8 +70,10 @@ from app.models.search import (
 __all__ = [
     "AgentTask", "Answer", "ApiToken", "Application", "ApplicationDocument", "ApplicationEvent",
     "ApplicationPacket", "Assessment",
-    "AuditEvent", "AuthSession", "Base", "Campaign", "ConfigRevision", "Connection", "Contact", "CustomFacet",
-    "DispatchAttempt", "EmployerAlias", "Experience", "Fact", "Guardrail", "GuardrailWaiver", "InterviewPack",
+    "AuditEvent", "AuthSession", "Base", "BulkItem", "BulkOperation", "Campaign", "ConfigRevision", "Connection",
+    "Contact", "CustomFacet",
+    "DispatchAttempt", "EmployerAlias", "EmployerPolicy", "Experience", "Fact", "Guardrail", "GuardrailWaiver",
+    "InterviewPack",
     "InterviewRound", "Job", "JobChange", "JobSighting", "JobVersion", "JobWatch",
     "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread", "Notification",
     "Owner",

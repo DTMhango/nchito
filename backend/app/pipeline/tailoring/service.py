@@ -65,6 +65,13 @@ async def request(session: AsyncSession, app: Application, *, actor: str,
     (new, or a failed one retried). Moves a shortlisted application to ``tailoring``."""
     if app.stage not in (Stage.shortlisted, Stage.tailoring, Stage.ready):
         raise TailoringError(f"an application in {app.stage.value} cannot be tailored")
+    from app.models.search import Job
+    from app.pipeline import employers
+
+    job = await session.get(Job, app.job_id)
+    never = await employers.never_apply_reason(session, job) if job is not None else None
+    if never is not None:  # the owner's per-employer "never apply" (7.1): no work is spent on it
+        raise TailoringError(never)
     _, kit = await checks.context(session, app)
     latest = await checks.latest_version(session, app.id)
     from_version = latest.version if latest else 0

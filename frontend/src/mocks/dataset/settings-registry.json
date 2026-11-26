@@ -91,6 +91,10 @@
   {
    "key": "sources",
    "label": "Discovery sources"
+  },
+  {
+   "key": "bulk",
+   "label": "Bulk actions"
   }
  ],
  "settings": [
@@ -2960,6 +2964,58 @@
    "description": "How a campaign title and location become a search phrase. Fields: {title}, {location}.",
    "kind": "string",
    "default": "{title} {location} job vacancy apply",
+   "nullable": false,
+   "choices": null,
+   "minimum": null,
+   "maximum": null,
+   "unit": null
+  },
+  {
+   "key": "bulk.max_selection",
+   "group": "bulk",
+   "label": "Largest bulk selection",
+   "description": "Most roles or applications one bulk action may cover; a bigger selection must be narrowed first.",
+   "kind": "int",
+   "default": 500,
+   "nullable": false,
+   "choices": null,
+   "minimum": 1,
+   "maximum": 5000,
+   "unit": "items"
+  },
+  {
+   "key": "bulk.undo_window_minutes",
+   "group": "bulk",
+   "label": "Bulk undo window",
+   "description": "How long after a bulk action finishes it can be undone (tags, snooze, skip, archive). 0 turns undo off.",
+   "kind": "int",
+   "default": 60,
+   "nullable": false,
+   "choices": null,
+   "minimum": 0,
+   "maximum": 1440,
+   "unit": "minutes"
+  },
+  {
+   "key": "bulk.preview_sample_size",
+   "group": "bulk",
+   "label": "Preview examples per reason",
+   "description": "How many example roles the preview lists under each reason a role cannot be changed.",
+   "kind": "int",
+   "default": 5,
+   "nullable": false,
+   "choices": null,
+   "minimum": 1,
+   "maximum": 20,
+   "unit": null
+  },
+  {
+   "key": "bulk.allow_approve_reviewed",
+   "group": "bulk",
+   "label": "Offer 'approve all reviewed'",
+   "description": "Offer a bulk approval for applications that already have a current packet and pass every gate with no unknowns. Each is still approved one by one through the normal approval; off by default.",
+   "kind": "bool",
+   "default": false,
    "nullable": false,
    "choices": null,
    "minimum": null,

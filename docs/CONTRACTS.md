@@ -1001,3 +1001,41 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
   The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
   skill asks for it.
+
+## Wave 4 bulk additions (bulk actions, employers and cooldown)
+
+- **Bulk** (`app/pipeline/bulk.py`, `app/api/routers/bulk.py`, task `run_bulk_operation`). Replaces the 501
+  `POST /api/jobs/bulk` (removed). `POST /api/bulk/preview {subject: jobs|applications, action, params, selection}`
+  where `selection` is `{ids}` or `{view: {view_id?, conditions?, q?, triage?, stage?, campaign_id?, channel?,
+  pinned?}}` ("everything matching this view", resolved on the server by the list's own filter). It creates a
+  `previewed` operation, changes nothing, and returns `{operation_id, selected, will_change, unchanged, refused[]
+  {code, title, count, samples[] {id, label, reason}], refused_total, reversible}`. `POST /api/bulk/{id}/run
+  {confirm_count}` must equal `selected` (409 `count_mismatch`), then queues the background run (202); running a
+  `failed` or `partial` operation again retries only the failed items. `GET /api/bulk/{id}` (status, `counts` per
+  outcome, `done`, `can_undo`), `GET /api/bulk/{id}/items?outcome=`, `POST /api/bulk/{id}/undo`, `GET
+  /api/bulk/{id}/csv` (export), `GET /api/bulk` (recent), `GET /api/bulk/options`. SSE: `bulk.progress {operation_id,
+  done, total}`, `bulk.finished {operation_id, status}`.
+- Actions: `tag`, `untag`, `skip` (reason required), `snooze`, `move_stage` (applications; owner transitions only),
+  `assign_campaign`, `queue_tailoring`, `send_for_approval`, `approve_reviewed` (off unless
+  `bulk.allow_approve_reviewed`), `archive`, `recheck`, `export_csv`. Each item goes through the single-item service
+  (`bulk.patch_job_fields`, `bulk.create_application`, `stages.transition`, `approval.reject`,
+  `tailoring.service.request`, `prepare.prepare_packet`, `approval.approve`, `recheck.recheck_job`): a held role, a
+  "never apply" employer, an unchecked draft or an illegal move is refused per item with a stable code (`held`,
+  `never_apply`, `spec_not_ready`, `answers_waiting`, `no_packet`, `gates`, `illegal_stage`, `illegal_transition`,
+  `duplicate`, `merged`, ...). A preview tries each item inside a savepoint and rolls it back, so preview counts equal
+  run results. Bulk send is never an approval: `send_for_approval` builds the packet and lets the policy act; each
+  approval stays per packet. Undo (tags, snooze, skip, archive) inside `bulk.undo_window_minutes`; an item that changed
+  since is left alone (`undo_skipped`, `changed_since`).
+- **Employers** (`app/pipeline/employers.py`, `app/api/routers/employers.py`), addressed by `key` (query): `GET
+  /api/employers?state=&q=`, `GET /api/employers/detail?key=`, `PATCH /api/employers/policy?key=` (cooldown_days,
+  always_ask_first, never_apply + never_reason, priority, watched, notes), `POST /api/employers/end-cooldown?key=
+  {reason}`, `POST /api/employers/merge?key= {into, remember_alias}`, `POST /api/employers/split {alias}`, `POST
+  /api/employers/states {job_ids}` (the chip for Matches and Applications). States: free, role_in_progress,
+  cooling_down, always_ask_first, blocked. Cooldown length: employer override, else the watched employer's, else
+  `matching.employer_cooldown_days`; it runs from the end state, or from the applied date when there has been no reply;
+  ending it early records who, when and why and ignores applications that ended or went out before then.
+- **Never apply** is an exclusion gate (`employer_never_apply`, layer `exclusion`) in the decision table, a refusal in
+  `tailoring.service.request`, and a fail in `conflicts.check_conflict_at_submit` (so permits and dispatch refuse it).
+  `employer_policy.always_ask_first` joins the watched-employer flag.
+- Tables: `employer_policy`, `bulk_operation`, `bulk_item` (migration `0019_bulk`, after `0018_blocker_kind`). Settings:
+  `bulk.max_selection`, `bulk.undo_window_minutes`, `bulk.preview_sample_size`, `bulk.allow_approve_reviewed`.

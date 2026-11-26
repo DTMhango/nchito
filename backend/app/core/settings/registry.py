@@ -61,6 +61,7 @@ GROUPS: dict[str, str] = {
     "accounts": "Portal accounts",
     "data": "Data import and export",
     "sources": "Discovery sources",
+    "bulk": "Bulk actions",
 }
 
 AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
@@ -821,6 +822,20 @@ _add("sources.search.query_template", "string", "Web search phrase",
      has_invalid_example=True)
 
 
+# Bulk actions (10.3, wave 4)
+_int("bulk.max_selection", "Largest bulk selection",
+     "Most roles or applications one bulk action may cover; a bigger selection must be narrowed first.",
+     500, 100, 1, 5000, "items")
+_int("bulk.undo_window_minutes", "Bulk undo window",
+     "How long after a bulk action finishes it can be undone (tags, snooze, skip, archive). 0 turns undo off.",
+     60, 15, 0, 1440, "minutes")
+_int("bulk.preview_sample_size", "Preview examples per reason",
+     "How many example roles the preview lists under each reason a role cannot be changed.", 5, 3, 1, 20)
+_bool("bulk.allow_approve_reviewed", "Offer 'approve all reviewed'",
+      "Offer a bulk approval for applications that already have a current packet and pass every gate with "
+      "no unknowns. Each is still approved one by one through the normal approval; off by default.", False)
+
+
 REGISTRY: dict[str, SettingDef] = {d.key: d for d in _DEFS}
 if len(REGISTRY) != len(_DEFS):  # pragma: no cover - guards against copy-paste errors
     raise RuntimeError("duplicate setting key in registry")
@@ -844,3 +859,4 @@ def cross_check(values: dict[str, Any]) -> None:
         raise SettingValueError("thresholds must satisfy shortlist <= tailor <= auto-apply")
     if values["automation.daily_cap"] > values["automation.weekly_cap"]:
         raise SettingValueError("the daily cap cannot exceed the weekly cap")
+
