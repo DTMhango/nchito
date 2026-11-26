@@ -16,15 +16,12 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apply import approval, packets, stages
 from app.core import audit
 from app.core.clock import utcnow
 from app.models.applications import (
-    AgentTask,
-    AgentTaskStatus,
     Application,
     PendingAction,
     PendingActionType,
@@ -162,23 +159,8 @@ async def confirm_submission(session: AsyncSession, action: PendingAction, *, ac
 
 async def continue_task(session: AsyncSession, action: PendingAction, *, actor: str, note: str | None = None,
                         now: datetime | None = None) -> list[PendingAction]:
-    """'I've signed in, continue' (8.4). Returns the actions that closed."""
-    now = now or utcnow()
-    closed = [action]
-    if action.group_key:
-        closed += list((await session.scalars(select(PendingAction).where(
-            PendingAction.group_key == action.group_key, PendingAction.status == PendingStatus.open,
-            PendingAction.type.in_(CONTINUABLE), PendingAction.id != action.id))).all())
-    for a in closed:
-        if a.agent_task_id:
-            task = await session.get(AgentTask, a.agent_task_id)
-            if task is not None and task.status in (AgentTaskStatus.blocked, AgentTaskStatus.claimed):
-                # Back to the same runner, from its checkpoint; the submit permit is still required.
-                task.status = AgentTaskStatus.queued
-                task.checkpoint = a.checkpoint or task.checkpoint
-                task.payload = {**task.payload, "resume": True,
-                                "resume_runner_token_id": str(task.claimed_by_token_id)
-                                if task.claimed_by_token_id else None}
-        await _close(session, a, {"resolution": "continue", "note": note,
-                                  "via": None if a is action else str(action.id)}, actor, now)
-    return closed
+    """'I've signed in, continue' (8.4). Returns the actions that closed. The work is in ``accounts``: it marks
+    the portal account signed in, re-checks expiry and duplicates, and requeues each task for the same runner."""
+    from app.apply import accounts
+
+    return await accounts.continue_blocker(session, action, actor=actor, note=note, now=now)

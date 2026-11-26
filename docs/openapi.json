@@ -12889,6 +12889,303 @@
         }
       }
     },
+    "/api/portal-accounts": {
+      "get": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts List",
+        "operationId": "portal_accounts_list",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "none",
+                    "created",
+                    "signed_in"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PortalAccountOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Create",
+        "operationId": "portal_accounts_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalAccountWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAccountOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal-accounts/{account_id}": {
+      "get": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Get",
+        "operationId": "portal_accounts_get",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAccountOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Update",
+        "operationId": "portal_accounts_update",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalAccountPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAccountOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Delete",
+        "operationId": "portal_accounts_delete",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal-accounts/actions/{action_id}/give-up": {
+      "post": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Give Up",
+        "description": "The owner cannot or will not get past the blocker: move the waiting applications (default all) to manual\nhandoff or skip them.",
+        "operationId": "portal_accounts_give_up",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiveUpIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GiveUpOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal-accounts/refresh": {
+      "post": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Refresh",
+        "description": "Run the periodic pass now: raise or join sign-in requests, drop what no longer waits, send due reminders.",
+        "operationId": "portal_accounts_refresh",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/runs": {
       "get": {
         "tags": [
@@ -21205,6 +21502,84 @@
         "title": "GateResult",
         "description": "One gate's result. ``outcome`` is the three-state answer (unknown is never a pass); ``passed`` is\nkept for compatibility and is true only when ``outcome`` is ``pass``."
       },
+      "GiveUpIn": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "manual_handoff",
+              "skipped"
+            ],
+            "title": "Outcome",
+            "description": "manual_handoff: the owner applies by hand; skipped: the application is skipped"
+          },
+          "application_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Ids",
+            "description": "Default: every waiting application"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "GiveUpIn"
+      },
+      "GiveUpOut": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "handled": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Handled"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining"
+          },
+          "closed": {
+            "type": "boolean",
+            "title": "Closed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "handled",
+          "remaining",
+          "closed"
+        ],
+        "title": "GiveUpOut"
+      },
       "Group-Input": {
         "properties": {
           "type": {
@@ -24984,6 +25359,45 @@
         ],
         "title": "Page[PendingActionOut]"
       },
+      "Page_PortalAccountOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortalAccountOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque; pass back as ?cursor="
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[PortalAccountOut]"
+      },
       "Page_ReferenceOut_": {
         "properties": {
           "items": {
@@ -26238,6 +26652,289 @@
         ],
         "title": "PersonalDetailHit"
       },
+      "PortalAccountOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "portal": {
+            "type": "string",
+            "title": "Portal"
+          },
+          "tenant": {
+            "type": "string",
+            "title": "Tenant"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "created",
+              "signed_in"
+            ],
+            "title": "Status"
+          },
+          "signed_in_runner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed In Runner"
+          },
+          "email_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Used"
+          },
+          "last_sign_in_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sign In At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "waiting_applications": {
+            "type": "integer",
+            "title": "Waiting Applications",
+            "description": "Applications waiting on the open sign-in request, if any"
+          },
+          "open_action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Action Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "portal",
+          "tenant",
+          "key",
+          "url",
+          "status",
+          "signed_in_runner",
+          "email_used",
+          "last_sign_in_at",
+          "notes",
+          "waiting_applications"
+        ],
+        "title": "PortalAccountOut"
+      },
+      "PortalAccountPatch": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "created",
+                  "signed_in"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "signed_in_runner": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed In Runner"
+          },
+          "email_used": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Used"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PortalAccountPatch"
+      },
+      "PortalAccountWrite": {
+        "properties": {
+          "portal": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Portal",
+            "description": "workday, icims, taleo, ..."
+          },
+          "tenant": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Tenant",
+            "description": "Tenant host (and site), e.g. arch.wd5.myworkdayjobs.com/arch"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "created",
+              "signed_in"
+            ],
+            "title": "Status",
+            "default": "none"
+          },
+          "signed_in_runner": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed In Runner",
+            "description": "pc, server or a runner name"
+          },
+          "email_used": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Used"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "portal",
+          "tenant"
+        ],
+        "title": "PortalAccountWrite"
+      },
       "Positioning": {
         "properties": {
           "type": {
@@ -27239,6 +27936,34 @@
           "over"
         ],
         "title": "Reframe"
+      },
+      "RefreshOut": {
+        "properties": {
+          "raised": {
+            "type": "integer",
+            "title": "Raised"
+          },
+          "joined": {
+            "type": "integer",
+            "title": "Joined"
+          },
+          "closed": {
+            "type": "integer",
+            "title": "Closed"
+          },
+          "reminded": {
+            "type": "integer",
+            "title": "Reminded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "raised",
+          "joined",
+          "closed",
+          "reminded"
+        ],
+        "title": "RefreshOut"
       },
       "RejectIn": {
         "properties": {
