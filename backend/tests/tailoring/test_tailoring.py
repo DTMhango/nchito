@@ -20,6 +20,7 @@ from app.models.applications import (
     TailoringStatus,
 )
 from app.models.kit import AnswerClass, Fact
+from app.models.search import Run, RunKind, RunStatus
 from app.pipeline.checks import service as checks
 from app.pipeline.tailoring import service, studio
 from app.schemas.json_types import ApplicationSpec
@@ -145,6 +146,32 @@ async def test_budget_pause_then_resume_without_duplicate_specs(session):
     assert again.id != req.id and again.from_version == 1
     same, needs_queue = await service.request(session, w.app, actor="owner")
     assert same.id == again.id and not needs_queue  # idempotent per application and spec version
+
+
+async def test_each_request_has_its_own_run_with_status_and_cost(session):
+    w = await world(session)
+    refused = BudgetExhausted("no_cap", needed_micros=5_000, available_micros=None, currency="USD")
+    fake = FakeLLMClient().script("tailor", refused, reply(w)).script("claim_check", no_flags)
+    fake.cost_micros = 700
+    req, queue = await service.request(session, w.app, actor="owner")
+    run = await session.get(Run, req.tailoring_run_id)
+    assert run is not None and run.kind == RunKind.tailoring and run.status == RunStatus.queued
+    assert run.trigger == "manual" and run.campaign_id == w.app.campaign_id
+    assert run.config_versions["request_id"] == str(req.id)
+    assert await service.process(session, fake, req.id) == TailoringStatus.paused
+    assert run.status == RunStatus.paused and run.finished_at is None and run.started_at is not None
+    await settings_service.set_value(session, "budget.monthly_cap_micros", 20_000_000, actor="owner")
+    await session.commit()
+
+    async def enqueue(r: TailoringRequest) -> None:
+        return None
+
+    await service.resume_paused(session, enqueue)
+    assert run.status == RunStatus.queued
+    assert await service.process(session, fake, req.id) == TailoringStatus.done
+    assert run.status == RunStatus.succeeded and run.finished_at is not None
+    assert run.cost_micros > 0 and run.counts == {"tailored": 1}
+    assert run.cost_micros == (await checks.latest_version(session, w.app.id)).cost_micros
 
 
 async def test_screening_answers_come_from_the_answer_bank_and_unknown_is_not_yes(session):

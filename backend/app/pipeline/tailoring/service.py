@@ -37,6 +37,7 @@ from app.models.applications import (
     TailoringRequest,
     TailoringStatus,
 )
+from app.models.search import Run, RunKind, RunStatus
 from app.pipeline.checks import service as checks
 from app.pipeline.checks.items import content_hash
 from app.pipeline.tailoring.answers import draft_answers
@@ -59,6 +60,36 @@ def request_key(from_version: int, kit_digest: str) -> str:
     return hashlib.sha256(f"{from_version}|{kit_digest}".encode()).hexdigest()
 
 
+async def _open_run(session: AsyncSession, app: Application, req: TailoringRequest) -> None:
+    """The request's own run, so tailoring started by a sweep or by the owner shows in run history with cost.
+    Spend still counts against the sweep that asked (``req.run_id``); this run records the request's outcome."""
+    run = Run(kind=RunKind.tailoring, trigger="sweep" if req.run_id else "manual", campaign_id=app.campaign_id,
+              status=RunStatus.queued, counts={}, config_versions={"application_id": str(app.id),
+                                                                   "request_id": str(req.id)})
+    session.add(run)
+    await session.flush()
+    req.tailoring_run_id = run.id
+
+
+async def _close_run(session: AsyncSession, req: TailoringRequest, status: RunStatus, *, cost_micros: int = 0,
+                     error: str | None = None, counts: dict[str, int] | None = None) -> None:
+    run = await session.get(Run, req.tailoring_run_id) if req.tailoring_run_id else None
+    if run is None:
+        return
+    run.status = status
+    if status == RunStatus.running:
+        run.started_at = run.started_at or utcnow()
+        await publish(session, "run.started", {"run_id": str(run.id), "kind": "tailoring"})
+        return
+    run.error = error
+    if status == RunStatus.paused:
+        return  # not finished: it resumes when the budget allows
+    run.finished_at = utcnow()
+    run.cost_micros += cost_micros
+    run.counts = counts or {}
+    await publish(session, "run.finished", {"run_id": str(run.id), "status": status.value})
+
+
 async def request(session: AsyncSession, app: Application, *, actor: str,
                   run_id: uuid.UUID | None = None) -> tuple[TailoringRequest, bool]:
     """The request for this application's current spec version and Kit; ``True`` when it needs queueing
@@ -75,6 +106,7 @@ async def request(session: AsyncSession, app: Application, *, actor: str,
         if existing.status != TailoringStatus.failed:
             return existing, False
         existing.status, existing.error = TailoringStatus.queued, None
+        await _open_run(session, app, existing)
         await session.flush()
         return existing, True
     row = TailoringRequest(application_id=app.id, request_key=key, from_version=from_version, run_id=run_id,
@@ -87,6 +119,7 @@ async def request(session: AsyncSession, app: Application, *, actor: str,
             TailoringRequest.application_id == app.id, TailoringRequest.request_key == key))
         assert winner is not None
         return winner, False
+    await _open_run(session, app, row)
     if app.stage == Stage.shortlisted:
         await stages.transition(session, app, Stage.tailoring, actor=actor, why="tailoring requested", via="system")
     await audit.record(session, actor=actor, action="application.tailor_requested", subject_type="application",
@@ -114,6 +147,7 @@ async def process(session: AsyncSession, client: LLMClient, request_id: uuid.UUI
     assert app is not None
     req.status = TailoringStatus.running
     req.attempts += 1
+    await _close_run(session, req, RunStatus.running)
     job, kit = await checks.context(session, app)
     values = await settings_service.values(session)
     cfg = await checks.check_settings(session, values)
@@ -131,11 +165,13 @@ async def process(session: AsyncSession, client: LLMClient, request_id: uuid.UUI
         req.status = TailoringStatus.paused
         req.paused_mark = await _pause_mark(session, exc, now)
         req.error = str(exc)[:2000]
+        await _close_run(session, req, RunStatus.paused, error=req.error)
         await audit.record(session, actor="system", action="application.tailor_paused", subject_type="application",
                            subject_id=app.id, detail={"request_id": str(req.id), "scope": exc.scope})
         return req.status
     except LLMError as exc:
         req.status, req.error = TailoringStatus.failed, str(exc)[:2000]
+        await _close_run(session, req, RunStatus.failed, error=req.error)
         await audit.record(session, actor="system", action="application.tailor_failed", subject_type="application",
                            subject_id=app.id, detail={"request_id": str(req.id), "error": req.error[:300]})
         return req.status
@@ -152,6 +188,7 @@ async def process(session: AsyncSession, client: LLMClient, request_id: uuid.UUI
     results, check_cost = await checks.check_version(session, version, client=client)
     version.cost_micros = usage.cost_micros + check_cost
     req.status, req.result_version, req.error, req.paused_mark = TailoringStatus.done, version.version, None, None
+    await _close_run(session, req, RunStatus.succeeded, cost_micros=version.cost_micros, counts={"tailored": 1})
     await stages.add_event(session, app.id, "spec_version", "system", {
         "version": version.version, "origin": "tailor", "content_hash": version.content_hash,
         "status": checks.worst(results)})
@@ -184,6 +221,10 @@ async def resume_paused(session: AsyncSession, enqueue: Callable[[TailoringReque
                 and mark.get("month") == month):
             continue
         req.status = TailoringStatus.queued
+        if req.tailoring_run_id:
+            run = await session.get(Run, req.tailoring_run_id)
+            if run is not None:
+                run.status, run.error = RunStatus.queued, None
         await audit.record(session, actor="system", action="application.tailor_resumed", subject_type="application",
                            subject_id=req.application_id, detail={"request_id": str(req.id),
                                                                   "after": mark.get("scope")})
