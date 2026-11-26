@@ -176,7 +176,7 @@ function JobHeader({ job }: { job: JobDetail }) {
             </span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
           <WhyButton jobId={job.id} />
           <CorrectionsMenu job={job} />
         </div>
