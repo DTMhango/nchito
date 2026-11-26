@@ -89,12 +89,13 @@ class IntakeDeps:
 async def connector_extras(session: AsyncSession, source: Source, llm: LLMClient | None,
                            values: dict[str, Any]) -> dict[str, Any]:
     """What a connector needs besides its fetcher: the live settings, the run's AI client (careers pages, budget
-    capped by the connector's own setting) and, for web search, the key from its search API connection."""
+    capped by the connector's own setting) and, for web search, its Search API connection (endpoint, response
+    shape and key)."""
     from app.connect import search_api
 
     extras: dict[str, Any] = {"settings": values, "llm": llm}
     if source.connector == "web_search":
-        extras["api_key"] = await search_api.api_key_for(session, source)
+        extras["search_connection"] = await search_api.connection_for(session, source)
     return extras
 
 

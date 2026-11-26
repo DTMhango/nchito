@@ -17,7 +17,7 @@ from app.schemas.json_types import RateLimit
 from app.sources.careers_page import CareersPageConnector
 from app.sources.jobspy import JobSpyConnector
 from app.sources.registry import build_connector
-from app.sources.web_search import WebSearchConnector
+from app.sources.web_search import SearchConnection, WebSearchConnector
 from tests.apply.helpers import browser_draft, setup_app, setup_campaign
 from tests.pipeline.matching.helpers import NOW
 from tests.sources.support import FakeFetcher
@@ -33,13 +33,14 @@ def source(connector: str, **config) -> Source:
 def test_build_connector_passes_only_what_each_connector_takes():
     values = {"sources.search.max_queries": 2}
     llm = object()
-    extras = {"api_key": "k-123", "llm": llm, "settings": values}
+    connection = SearchConnection(endpoint=API, api_key="k-123", shape={})
+    extras = {"search_connection": connection, "llm": llm, "settings": values}
     web = build_connector(source("web_search"), FakeFetcher({}), extras=extras)
-    assert isinstance(web, WebSearchConnector) and web._api_key == "k-123" and web.settings is values
+    assert isinstance(web, WebSearchConnector) and web._connection is connection and web.settings is values
     careers = build_connector(source("careers_page"), FakeFetcher({}), extras=extras)
     assert isinstance(careers, CareersPageConnector) and careers.llm is llm and careers.settings is values
     spy = build_connector(source("jobspy"), FakeFetcher({}), extras=extras)
-    assert isinstance(spy, JobSpyConnector) and spy.settings is values  # no api_key or llm parameter
+    assert isinstance(spy, JobSpyConnector) and spy.settings is values  # no search_connection or llm parameter
 
 
 async def test_search_api_connection_gives_the_web_search_source_its_key(owner_client, session):
@@ -61,11 +62,13 @@ async def test_search_api_connection_gives_the_web_search_source_its_key(owner_c
         search_api.set_fetcher(None)
     assert tested.status_code == 200 and tested.json()["ok"] is True, tested.text
 
-    src = source("web_search", endpoint=API)
+    src = source("web_search", endpoint="https://stale.example.com/search")  # an old per-source endpoint: ignored
     extras = await orchestrator.connector_extras(session, src, None, {"x": 1})
-    assert extras["api_key"] == "secret-key-1" and extras["settings"] == {"x": 1}
-    src.config = {"endpoint": API, "connection_id": "00000000-0000-4000-8000-000000000009"}
-    assert (await orchestrator.connector_extras(session, src, None, {}))["api_key"] is None  # unknown: no key
+    found = extras["search_connection"]
+    assert found.api_key == "secret-key-1" and found.endpoint == API and found.shape["key_header"] == "X-Api-Key"
+    assert extras["settings"] == {"x": 1}
+    src.config = {"connection_id": "00000000-0000-4000-8000-000000000009"}
+    assert (await orchestrator.connector_extras(session, src, None, {}))["search_connection"] is None  # unknown
 
 
 async def test_a_posting_seen_again_by_a_sweep_feeds_change_detection(session):

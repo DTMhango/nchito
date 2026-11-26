@@ -983,3 +983,10 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
 - **Reminders on blocker actions**: `PendingActionOut.reminders_sent` and `next_reminder_at` (the widest
   `accounts.reminder_offsets_hours` offset not yet reminded before the nearest deadline; null when none is left);
   both null for non-blocker actions.
+- **Web search provider from the connection.** The endpoint, response shape and key of a `web_search` source come
+  only from its Search API connection (`connection_id`, else the first enabled one): `search_api.connection_for` ->
+  `web_search.SearchConnection {endpoint, api_key, shape}`, passed as the connector extra `search_connection` (was
+  `api_key`). A source's config keeps `connection_id`, `query_template` and its limits (`max_queries`,
+  `results_per_query`, `max_leads`); provider keys (`endpoint`, `query_param`, `limit_param`, `key_header`,
+  `key_param`, `result_path`, `url_field`, `title_field`) are dropped by `validate_config` and ignored if stored.
+  `POST /api/sources/{id}/test` now builds the connector with the same extras as a run.

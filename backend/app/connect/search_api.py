@@ -2,8 +2,9 @@
 
 The key is Fernet-encrypted in ``Connection.secrets_enc``, returned only masked and never logged or audited
 (the audit lists secret *names*). The record's config holds the provider's endpoint and response shape, so the
-connection can be tested on its own; a ``web_search`` source names its connection with ``connection_id`` in its
-config, else the first enabled search API connection is used.
+connection can be tested on its own and every ``web_search`` source searches through it (a source may only
+override the query template and its limits); a source names its connection with ``connection_id`` in its config,
+else the first enabled search API connection is used.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from app.models.search import Source
 from app.sources.base import HttpFetcher, SourceError
 from app.sources.http import HttpxFetcher
 from app.sources.web import http_url
-from app.sources.web_search import PROVIDER_SHAPE, JsonSearchProvider
+from app.sources.web_search import PROVIDER_SHAPE, JsonSearchProvider, SearchConnection
 
 PROVIDER = "search_api"
 CONFIG_KEYS = ("endpoint", *PROVIDER_SHAPE)
@@ -99,10 +100,14 @@ async def update(session: AsyncSession, conn: Connection, *, label: str | None, 
     return conn
 
 
-def _provider(conn: Connection, fetcher: HttpFetcher) -> JsonSearchProvider:
-    key = read_secrets(conn).get("api_key") or ""
+def search_connection(conn: Connection) -> SearchConnection:
     shape = {k: conn.config.get(k, default) for k, default in PROVIDER_SHAPE.items()}
-    return JsonSearchProvider(fetcher, endpoint=str(conn.config["endpoint"]), api_key=key, **shape)
+    return SearchConnection(endpoint=str(conn.config["endpoint"]), api_key=read_secrets(conn).get("api_key") or "",
+                            shape=shape)
+
+
+def _provider(conn: Connection, fetcher: HttpFetcher) -> JsonSearchProvider:
+    return search_connection(conn).provider(fetcher)
 
 
 async def run_test(conn: Connection) -> tuple[bool, str]:
@@ -116,8 +121,9 @@ async def run_test(conn: Connection) -> tuple[bool, str]:
     return True, f"the provider answered ({len(hits)} result{'s' if len(hits) != 1 else ''})"
 
 
-async def api_key_for(session: AsyncSession, source: Source) -> str | None:
-    """The key for a web search source: its ``connection_id``, else the first enabled search API connection."""
+async def connection_for(session: AsyncSession, source: Source) -> SearchConnection | None:
+    """What a web search source searches with: its ``connection_id``'s Search API connection, else the first
+    enabled one. ``None`` when there is none (or the named one is not an enabled search connection)."""
     raw = (source.config or {}).get("connection_id")
     conn: Connection | None = None
     if raw:
@@ -131,4 +137,4 @@ async def api_key_for(session: AsyncSession, source: Source) -> str | None:
         conn = await session.scalar(select(Connection).where(
             Connection.provider == ConnectionProvider.search_api, Connection.enabled.is_(True))
             .order_by(Connection.created_at).limit(1))
-    return (read_secrets(conn).get("api_key") or None) if conn is not None else None
+    return search_connection(conn) if conn is not None and conn.config.get("endpoint") else None

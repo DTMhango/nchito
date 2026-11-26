@@ -7,10 +7,13 @@ with JSON-LD ``JobPosting`` data. Anything else is dropped. The URL actually req
 in ``extra["visited_url"]``, next to the lead URL and the query that found it.
 
 ``SearchProvider`` is provider-agnostic. DESIGN names no provider, so the concrete one is a generic
-JSON search API (``JsonSearchProvider``) configured by endpoint, key placement and field names; the
-API key comes from the owner's connection and is handed to the connector at construction (it is never
-in the source config and never logged). robots.txt is honoured for every lead page. Result text is
-never read as a posting: only the URL is used, and the posting text comes from the page itself.
+JSON search API (``JsonSearchProvider``) configured by endpoint, key placement and field names. The
+endpoint, response shape and API key all belong to the owner's **Search API connection**
+(``app.connect.search_api``), handed to the connector at construction as a ``SearchConnection``; a
+source's own config may only pick that connection (``connection_id``), override the query template and set
+its search limits. Provider keys left in an older source config are ignored. The key is never logged.
+robots.txt is honoured for every lead page. Result text is never read as a posting: only the URL is used,
+and the posting text comes from the page itself.
 """
 
 from __future__ import annotations
@@ -35,7 +38,7 @@ from app.sources.common import ConnectorBase, closed_by_page
 from app.sources.detect import detect_from_url
 from app.sources.http import parse_json
 from app.sources.page import job_postings, parse_page
-from app.sources.web import RobotsGuard, ats_target, canonical_url, http_url, knob
+from app.sources.web import RobotsGuard, ats_target, canonical_url, knob
 
 
 @dataclass(frozen=True)
@@ -93,6 +96,21 @@ class JsonSearchProvider:
 
 PROVIDER_SHAPE = {"query_param": "q", "limit_param": None, "key_header": None, "key_param": None,
                   "result_path": "results", "url_field": "url", "title_field": "title"}
+PROVIDER_KEYS = frozenset({"endpoint", *PROVIDER_SHAPE})
+SOURCE_KNOBS = ("max_queries", "results_per_query", "max_leads", "query_template")
+
+
+@dataclass(frozen=True)
+class SearchConnection:
+    """What the Search API connection gives a web search source: where to search, how, and the key."""
+
+    endpoint: str
+    api_key: str
+    shape: Mapping[str, Any]
+
+    def provider(self, fetcher: HttpFetcher) -> JsonSearchProvider:
+        shape = {key: self.shape.get(key, default) for key, default in PROVIDER_SHAPE.items()}
+        return JsonSearchProvider(fetcher, endpoint=self.endpoint, api_key=self.api_key, **shape)
 
 
 def _location_words(locations: Sequence[str]) -> list[str]:
@@ -119,44 +137,39 @@ class WebSearchConnector(ConnectorBase):
     default_rate_limit = RateLimitSpec(requests_per_minute=10, burst=2)
     permitted_actions = frozenset({"search", "fetch", "check_open"})
 
-    def __init__(self, fetcher: HttpFetcher, *, api_key: str | None = None, provider: SearchProvider | None = None,
-                 settings: Mapping[str, Any] | None = None) -> None:
+    def __init__(self, fetcher: HttpFetcher, *, search_connection: SearchConnection | None = None,
+                 provider: SearchProvider | None = None, settings: Mapping[str, Any] | None = None) -> None:
         super().__init__(fetcher)
-        self._api_key = api_key
+        self._connection = search_connection
         self._provider = provider
         self.settings = settings
         self.robots = RobotsGuard(fetcher)
         self.dropped: list[str] = []
 
     def validate_config(self, config: Mapping[str, Any]) -> dict[str, Any]:
-        out = dict(config)
-        if self._provider is None:
-            out["endpoint"] = http_url(config.get("endpoint", ""))
-            for key in ("query_param", "result_path", "url_field", "title_field"):
-                if config.get(key) is not None and not str(config[key]).strip():
-                    raise ValueError(f"{key} cannot be blank")
-            if config.get("key_header") and config.get("key_param"):
-                raise ValueError("give the key as a header or a query parameter, not both")
-        for key in ("max_queries", "results_per_query", "max_leads", "query_template"):
+        """The source's own part: ``connection_id``, the query template and its search limits. The endpoint and
+        response shape belong to the Search API connection, so any left here are dropped."""
+        out = {k: v for k, v in config.items() if k not in PROVIDER_KEYS}
+        if out.get("connection_id") is not None and not str(out["connection_id"]).strip():
+            out.pop("connection_id")
+        for key in SOURCE_KNOBS:
             if config.get(key) is not None:
                 out[key] = knob(f"sources.search.{key}", config)
         return out
 
-    def _search_provider(self, config: Mapping[str, Any]) -> SearchProvider:
+    def _search_provider(self) -> SearchProvider:
         if self._provider is not None:
             return self._provider
-        if not self._api_key:
-            raise SourceError("no API key: connect the search provider first")
-        cfg = self.validate_config(config)
-        shape = {key: cfg.get(key, default) for key, default in PROVIDER_SHAPE.items()}
-        return JsonSearchProvider(self.fetcher, endpoint=cfg["endpoint"], api_key=self._api_key, **shape)
+        if self._connection is None or not self._connection.api_key:
+            raise SourceError("no search API connection: connect the search provider first (Settings, Connections)")
+        return self._connection.provider(self.fetcher)
 
     # ----- search -------------------------------------------------------------------------
 
     async def search(self, ctx: SearchContext, since: datetime | None) -> list[RawJob]:
         self.warnings, self.dropped = [], []
         cfg = ctx.source_config
-        provider = self._search_provider(cfg)
+        provider = self._search_provider()
         template = knob("sources.search.query_template", cfg, self.settings)
         queries = build_queries(ctx, template, knob("sources.search.max_queries", cfg, self.settings))
         if not queries:

@@ -469,7 +469,7 @@ async def test_pending_action_kind_is_the_exact_blocker_kind_and_filters(owner_c
     """Every blocker the gateway raises carries its own kind (never a generic "blocker"), so ``?kind=`` finds it."""
     kinds = ["captcha", "page_instruction", "assessment", "unsupported_form"]
     for kind in kinds:
-        app_id, _ = await approved_app(employer=f"{kind.title()} Example")
+        await approved_app(employer=f"{kind.title()} Example")
         runner, _ = await make_token(f"pc-{kind}")
         task_id = await claim(runner)
         await call(runner, "raise_blocker", task_id=task_id, type=kind, detail="needs the owner", url=URL)

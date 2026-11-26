@@ -11,7 +11,7 @@ import pytest
 from app.sources import registry  # noqa: F401  (imports every connector)
 from app.sources.base import RateLimitSpec, SearchContext, SourceError
 from app.sources.http import PoliteFetcher, RateLimiter
-from app.sources.web_search import SearchHit, WebSearchConnector, build_queries
+from app.sources.web_search import SearchConnection, SearchHit, WebSearchConnector, build_queries
 from tests.sources.support import FakeFetcher, fixture_text
 
 pytestmark = pytest.mark.nodb
@@ -20,7 +20,11 @@ GH = "https://boards-api.greenhouse.io/v1/boards"
 OPEN = (200, fixture_text("robots_allow_all.txt"))
 DENY_ALL = (200, "User-agent: *\nDisallow: /\n")
 API = "https://api.search.example.com/v1/search"
-CONFIG = {"endpoint": API, "key_header": "X-Api-Key"}
+
+
+def conn(key: str = "k", **shape: Any) -> SearchConnection:
+    """The Search API connection: endpoint, response shape and key (never the source's config)."""
+    return SearchConnection(endpoint=API, api_key=key, shape={"key_header": "X-Api-Key", **shape})
 
 
 class HeaderFetcher(FakeFetcher):
@@ -35,7 +39,7 @@ class HeaderFetcher(FakeFetcher):
 
 def ctx(titles=("Treaty Actuary",), locations=("Lusaka",), **config) -> SearchContext:
     return SearchContext(campaign_id="c1", titles=list(titles), keywords=[], locations=list(locations),
-                         source_config={**CONFIG, **config})
+                         source_config=dict(config))
 
 
 def routes(**extra) -> dict[str, tuple[int, str]]:
@@ -61,20 +65,30 @@ def test_build_queries_from_titles_and_locations():
     assert build_queries(SearchContext("c1", [], [], [], {}), "{title}", 5) == []
 
 
-def test_validate_config():
+def test_validate_config_keeps_only_the_sources_own_part():
     c = WebSearchConnector(FakeFetcher())
-    assert c.validate_config(CONFIG)["endpoint"] == API
-    for bad in ({}, {"endpoint": "ftp://x"}, {"endpoint": API, "key_header": "a", "key_param": "b"},
-                {"endpoint": API, "max_leads": 0}, {"endpoint": API, "query_template": "no title field"}):
+    assert c.validate_config({}) == {}
+    kept = c.validate_config({"connection_id": "abc", "query_template": "{title} jobs", "max_leads": 3,
+                              "endpoint": "https://other.example.com/s", "key_header": "X", "result_path": "x"})
+    assert kept == {"connection_id": "abc", "query_template": "{title} jobs", "max_leads": 3}
+    for bad in ({"max_leads": 0}, {"query_template": "no title field"}):
         with pytest.raises(ValueError):
             c.validate_config(bad)
-    # an injected provider needs no endpoint
-    assert WebSearchConnector(FakeFetcher(), provider=object()).validate_config({}) == {}  # type: ignore[arg-type]
+
+
+async def test_the_endpoint_comes_from_the_connection_never_the_source():
+    f = HeaderFetcher(routes())
+    stale = {"endpoint": "https://stale.example.com/search", "key_header": "X-Other", "query_template": "{title} role"}
+    await WebSearchConnector(f, search_connection=conn("sekret")).search(ctx(**stale), None)
+    search_urls = [h for h in f.headers if "search" in h[0] and "example.com/jobs" not in h[0]]
+    assert search_urls and all(u.startswith(API) for u, _ in search_urls)
+    assert search_urls[0][1]["X-Api-Key"] == "sekret" and "X-Other" not in search_urls[0][1]
+    assert "q=Treaty+Actuary+role" in search_urls[0][0]  # the source's own query template still applies
 
 
 async def test_only_leads_with_a_real_posting_become_jobs_and_the_visited_url_is_recorded():
     f = HeaderFetcher(routes())
-    c = WebSearchConnector(f, api_key="sekret")
+    c = WebSearchConnector(f, search_connection=conn("sekret"))
     jobs = await c.search(ctx(), None)
     assert len(jobs) == 2
     json_ld = next(j for j in jobs if j.extra["verified_by"] == "json_ld")
@@ -95,31 +109,32 @@ async def test_only_leads_with_a_real_posting_become_jobs_and_the_visited_url_is
 
 async def test_api_key_is_sent_as_header_only_and_is_not_kept_in_results():
     f = HeaderFetcher(routes())
-    jobs = await WebSearchConnector(f, api_key="sekret").search(ctx(), None)
+    jobs = await WebSearchConnector(f, search_connection=conn("sekret")).search(ctx(), None)
     search_call = next(h for h in f.headers if h[0].startswith(API))
     assert search_call[1]["X-Api-Key"] == "sekret" and "sekret" not in search_call[0]
     assert "sekret" not in json.dumps([j.__dict__ for j in jobs], default=str)
     param = HeaderFetcher(routes())
-    await WebSearchConnector(param, api_key="sekret").search(ctx(key_header=None, key_param="key"), None)
+    await WebSearchConnector(param, search_connection=conn("sekret", key_header=None, key_param="key")).search(
+        ctx(), None)
     assert "key=sekret" in next(h for h in param.headers if h[0].startswith(API))[0]
 
 
 async def test_injected_instruction_in_a_result_page_is_data_and_never_a_lead_or_posting():
     f = HeaderFetcher(routes())
-    jobs = await WebSearchConnector(f, api_key="k").search(ctx(), None)
+    jobs = await WebSearchConnector(f, search_connection=conn()).search(ctx(), None)
     assert all("Ignore previous instructions" not in j.raw_text for j in jobs)  # the blog page is dropped whole
     assert "https://blog.example.com/top-10-actuary-jobs" in [c[1] for c in f.calls]
 
 
 async def test_missing_key_and_provider_failures():
-    with pytest.raises(SourceError, match="API key"):
+    with pytest.raises(SourceError, match="search API connection"):
         await WebSearchConnector(HeaderFetcher(routes())).search(ctx(), None)
     f = HeaderFetcher(routes(**{f"{API}?*": (503, "")}))
     with pytest.raises(SourceError, match="search provider"):
-        await WebSearchConnector(f, api_key="k").search(ctx(), None)
+        await WebSearchConnector(f, search_connection=conn()).search(ctx(), None)
     bad_shape = HeaderFetcher(routes(**{f"{API}?*": (200, '{"data": []}')}))
     with pytest.raises(SourceError, match="result list"):
-        await WebSearchConnector(bad_shape, api_key="k").search(ctx(), None)
+        await WebSearchConnector(bad_shape, search_connection=conn()).search(ctx(), None)
 
 
 async def test_custom_response_shape_and_lead_cap():
@@ -128,7 +143,7 @@ async def test_custom_response_shape_and_lead_cap():
     f = HeaderFetcher(routes(**{f"{API}?*": (200, body)}))
     cfg = {"result_path": "data.items", "url_field": "link", "title_field": "name", "query_param": "query",
            "limit_param": "count"}
-    jobs = await WebSearchConnector(f, api_key="k").search(ctx(max_leads=1, **cfg), None)
+    jobs = await WebSearchConnector(f, search_connection=conn(**cfg)).search(ctx(max_leads=1), None)
     assert [j.requisition_id for j in jobs] == ["KR-101"]
     search_url = next(h[0] for h in f.headers if h[0].startswith(API))
     assert "query=" in search_url and "count=10" in search_url
@@ -162,7 +177,7 @@ async def test_check_open_three_states_and_fetch():
         "https://careers.example.com/jobs/blog": (200, fixture_text("search_blog.html")),
         "https://private.example.com/robots.txt": DENY_ALL,
     })
-    c = WebSearchConnector(f, api_key="k")
+    c = WebSearchConnector(f, search_connection=conn())
     base = "https://careers.example.com/jobs"
     assert await c.check_open(f"{base}/live") == "open"
     assert await c.check_open(f"{base}/gone") == "closed"
@@ -186,7 +201,7 @@ async def test_rate_limit_is_applied_to_search_and_lead_requests():
     inner = FakeFetcher(routes())
     polite = PoliteFetcher(inner, RateLimiter(RateLimitSpec(requests_per_minute=60, burst=1),
                                               clock=lambda: now[0], sleep=sleep))
-    await WebSearchConnector(polite, api_key="k").search(ctx(), None)
+    await WebSearchConnector(polite, search_connection=conn()).search(ctx(), None)
     assert len(inner.calls) > 3 and len(slept) == len(inner.calls) - 1  # one second between every request
 
 
