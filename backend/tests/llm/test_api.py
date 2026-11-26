@@ -52,7 +52,7 @@ async def test_provider_validation_and_non_llm_providers_wait_for_wave_2(owner_c
     r = await owner_client.post("/api/connections", json={"provider": "anthropic", "label": "x",
                                                           "config": {"api_key": "oops"}})
     assert r.status_code == 422
-    r = await owner_client.post("/api/connections", json={"provider": "gmail", "label": "Mail"})
+    r = await owner_client.post("/api/connections", json={"provider": "gdrive", "label": "Drive"})
     assert r.status_code == 501
 
 

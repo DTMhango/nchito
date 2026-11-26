@@ -45,6 +45,9 @@ class EnvConfig(BaseSettings):
     worker_stale_after_seconds: int = Field(default=180, ge=15, le=3600)
     scheduler_tick_seconds: int = Field(default=60, ge=10, le=600)
 
+    google_oauth_client_id: str | None = Field(default=None, description="Gmail OAuth client id.")
+    google_oauth_client_secret: str | None = Field(default=None, description="Gmail OAuth client secret.")
+
     s3_endpoint: str | None = None
     s3_bucket: str | None = None
     s3_access_key: str | None = None

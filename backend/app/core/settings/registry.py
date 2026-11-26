@@ -45,6 +45,7 @@ GROUPS: dict[str, str] = {
     "tracking": "Tracking",
     "answers": "Answer bank",
     "reconcile": "Reconciliation",
+    "mail": "Mail",
     "ai": "AI",
     "budget": "Budget",
     "documents": "Documents",
@@ -269,6 +270,26 @@ _add("answers.match_similarity", "float", "Question match similarity",
 # Reconciliation (8.5)
 _int("reconcile.confirmation_wait_hours", "Wait for confirmation",
      "Watch the mailbox this long for a confirmation before asking the owner.", 24, 48, 1, 336, "hours")
+
+# Mail (8.5, 12)
+MAIL_AUTO_CLASSES = ("confirmation", "rejection", "interview")
+_int("mail.check_interval_minutes", "Mailbox check interval",
+     "How often each connected mailbox is read for replies.", 10, 30, 1, 1440, "minutes")
+_int("mail.initial_lookback_days", "First check lookback",
+     "How far back the first check of a new mailbox (or alert source) reads.", 14, 30, 1, 365, "days")
+_int("mail.max_messages_per_check", "Messages per check",
+     "Most messages read from a mailbox in one check.", 200, 50, 1, 1000)
+_add("mail.auto_link_confidence", "float", "Link replies automatically at",
+     "A reply matched to an application at or above this confidence is linked; below it goes to review.",
+     0.8, 0.9, float, minimum=0.5, maximum=1.0, invalid_example=0.1, has_invalid_example=True)
+_add("mail.auto_apply_classes", "list", "Apply stage changes from mail",
+     "Reply kinds whose stage change is applied without asking. Empty: every change waits for the owner.",
+     [], ["confirmation"], list[str], choices=MAIL_AUTO_CLASSES, validators=(unique_items,),
+     invalid_example=["offer"], has_invalid_example=True)
+_bool("mail.llm_classify", "Use AI for unclear replies",
+      "When the plain rules cannot tell what a reply is, ask the classify-email model (budgeted).", True)
+_int("mail.llm_body_max_chars", "Reply text sent to AI",
+     "Longest part of a reply's text given to the model, as untrusted data.", 6000, 3000, 500, 50_000, "characters")
 
 # AI (11)
 _enum("ai.provider", "Provider", "Default LLM provider.", "anthropic", "openai_compatible",

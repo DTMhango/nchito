@@ -427,3 +427,28 @@ the registry under its own group prefix only.
   `block, waivable once`; 409 if already waived; 422 blank reason), `GET /api/kit/guardrail-waivers?application_id=`,
   `DELETE /api/kit/guardrail-waivers/{id}`. `POST /api/kit/guardrails/check` takes an optional `application_id`: a waived
   violation shows `waived: true` and no longer sets `blocked`. Audited `kit.guardrail.waived`, `kit.guardrail.waiver_removed`.
+
+## Wave 2 email additions
+
+- `MailClassification` gains `information_request` (migration `0007_email`, which also adds
+  `mail_thread.sender` and `mail_thread.last_message_at`). `MailThreadOut` gains `sender` and
+  `last_message_at`; `MailThreadLink.classification` and `MailThreadOut.classification` accept the new value.
+- `GET /api/mail-threads` and `PUT /api/mail-threads/{id}` are real. Linking a thread proposes a stage change
+  (pending action) exactly as an automatic match would; it never changes a stage silently.
+- Mailbox connections: `POST /api/connections` accepts `imap_smtp` (config: `from_address`, `username`, `imap_host`,
+  `imap_port`, `imap_security`, `read_folder`, `sent_folder`, `smtp_host`, `smtp_port`, `smtp_security`; secret:
+  `password`). Gmail connects only through `POST /api/connections/oauth/gmail/start` and the callback (config:
+  `from_address`, `read_label`, `read_query`, optional `client_id`; env `GOOGLE_OAUTH_CLIENT_ID` and
+  `GOOGLE_OAUTH_CLIENT_SECRET`). `PUT` merges config; sync bookkeeping keys are server-written. `/test` runs the
+  mailbox health check. The OAuth callback redirects (307) to `/settings/connections?connected=gmail`.
+- `Mailbox`: `MailMessage` gains `body_html`; errors are `MailError`, `MailConfigError`, `MailAuthError`,
+  `MailSendError` (a definite refusal; an unknown outcome is `send` returning `None`).
+- `EmailChannel(attachments=..., resolver=..., hasher=...)` in `app/apply/channels/email.py`. It reads the
+  `DispatchAttempt`, requires a consumed `SubmitPermit` for the same packet hash, and writes nothing: the apply
+  layer records the `DispatchOutcome`. Packet hash default: sha256 of canonical JSON (sorted keys, compact
+  separators) of `PacketContents.model_dump(mode="json")`; pass `hasher=` if the apply stream's differs.
+- Stage proposals from mail are `PendingAction` rows with `detail.kind == "mail_stage_proposal"`
+  (`confirm_submission` for acknowledgements, `follow_up` otherwise). The apply stream's resolve flow should call
+  `app.connect.mail_sync.apply_proposal(session, action, actor=...)` when the owner approves one.
+- Source connector `alert_email` (config `connection_id`, `senders`). Settings group `mail.*`.
+- Periodic task `mail_check` (system queue, every minute, gated by `mail.check_interval_minutes`).

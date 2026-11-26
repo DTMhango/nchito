@@ -18,6 +18,7 @@ from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timest
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.apply import autopilot, stages
 from app.apply.autopilot import AutopilotState, AutopilotWrite
+from app.connect.mail_sync import SyncResult, act_on_thread
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.config import get_config
@@ -29,6 +30,8 @@ from app.models.applications import (
     ApplicationEvent,
     Channel,
     Contact,
+    MailClassification,
+    MailThread,
     PendingAction,
     PendingStatus,
     Stage,
@@ -288,17 +291,22 @@ class ContactOut(ContactIn, Timestamps):
     origin: str
 
 
+MailClassT = Literal["confirmation", "rejection", "interview", "information_request", "other"]
+
+
 class MailThreadOut(Timestamps):
     application_id: uuid.UUID | None
     subject: str | None
-    classification: Literal["confirmation", "rejection", "interview", "other"]
+    classification: MailClassT
     match_confidence: float | None
     needs_review: bool
+    sender: str | None = None
+    last_message_at: datetime | None = None
 
 
 class MailThreadLink(BaseModel):
     application_id: uuid.UUID | None
-    classification: Literal["confirmation", "rejection", "interview", "other"] | None = None
+    classification: MailClassT | None = None
 
 
 class InterviewPackOut(Timestamps):
@@ -823,14 +831,49 @@ async def contacts_delete(item_id: uuid.UUID, principal: PrincipalDep, session: 
 
 
 @router.get("/mail-threads", response_model=Page[MailThreadOut], name="mail_threads_list")
-async def mail_threads(application_id: uuid.UUID | None = None, needs_review: bool | None = None,
-                       cursor: str | None = None) -> Page[MailThreadOut]:
-    not_implemented(2, "mail")
+async def mail_threads(session: SessionDep, application_id: uuid.UUID | None = None,
+                       needs_review: bool | None = None, cursor: str | None = None,
+                       limit: int = Query(default=50, ge=1, le=200)) -> Page[MailThreadOut]:
+    offset = int(cursor) if cursor and cursor.isdigit() else 0
+    stmt = select(MailThread).order_by(MailThread.last_message_at.desc().nulls_last(), MailThread.id)
+    if application_id is not None:
+        stmt = stmt.where(MailThread.application_id == application_id)
+    if needs_review is not None:
+        stmt = stmt.where(MailThread.needs_review.is_(needs_review))
+    rows = list(await session.scalars(stmt.offset(offset).limit(limit + 1)))
+    return Page[MailThreadOut](items=[MailThreadOut.model_validate(t) for t in rows[:limit]],
+                               next_cursor=str(offset + limit) if len(rows) > limit else None)
 
 
 @router.put("/mail-threads/{thread_id}", response_model=MailThreadOut, name="mail_threads_link")
-async def link_mail_thread(thread_id: uuid.UUID, body: MailThreadLink) -> MailThreadOut:
-    not_implemented(2, "mail")
+async def link_mail_thread(thread_id: uuid.UUID, body: MailThreadLink, session: SessionDep,
+                           principal: PrincipalDep) -> MailThreadOut:
+    """The owner settles a review: link the thread to an application (or unlink it) and/or fix its kind.
+    Linking applies the same proposal rules as an automatic match, but never silently changes a stage."""
+    thread = await session.get(MailThread, thread_id)
+    if thread is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="mail thread not found")
+    app = None
+    if body.application_id is not None:
+        app = await session.get(Application, body.application_id)
+        if app is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="application not found")
+    thread.application_id = body.application_id
+    if body.classification is not None:
+        thread.classification = MailClassification(body.classification)
+    thread.match_confidence = 1.0 if app is not None else None
+    thread.needs_review = False
+    await audit.record(session, actor=principal.actor, action="mail_thread.linked", subject_type="mail_thread",
+                       subject_id=thread.id, detail={"application_id": str(body.application_id) if app else None,
+                                                     "classification": thread.classification.value})
+    if app is not None and thread.provider_message_ids:
+        res = SyncResult()
+        values = await settings_service.values(session)
+        await act_on_thread(session, thread, app, thread.classification.value, thread.provider_message_ids[-1],
+                            list(values["mail.auto_apply_classes"]), res)
+    await session.flush()
+    await session.refresh(thread)
+    return MailThreadOut.model_validate(thread)
 
 
 @router.get("/jobs/{job_id}/interview-pack", response_model=InterviewPackOut, name="interview_pack_get")
