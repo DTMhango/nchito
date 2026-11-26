@@ -153,7 +153,7 @@ async def test_each_request_has_its_own_run_with_status_and_cost(session):
     refused = BudgetExhausted("no_cap", needed_micros=5_000, available_micros=None, currency="USD")
     fake = FakeLLMClient().script("tailor", refused, reply(w)).script("claim_check", no_flags)
     fake.cost_micros = 700
-    req, queue = await service.request(session, w.app, actor="owner")
+    req, _queued = await service.request(session, w.app, actor="owner")
     run = await session.get(Run, req.tailoring_run_id)
     assert run is not None and run.kind == RunKind.tailoring and run.status == RunStatus.queued
     assert run.trigger == "manual" and run.campaign_id == w.app.campaign_id

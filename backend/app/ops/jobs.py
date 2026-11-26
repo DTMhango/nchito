@@ -61,7 +61,10 @@ async def remote_store(session: AsyncSession, target: str) -> tuple[FileStore | 
         except Exception as exc:
             return None, f"Google Drive unavailable: {type(exc).__name__}: {exc}"[:300]
     if target == "s3":
-        return None, "S3 backups are not available in this build; the backup was kept locally"
+        try:
+            return await records.first_s3_store(session), None
+        except Exception as exc:
+            return None, f"S3 storage unavailable: {type(exc).__name__}: {exc}"[:300]
     return None, None
 
 

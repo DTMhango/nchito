@@ -69,7 +69,8 @@ async def test_an_earlier_prompt_version_becomes_active_again(owner_client, sess
         made = (await owner_client.post("/api/kit/prompts", json={"stage": stage, "text": text})).json()
         ids.append(made["id"])
         assert (await owner_client.post(f"/api/kit/prompts/{made['id']}/activate")).status_code == 200
-    activated = [i for i in await _history(owner_client, kind="prompt") if i["note"] and i["note"].startswith("activated")]
+    prompt_rows = await _history(owner_client, kind="prompt")
+    activated = [i for i in prompt_rows if i["note"] and i["note"].startswith("activated")]
     older = next(i for i in activated if i["diff"]["to_version"] == 2)
     r = await owner_client.post(f"/api/data/config-history/{older['id']}/rollback", json={})
     assert r.status_code == 200, r.text
