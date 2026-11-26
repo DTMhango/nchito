@@ -46,3 +46,16 @@ def install() -> None:
     orchestrator.install()
     scoring.set_client_factory(default_client)
     corrections.set_conflict_reevaluator(conflicts.resolve_employers)
+
+
+def uninstall() -> None:
+    """Undo ``install`` (tests): no AI client, no scorer, no run handlers, no conflict re-evaluation."""
+    from app.models.search import RunKind
+    from app.pipeline import runs
+
+    orchestrator.reset_deps()
+    orchestrator.reset_score_hook()
+    scoring.set_client_factory(None)
+    corrections.set_conflict_reevaluator(None)
+    for kind in (RunKind.sweep, RunKind.expiry_check, RunKind.retention):
+        runs.unregister(kind)

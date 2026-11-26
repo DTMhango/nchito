@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example remote jobs (fictional)</title>
+    <link>https://jobs.example.com/</link>
+    <description>Invented postings for tests</description>
+    <item>
+      <title>Senior Data Analyst</title>
+      <description>Example Insurance is hiring a Senior Data Analyst for claims forecasting. This role is fully remote. Power BI and SQL required. We sponsor visas.</description>
+      <pubDate>Mon, 23 Nov 2026 09:00:00 +0000</pubDate>
+      <guid>https://jobs.example.com/roles/2001</guid>
+      <link>https://jobs.example.com/roles/2001</link>
+    </item>
+    <item>
+      <title>Senior Data Analyst</title>
+      <description>Example Insurance is hiring a Senior Data Analyst for claims forecasting. This role is fully remote. Power BI and SQL required. We sponsor visas.</description>
+      <pubDate>Mon, 23 Nov 2026 09:00:00 +0000</pubDate>
+      <guid>https://jobs.example.com/roles/2001-repost</guid>
+      <link>https://jobs.example.com/roles/2001?ref=feed</link>
+    </item>
+  </channel>
+</rss>

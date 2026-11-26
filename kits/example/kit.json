@@ -783,7 +783,9 @@
       "name": "Example Greenhouse board",
       "access": "api",
       "config": {
-        "board_slug": "exampleco"
+        "boards": [
+          "exampleco"
+        ]
       },
       "permitted_actions": [
         "search",
@@ -796,7 +798,8 @@
       "name": "Remote feed",
       "access": "feed",
       "config": {
-        "url": "https://jobs.example.com/feed.xml"
+        "feed_url": "https://jobs.example.com/feed.xml",
+        "employer": "Example Insurance (fictional)"
       },
       "permitted_actions": [
         "search",

@@ -1,0 +1,43 @@
+{
+  "jobs": [
+    {
+      "absolute_url": "https://boards.greenhouse.io/exampleco/jobs/1001",
+      "id": 1001,
+      "requisition_id": "EX-1001",
+      "title": "Senior Data Analyst",
+      "company_name": "ExampleCo (fictional)",
+      "location": {"name": "Remote"},
+      "first_published": "2026-11-20T09:00:00Z",
+      "updated_at": "2026-11-20T09:00:00Z",
+      "content": "&lt;p&gt;ExampleCo is hiring a Senior Data Analyst to own forecasting and Power BI dashboards. This role is fully remote. We sponsor visas. You will use SQL and Python every day.&lt;/p&gt;",
+      "departments": [{"id": 1, "name": "Analytics"}],
+      "offices": []
+    },
+    {
+      "absolute_url": "https://boards.greenhouse.io/exampleco/jobs/1002",
+      "id": 1002,
+      "requisition_id": "EX-1002",
+      "title": "Analytics Lead",
+      "company_name": "ExampleCo (fictional)",
+      "location": {"name": "Remote"},
+      "first_published": "2026-11-21T09:00:00Z",
+      "updated_at": "2026-11-21T09:00:00Z",
+      "content": "&lt;p&gt;ExampleCo needs an Analytics Lead to run the reporting team. This role is fully remote. We sponsor visas. SQL required.&lt;/p&gt;",
+      "departments": [{"id": 1, "name": "Analytics"}],
+      "offices": []
+    },
+    {
+      "absolute_url": "https://boards.greenhouse.io/exampleco/jobs/1003",
+      "id": 1003,
+      "requisition_id": "EX-1003",
+      "title": "Warehouse Supervisor",
+      "company_name": "ExampleCo (fictional)",
+      "location": {"name": "Remote"},
+      "first_published": "2026-11-22T09:00:00Z",
+      "updated_at": "2026-11-22T09:00:00Z",
+      "content": "&lt;p&gt;Supervise the warehouse shift. Candidates must already hold the right to work in the country; we cannot sponsor.&lt;/p&gt;",
+      "departments": [{"id": 2, "name": "Operations"}],
+      "offices": []
+    }
+  ]
+}
