@@ -23,6 +23,12 @@
           ],
           "default": null,
           "title": "Kinds"
+        },
+        "dry_run": {
+          "default": false,
+          "description": "Rehearsal: the claim is given back when the task ends, submit permits are always refused and nothing is recorded on the application",
+          "title": "Dry Run",
+          "type": "boolean"
         }
       },
       "title": "NextTaskIn",
@@ -532,6 +538,7 @@
           "enum": [
             "sign_in",
             "create_account",
+            "verification_code",
             "captcha",
             "assessment",
             "declaration",
@@ -923,6 +930,184 @@
         "duplicates"
       ],
       "title": "ReportJobsOut",
+      "type": "object"
+    }
+  },
+  "report_check": {
+    "description": "Check tasks: is the posting open, closed or unknown.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "status": {
+          "description": "A check that failed or could not tell is unknown, never closed",
+          "enum": [
+            "open",
+            "closed",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "evidence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "What on the page showed it (text, as data)",
+          "title": "Evidence"
+        },
+        "screenshot_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Screenshot Ref"
+        }
+      },
+      "required": [
+        "task_id",
+        "status"
+      ],
+      "title": "ReportCheckIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "recorded": {
+          "title": "Recorded",
+          "type": "boolean"
+        },
+        "availability": {
+          "enum": [
+            "open",
+            "closed",
+            "unknown"
+          ],
+          "title": "Availability",
+          "type": "string"
+        }
+      },
+      "required": [
+        "recorded",
+        "availability"
+      ],
+      "title": "ReportCheckOut",
+      "type": "object"
+    }
+  },
+  "release_task": {
+    "description": "Give a claimed task back to the queue (from its checkpoint).",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "reason"
+      ],
+      "title": "ReleaseTaskIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "released": {
+          "title": "Released",
+          "type": "boolean"
+        },
+        "task_status": {
+          "title": "Task Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "released",
+        "task_status"
+      ],
+      "title": "ReleaseTaskOut",
+      "type": "object"
+    }
+  },
+  "evidence_upload_url": {
+    "description": "A short-lived URL to upload a screenshot or confirmation; returns its reference.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "content_type": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "application/pdf",
+            "text/plain"
+          ],
+          "title": "Content Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "content_type"
+      ],
+      "title": "EvidenceUploadIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "upload_url": {
+          "description": "PUT the raw bytes here (short-lived signed URL, one upload)",
+          "title": "Upload Url",
+          "type": "string"
+        },
+        "ref": {
+          "description": "Use as screenshot_ref in save_checkpoint and report_result",
+          "title": "Ref",
+          "type": "string"
+        },
+        "max_bytes": {
+          "title": "Max Bytes",
+          "type": "integer"
+        },
+        "expires_at": {
+          "title": "Expires At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "upload_url",
+        "ref",
+        "max_bytes",
+        "expires_at"
+      ],
+      "title": "EvidenceUploadOut",
       "type": "object"
     }
   }

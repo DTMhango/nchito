@@ -1259,8 +1259,15 @@ async def mark_submitted(application_id: uuid.UUID, body: MarkSubmittedIn, princ
 
 @router.get("/applications/{application_id}/releases", response_model=list[ReleaseRecord],
             name="applications_releases")
-async def releases(application_id: uuid.UUID) -> list[ReleaseRecord]:
-    not_implemented(3, "gateway")
+async def releases(application_id: uuid.UUID, session: SessionDep) -> list[ReleaseRecord]:
+    """What each runner task was given (packet, answers, files) and what it reports having entered (18.1)."""
+    from app.models.applications import AgentTask
+
+    await _load(session, application_id)
+    tasks = (await session.scalars(select(AgentTask).where(AgentTask.application_id == application_id)
+                                   .order_by(AgentTask.created_at))).all()
+    return [ReleaseRecord(agent_task_id=t.id, released={"given": (t.released or {}).get("given") or []},
+                          entered=(t.released or {}).get("entered") or {}) for t in tasks if t.released]
 
 
 # ----- contacts, mail, interview --------------------------------------------------------------

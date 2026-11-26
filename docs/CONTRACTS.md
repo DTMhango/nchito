@@ -242,7 +242,7 @@ Schemas: `backend/app/gateway/tools.py`; JSON Schemas for every input and output
 
 | Tool | In | Out |
 |---|---|---|
-| `next_task` | `{kinds?}` | `{task_id \| null, type, instructions, posting_url, checkpoint, rules: {stay_on_domain, max_steps, never[]}}` |
+| `next_task` | `{kinds?, dry_run?}` | `{task_id \| null, type, instructions, posting_url, checkpoint, rules: {stay_on_domain, max_steps, never[]}}` |
 | `get_packet` | `{task_id}` | `{packet_version, packet_hash, destination_domain, fields[], answers[], files[{name, kind, sha256, download_url (short-lived signed), attach_rule}]}` |
 | `find_answer` | `{task_id, question, options?}` | `{outcome: value \| ask_owner \| do_not_answer, value?, select?}` |
 | `save_checkpoint` | `{task_id, state: {step, fields_filled, screenshot_ref, url, data}}` | `{ok, steps_used, steps_left}` |
@@ -250,6 +250,11 @@ Schemas: `backend/app/gateway/tools.py`; JSON Schemas for every input and output
 | `request_submit_permit` | `{task_id, summary, entered_answers[], attached_files_sha256[], current_url}` | `{decision: granted \| wait_for_owner \| denied, permit_id?, expires_at?, reason?, changes[]}` |
 | `report_result` | `{task_id, outcome: submitted \| uncertain \| failed, permit_id?, confirmation_text?, reference?, screenshot_ref?, detail?}` | `{recorded, application_stage}` |
 | `report_jobs` | `{task_id, jobs[{url_visited, title, employer, location?, snippet?}]}` | `{accepted, duplicates}` |
+| `report_check` (wave 3) | `{task_id, status: open \| closed \| unknown, evidence?, screenshot_ref?}` | `{recorded, availability}` |
+| `release_task` (wave 3) | `{task_id, reason}` | `{released, task_status}` |
+| `evidence_upload_url` (wave 3) | `{task_id, content_type: image/png \| image/jpeg \| image/webp \| application/pdf \| text/plain}` | `{upload_url, ref, max_bytes, expires_at}` |
+
+`raise_blocker.type` also accepts `verification_code` (wave 3). See "Wave 3 gateway additions" at the end.
 
 Semantics (DESIGN.md 8.3, 18.1 to 18.3), enforced server-side:
 
@@ -737,3 +742,52 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
 - **Exit test** (`tests/integration/test_wave2_exit.py`): besides the pipeline path, an API-only path (set and
   confirm the address, prepare, approve and dispatch through the endpoints; one email in the fake mailbox) and a test
   that a posting's unconfirmed address is packed for manual hand-off and never sent automatically.
+
+## Wave 3 gateway additions
+
+- **Transport.** `/mcp`: stateless streamable HTTP, JSON responses (official `mcp` SDK, low-level server; tool
+  schemas are exactly `app/gateway/tools.py`). `Authorization: Bearer nch_...`: missing, unknown or revoked is 401
+  before MCP; over `runners.calls_per_minute` is 429. A refused call is an MCP tool error whose text is
+  `{"code", "reason"}` (codes include `not_your_task`, `task_not_active`, `lease_expired`, `scope_missing`,
+  `runner_suspended`, `token_revoked`, `not_approved`, `destination_unverified`, `untrusted_site`, `permit_given`,
+  `rate_limited`, `invalid_input`). Python entry point: `app.gateway.service.call(token_id, tool, args)`.
+- **Tokens** (`/api/tokens`): list, create (secret shown once; sha256 stored), revoke (tasks held go back to the
+  queue), reinstate (lifts a suspension; 409 for a revoked token), `GET /api/tokens/runners` (last seen = last
+  gateway call, online within `runners.stale_after_minutes`, current task). Scopes: `gateway:tasks` (apply, check),
+  `gateway:packets` (get_packet, find_answer), `gateway:permits`, `gateway:sweep` (sweep tasks, report_jobs).
+  A suspended token may still report (results, checkpoints, blockers) but gets no tasks, packets, answers or permits.
+- **Tasks.** Claimed with `FOR UPDATE SKIP LOCKED`; a runner holding `runners.max_claimed_tasks` gets its held task
+  back (resume). Lease `runners.task_lease_minutes` from the last call on the task; on expiry the task is requeued
+  with its checkpoint, unless a permit was given (open dispatch attempt): then it is `failed/uncertain` and left to
+  reconciliation. **Resume to the same runner:** a `queued` task whose `payload.resume_runner_token_id` is set is
+  given only to that token (what `owner_actions.continue_task` writes). Routing: `AgentTask.preferred_runner`
+  (`pc` / `server` / null) against the token's `runner_kind`; a form that needs or might need an account is `pc`
+  (`app.apply.accounts.needs_account` when present, else facets and `runners.account_free_portals`); account-free
+  forms follow `runners.route_account_free`. Server tokens get nothing while `runners.server_runner_enabled` is off;
+  apply tasks are not handed out while paused. Hand-out: `gateway_tick` (system queue, every minute) queues one task
+  per ready application whose current packet is approved for `browser`, expires leases, and requeues tasks that
+  waited for an approval once the new packet is approved. Helpers: `tasks.enqueue_apply/enqueue_sweep/enqueue_check`.
+- **Permit through the gateway.** Entered answers are compared with the approved packet: a `never` / `owner_only`
+  answer entered, an unknown file, or a page off the destination domain is `denied` (the off-domain case also raises a
+  `redirect_off_domain` blocker); a new question or changed value builds a new packet version holding the entered
+  values and asks the owner (`wait_for_owner`, task `blocked`). Otherwise `permits.request` (channel `browser`, runner
+  and task bound); a grant writes a `DispatchAttempt` (`reserved`, `started_at` set, permit linked, not consumed) in
+  the same transaction. `report_result(submitted)` consumes the permit (`permits.consume`) and records `sent` with
+  evidence (`reference` or `confirmation_text`) or `unknown` without; no consumable permit = violation (token
+  suspended, `gateway.violation` audit, `health` notification, the submission held `unknown`). `failed` settles the
+  attempt failed and gives the role back; `uncertain` holds it `unknown`.
+- **Dry run** (`next_task {dry_run: true}`): the claim is given back when the task ends or is released, permits are
+  always denied, attempts are not counted, nothing is recorded on the application.
+- **report_check**: `open` / `closed` set `Job.availability` and `last_checked_at`; `closed` without evidence and
+  `unknown` record `unknown` (never closed). **release_task**: back to the queue with its checkpoint; refused once a
+  permit was given. **Evidence**: `evidence_upload_url` returns a signed `PUT /api/gateway/uploads/{signed}` link
+  (one upload, declared type only, at most `runners.evidence_max_kb`, stored untouched under `evidence/<task>/`);
+  `ref` is `evidence:<task id>/<id>`. Packet files: `GET /api/gateway/files/{signed}` (expires after
+  `runners.file_url_minutes`, only while the task is claimed and the file is in the approved packet; sha256 checked).
+- **Releases:** `GET /api/applications/{id}/releases` returns per task `released.given[]` (each `get_packet`:
+  packet hash, fields, answers, files, withheld files) and `entered` (the last permit request).
+- **Pending action types** `unsupported_form`, `redirect_off_domain`, `page_instruction` (migration `0013_gateway`).
+  Blockers carry `detail.released` (what the runner was already given). Sign-in style blockers go through
+  `app.apply.accounts.register_blocker` when that module is present (`app.gateway.accounts_bridge`).
+- **Settings** (`runners.*`): `task_lease_minutes`, `max_claimed_tasks`, `claims_per_hour`, `calls_per_minute`,
+  `file_url_minutes`, `evidence_max_kb`, `route_account_free`, `account_free_portals`, `task_instructions`.

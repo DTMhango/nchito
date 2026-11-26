@@ -11572,6 +11572,7 @@
           "applications"
         ],
         "summary": "Applications Releases",
+        "description": "What each runner task was given (packet, answers, files) and what it reports having entered (18.1).",
         "operationId": "applications_releases",
         "parameters": [
           {
@@ -13852,6 +13853,7 @@
           "tokens"
         ],
         "summary": "Tokens Create",
+        "description": "A runner token: one runner identity of a declared kind. The token itself is shown only in this reply.",
         "operationId": "tokens_create",
         "requestBody": {
           "content": {
@@ -13903,6 +13905,7 @@
           "tokens"
         ],
         "summary": "Tokens Revoke",
+        "description": "Revoke at once: the token is refused from now on and the tasks it held go back to the queue.",
         "operationId": "tokens_revoke",
         "parameters": [
           {
@@ -14010,6 +14013,7 @@
           "tokens"
         ],
         "summary": "Tokens Runner Status",
+        "description": "Each live runner: last seen (its last gateway call), online within ``runners.stale_after_minutes``,\nand the task it holds.",
         "operationId": "tokens_runner_status",
         "responses": {
           "200": {
@@ -14991,6 +14995,92 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SpendMeter"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gateway/files/{signed}": {
+      "get": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Gateway File",
+        "description": "One packet file for a runner, through a short-lived signed link.",
+        "operationId": "gateway_file",
+        "parameters": [
+          {
+            "name": "signed",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Signed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gateway/uploads/{signed}": {
+      "put": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Gateway Upload",
+        "description": "One evidence file (screenshot or confirmation) from a runner. Stored as untrusted data.",
+        "operationId": "gateway_upload",
+        "parameters": [
+          {
+            "name": "signed",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Signed"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Gateway Upload"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
