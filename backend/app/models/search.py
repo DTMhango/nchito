@@ -76,6 +76,9 @@ class Campaign(Base, Entity):
     paused_until: Mapped[date | None] = mapped_column(Date)
     preferred_seniority: Mapped[str | None] = mapped_column(String(60))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    unconfirmed_items: Mapped[list[str]] = mapped_column(
+        ARRAY(String(40)), nullable=False, default=list,
+        doc="Criteria groups still to confirm (pay_floors, locations, ...); confirmed only when empty")
     last_sweep_checkpoint: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
@@ -230,6 +233,8 @@ class Job(Base, Entity):
     conflict_state: Mapped[ConflictState] = mapped_column(str_enum(ConflictState), nullable=False,
                                                           default=ConflictState.none)
     conflict_note: Mapped[str | None] = mapped_column(Text)
+    conflict_detail: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, doc="Held: outranking job id, title and both scores (7.1)")
     facets: Mapped[JobFacets] = mapped_column(PydanticJSON(JobFacets), nullable=False, default=JobFacets)
     custom_facets: Mapped[dict[str, CustomFacetValue]] = mapped_column(
         PydanticJSON(dict[str, CustomFacetValue]), nullable=False, default=dict)
@@ -308,9 +313,16 @@ class JobSighting(Base, Entity):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
 
+class AssessmentState(enum.StrEnum):
+    pending = "pending"
+    filtered_out = "filtered_out"
+    scored = "scored"
+    parked = "parked"
+
+
 class Assessment(Base, Entity):
     __tablename__ = "assessment"
-    __table_args__ = (Index("ix_assessment_job_campaign", "job_id", "campaign_id"),)
+    __table_args__ = (UniqueConstraint("job_id", "campaign_id", name="job_campaign"),)
 
     job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("job.id", ondelete="CASCADE"), nullable=False)
     campaign_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("campaign.id", ondelete="CASCADE"), nullable=False)
@@ -320,6 +332,11 @@ class Assessment(Base, Entity):
                                                                default=list)
     ratings: Mapped[list[CriterionRating]] = mapped_column(PydanticJSON(list[CriterionRating]), nullable=False,
                                                            default=list)
+    state: Mapped[AssessmentState] = mapped_column(str_enum(AssessmentState), nullable=False,
+                                                   default=AssessmentState.pending,
+                                                   doc="filtered_out: failed a hard filter, never scored; "
+                                                       "parked: budget exhausted, resumable")
+    base_score: Mapped[int | None] = mapped_column(Integer, doc="Rubric score before campaign adjustments")
     score: Mapped[int | None] = mapped_column(Integer)
     gaps: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     model: Mapped[str | None] = mapped_column(String(128))

@@ -4425,238 +4425,6 @@
         }
       }
     },
-    "/api/rubrics": {
-      "get": {
-        "tags": [
-          "campaigns"
-        ],
-        "summary": "Rubrics List",
-        "operationId": "rubrics_list",
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cursor"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 50,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page_RubricOut_"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "campaigns"
-        ],
-        "summary": "Rubrics Create",
-        "operationId": "rubrics_create",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RubricIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RubricOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/rubrics/{item_id}": {
-      "get": {
-        "tags": [
-          "campaigns"
-        ],
-        "summary": "Rubrics Get",
-        "operationId": "rubrics_get",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Item Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RubricOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "campaigns"
-        ],
-        "summary": "Rubrics Update",
-        "operationId": "rubrics_update",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Item Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RubricIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RubricOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/campaigns/{item_id}/status": {
       "post": {
         "tags": [
@@ -4726,7 +4494,7 @@
           "campaigns"
         ],
         "summary": "Campaigns Confirm",
-        "description": "Confirm criteria (principle 2). Required before the mode can go above Prepare.",
+        "description": "Confirm every remaining criteria item (principle 2). Required before the mode can go above Prepare.",
         "operationId": "campaigns_confirm",
         "parameters": [
           {
@@ -4774,12 +4542,87 @@
         }
       }
     },
+    "/api/campaigns/{item_id}/confirm/{item}": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Campaigns Confirm Item",
+        "description": "Confirm one criteria item; the campaign is confirmed (and the mode lock lifts) when none remain.",
+        "operationId": "campaigns_confirm_item",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "item",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "titles",
+                "keywords",
+                "rules",
+                "locations",
+                "work_models",
+                "seniority",
+                "pay_floors",
+                "deprioritise_themes",
+                "unknown_data_policy"
+              ],
+              "type": "string",
+              "title": "Item"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/campaigns/{item_id}/clone": {
       "post": {
         "tags": [
           "campaigns"
         ],
         "summary": "Campaigns Clone",
+        "description": "A copy in draft, needing confirmation again.",
         "operationId": "campaigns_clone",
         "parameters": [
           {
@@ -4891,12 +4734,77 @@
         }
       }
     },
+    "/api/campaigns/{item_id}/rules/from-view": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Campaigns Rule From View",
+        "description": "Convert a saved view into an exclusion, an inclusion, or a scoring penalty or bonus.",
+        "operationId": "campaigns_rule_from_view",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleFromViewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/campaigns/{item_id}/preview": {
       "post": {
         "tags": [
           "campaigns"
         ],
         "summary": "Campaigns Preview Rule",
+        "description": "What a rule would match among saved jobs. Reads only.",
         "operationId": "campaigns_preview_rule",
         "parameters": [
           {
@@ -4960,6 +4868,7 @@
           "campaigns"
         ],
         "summary": "Campaigns Dry Run",
+        "description": "Run the decision table over saved jobs with this campaign as it stands; nothing is changed\nexcept the run record (counts per verdict). No model calls and no fetching.",
         "operationId": "campaigns_dry_run",
         "parameters": [
           {
@@ -4980,6 +4889,240 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DryRunOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rubrics": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics List",
+        "operationId": "rubrics_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RubricOut_"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics Create",
+        "description": "A new rubric family, as draft version 1 (weights must sum to 100).",
+        "operationId": "rubrics_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RubricIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rubrics/{item_id}": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics Get",
+        "operationId": "rubrics_get",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics Update",
+        "description": "Edits a draft in place. Editing an active or retired version creates a new draft version.",
+        "operationId": "rubrics_update",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RubricIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricOut"
                 }
               }
             }
@@ -5061,12 +5204,65 @@
         }
       }
     },
+    "/api/rubrics/backtest/estimate": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics Backtest Estimate",
+        "description": "Step one: how many roles and what the backtest would cost. Spends nothing.",
+        "operationId": "rubrics_backtest_estimate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestEstimateOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/rubrics/backtest": {
       "post": {
         "tags": [
           "campaigns"
         ],
         "summary": "Rubrics Backtest",
+        "description": "Step two: score the roles with the draft rubric (old vs new, ranks, threshold crossings).\nStored assessments are not changed.",
         "operationId": "rubrics_backtest",
         "requestBody": {
           "content": {
@@ -6212,6 +6408,7 @@
           "jobs"
         ],
         "summary": "Jobs List",
+        "description": "Matches. ``conditions`` (JSON ``ConditionSet``) carries the facet grammar; ``view_id`` adds a\nsaved view's conditions (and its group and sort unless given); ``q`` is free text.",
         "operationId": "jobs_list",
         "parameters": [
           {
@@ -6478,6 +6675,7 @@
           "jobs"
         ],
         "summary": "Jobs Patch",
+        "description": "Triage, pin, snooze, notes and manual tags. Skipping a conflict winner promotes the next role.",
         "operationId": "jobs_patch",
         "parameters": [
           {
@@ -6637,6 +6835,7 @@
           "jobs"
         ],
         "summary": "Jobs Why",
+        "description": "The \"Why?\" panel: the decision table's gates for each campaign that assessed the role (or the\none asked for), with each rule's effective value, source and version, and what would change it.",
         "operationId": "jobs_why",
         "parameters": [
           {
@@ -6824,6 +7023,7 @@
           "jobs"
         ],
         "summary": "Jobs Recheck",
+        "description": "Needs the source connectors' open check (sources stream); then ``conflicts.on_job_changed``.",
         "operationId": "jobs_recheck",
         "parameters": [
           {
@@ -8408,6 +8608,7 @@
           "assessments"
         ],
         "summary": "Assessments Override",
+        "description": "Record who and why. A score override replaces the rubric score at the score layer only:\nexclusions, eligibility and automation gates still apply.",
         "operationId": "assessments_override",
         "parameters": [
           {
@@ -8471,6 +8672,7 @@
           "assessments"
         ],
         "summary": "Assessments Rescore",
+        "description": "Queue a rescore run. One assessment per job and campaign is updated in place, so a rescore\nnever duplicates assessments or applications.",
         "operationId": "assessments_rescore",
         "requestBody": {
           "content": {
@@ -14955,6 +15157,29 @@
           "is_conflict_winner": {
             "type": "boolean",
             "title": "Is Conflict Winner"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "filtered_out",
+              "scored",
+              "parked"
+            ],
+            "title": "State",
+            "default": "pending"
+          },
+          "base_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Score",
+            "description": "Rubric score before campaign rules and overrides"
           }
         },
         "type": "object",
@@ -15249,6 +15474,36 @@
           "currency"
         ],
         "title": "BackfillEstimate"
+      },
+      "BacktestEstimateOut": {
+        "properties": {
+          "jobs": {
+            "type": "integer",
+            "title": "Jobs",
+            "description": "Roles in the backtest"
+          },
+          "to_score": {
+            "type": "integer",
+            "title": "To Score",
+            "description": "Roles that need a model call (not filtered out, not cached)"
+          },
+          "estimated_cost_minor": {
+            "type": "integer",
+            "title": "Estimated Cost Minor"
+          },
+          "cost_currency": {
+            "type": "string",
+            "title": "Cost Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs",
+          "to_score",
+          "estimated_cost_minor",
+          "cost_currency"
+        ],
+        "title": "BacktestEstimateOut"
       },
       "BacktestIn": {
         "properties": {
@@ -15958,6 +16213,27 @@
         ],
         "title": "CampaignIn"
       },
+      "CampaignMatchCounts": {
+        "properties": {
+          "new": {
+            "type": "integer",
+            "title": "New",
+            "default": 0
+          },
+          "shortlisted": {
+            "type": "integer",
+            "title": "Shortlisted",
+            "default": 0
+          },
+          "held": {
+            "type": "integer",
+            "title": "Held",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "CampaignMatchCounts"
+      },
       "CampaignOut": {
         "properties": {
           "id": {
@@ -16117,6 +16393,41 @@
             ],
             "title": "Mode Ceiling",
             "description": "Highest mode allowed now: 'prepare' until criteria and answers are confirmed"
+          },
+          "unconfirmed": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "titles",
+                "keywords",
+                "rules",
+                "locations",
+                "work_models",
+                "seniority",
+                "pay_floors",
+                "deprioritise_themes",
+                "unknown_data_policy"
+              ]
+            },
+            "type": "array",
+            "title": "Unconfirmed",
+            "description": "Criteria items still to confirm; the campaign is confirmed when empty"
+          },
+          "match_counts": {
+            "$ref": "#/components/schemas/CampaignMatchCounts",
+            "description": "Assessed jobs by triage, and held by a conflict group"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
           }
         },
         "type": "object",
@@ -16596,6 +16907,98 @@
           "note"
         ],
         "title": "ConfigRevisionOut"
+      },
+      "ConflictOut": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "winner",
+              "held",
+              "released"
+            ],
+            "title": "State"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "outranked_by_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outranked By Job Id"
+          },
+          "outranked_by_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outranked By Title"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "outranked_by_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outranked By Score"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "outranked",
+                  "applied"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "outranked: a higher role won; applied: the employer is locked after applying"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "ConflictOut",
+        "description": "The role's employer-group state; for a held role, the role that outranks it and both scores."
       },
       "ConnectionCreate": {
         "properties": {
@@ -19675,6 +20078,26 @@
             ],
             "title": "Conflict Note"
           },
+          "conflict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConflictOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pay_state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "estimated",
+              "not_stated"
+            ],
+            "title": "Pay State",
+            "default": "not_stated"
+          },
           "pay": {
             "$ref": "#/components/schemas/PayOut"
           },
@@ -19712,6 +20135,40 @@
               }
             ],
             "title": "Posted At"
+          },
+          "work_model": {
+            "type": "string",
+            "enum": [
+              "on_site",
+              "hybrid",
+              "remote",
+              "not_stated"
+            ],
+            "title": "Work Model",
+            "default": "not_stated"
+          },
+          "remote_scope": {
+            "type": "string",
+            "enum": [
+              "worldwide",
+              "regions",
+              "country_only",
+              "not_stated"
+            ],
+            "title": "Remote Scope",
+            "default": "not_stated"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Name of the first sighting's source"
           },
           "recruiter": {
             "anyOf": [
@@ -20262,6 +20719,26 @@
             ],
             "title": "Conflict Note"
           },
+          "conflict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConflictOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pay_state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "estimated",
+              "not_stated"
+            ],
+            "title": "Pay State",
+            "default": "not_stated"
+          },
           "pay": {
             "$ref": "#/components/schemas/PayOut"
           },
@@ -20299,6 +20776,40 @@
               }
             ],
             "title": "Posted At"
+          },
+          "work_model": {
+            "type": "string",
+            "enum": [
+              "on_site",
+              "hybrid",
+              "remote",
+              "not_stated"
+            ],
+            "title": "Work Model",
+            "default": "not_stated"
+          },
+          "remote_scope": {
+            "type": "string",
+            "enum": [
+              "worldwide",
+              "regions",
+              "country_only",
+              "not_stated"
+            ],
+            "title": "Remote Scope",
+            "default": "not_stated"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Name of the first sighting's source"
           }
         },
         "type": "object",
@@ -24674,6 +25185,56 @@
         "additionalProperties": false,
         "type": "object",
         "title": "RubricThresholds"
+      },
+      "RuleFromViewIn": {
+        "properties": {
+          "view_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "View Id"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "include",
+              "penalty",
+              "bonus"
+            ],
+            "title": "Effect"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "view_id",
+          "effect"
+        ],
+        "title": "RuleFromViewIn",
+        "description": "\"Use as campaign rule\": copy a saved view's conditions into the campaign."
       },
       "RulePreviewIn": {
         "properties": {

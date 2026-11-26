@@ -193,6 +193,11 @@ _enum("scoring.unknown_pay", "Unknown pay",
       "pass_blocks_auto", "review", UNKNOWN_POLICIES)
 _enum("scoring.unknown_eligibility", "Unknown eligibility",
       "What an unknown work-rights or location eligibility does.", "review", "fail", UNKNOWN_POLICIES)
+_enum("scoring.unknown_deadline", "Unknown deadline",
+      "What a posting with no stated deadline does (only a passed date excludes a role).",
+      "pass_blocks_auto", "review", UNKNOWN_POLICIES)
+_int("scoring.backtest_default_jobs", "Backtest sample",
+     "How many recent saved roles a backtest scores when you do not pick them.", 50, 100, 1, 500, "roles")
 _int("scoring.escalation_margin", "Escalation margin",
      "Re-score with the stronger model when within this many points of a threshold.", 5, 3, 0, 20, "points")
 _int("scoring.unknown_penalty", "Unknown-data penalty",
