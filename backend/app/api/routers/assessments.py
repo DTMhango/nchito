@@ -34,6 +34,7 @@ class AssessmentOut(Timestamps):
     gaps: list[str]
     model: str | None
     cost_minor: int
+    cost_micros: int = 0
     cost_currency: str | None
     override: Override | None
     is_conflict_winner: bool

@@ -131,3 +131,44 @@ async def test_csrf_cross_site_requests_refused(owner_client):
     # Safe methods are never blocked.
     r = await owner_client.get("/api/auth/me", headers={"Sec-Fetch-Site": "cross-site"})
     assert r.status_code == 200
+
+
+async def test_sessions_list_revoke(owner_client, app):
+    import httpx
+
+    first = owner_client
+    transport = httpx.ASGITransport(app=app, client=("10.0.0.2", 50001))
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as second:
+        r = await second.post("/api/auth/login", json={"email": OWNER["email"], "password": OWNER["password"]},
+                              headers={"user-agent": "phone"})
+        assert r.status_code == 204
+        rows = (await first.get("/api/auth/sessions")).json()
+        assert len(rows) == 2
+        assert sum(x["current"] for x in rows) == 1
+        other = next(x for x in rows if not x["current"])
+        assert other["user_agent"] == "phone" and other["ip"] == "10.0.0.2"
+        assert (await second.get("/api/auth/me")).status_code == 200
+        assert (await first.delete(f"/api/auth/sessions/{other['id']}")).status_code == 204
+        assert (await second.get("/api/auth/me")).status_code == 401
+        assert (await first.delete(f"/api/auth/sessions/{other['id']}")).status_code == 404
+        assert len((await first.get("/api/auth/sessions")).json()) == 1
+
+
+async def test_revoke_others_and_password_change(owner_client, app, session):
+    import httpx
+
+    first = owner_client
+    transport = httpx.ASGITransport(app=app, client=("10.0.0.2", 50001))
+    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as second:
+        await second.post("/api/auth/login", json={"email": OWNER["email"], "password": OWNER["password"]})
+        assert (await first.post("/api/auth/sessions/revoke-others")).json() == {"revoked": 1}
+        assert (await second.get("/api/auth/me")).status_code == 401
+        assert (await first.get("/api/auth/me")).status_code == 200
+        await second.post("/api/auth/login", json={"email": OWNER["email"], "password": OWNER["password"]})
+        r = await first.post("/api/auth/password", json={"current_password": OWNER["password"],
+                                                         "new_password": "another long passphrase 1"})
+        assert r.status_code == 204
+        assert (await second.get("/api/auth/me")).status_code == 401
+        assert (await first.get("/api/auth/me")).status_code == 200
+    actions = set((await session.scalars(select(AuditEvent.action))).all())
+    assert {"auth.sessions_revoked_others", "auth.password_changed"} <= actions

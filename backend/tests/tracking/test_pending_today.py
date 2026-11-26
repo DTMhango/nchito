@@ -225,7 +225,8 @@ async def test_today_summary(owner_client, session) -> None:
     assert {f["stage"]: f["count"] for f in body["funnel"]} == {"ready": 1, "submitted": 1}
     assert [s["name"] for s in body["sources"]] == ["Careers feed"] and body["sources"][0]["status"] == "unknown"
     assert body["spend"] == {"month_to_date_minor": 0, "reserved_minor": 0, "cap_minor": None, "currency": "USD",
-                             "estimated_unbilled_minor": 0}
+                             "estimated_unbilled_minor": 0, "month_to_date_micros": 0, "reserved_micros": 0,
+                             "cap_micros": None, "estimated_unbilled_micros": 0}
     assert len((await owner_client.get("/api/today", params={"top": 1})).json()["top_matches"]) == 1
 
 

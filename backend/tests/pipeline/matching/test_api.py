@@ -303,7 +303,7 @@ async def test_rubric_versions_activate_and_backtest_via_api(owner_client):
     scoring.set_client_factory(factory)
     try:
         est = (await owner_client.post("/api/rubrics/backtest/estimate", json=payload)).json()
-        assert est == {"jobs": 1, "to_score": 1, "estimated_cost_minor": 0, "cost_currency": est["cost_currency"]}
+        assert est["estimated_cost_minor"] == 0 and est["estimated_cost_micros"] > 0 and est["to_score"] == 1
         assert client.calls == []
         result = (await owner_client.post("/api/rubrics/backtest", json=payload)).json()
         assert result["rows"][0]["new_score"] == 100 and len(client.calls) == 1

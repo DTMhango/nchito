@@ -36,6 +36,7 @@ from app.core.events import publish
 from app.core.settings import service as settings_service
 from app.llm.client import LLMClient
 from app.llm.ledger import month_bounds
+from app.llm.money import effective_cap_micros
 from app.models.applications import Application
 from app.models.search import (
     Availability,
@@ -281,13 +282,15 @@ async def _finish_paid(session: AsyncSession, run: Run, campaign: Campaign, job_
     run.config_versions = {**run.config_versions, "job_ids": [str(i) for i in dict.fromkeys(job_ids)]}
     if run.dry_run:
         proposals = await dry_run.propose_actions(session, campaign, job_ids, now=now, limit=MAX_PROPOSED)
+        ties = dry_run.choice_proposals((run.config_versions or {}).get("dry_run_choices", []))
+        proposals = [*ties, *proposals][:MAX_PROPOSED]
         run.config_versions = {**run.config_versions, "proposed_actions": proposals}
     if paid.budget_scope is not None and status in (RunStatus.succeeded, RunStatus.partial):
         values = await settings_service.values(session)
         tz = values["general.timezone"]
         run.config_versions = {**run.config_versions, "paused": {
-            "scope": paid.budget_scope, "cap_minor": values["budget.monthly_cap_minor"],
-            "per_run_cap_minor": values["budget.per_run_cap_minor"], "month": month_bounds(now, tz)[2]}}
+            "scope": paid.budget_scope, "cap_micros": effective_cap_micros(values, "monthly"),
+            "per_run_cap_micros": effective_cap_micros(values, "per_run"), "month": month_bounds(now, tz)[2]}}
         note = f"Paused for budget: {budget_reason(paid.budget_scope)}. Parked work resumes when the cap allows."
         run.error = ((run.error + "; ") if run.error else "") + note
         status = RunStatus.paused
@@ -445,14 +448,14 @@ async def resume_paused(session: AsyncSession, enqueue: Callable[[Run], Awaitabl
     if not paused:
         return []
     values = await settings_service.values(session)
-    if values["budget.monthly_cap_minor"] is None:
+    if effective_cap_micros(values, "monthly") is None:
         return []
     month = month_bounds((clock or SystemClock()).now(), values["general.timezone"])[2]
     resumed: list[Run] = []
     for run in paused:
         mark = (run.config_versions or {}).get("paused") or {}
-        changed = (mark.get("cap_minor") != values["budget.monthly_cap_minor"]
-                   or mark.get("per_run_cap_minor") != values["budget.per_run_cap_minor"]
+        changed = (mark.get("cap_micros") != effective_cap_micros(values, "monthly")
+                   or mark.get("per_run_cap_micros") != effective_cap_micros(values, "per_run")
                    or mark.get("month") != month)
         if not changed:
             continue

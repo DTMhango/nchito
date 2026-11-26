@@ -30,6 +30,18 @@ ACTION_BY_VERDICT = {"auto_apply": "apply", "ask_owner": "ask_owner", "tailor": 
                      "excluded": "skip"}
 
 
+def choice_proposals(choices: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Ties a real run would ask the owner to settle, reported as proposals (a dry run raises nothing)."""
+    out = []
+    for item in choices:
+        detail = item.get("detail") or {}
+        subject = detail.get("candidate") or detail.get("challenger") or {}
+        out.append({"job_id": subject.get("job_id"), "title": subject.get("title", item["title"]),
+                    "employer": item["title"], "score": subject.get("score"), "action": "ask_owner",
+                    "reason": f"A real run would ask you to choose: {item['title']} ({detail.get('kind')})."})
+    return out
+
+
 async def sent_counters(session: AsyncSession, now: datetime, tz_name: str) -> dict[str, int]:
     """Applications sent today and this week (Monday start), in the owner's time zone."""
     local = now.astimezone(ZoneInfo(tz_name))

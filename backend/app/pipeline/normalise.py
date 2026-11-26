@@ -512,6 +512,42 @@ def build_facets(out: ExtractionOut, text: str, aliases: dict[str, str]) -> JobF
         industry=(out.industry or "").strip() or None)
 
 
+async def recanonicalise_jobs(session: AsyncSession) -> int:
+    """After the skill alias table changes: re-apply it to every stored job's skills, with no fetch and no
+    model call. The raw skill names come from the extraction cache (keyed on the posting's content hash);
+    a job with no cache entry has its stored names mapped through the table as they are. Returns the number
+    of jobs whose skills changed."""
+    aliases = await load_skill_aliases(session)
+    cached: dict[str, ExtractionOut] = {}
+    for row in (await session.scalars(select(ExtractionCache).order_by(ExtractionCache.created_at))).all():
+        try:
+            cached[row.content_hash] = ExtractionOut.model_validate(row.result)  # newest wins
+        except ValueError:
+            continue
+    changed = 0
+    for job in (await session.scalars(select(Job))).all():
+        out = cached.get(job.content_hash)
+        if out is not None:
+            required = canonical_skills(out.required_skills, aliases)
+            preferred = canonical_skills(out.preferred_skills, aliases)
+            requirements = [
+                Requirement(text=r.text.strip()[:500], kind="preferred" if r.kind == "preferred" else "required",
+                            skill=canonical_skills([r.skill], aliases)[0] if r.skill and r.skill.strip() else None)
+                for r in out.requirements if r.text.strip()][:60]
+        else:
+            required, preferred = (canonical_skills(job.facets.required_skills, aliases),
+                                   canonical_skills(job.facets.preferred_skills, aliases))
+            requirements = [r.model_copy(update={"skill": canonical_skills([r.skill], aliases)[0]})
+                            if r.skill and r.skill.strip() else r for r in job.requirements]
+        same_skills = (required, preferred) == (job.facets.required_skills, job.facets.preferred_skills)
+        if not same_skills or requirements != job.requirements:
+            job.facets = job.facets.model_copy(update={"required_skills": required, "preferred_skills": preferred})
+            job.requirements = requirements
+            changed += 1
+    await session.flush()
+    return changed
+
+
 def identity_from(out: ExtractionOut, text: str) -> tuple[str | None, str | None]:
     """``(employer, title)`` the posting itself names, for captured text that lacked them."""
     haystack = _norm_quote(text)

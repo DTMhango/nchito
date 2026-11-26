@@ -52,6 +52,7 @@ class RunOut(Timestamps):
                                                    description="Dry runs only: what a real run would do")
     source_results: list[SourceRunResult]
     cost_minor: int
+    cost_micros: int = 0
     config_versions: dict[str, Any]
     status: Literal["queued", "running", "succeeded", "failed", "partial", "cancelled", "skipped", "paused"]
     started_at: datetime | None

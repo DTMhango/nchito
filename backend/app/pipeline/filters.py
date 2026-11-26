@@ -37,6 +37,8 @@ from app.core.conditions import (
     group_by,
     lookup,
 )
+from app.kit import work_rights
+from app.kit.answers import AnswerRecord
 from app.models.search import (
     Assessment,
     Campaign,
@@ -84,8 +86,10 @@ def job_record(
     employer_aliases: Mapping[str, str] | None = None,
     best_score: int | None = None,
     always_ask_first: bool = False,
+    kit_answers: Sequence[AnswerRecord] | None = None,
 ) -> dict[str, Any]:
-    """The plain-dict view of a job for conditions and the decision table."""
+    """The plain-dict view of a job for conditions and the decision table. ``kit_answers`` (matcher
+    records of the answer bank) lets the table read the owner's work rights, sponsorship and relocation."""
     aliases = skill_aliases or {}
     dumped = job.facets.model_dump(mode="python")
     facets = {key: _unwrap(value) for key, value in dumped.items()}
@@ -96,8 +100,13 @@ def job_record(
     employer = (employer_aliases or {}).get(job.canonical_employer.strip().casefold(), job.canonical_employer)
     posted_age = (now - job.posted_at).days if job.posted_at else None
     days_left = (job.deadline - now.date()).days if job.deadline else None
+    kit_rights = None
+    if kit_answers is not None:
+        countries = work_rights.job_countries({"facets": facets, "location": job.location.model_dump()})
+        kit_rights = work_rights.resolve(kit_answers, countries, today=now.date()).to_record()
     return {
         "id": str(job.id),
+        "kit_work_rights": kit_rights,
         "title": job.title,
         "employer": employer,
         "employer_as_posted": job.employer,
@@ -196,12 +205,14 @@ async def load_records(session: AsyncSession, *, now: datetime, job_ids: Sequenc
             .where(JobSighting.job_id.in_(ids)).order_by(JobSighting.first_seen_at))).all():
         sources.setdefault(job_id, []).append(name)
     lk = await load_lookups(session)
+    kit_answers = await work_rights.load_answers(session)
     out = []
     for job in jobs:
         record = job_record(job, now=now, estimate=estimates.get(job.id), sources=sources.get(job.id, ()),
                             skill_aliases=lk.skill_aliases, employer_aliases=lk.employer_aliases,
                             best_score=best.get(job.id),
-                            always_ask_first=job.canonical_employer.strip().casefold() in lk.always_ask)
+                            always_ask_first=job.canonical_employer.strip().casefold() in lk.always_ask,
+                            kit_answers=kit_answers)
         out.append((job, record))
     return out
 
