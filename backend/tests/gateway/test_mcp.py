@@ -11,7 +11,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
 from app.core.clock import FakeClock
-from app.gateway import accounts_bridge, common, server
+from app.gateway import common, server
 from app.gateway.tools import TOOLS
 from tests.gateway.helpers import URL, make_token, world
 from tests.pipeline.matching.helpers import NOW
@@ -20,11 +20,9 @@ from tests.pipeline.matching.helpers import NOW
 @pytest.fixture(autouse=True)
 def clock():
     common.set_clock(FakeClock(NOW))
-    accounts_bridge.set_module(None)
     server.limiter.reset()
     yield
     common.set_clock(None)
-    accounts_bridge.set_module()
 
 
 @asynccontextmanager
@@ -121,3 +119,17 @@ async def test_evidence_upload_through_a_signed_link(app, monkeypatch, tmp_path)
     saved = await call(w.runner_a, "save_checkpoint", task_id=task_id,
                        state={"step": "confirm", "screenshot_ref": link["ref"]})
     assert saved["ok"]
+
+
+async def test_any_authenticated_request_is_last_seen_and_the_runner_config_is_published(app):
+    from app.models.platform import ApiToken
+    from tests.gateway.helpers import load
+
+    w = await world()
+    async with mcp_client(app, w.secret_a) as mcp:
+        await mcp.list_tools()  # no tool call at all
+        assert (await load(ApiToken, w.runner_a)).last_used_at == NOW
+        config = structured(await mcp.call_tool("get_runner_config", {}))
+    assert config["runner_kind"] == "pc" and config["enabled"] is True
+    assert config["task_cap_minor"] == 100 and config["day_cap_minor"] == 1000 and config["max_steps"] == 80
+    assert config["currency"] == "USD" and config["model"]

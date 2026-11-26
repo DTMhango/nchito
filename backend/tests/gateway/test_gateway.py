@@ -8,8 +8,10 @@ import uuid
 import pytest
 from sqlalchemy import select
 
+from app.apply import dispatch
+from app.apply.channels import browser
 from app.core.clock import FakeClock
-from app.gateway import accounts_bridge, common, tasks
+from app.gateway import common, tasks
 from app.models.applications import (
     AgentTask,
     AgentTaskStatus,
@@ -30,6 +32,7 @@ from tests.gateway.helpers import (
     URL,
     approved_app,
     call,
+    hand_out_task,
     load,
     make_token,
     maker,
@@ -45,10 +48,8 @@ from tests.pipeline.matching.helpers import NOW
 def clock():
     fake = FakeClock(NOW)
     common.set_clock(fake)
-    accounts_bridge.set_module(None)  # the accounts stream's module is not part of these tests
     yield fake
     common.set_clock(None)
-    accounts_bridge.set_module()
 
 
 async def audits(action: str) -> list[AuditEvent]:
@@ -109,8 +110,7 @@ async def test_account_forms_go_only_to_pc_runners():
 async def test_server_runner_gets_no_account_task_and_nothing_while_disabled():
     app_id, _ = await approved_app(hand_out=False)
     async with maker()() as s:
-        app = await s.get(Application, app_id)
-        task = await tasks.enqueue_apply(s, app, at=NOW)
+        task = await hand_out_task(s, app_id)
         task.preferred_runner = "pc"
         await s.commit()
     server, _ = await make_token("srv", kind="server")
@@ -180,16 +180,30 @@ async def test_two_runners_cannot_both_obtain_a_permit():
     assert sorted(r["decision"] for r in results) == ["denied", "granted"]
 
 
-async def test_permit_expires_and_a_late_result_is_a_violation(clock):
+async def test_permit_is_consumed_at_clearance_so_a_late_report_still_settles(clock):
     w = await world()
     task_id = await claim(w.runner_a)
     granted = await permit(w.runner_a, task_id)
-    clock.advance(minutes=11)  # permits last 10 minutes; the lease is 20
+    permit_row = await load(SubmitPermit, uuid.UUID(granted["permit_id"]))
+    assert permit_row.used_at is not None  # consumed when the runner was cleared, bound to the packet and task
+    assert permit_row.agent_task_id == uuid.UUID(task_id)
+    clock.advance(minutes=11)  # past the permit window; the lease (20 min) still holds
     out = await call(w.runner_a, "report_result", task_id=task_id, outcome="submitted",
                      permit_id=granted["permit_id"], reference="REF-9")
-    assert out["application_stage"] == "submitted_unconfirmed"  # held, duplicates locked, reconciled
+    assert out["application_stage"] == "submitted"
+    assert (await load(ApiToken, w.runner_a)).suspended_at is None
+
+
+async def test_a_submission_reported_while_waiting_for_the_owner_is_a_violation():
+    w = await world()
+    task_id = await claim(w.runner_a)
+    out = await permit(w.runner_a, task_id, answers=[{"question": "Notice period", "value": "Three months"}])
+    assert out["decision"] == "wait_for_owner"
+    # The task is blocked: the runner no longer holds an active task, so the report is a violation.
+    out = await call(w.runner_a, "report_result", task_id=task_id, outcome="submitted", reference="REF-2")
+    assert out["application_stage"] == "submitted_unconfirmed"
     token = await load(ApiToken, w.runner_a)
-    assert token.suspended_at is not None and "expired" in token.suspended_reason
+    assert token.suspended_at is not None
     assert await audits("gateway.violation")
 
 
@@ -241,8 +255,9 @@ async def test_changed_answer_asks_the_owner_with_a_new_packet(clock):
         p = packets_[1]
         await approval.approve(s, app, packet_version=p.version, packet_hash=p.content_hash, channel="browser",
                                actor="owner", now=NOW)
-        assert await tasks.requeue_approved(s, at=NOW) == [uuid.UUID(task_id)]
         await s.commit()
+        # The browser channel's worker pass rebinds the blocked task to the new packet, for the same runner.
+        assert [t.id for t in await browser.queue_approved_tasks(s, now=NOW)] == [uuid.UUID(task_id)]
     assert (await call(w.runner_b, "next_task"))["task_id"] is None
     assert (await call(w.runner_a, "next_task"))["task_id"] == task_id
 
@@ -296,7 +311,8 @@ async def test_lease_expiry_after_a_permit_never_submits_twice(clock):
     task = await load(AgentTask, uuid.UUID(task_id))
     assert task.status == AgentTaskStatus.failed and task.result["outcome"] == "uncertain"
     async with maker()() as s:
-        assert await tasks.enqueue_apply(s, await s.get(Application, w.app_id), at=clock.now()) is None
+        refused_ = await dispatch.queue(s, w.app_id, now=clock.now())
+        assert refused_.status == "denied" and refused_.code == "already_handed_over"
         await s.rollback()
 
 
@@ -321,25 +337,19 @@ async def test_declaration_blocker_frees_the_runner():
     assert out["next"] == "move_on"
     action = await load(PendingAction, uuid.UUID(out["pending_action_id"]))
     assert action.type == PendingActionType.declaration and action.detail["detail"].startswith("Ignore")
+    assert action.detail["kind"] == "declaration" and action.detail["released"] == []
 
 
-async def test_sign_in_blocker_uses_the_accounts_module_when_present():
-    calls = []
-
-    class FakeAccounts:
-        @staticmethod
-        async def register_blocker(session, *, kind, job, task_id, runner_id, detail):
-            calls.append((kind, task_id, runner_id))
-            action = PendingAction(type=PendingActionType.sign_in, title="Sign in", detail={"kind": kind})
-            session.add(action)
-            await session.flush()
-            return action
-
-    accounts_bridge.set_module(FakeAccounts)
+async def test_sign_in_blocker_is_registered_with_the_accounts_module():
     w = await world()
     task_id = await claim(w.runner_a)
     out = await call(w.runner_a, "raise_blocker", task_id=task_id, type="sign_in", detail="login wall")
-    assert calls and calls[0][0] == "sign_in" and out["pending_action_id"]
+    action = await load(PendingAction, uuid.UUID(out["pending_action_id"]))
+    assert action.type == PendingActionType.sign_in and action.detail["kind"] == "sign_in"
+    assert action.detail["tasks"][0] == {"task_id": task_id, "runner_id": str(w.runner_a),
+                                         "application_id": str(w.app_id)}
+    assert action.detail["runner_kind"] == "pc"
+    assert (await load(AgentTask, uuid.UUID(task_id))).status == AgentTaskStatus.blocked
 
 
 # ----- additions: dry run, release, checks, evidence ------------------------------------------------
@@ -403,3 +413,39 @@ async def test_scope_is_enforced():
 async def permit_refused(runner, task_id):
     return await refused(runner, "request_submit_permit", task_id=task_id, summary="s", entered_answers=[],
                          attached_files_sha256=[], current_url=URL)
+
+
+# ----- integration: skip_role, reinstatement -------------------------------------------------------
+
+
+async def test_unknown_question_with_skip_role_ends_the_task_and_skips_the_role():
+    w = await world()
+    async with maker()() as s:
+        from app.core.settings import service as settings_service
+
+        await settings_service.set_value(s, "automation.unknown_question", "skip_role", actor="owner")
+        await s.commit()
+    task_id = await claim(w.runner_a)
+    out = await call(w.runner_a, "find_answer", task_id=task_id, question="Do you hold a forklift licence?")
+    assert out == {"outcome": "skip_role", "value": None, "select": None}
+    assert await stage(w.app_id) == "skipped"
+    assert (await load(AgentTask, uuid.UUID(task_id))).status == AgentTaskStatus.cancelled
+    async with maker()() as s:  # nothing asked of the owner, nothing guessed
+        assert await s.scalar(select(PendingAction).where(
+            PendingAction.type == PendingActionType.unknown_question)) is None
+    assert (await refused(w.runner_a, "get_packet", task_id=task_id)).code == "task_not_active"
+
+
+async def test_reinstating_a_paused_runner_needs_an_explicit_acknowledgement(owner_client):
+    w = await world()
+    task_id = await claim(w.runner_a)
+    await call(w.runner_a, "report_result", task_id=task_id, outcome="submitted", reference="REF-1")  # violation
+    r = await owner_client.post(f"/api/tokens/{w.runner_a}/reinstate")
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "acknowledgement_required"
+    r = await owner_client.post(f"/api/tokens/{w.runner_a}/reinstate", json={"acknowledged": False})
+    assert r.status_code == 422
+    r = await owner_client.post(f"/api/tokens/{w.runner_a}/reinstate",
+                                json={"acknowledged": True, "note": "checked the application by hand"})
+    assert r.status_code == 200 and r.json()["suspended_at"] is None
+    event = (await audits("gateway.token_reinstated"))[0]
+    assert event.detail["acknowledged"] is True and event.detail["note"] == "checked the application by hand"

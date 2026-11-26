@@ -381,10 +381,12 @@
       "additionalProperties": false,
       "properties": {
         "outcome": {
+          "description": "skip_role: the owner chose to skip roles with unanswerable questions; the task has ended, leave the form unsubmitted and call next_task",
           "enum": [
             "value",
             "ask_owner",
-            "do_not_answer"
+            "do_not_answer",
+            "skip_role"
           ],
           "title": "Outcome",
           "type": "string"
@@ -1108,6 +1110,89 @@
         "expires_at"
       ],
       "title": "EvidenceUploadOut",
+      "type": "object"
+    }
+  },
+  "get_runner_config": {
+    "description": "This runner's budget caps, model and limits, as set by the owner.",
+    "input": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "GetRunnerConfigIn",
+      "type": "object"
+    },
+    "output": {
+      "additionalProperties": false,
+      "properties": {
+        "runner_kind": {
+          "enum": [
+            "pc",
+            "server"
+          ],
+          "title": "Runner Kind",
+          "type": "string"
+        },
+        "enabled": {
+          "description": "False: this runner gets no tasks (a server runner while it is switched off, or a suspended runner)",
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "model": {
+          "description": "The model the server runner drives the browser with (ai.model_browser_agent)",
+          "title": "Model",
+          "type": "string"
+        },
+        "currency": {
+          "title": "Currency",
+          "type": "string"
+        },
+        "task_cap_minor": {
+          "description": "Most one task may cost (budget.agent_task_ceiling_minor)",
+          "title": "Task Cap Minor",
+          "type": "integer"
+        },
+        "day_cap_minor": {
+          "description": "Most this runner may spend in a day (runners.server_day_cap_minor)",
+          "title": "Day Cap Minor",
+          "type": "integer"
+        },
+        "task_max_tokens": {
+          "title": "Task Max Tokens",
+          "type": "integer"
+        },
+        "day_max_tokens": {
+          "title": "Day Max Tokens",
+          "type": "integer"
+        },
+        "max_steps": {
+          "description": "automation.agent_max_steps; the server also enforces it",
+          "title": "Max Steps",
+          "type": "integer"
+        },
+        "lease_minutes": {
+          "description": "A claimed task is lost after this long without a call on it",
+          "title": "Lease Minutes",
+          "type": "integer"
+        },
+        "evidence_max_bytes": {
+          "title": "Evidence Max Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "runner_kind",
+        "enabled",
+        "model",
+        "currency",
+        "task_cap_minor",
+        "day_cap_minor",
+        "task_max_tokens",
+        "day_max_tokens",
+        "max_steps",
+        "lease_minutes",
+        "evidence_max_bytes"
+      ],
+      "title": "RunnerConfigOut",
       "type": "object"
     }
   }

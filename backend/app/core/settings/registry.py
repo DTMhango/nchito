@@ -336,7 +336,7 @@ _add("accounts.portals_requiring_account", "list", "Portals that need an account
      validators=(unique_items,), invalid_example=["workday", "workday"], has_invalid_example=True)
 _add("accounts.account_free_methods", "list", "Methods that need no account",
      "Apply methods known to need no account. A method in neither list is unknown, never 'no account'.",
-     ["email", "greenhouse", "lever", "ashby", "workable"], ["email", "lever"], list[str],
+     ["email", "greenhouse", "lever", "ashby", "workable", "teamtailor", "bamboohr"], ["email", "lever"], list[str],
      validators=(unique_items,), invalid_example=["email", "email"], has_invalid_example=True)
 _enum("accounts.runner_for_account_roles", "Runner for roles that need an account",
       "Where roles that need (or may need) an account are sent: the PC runner, where you can sign in, or the "
@@ -725,12 +725,17 @@ _int("runners.file_url_minutes", "File link lifetime", "How long a file download
      5, 2, 1, 60, "minutes")
 _int("runners.evidence_max_kb", "Largest evidence upload",
      "The largest screenshot or confirmation file a runner may upload.", 2048, 512, 16, 20_480, "KB")
+_int("runners.server_day_cap_minor", "Server runner daily spend",
+     "The most the server runner may spend on its AI model in one day, in minor units of the budget currency. "
+     "0 stops it.", 1000, 500, 0, 1_000_000, "minor units")
+_int("runners.server_task_max_tokens", "Server runner tokens per task",
+     "The most model tokens the server runner may use on one task.", 600_000, 300_000, 1000, 20_000_000, "tokens")
+_int("runners.server_day_max_tokens", "Server runner tokens per day",
+     "The most model tokens the server runner may use in one day.", 6_000_000, 2_000_000, 1000, 500_000_000,
+     "tokens")
 _enum("runners.route_account_free", "Account-free forms go to",
-      "Which runners take forms known to need no account. Forms that need an account, or might, always go to the "
-      "PC runner, where the owner can sign in.", "any", "server", ("any", "server", "pc"))
-_terms("runners.account_free_portals", "Account-free application systems",
-       "Application systems (as recognised from the apply link) whose forms need no account.",
-       ["greenhouse", "lever", "ashby", "teamtailor", "bamboohr"], ["greenhouse", "lever"])
+      "Which runners take forms known to need no account (accounts.account_free_methods). Forms that need an "
+      "account, or might, follow accounts.runner_for_account_roles.", "any", "server", ("any", "server", "pc"))
 _add("runners.task_instructions", "string", "Runner instructions",
      "The instructions every task gives its runner. Fields: {task_type}, {posting_url}, {domain}, {max_steps}. "
      "The rules are enforced by the server whatever this text says.",

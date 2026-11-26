@@ -47,6 +47,7 @@ from app.models.applications import (
     AgentTaskStatus,
     AgentTaskType,
     Application,
+    ApplicationPacket,
     Channel,
     DispatchAttempt,
     DispatchStatus,
@@ -55,6 +56,7 @@ from app.models.applications import (
     Stage,
     SubmitPermit,
 )
+from app.models.search import Job
 from app.schemas.json_types import Evidence
 
 ReportedOutcome = Literal["submitted", "uncertain", "failed"]
@@ -125,22 +127,66 @@ async def queue_task(session: AsyncSession, application_id: uuid.UUID, *, actor:
     for task in await _open_tasks(session, app.id):
         if task.payload.get("packet_hash") == packet.content_hash:
             existing = task
+        elif task.status == AgentTaskStatus.blocked and task.payload.get("waiting_for") == "approval":
+            # The runner met answers that differ from the packet and the owner has now approved the new
+            # version: the task goes back to the same runner, from its checkpoint, bound to the new packet.
+            await _rebind_for_approval(session, task, packet, actor, now)
+            existing = task
         else:  # built for an older packet: withdraw it
             await _end_task(session, task, AgentTaskStatus.cancelled, {"reason": "the packet changed"}, now)
     if existing is not None:
         return existing
+    job = await session.get(Job, app.job_id)
+    assert job is not None
+    preferred = await preferred_runner(session, job)
     max_steps = int(await settings_service.get_value(session, "automation.agent_max_steps"))
     task = AgentTask(type=AgentTaskType.apply, application_id=app.id, status=AgentTaskStatus.queued,
-                     payload={"packet_id": str(packet.id), "packet_version": packet.version,
-                              "packet_hash": packet.content_hash, "destination_url": packet.contents.destination.url,
-                              "destination_domain": packet.contents.destination.domain, "max_steps": max_steps,
+                     preferred_runner=preferred,
+                     payload={**_packet_payload(packet), "max_steps": max_steps, "needs_account": preferred == "pc",
                               "queued_at": now.isoformat()})
     session.add(task)
     await session.flush()
     await audit.record(session, actor=actor, action="browser.task_queued", subject_type="agent_task",
                        subject_id=task.id, detail={"application_id": str(app.id), "packet_hash": packet.content_hash,
-                                                   "domain": packet.contents.destination.domain})
+                                                   "domain": packet.contents.destination.domain,
+                                                   "preferred_runner": preferred})
     return task
+
+
+def _packet_payload(packet: ApplicationPacket) -> dict[str, Any]:
+    dest = packet.contents.destination
+    return {"packet_id": str(packet.id), "packet_version": packet.version, "packet_hash": packet.content_hash,
+            "destination_url": dest.url, "destination_domain": dest.domain, "posting_url": dest.url,
+            "domain": dest.domain}
+
+
+async def _rebind_for_approval(session: AsyncSession, task: AgentTask, packet: ApplicationPacket, actor: str,
+                               now: datetime) -> None:
+    holder = task.claimed_by_token_id
+    task.status = AgentTaskStatus.queued
+    task.claimed_by_token_id = task.claimed_at = task.heartbeat_at = None
+    task.payload = {**{k: v for k, v in task.payload.items() if k not in ("waiting_for", "attempt_id", "cleared_at")},
+                    **_packet_payload(packet), "resume": True,
+                    "resume_runner_token_id": str(holder) if holder else None, "queued_at": now.isoformat()}
+    await session.flush()
+    await audit.record(session, actor=actor, action="browser.task_requeued", subject_type="agent_task",
+                       subject_id=task.id, detail={"application_id": str(task.application_id),
+                                                   "reason": "the owner approved the new packet",
+                                                   "packet_hash": packet.content_hash,
+                                                   "runner": str(holder) if holder else None})
+
+
+async def preferred_runner(session: AsyncSession, job: Job) -> str | None:
+    """``pc``, ``server`` or None (any runner) for a browser task on this job. A role that needs an account, or
+    might (unknown is not "no"), goes where the owner can sign in, or to the runner already holding the portal
+    session (``accounts.preferred_runner_kind``); account-free forms follow ``runners.route_account_free``."""
+    from app.apply import accounts
+
+    kind = await accounts.preferred_runner_kind(session, job)
+    if kind is not None:
+        return kind
+    choice = str(await settings_service.get_value(session, "runners.route_account_free"))
+    return None if choice == "any" else choice
 
 
 async def queue_approved_tasks(session: AsyncSession, *, now: datetime | None = None) -> list[AgentTask]:

@@ -101,7 +101,9 @@ class FindAnswerIn(_M):
 
 
 class FindAnswerOut(_M):
-    outcome: Literal["value", "ask_owner", "do_not_answer"]
+    outcome: Literal["value", "ask_owner", "do_not_answer", "skip_role"] = Field(
+        description="skip_role: the owner chose to skip roles with unanswerable questions; the task has ended, "
+                    "leave the form unsubmitted and call next_task")
     value: str | None = None
     select: str | None = Field(default=None, description="For do_not_answer: what to select, e.g. 'Prefer not to say'")
 
@@ -231,6 +233,25 @@ class EvidenceUploadOut(_M):
     expires_at: str
 
 
+class GetRunnerConfigIn(_M):
+    pass
+
+
+class RunnerConfigOut(_M):
+    runner_kind: Literal["pc", "server"]
+    enabled: bool = Field(description="False: this runner gets no tasks (a server runner while it is switched off, "
+                                      "or a suspended runner)")
+    model: str = Field(description="The model the server runner drives the browser with (ai.model_browser_agent)")
+    currency: str
+    task_cap_minor: int = Field(description="Most one task may cost (budget.agent_task_ceiling_minor)")
+    day_cap_minor: int = Field(description="Most this runner may spend in a day (runners.server_day_cap_minor)")
+    task_max_tokens: int
+    day_max_tokens: int
+    max_steps: int = Field(description="automation.agent_max_steps; the server also enforces it")
+    lease_minutes: int = Field(description="A claimed task is lost after this long without a call on it")
+    evidence_max_bytes: int
+
+
 TOOLS: dict[str, tuple[type[BaseModel], type[BaseModel], str]] = {
     "next_task": (NextTaskIn, NextTaskOut, "Claim the next task for this runner."),
     "get_packet": (GetPacketIn, GetPacketOut, "Field values, answers and signed file URLs for this task's form."),
@@ -245,6 +266,8 @@ TOOLS: dict[str, tuple[type[BaseModel], type[BaseModel], str]] = {
     "release_task": (ReleaseTaskIn, ReleaseTaskOut, "Give a claimed task back to the queue (from its checkpoint)."),
     "evidence_upload_url": (EvidenceUploadIn, EvidenceUploadOut,
                             "A short-lived URL to upload a screenshot or confirmation; returns its reference."),
+    "get_runner_config": (GetRunnerConfigIn, RunnerConfigOut,
+                          "This runner's budget caps, model and limits, as set by the owner."),
 }
 
 

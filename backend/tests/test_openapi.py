@@ -38,7 +38,7 @@ def test_gateway_tools_have_schemas():
     schemas = tool_schemas()
     assert set(schemas) == {"next_task", "get_packet", "find_answer", "save_checkpoint", "raise_blocker",
                             "request_submit_permit", "report_result", "report_jobs", "report_check",
-                            "release_task", "evidence_upload_url"} == set(TOOLS)
+                            "release_task", "evidence_upload_url", "get_runner_config"} == set(TOOLS)
     assert "entered_answers" in schemas["request_submit_permit"]["input"]["properties"]
 
 

@@ -14231,7 +14231,7 @@
           "tokens"
         ],
         "summary": "Tokens Reinstate",
-        "description": "Lift a suspension (after a submission without a permit was detected).",
+        "description": "Lift a suspension (after a submission without a permit was detected). Needs ``acknowledged: true``;\nthe acknowledgement and note are audited.",
         "operationId": "tokens_reinstate",
         "parameters": [
           {
@@ -14245,6 +14245,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ReinstateIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -14267,14 +14284,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "acknowledgement_required"
           }
         }
       }
@@ -29690,6 +29700,30 @@
           "reminded"
         ],
         "title": "RefreshOut"
+      },
+      "ReinstateIn": {
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "title": "Acknowledged",
+            "description": "Required (true) to lift a suspension: the owner has read why the runner was paused",
+            "default": false
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "ReinstateIn"
       },
       "RejectIn": {
         "properties": {

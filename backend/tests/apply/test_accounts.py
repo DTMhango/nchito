@@ -284,7 +284,7 @@ async def test_register_blocker_joins_the_tenant_action_and_captcha_is_per_task(
     assert two.detail["task_id"] == str(t2.id) and two.detail["runner_id"] == runner
     cap = await accounts.register_blocker(session, kind="captcha", job=j1, task_id=t1.id, runner_id=runner)
     again = await accounts.register_blocker(session, kind="captcha", job=j1, task_id=t1.id, runner_id=runner)
-    assert cap.id == again.id != one.id and cap.group_key == f"task:{t1.id}"
+    assert cap.id == again.id != one.id and cap.group_key == f"task:{t1.id}:captcha"
     with pytest.raises(ValueError):
         await accounts.register_blocker(session, kind="login_form", job=j1, task_id=t1.id, runner_id=runner)
 
@@ -360,13 +360,19 @@ async def test_captcha_and_verification_code_use_the_continue_flow(owner_client)
         assert code.detail["kind"] == "verification_code" and code.type.value == "sign_in"
         await s.commit()
         cap_id, code_id, task_id = cap.id, code.id, t1.id
+    assert code.group_key != cap.group_key  # two actions: one continue must not close both
     assert (await owner_client.post(f"/api/pending-actions/{cap_id}/resolve",
                                     json={"resolution": "continue"})).status_code == 200
     async with get_sessionmaker()() as s:
-        assert (await s.get(AgentTask, task_id)).status == AgentTaskStatus.queued
+        # The verification code still needs the owner: it stays open and the task stays blocked.
+        assert (await s.get(PendingAction, code_id)).status == PendingStatus.open
+        assert (await s.get(AgentTask, task_id)).status == AgentTaskStatus.blocked
         assert await s.scalar(select(PortalAccount)) is None  # a CAPTCHA does not mean "signed in"
-    async with get_sessionmaker()() as s:  # the two blockers of one task close together
-        assert (await s.get(PendingAction, code_id)).status == PendingStatus.resolved
+    assert (await owner_client.post(f"/api/pending-actions/{code_id}/resolve",
+                                    json={"resolution": "continue"})).status_code == 200
+    async with get_sessionmaker()() as s:
+        task = await s.get(AgentTask, task_id)
+        assert task.status == AgentTaskStatus.queued and task.payload["resume_runner_token_id"] == runner
 
 
 # ----- "I can't / skip" ----------------------------------------------------------------------------
@@ -451,3 +457,19 @@ def test_no_secret_column_on_the_model_or_in_the_api_output():
     fields = [*PortalAccountOut.model_fields, *PortalAccountWrite.model_fields, *PortalAccountPatch.model_fields]
     for name in columns + fields:
         assert not any(w == name or name.startswith(w) or name.endswith("_" + w) for w in words), name
+
+
+async def test_approving_a_browser_packet_raises_the_sign_in_request_at_once(session):
+    from app.apply import approval, packets
+    from app.pipeline import conflicts
+    from tests.apply.helpers import browser_draft
+
+    campaign = await setup_campaign(session)
+    job, app = await role(session, campaign, title="Data Analyst")
+    await conflicts.resolve_employers(session, [job.employer], now=NOW)
+    built = await packets.build(session, app, browser_draft(job.apply_url), actor="owner", now=NOW)
+    await approval.approve(session, app, packet_version=built.packet.version, packet_hash=built.packet.content_hash,
+                           channel="browser", actor="owner", now=NOW)
+    actions = await open_actions(session)  # no accounts tick needed
+    assert len(actions) == 1 and actions[0].detail["kind"] == "create_account"
+    assert actions[0].detail["applications"][0]["application_id"] == str(app.id)

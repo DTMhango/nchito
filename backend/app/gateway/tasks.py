@@ -11,7 +11,8 @@ Invariants, never settings:
   where the owner can sign in; server runners take only forms known to need none. A task resumed after
   the owner signed in goes back to the runner that holds the session.
 - **Nothing outward while paused.** No apply task is handed out while autopilot is paused.
-- Hand-out is only for an application whose current packet is approved for the browser channel.
+- Hand-out is only for an application whose current packet is approved for the browser channel. Apply tasks
+  are created by the browser channel and claimed through ``browser.mark_task_claimed`` (one permit flow).
 """
 
 from __future__ import annotations
@@ -24,8 +25,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apply import outcomes, packets
+from app.apply.channels import browser
 from app.core import audit
-from app.gateway import accounts_bridge
 from app.gateway.common import (
     GatewayError,
     approved_packet,
@@ -58,67 +59,27 @@ from app.models.applications import (
 )
 from app.models.platform import ApiToken
 from app.models.search import Availability, Job
-from app.pipeline import normalise
 
 OPEN_TASK = (AgentTaskStatus.queued, AgentTaskStatus.claimed, AgentTaskStatus.blocked)
 SCOPE_OF = {AgentTaskType.apply: "gateway:tasks", AgentTaskType.check_posting: "gateway:tasks",
             AgentTaskType.sweep_site: "gateway:sweep"}
 
 
-# ----- routing and hand-out ----------------------------------------------------------------------
+# ----- routing ----------------------------------------------------------------------------------
+#
+# Apply tasks are created by the browser channel only (``dispatch.queue`` without a runner token, or the worker's
+# ``browser.queue_approved_tasks``): one hand-out path, one permit flow. Routing is ``browser.preferred_runner``.
 
 
 async def route_for(session: AsyncSession, job: Job) -> str | None:
-    """``pc``, ``server`` or None (any runner) for an apply task on this job."""
-    if accounts_bridge.has("needs_account"):
-        account_free = str(await accounts_bridge.module().needs_account(session, job)) == "no"  # type: ignore[union-attr]
-    else:
-        free = {p.lower() for p in await setting(session, "runners.account_free_portals")}
-        ats = normalise.ats_from_url(job.apply_url) or (job.apply_method or "").lower()
-        stated = job.facets.needs_account.value
-        account_free = stated == "no" or (stated != "yes" and ats in free)
-    if not account_free:
-        return "pc"
-    choice = str(await setting(session, "runners.route_account_free"))
-    return None if choice == "any" else choice
+    """``pc``, ``server`` or None (any runner) for a task on this job (the browser channel's routing)."""
+    return await browser.preferred_runner(session, job)
 
 
 async def open_attempt(session: AsyncSession, application_id: uuid.UUID) -> DispatchAttempt | None:
     return await session.scalar(select(DispatchAttempt).where(
         DispatchAttempt.application_id == application_id, DispatchAttempt.status.in_(outcomes.OPEN_STATUSES))
         .order_by(DispatchAttempt.created_at.desc()).limit(1))
-
-
-async def enqueue_apply(session: AsyncSession, app: Application, *, actor: str = "system",
-                        at: datetime) -> AgentTask | None:
-    """Hand an approved browser packet to the runner queue. One open task per application; nothing when a
-    dispatch attempt is already open for it."""
-    if app.stage != Stage.ready:
-        return None
-    packet = await approved_packet(session, app)
-    if packet is None:
-        return None
-    existing = await session.scalar(select(AgentTask.id).where(
-        AgentTask.application_id == app.id, AgentTask.type == AgentTaskType.apply,
-        AgentTask.status.in_(OPEN_TASK)).limit(1))
-    if existing is not None or await open_attempt(session, app.id) is not None:
-        return None
-    job = await session.get(Job, app.job_id)
-    assert job is not None
-    preferred = await route_for(session, job)
-    task = AgentTask(type=AgentTaskType.apply, application_id=app.id, preferred_runner=preferred,
-                     status=AgentTaskStatus.queued,
-                     payload={"packet_hash": packet.content_hash, "packet_version": packet.version,
-                              "posting_url": packet.contents.destination.url,
-                              "domain": packet.contents.destination.domain,
-                              "needs_account": preferred == "pc"})
-    session.add(task)
-    await session.flush()
-    await audit.record(session, actor=actor, action="gateway.task_queued", subject_type="agent_task",
-                       subject_id=task.id, detail={"type": "apply", "application_id": str(app.id),
-                                                   "preferred_runner": preferred, "packet_hash": packet.content_hash,
-                                                   "at": at.isoformat()})
-    return task
 
 
 async def enqueue_sweep(session: AsyncSession, *, source_id: uuid.UUID, url: str, actor: str = "system",
@@ -134,41 +95,6 @@ async def enqueue_sweep(session: AsyncSession, *, source_id: uuid.UUID, url: str
     await audit.record(session, actor=actor, action="gateway.task_queued", subject_type="agent_task",
                        subject_id=task.id, detail={"type": "sweep_site", "source_id": str(source_id), "url": url})
     return task
-
-
-async def hand_out(session: AsyncSession, *, at: datetime) -> list[uuid.UUID]:
-    """Queue a task for every ready application with an approved browser packet and none open."""
-    apps = (await session.scalars(select(Application).where(
-        Application.stage == Stage.ready, Application.approved_packet_id.is_not(None)))).all()
-    queued = []
-    for app in apps:
-        task = await enqueue_apply(session, app, at=at)
-        if task is not None:
-            queued.append(task.id)
-    return queued
-
-
-async def requeue_approved(session: AsyncSession, *, at: datetime) -> list[uuid.UUID]:
-    """Tasks blocked waiting for the owner's approval go back to their runner once the current packet is
-    approved."""
-    rows = (await session.scalars(select(AgentTask).where(
-        AgentTask.status == AgentTaskStatus.blocked, AgentTask.type == AgentTaskType.apply,
-        AgentTask.payload["waiting_for"].astext == "approval"))).all()
-    back = []
-    for task in rows:
-        app = await session.get(Application, task.application_id) if task.application_id else None
-        packet = await approved_packet(session, app) if app is not None else None
-        if app is None or packet is None or app.stage != Stage.ready:
-            continue
-        task.status = AgentTaskStatus.queued
-        task.payload = {**{k: v for k, v in task.payload.items() if k != "waiting_for"},
-                        "packet_hash": packet.content_hash, "packet_version": packet.version, "resume": True,
-                        "resume_runner_token_id": str(task.claimed_by_token_id) if task.claimed_by_token_id else None}
-        await audit.record(session, actor="system", action="gateway.task_requeued", subject_type="agent_task",
-                           subject_id=task.id, detail={"reason": "approved by the owner", "at": at.isoformat(),
-                                                       "packet_hash": packet.content_hash})
-        back.append(task.id)
-    return back
 
 
 # ----- leases ------------------------------------------------------------------------------------
@@ -211,8 +137,8 @@ async def expire_leases(session: AsyncSession, *, at: datetime) -> dict[uuid.UUI
 async def instructions(session: AsyncSession, task: AgentTask) -> tuple[str, TaskRules]:
     template = str(await setting(session, "runners.task_instructions"))
     max_steps = int(await setting(session, "automation.agent_max_steps"))
-    domain = str(task.payload.get("domain") or "")
-    text = template.format(task_type=task.type.value.replace("_", " "), posting_url=task.payload.get("posting_url"),
+    domain = str(task.payload.get("domain") or task.payload.get("destination_domain") or "")
+    text = template.format(task_type=task.type.value.replace("_", " "), posting_url=posting_url(task),
                            domain=domain, max_steps=max_steps)
     return text, TaskRules(stay_on_domain=domain, max_steps=max_steps)
 
@@ -220,7 +146,11 @@ async def instructions(session: AsyncSession, task: AgentTask) -> tuple[str, Tas
 async def describe(session: AsyncSession, task: AgentTask) -> NextTaskOut:
     text, rules = await instructions(session, task)
     return NextTaskOut(task_id=str(task.id), type=task.type.value, instructions=text,
-                       posting_url=task.payload.get("posting_url"), checkpoint=task.checkpoint, rules=rules)
+                       posting_url=posting_url(task), checkpoint=task.checkpoint, rules=rules)
+
+
+def posting_url(task: AgentTask) -> str | None:
+    return task.payload.get("posting_url") or task.payload.get("destination_url")
 
 
 def _allowed_types(token: ApiToken, wanted: list[str] | None) -> list[AgentTaskType]:
@@ -231,19 +161,42 @@ def _allowed_types(token: ApiToken, wanted: list[str] | None) -> list[AgentTaskT
 
 
 async def _still_wanted(session: AsyncSession, task: AgentTask, at: datetime) -> bool:
-    """An apply task whose packet is no longer the approved one is cancelled instead of handed out."""
+    """An apply task whose packet is no longer the approved current one is cancelled instead of handed out
+    (a newly approved packet gets its own task from the browser channel)."""
     if task.type != AgentTaskType.apply:
         return True
     app = await session.get(Application, task.application_id) if task.application_id else None
     packet = await approved_packet(session, app) if app is not None else None
-    if app is not None and packet is not None and app.stage == Stage.ready:
-        task.payload = {**task.payload, "packet_hash": packet.content_hash, "packet_version": packet.version}
+    if app is not None and packet is not None and app.stage == Stage.ready \
+            and task.payload.get("packet_hash") == packet.content_hash:
         return True
     task.status = AgentTaskStatus.cancelled
-    task.result = {"outcome": "cancelled", "reason": "the application is no longer approved and ready"}
+    task.result = {"outcome": "cancelled", "reason": "the application is no longer approved and ready for this "
+                                                     "packet"}
     await audit.record(session, actor="system", action="gateway.task_cancelled", subject_type="agent_task",
                        subject_id=task.id, detail={"reason": task.result["reason"], "at": at.isoformat()})
     return False
+
+
+async def _claim(session: AsyncSession, token: ApiToken, task: AgentTask, at: datetime, dry_run: bool) -> bool:
+    """Claim ``task`` for ``token``. Apply tasks are claimed through the browser channel, which refuses (and
+    withdraws the task) when the application has an open or sent attempt."""
+    if task.type == AgentTaskType.apply:
+        try:
+            await browser.mark_task_claimed(session, task.id, token_id=token.id, now=at)
+        except browser.BrowserError:
+            return False
+        if dry_run:  # a rehearsal is not an attempt
+            task.attempts -= 1
+    else:
+        task.status = AgentTaskStatus.claimed
+        task.claimed_by_token_id, task.claimed_at, task.heartbeat_at = token.id, at, at
+        if not dry_run:
+            task.attempts += 1
+    if dry_run:
+        task.payload = {**task.payload, "dry_run": True}
+    await session.flush()
+    return True
 
 
 async def next_task(session: AsyncSession, token: ApiToken, body: NextTaskIn, *, at: datetime) -> NextTaskOut:
@@ -279,15 +232,8 @@ async def next_task(session: AsyncSession, token: ApiToken, body: NextTaskIn, *,
             .order_by(AgentTask.created_at).limit(1).with_for_update(skip_locked=True))
         if task is None:
             return NextTaskOut(task_id=None)
-        if not await _still_wanted(session, task, at):
+        if not await _still_wanted(session, task, at) or not await _claim(session, token, task, at, body.dry_run):
             continue
-        task.status = AgentTaskStatus.claimed
-        task.claimed_by_token_id, task.claimed_at, task.heartbeat_at = token.id, at, at
-        if body.dry_run:
-            task.payload = {**task.payload, "dry_run": True}
-        else:
-            task.attempts += 1
-        await session.flush()
         await audit.record(session, actor=f"runner:{token.name}", action="gateway.task_claimed",
                            subject_type="agent_task", subject_id=task.id,
                            detail={"type": task.type.value, "runner_id": str(token.id), "attempt": task.attempts,

@@ -294,12 +294,24 @@ async def revoke_token(token_id: uuid.UUID, session: SessionDep, principal: Prin
     return _token_out(token)
 
 
-@tokens_router.post("/{token_id}/reinstate", response_model=TokenOut, name="tokens_reinstate")
-async def reinstate_token(token_id: uuid.UUID, session: SessionDep, principal: PrincipalDep) -> TokenOut:
-    """Lift a suspension (after a submission without a permit was detected)."""
+class ReinstateIn(BaseModel):
+    acknowledged: bool = Field(default=False, description="Required (true) to lift a suspension: the owner has "
+                                                          "read why the runner was paused")
+    note: str | None = Field(default=None, max_length=2000)
+
+
+@tokens_router.post("/{token_id}/reinstate", response_model=TokenOut, name="tokens_reinstate",
+                    responses={422: {"description": "acknowledgement_required"}})
+async def reinstate_token(token_id: uuid.UUID, session: SessionDep, principal: PrincipalDep,
+                          body: ReinstateIn | None = None) -> TokenOut:
+    """Lift a suspension (after a submission without a permit was detected). Needs ``acknowledged: true``;
+    the acknowledgement and note are audited."""
     token = await _token(session, token_id)
+    if token.suspended_at is not None and not (body and body.acknowledged):
+        raise HTTPException(422, detail={"code": "acknowledgement_required",
+                                         "reason": "confirm you have read why this runner was paused"})
     try:
-        await gateway_auth.reinstate(session, token, by=principal.actor)
+        await gateway_auth.reinstate(session, token, by=principal.actor, note=body.note if body else None)
     except ValueError as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     await session.refresh(token)

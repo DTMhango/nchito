@@ -8,9 +8,9 @@ from typing import Any
 
 from sqlalchemy import select
 
-from app.apply import approval, packets
+from app.apply import approval, dispatch, packets
 from app.core.db import get_sessionmaker
-from app.gateway import auth, service, tasks
+from app.gateway import auth, service
 from app.gateway.common import GatewayError
 from app.models.applications import AgentTask, Application
 from tests.apply.helpers import browser_draft, setup_app, setup_campaign
@@ -48,9 +48,19 @@ async def approved_app(*, employer: str = "Acme Example", draft: packets.PacketD
         await approval.approve(s, app, packet_version=built.packet.version, packet_hash=built.packet.content_hash,
                                channel="browser", actor="owner", now=NOW)
         if hand_out:
-            assert await tasks.enqueue_apply(s, app, at=NOW) is not None
+            await hand_out_task(s, app.id)
         await s.commit()
         return app.id, job.id
+
+
+async def hand_out_task(s, app_id: uuid.UUID) -> AgentTask:
+    """The one hand-out path: ``dispatch.queue`` without a runner token queues the browser task (no permit)."""
+    queued = await dispatch.queue(s, app_id, actor="owner", now=NOW)
+    assert queued.status == "queued" and queued.attempt is None, queued
+    task = await s.scalar(select(AgentTask).where(AgentTask.application_id == app_id)
+                          .order_by(AgentTask.created_at.desc()).limit(1))
+    assert task is not None
+    return task
 
 
 async def world() -> World:

@@ -66,9 +66,10 @@ TYPE_FOR_KIND: dict[str, PendingActionType] = {
     "sign_in": PendingActionType.sign_in, "create_account": PendingActionType.create_account,
     "verification_code": PendingActionType.sign_in, "captcha": PendingActionType.captcha,
     "assessment": PendingActionType.assessment, "declaration": PendingActionType.declaration,
-    "unsupported_form": PendingActionType.assessment,
+    "unsupported_form": PendingActionType.unsupported_form,
 }
 ACCOUNT_TYPES = (PendingActionType.sign_in, PendingActionType.create_account, PendingActionType.captcha,
+                 PendingActionType.unsupported_form,
                  PendingActionType.assessment, PendingActionType.declaration)
 ACTIVE_STAGES = stages.PRE_SUBMIT
 MAX_LISTED = 3
@@ -136,9 +137,19 @@ def portal_ref(job: Job) -> PortalRef | None:
     return PortalRef(portal[:60].lower(), tenant[:200].lower(), url)
 
 
+def _portal_from_url(url: str | None) -> str | None:
+    from app.pipeline import normalise
+
+    host = (urlsplit((url or "").strip()).hostname or "").lower()
+    by_host = next((name for suffix, name in _HOST_PORTALS if host == suffix or host.endswith("." + suffix)), None)
+    return by_host or normalise.ats_from_url(url)
+
+
 def assess_need(job: Job, *, required: list[str], account_free: list[str]) -> AccountNeed:
     """Pure: does applying for this role need an account? An unstated or unrecognised case is ``unknown``."""
     method = (job.apply_method or "").lower()
+    if method in _NO_METHOD:  # the posting names no system: use the one recognised from the apply link
+        method = _portal_from_url(job.apply_url) or method
     facet = job.facets.needs_account.value if job.facets is not None else "not_stated"
     if facet == "yes" or method in required:
         return AccountNeed.yes
@@ -387,10 +398,12 @@ async def register_blocker(session: AsyncSession, *, kind: str, job: Job, task_i
          "task_id": str(task.id), "runner_id": task_entry["runner_id"], "runner_kind": runner_kind,
          "origin": "runner", "applications": [entry] if entry else [], "tasks": [task_entry],
          "note": detail.get("note") or detail.get("detail")}
+    # What the gateway knows (the page URL, what the runner was already given) stays on the action, as data.
+    d = {**{k: v for k, v in detail.items() if k not in d}, **d}
     action = PendingAction(
         type=TYPE_FOR_KIND[kind], title="", status=PendingStatus.open, agent_task_id=task.id,
         application_id=None if tenant_level else app_id, checkpoint=task.checkpoint, detail=d,
-        group_key=ref.group_key if tenant_level and ref else f"task:{task.id}")
+        group_key=ref.group_key if tenant_level and ref else task_group_key(task.id, kind))
     session.add(action)
     await session.flush()
     await _refresh(session, action)
@@ -399,6 +412,12 @@ async def register_blocker(session: AsyncSession, *, kind: str, job: Job, task_i
                        subject_type="pending_action", subject_id=action.id,
                        detail={"kind": kind, "task_id": str(task.id), "key": ref.key if ref else None})
     return action
+
+
+def task_group_key(task_id: uuid.UUID | str, kind: str) -> str:
+    """Per-task blockers are one action per task *and kind*: a CAPTCHA and a verification code on one task are
+    two actions, and continuing one never closes the other."""
+    return f"task:{task_id}:{kind}"
 
 
 # ----- continue ----------------------------------------------------------------------------------
@@ -475,6 +494,8 @@ async def continue_blocker(session: AsyncSession, action: PendingAction, *, acto
                 task.status = AgentTaskStatus.cancelled
                 task.result = {"cancelled": reason, "by": "portal_continue"}
                 continue
+            if await _other_open_blocker(session, task.id, closing={c.id for c in closed}):
+                continue  # another blocker on this task still needs the owner: it stays blocked
             # Back to the same runner, from its checkpoint; the submit permit is still required.
             token = t.get("runner_id") or (str(task.claimed_by_token_id) if task.claimed_by_token_id else None)
             task.status = AgentTaskStatus.queued
@@ -490,6 +511,14 @@ async def continue_blocker(session: AsyncSession, action: PendingAction, *, acto
         await _close(session, a, {"resolution": "continue", "note": note, "via": via, "runner": runner,
                                   "resumed_tasks": resumed, "not_resumed": not_resumed}, actor, now)
     return closed
+
+
+async def _other_open_blocker(session: AsyncSession, task_id: uuid.UUID, *, closing: set[uuid.UUID]) -> bool:
+    rows = await session.scalars(select(PendingAction).where(
+        PendingAction.status == PendingStatus.open, PendingAction.id.not_in(closing)))
+    tid = str(task_id)
+    return any(a.agent_task_id == task_id or any(t.get("task_id") == tid for t in (a.detail or {}).get("tasks", []))
+               for a in rows if _is_account_action(a))
 
 
 def _ref_from(detail: dict[str, Any]) -> PortalRef | None:

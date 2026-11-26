@@ -117,12 +117,14 @@ async def suspend(session: AsyncSession, token: ApiToken, *, reason: str, now: d
     await session.flush()
 
 
-async def reinstate(session: AsyncSession, token: ApiToken, *, by: str) -> None:
+async def reinstate(session: AsyncSession, token: ApiToken, *, by: str, note: str | None = None) -> None:
+    """Lift a suspension. The caller has the owner's explicit acknowledgement (the API requires it)."""
     if token.revoked_at is not None:
         raise ValueError("a revoked token cannot be reinstated; create a new one")
     if token.suspended_at is not None:
         reason = token.suspended_reason
         token.suspended_at = token.suspended_reason = None
         await audit.record(session, actor=by, action="gateway.token_reinstated", subject_type="api_token",
-                           subject_id=token.id, detail={"name": token.name, "was_suspended_for": reason})
+                           subject_id=token.id, detail={"name": token.name, "was_suspended_for": reason,
+                                                        "acknowledged": True, "note": note})
     await session.flush()

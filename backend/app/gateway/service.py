@@ -16,7 +16,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import get_sessionmaker
-from app.gateway import answers, blockers, common, release, submit, sweep, tasks
+from app.gateway import answers, blockers, common, release, runner_config, submit, sweep, tasks
 from app.gateway.common import GatewayError
 from app.gateway.tools import TOOLS
 from app.models.platform import ApiToken
@@ -35,6 +35,7 @@ HANDLERS: dict[str, Callable[..., Awaitable[BaseModel]]] = {
     "report_check": tasks.report_check,
     "release_task": tasks.release_task,
     "evidence_upload_url": release.evidence_upload_url,
+    "get_runner_config": runner_config.get_runner_config,
 }
 assert set(HANDLERS) == set(TOOLS), "every contract tool has exactly one handler"
 

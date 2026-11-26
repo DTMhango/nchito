@@ -7,22 +7,23 @@ Invariants, never settings:
 - A redirect off the destination, a page asking for something outside the application, or a declaration
   revokes any unused permit for that application at once. A permit already given and not reported is
   settled as not sent: the runner stopped before submitting.
-- Sign-in and account blockers are grouped by portal, so one sign-in unlocks every task waiting on it; the
-  owner's "continue" sends the task back to the same runner (``owner_actions.continue_task``).
+- Sign-in and account blockers go to ``accounts.register_blocker``: grouped by portal tenant, so one sign-in
+  unlocks every task waiting on it; per-task kinds (CAPTCHA, verification code, ...) are one action each. The
+  owner's "continue" sends the task back to the same runner (``accounts.continue_blocker``).
 - The runner's ``detail`` is page-derived text: stored as data, bounded, never followed.
 - Whether the runner moves on or waits is ``automation.blocker_handling``.
 """
 
 from __future__ import annotations
 
+import contextlib
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.apply import outcomes, packets, permits
-from app.apply.channels.base import DispatchOutcome
+from app.apply import accounts, packets, permits
+from app.apply.channels import browser
 from app.core import audit
-from app.gateway import accounts_bridge
 from app.gateway.common import clip, own_task, setting
 from app.gateway.tasks import give_back, is_dry_run, open_attempt
 from app.gateway.tools import RaiseBlockerIn, RaiseBlockerOut
@@ -54,12 +55,11 @@ async def _stop_outward(session: AsyncSession, task: AgentTask, app: Application
                         at: datetime) -> None:
     await permits.revoke(session, application_id=app.id, reason=why, actor=actor, now=at)
     attempt = await open_attempt(session, app.id)
-    if attempt is not None and str(attempt.id) == task.payload.get("attempt_id") \
-            and attempt.status in outcomes.OPEN_STATUSES:
-        await outcomes.record(session, attempt, DispatchOutcome(status="failed", error=f"runner stopped: {why}"),
-                              via="gateway", actor=actor, now=at)
-        locked = await outcomes.lock_application(session, app.id)
-        await outcomes.give_back(session, locked, attempt, f"runner stopped before submitting: {why}", now=at)
+    if attempt is not None and str(attempt.id) == task.payload.get("attempt_id"):
+        # Cleared but stopped before Submit: the runner's word that nothing went out (settled as not sent).
+        with contextlib.suppress(browser.UnpermittedReport):
+            await browser.record_result(session, attempt, "failed", None, task_id=task.id,
+                                        detail=f"runner stopped before submitting: {why}", actor=actor, now=at)
 
 
 async def raise_blocker(session: AsyncSession, token: ApiToken, body: RaiseBlockerIn, *,
@@ -75,10 +75,10 @@ async def raise_blocker(session: AsyncSession, token: ApiToken, body: RaiseBlock
               "runner_kind": token.runner_kind, "task_type": task.type.value,
               "released": task.released.get("given") or [], "dry_run": is_dry_run(task)}
     action_id = None
-    if body.type in accounts_bridge.ACCOUNT_KINDS and job is not None and accounts_bridge.has("register_blocker"):
-        registered = await accounts_bridge.module().register_blocker(  # type: ignore[union-attr]
-            session, kind=body.type, job=job, task_id=task.id, runner_id=token.id, detail=detail)
-        action_id = getattr(registered, "id", registered)
+    if body.type in accounts.BLOCKER_KINDS and job is not None:
+        registered = await accounts.register_blocker(session, kind=body.type, job=job, task_id=task.id,
+                                                     runner_id=token.id, detail=detail)
+        action_id = registered.id
     if action_id is None:
         group = f"portal:{domain}" if body.type in PORTAL_TYPES else None
         action = PendingAction(type=TYPES[body.type], application_id=task.application_id, agent_task_id=task.id,

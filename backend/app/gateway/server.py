@@ -3,7 +3,8 @@
 - Stateless streamable HTTP with JSON responses: each POST is one self-contained exchange, so the web
   process keeps no MCP session state and needs no lifespan hook.
 - ``Authorization: Bearer nch_...`` on every request. A missing, unknown or revoked token is 401 before
-  the MCP layer sees anything. Calls per token are limited per minute (``runners.calls_per_minute``,
+  the MCP layer sees anything. Every authenticated request (tool call, list, ping) updates the runner's
+  last-seen (``ApiToken.last_used_at``). Calls per token are limited per minute (``runners.calls_per_minute``,
   per web process).
 - Tools and their JSON Schemas are exactly ``app.gateway.tools.TOOLS``; the server validates input and
   output against them. A refused call returns an MCP tool error whose text is ``{"code", "reason"}``.
@@ -90,6 +91,8 @@ async def _authenticate(scope: Scope) -> tuple[str | None, JSONResponse | None]:
             return None, _unauthorised("unknown or revoked token")
         limit = int(await common.setting(session, "runners.calls_per_minute"))
         token_id = str(token.id)
+        token.last_used_at = common.now()  # any authenticated request (a ping too) is the runner's last-seen
+        await session.commit()
     if not limiter.allow(token_id, limit):
         return None, JSONResponse({"detail": "too many calls; slow down"}, status_code=429,
                                   headers={"Retry-After": "60"})

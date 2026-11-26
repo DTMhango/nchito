@@ -6,7 +6,8 @@
 - ``never`` answers are ``do_not_answer`` (with the forced option where the form offers it), and so are
   ``owner_only`` answers: the runner leaves them for the owner, who is asked through a pending action.
 - Anything else the bank cannot settle is ``ask_owner`` and raises one ``unknown_question`` pending action
-  per question and application.
+  per question and application, or, when ``automation.unknown_question`` is ``skip_role``, ends the task and
+  skips the role (``skip_role``).
 - The question text comes from a web page: it is stored as data, bounded, and never followed.
 - A bank answer that is not in the approved packet is still a packet change: the permit asks the owner.
 """
@@ -35,11 +36,13 @@ from app.kit.answers import match, normalise, similarity
 from app.kit.work_rights import to_record
 from app.models.applications import (
     AgentTask,
+    AgentTaskStatus,
     AgentTaskType,
     Application,
     PendingAction,
     PendingActionType,
     PendingStatus,
+    Stage,
 )
 from app.models.kit import Answer, AnswerClass
 from app.models.platform import ApiToken
@@ -61,6 +64,29 @@ async def raise_question(session: AsyncSession, app: Application, task: AgentTas
     session.add(action)
     await session.flush()
     return action.id
+
+
+async def _skip_role(session: AsyncSession, token: ApiToken, task: AgentTask, app: Application, question: str,
+                     at: datetime) -> FindAnswerOut:
+    """``automation.unknown_question = skip_role``: a question the bank cannot answer ends the task and skips the
+    role (nothing is guessed). A dry run only gives the task back."""
+    from app.apply import permits, stages
+    from app.gateway.tasks import give_back, is_dry_run
+
+    actor = f"runner:{token.name}"
+    if is_dry_run(task):
+        await give_back(session, task, reason="dry run: unknown question (skip_role)", actor=actor, at=at)
+        return FindAnswerOut(outcome="skip_role")
+    why = f"the form asked a question the answer bank cannot answer: {question[:200]}"
+    await permits.revoke(session, application_id=app.id, reason=why, actor=actor, now=at)
+    if app.stage in (Stage.shortlisted, Stage.tailoring, Stage.ready):
+        await stages.transition(session, app, Stage.skipped, actor="system", via="system", now=at, why=why,
+                                detail={"setting": "automation.unknown_question", "task_id": str(task.id)})
+    task.status = AgentTaskStatus.cancelled
+    task.result = {"outcome": "skipped", "reason": why, "at": at.isoformat()}
+    await audit.record(session, actor=actor, action="gateway.role_skipped", subject_type="agent_task",
+                       subject_id=task.id, detail={"application_id": str(app.id), "question": question})
+    return FindAnswerOut(outcome="skip_role")
 
 
 async def find_answer(session: AsyncSession, token: ApiToken, body: FindAnswerIn, *, at: datetime) -> FindAnswerOut:
@@ -96,6 +122,8 @@ async def find_answer(session: AsyncSession, token: ApiToken, body: FindAnswerIn
             out = FindAnswerOut(outcome="value", value=in_packet.value)
         elif result.outcome == "value":
             out = FindAnswerOut(outcome="value", value=result.value)
+        elif str(await setting(session, "automation.unknown_question")) == "skip_role":
+            out = await _skip_role(session, token, task, app, question, at)
         else:
             pending = await raise_question(session, app, task, question, {
                 "reason": result.reason, "answer_id": str(result.answer_id) if result.answer_id else None,

@@ -2,22 +2,22 @@
 
 Invariants, never settings:
 
-- **Permit only through ``apply.permits.request``** (every gate again, under the permit and employer locks)
-  and only for the answers actually entered: each entered answer must be in the approved packet with the
-  same value, and each attached file must be one of its files. A new question or a changed value is a
-  packet change: a new packet version holding what was entered is built and the owner is asked
-  (``wait_for_owner``). An entered answer to a ``never`` or ``owner_only`` question, an unknown file, or a
-  page off the destination is ``denied``. Unknown never grants.
-- **Attempt before the click.** A granted permit writes a ``DispatchAttempt`` (in flight, caps reserved) in
-  the same transaction, so a second permit for the application is refused (duplicate gate) and a runner
-  that dies is reconciled, never repeated.
-- **The permit is consumed by the result.** ``report_result(submitted)`` consumes the permit atomically
-  (single use, unexpired, this runner, this packet). With evidence the send is ``sent``; without it,
-  ``unknown`` and reconciliation.
-- **Violation.** ``submitted`` without a permit that can be consumed is a violation: audited, an alert is
-  raised, the runner is suspended and the submission is held as uncertain so duplicates stay locked.
-- ``uncertain`` goes to reconciliation and is never retried automatically. ``failed`` (the runner says it
-  never submitted) settles the attempt as failed and the role goes back to ``ready``.
+- **One permit flow: the browser channel's** (``app/apply/channels/browser.py``). The gateway first compares
+  what was entered with the approved packet: each entered answer must be in it with the same value, and each
+  attached file one of its files. A new question or a changed value is a packet change: a new packet version
+  holding what was entered is built and the owner is asked (``wait_for_owner``). An entered answer to a
+  ``never`` or ``owner_only`` question, an unknown file, or a page off the destination is ``denied``.
+- **Consumed at clearance.** Then ``dispatch.queue(app, runner_token_id=, agent_task_id=)`` requests the permit
+  (every gate, under the permit and employer locks) and consumes it with the ``DispatchAttempt`` in one
+  transaction, and ``dispatch.run`` rechecks every gate and asks ``BrowserChannel.dispatch`` to clear the
+  claimed task (the permit is bound to the packet hash and that task). Only a ``handed_off`` attempt is
+  ``granted``: the runner may click Submit. A second permit for the application is refused (duplicate gate)
+  and a runner that dies after clearance is reconciled, never repeated. Unknown never grants.
+- **Results** go to ``browser.record_result``: ``submitted`` with evidence is ``sent``; without it, or
+  ``uncertain``, the attempt is held for reconciliation (never retried); ``failed`` settles as not sent.
+- **Violation.** ``submitted`` with no cleared attempt for the task (``browser.UnpermittedReport``) is a
+  violation: audited, an alert is raised, the runner is suspended and the submission is held as uncertain so
+  duplicates stay locked.
 - A dry run never gets a permit and records nothing on the application.
 """
 
@@ -30,7 +30,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.apply import approval, outcomes, packets, permits
+from app.apply import approval, dispatch, outcomes, packets, permits
+from app.apply.channels import browser
 from app.apply.channels.base import DispatchOutcome
 from app.core import audit
 from app.gateway.answers import raise_question
@@ -66,7 +67,6 @@ from app.models.kit import Answer, AnswerClass
 from app.models.platform import ApiToken
 from app.models.search import Job
 from app.pipeline.tailoring.answers import context_for
-from app.schemas.json_types import Evidence
 
 # ----- comparing what was entered with the packet -----------------------------------------------
 
@@ -179,42 +179,44 @@ async def request_submit_permit(session: AsyncSession, token: ApiToken, body: Re
                                                        **entered})
         return RequestPermitOut(decision="wait_for_owner", changes=changes,
                                 reason="the entered answers differ from the approved packet; the owner is asked")
-    result = await permits.request(session, app.id, packet_hash=packet.content_hash, channel="browser",
-                                   runner_token_id=token.id, agent_task_id=task.id, actor=actor, now=at)
-    if result.status == "wait_for_owner":
-        await _wait(session, task, app, packet, result.reason)
-        return RequestPermitOut(decision="wait_for_owner", reason=result.reason)
-    if not result.granted or result.permit is None:
-        return RequestPermitOut(decision="denied", reason=result.reason)
-    permit = result.permit
-    attempt = DispatchAttempt(application_id=app.id, packet_id=packet.id, packet_hash=packet.content_hash,
-                              channel=Channel.browser, permit_id=permit.id, status=DispatchStatus.reserved,
-                              send_after=at, started_at=at, gate_results=permit.checks)
-    session.add(attempt)
-    await session.flush()
-    await outcomes._log(session, attempt, "dispatch.reserved", actor, packet_version=packet.version,
-                        approved_by=packet.approved_by, runner=token.name, agent_task_id=str(task.id),
-                        gates=result.gates)
-    task.payload = {**task.payload, "permit_id": str(permit.id), "attempt_id": str(attempt.id)}
-    return RequestPermitOut(decision="granted", permit_id=str(permit.id), expires_at=permit.expires_at.isoformat(),
-                            reason=result.reason)
+    # One permit flow (the browser channel's): the permit is requested and consumed with the attempt in
+    # ``dispatch.queue``, then ``dispatch.run`` rechecks every gate and the channel clears this runner's task.
+    queued = await dispatch.queue(session, app.id, actor=actor, runner_token_id=token.id, agent_task_id=task.id,
+                                  now=at)
+    if queued.status == "wait_for_owner":
+        task.status = AgentTaskStatus.blocked
+        task.payload = {**task.payload, "waiting_for": "approval",
+                        "approval_action_id": str(queued.pending_action_id) if queued.pending_action_id else None}
+        return RequestPermitOut(decision="wait_for_owner", reason=queued.reason)
+    if not queued.queued or queued.attempt is None:
+        return await refuse(queued.reason)
+    attempt_id, permit_id = queued.attempt.id, queued.attempt.permit_id
+    status = await dispatch.run(session, attempt_id, now=at)  # commits: the attempt is durable before the click
+    attempt = await session.get(DispatchAttempt, attempt_id, populate_existing=True)
+    assert attempt is not None
+    if status is None and attempt.status == DispatchStatus.reserved and attempt.started_at is None:
+        # Deferred (quiet hours began between the permit and the run): nothing was cleared.
+        locked = await outcomes.lock_application(session, app.id)
+        await outcomes.cancel(session, attempt, locked, "not cleared: deferred by quiet hours", actor=actor, now=at)
+        return await refuse("quiet hours: try again later")
+    if attempt.status != DispatchStatus.handed_off:
+        return await refuse(attempt.error or f"not cleared: the send is {attempt.status.value}")
+    permit = await session.get(SubmitPermit, permit_id) if permit_id else None
+    task = await session.get(AgentTask, task.id, populate_existing=True) or task
+    task.payload = {**task.payload, "permit_id": str(permit_id), "attempt_id": str(attempt.id)}
+    await audit.record(session, actor=actor, action="gateway.permit_granted", subject_type="agent_task",
+                       subject_id=task.id, detail={"attempt_id": str(attempt.id), "permit_id": str(permit_id),
+                                                   "packet_hash": attempt.packet_hash})
+    return RequestPermitOut(decision="granted", permit_id=str(permit_id),
+                            expires_at=permit.expires_at.isoformat() if permit else None,
+                            reason="cleared: submit now, then report the result")
 
 
 # ----- results -----------------------------------------------------------------------------------
 
 
-def _evidence(body: ReportResultIn, at: datetime) -> Evidence | None:
-    shot = clip(body.screenshot_ref, 500)
-    if body.reference and body.reference.strip():
-        return Evidence(kind="reference", value=clip(body.reference.strip(), 200) or "", screenshot_ref=shot,
-                        at=at.isoformat())
-    if body.confirmation_text and body.confirmation_text.strip():
-        return Evidence(kind="confirmation_page", value=clip(body.confirmation_text.strip(), 1000) or "",
-                        screenshot_ref=shot, at=at.isoformat())
-    return None
-
-
 async def _attempt_for(session: AsyncSession, task: AgentTask) -> DispatchAttempt | None:
+    """The attempt the browser channel cleared this task for (set at clearance), locked."""
     raw = task.payload.get("attempt_id")
     if not raw:
         return None
@@ -245,10 +247,13 @@ async def _hold_uncertain(session: AsyncSession, task: AgentTask, app: Applicati
     if attempt.status in outcomes.OPEN_STATUSES and attempt.status != DispatchStatus.unknown:
         await outcomes.record(session, attempt, DispatchOutcome(status="unknown", error=why), via="gateway",
                               actor=actor, now=at)
+    await browser.withdraw_unclaimed_tasks(session, app.id, "an earlier send is uncertain", now=at)
 
 
 async def violation(session: AsyncSession, token: ApiToken, task: AgentTask | None, reason: str, *,
                     at: datetime) -> None:
+    """A submission without a consumed permit (``browser.UnpermittedReport``): audited, the runner is paused
+    (only an explicit, audited acknowledgement reinstates it) and the owner is alerted."""
     from app.ops import notifications
 
     await suspend(session, token, reason=reason, now=at, keep=task.id if task else None)
@@ -258,6 +263,14 @@ async def violation(session: AsyncSession, token: ApiToken, task: AgentTask | No
     await notifications.notify(session, kind="health", key=f"gateway-violation-{token.id}-{task.id if task else ''}",
                                title=f"Runner {token.name} suspended: a submission without a permit",
                                body=reason, link="/settings/connections")
+
+
+async def _unpermitted(session: AsyncSession, token: ApiToken, task: AgentTask, app: Application, problem: str,
+                       actor: str, at: datetime) -> None:
+    await violation(session, token, task, f"submitted without a usable permit: {problem}", at=at)
+    await _hold_uncertain(session, task, app, f"submitted without a usable permit: {problem}", actor, at)
+    task.status = AgentTaskStatus.failed
+    task.result = {**(task.result or {}), "violation": problem}
 
 
 async def report_result(session: AsyncSession, token: ApiToken, body: ReportResultIn, *,
@@ -291,49 +304,36 @@ async def report_result(session: AsyncSession, token: ApiToken, body: ReportResu
         await give_back(session, task, reason=f"dry run finished: {body.outcome}", actor=actor, at=at)
         return ReportResultOut(recorded=False, application_stage=app.stage.value)
     attempt = await _attempt_for(session, task)
-    if body.outcome == "submitted":
-        consumed: SubmitPermit | None = None
-        problem = None
-        if not body.permit_id or body.permit_id != task.payload.get("permit_id") or attempt is None:
-            problem = "no submit permit was granted for this task" if not task.payload.get("permit_id") \
-                else "the permit reported is not the one granted for this task"
-        else:
-            try:
-                consumed = await permits.consume(session, parse_id(body.permit_id, "permit"),
-                                                 packet_hash=attempt.packet_hash, channel="browser",
-                                                 runner_token_id=token.id, actor=actor, now=at)
-            except permits.PermitRefused as exc:
-                problem = f"the permit could not be used: {exc.reason}"
-        if consumed is None:
-            await violation(session, token, task, f"submitted without a usable permit: {problem}", at=at)
-            await _hold_uncertain(session, task, app, f"submitted without a usable permit: {problem}", actor, at)
-            task.status = AgentTaskStatus.failed
-            task.result = {**task.result, "violation": problem}
-        else:
-            assert attempt is not None
-            evidence = _evidence(body, at)
-            outcome = DispatchOutcome(status="sent", evidence=evidence) if evidence else DispatchOutcome(
-                status="unknown", error="the runner reported it submitted without a confirmation or reference")
-            if attempt.status in outcomes.OPEN_STATUSES:
-                await outcomes.record(session, attempt, outcome, via="gateway", actor=actor, now=at)
+    reported = dict(task.result)
+    if body.outcome == "submitted" and (attempt is None or (body.permit_id and body.permit_id != str(
+            attempt.permit_id))):
+        problem = "no submit permit was granted for this task" if attempt is None \
+            else "the permit reported is not the one granted for this task"
+        await _unpermitted(session, token, task, app, problem, actor, at)
+    elif attempt is None:
+        # Never cleared: nothing can have gone out with this system's permit.
+        if body.outcome == "uncertain":
+            await _hold_uncertain(session, task, app, clip(body.detail, 500) or "the runner is not sure it went out",
+                                  actor, at)
             task.status = AgentTaskStatus.done
-    elif body.outcome == "uncertain":
-        await _hold_uncertain(session, task, app, clip(body.detail, 500) or "the runner is not sure it went out",
-                              actor, at)
-        await permits.revoke(session, application_id=app.id, reason="runner reported uncertain", actor=actor, now=at)
-        task.status = AgentTaskStatus.done
+        else:
+            task.status = AgentTaskStatus.failed
+        await permits.revoke(session, application_id=app.id, reason=f"runner reported {body.outcome}", actor=actor,
+                             now=at)
     else:
-        await permits.revoke(session, application_id=app.id, reason="runner reported failed", actor=actor, now=at)
-        if attempt is not None and attempt.status in outcomes.OPEN_STATUSES:
-            await outcomes.record(session, attempt, DispatchOutcome(
-                status="failed", error=f"runner: {clip(body.detail, 500) or 'failed before submitting'}"),
-                via="gateway", actor=actor, now=at)
-            locked = await outcomes.lock_application(session, app.id)
-            await outcomes.give_back(session, locked, attempt, "the runner failed before submitting", now=at)
-        task.status = AgentTaskStatus.failed
+        evidence = browser.evidence_from_report(confirmation_text=clip(body.confirmation_text),
+                                                reference=clip(body.reference, 200),
+                                                screenshot_ref=clip(body.screenshot_ref, 500), now=at)
+        try:
+            await browser.record_result(session, attempt, body.outcome, evidence, task_id=task.id,
+                                        detail=clip(body.detail, 500), actor=actor, now=at)
+        except browser.UnpermittedReport as exc:
+            await _unpermitted(session, token, task, app, exc.message, actor, at)
+        else:
+            task.result = {**reported, **(task.result or {})}
     await session.flush()
     await audit.record(session, actor=actor, action="gateway.result_reported", subject_type="agent_task",
-                       subject_id=task.id, detail={**task.result, "application_id": str(app.id),
+                       subject_id=task.id, detail={**reported, "application_id": str(app.id),
                                                    "task_status": task.status.value})
     await session.refresh(app)
     return ReportResultOut(recorded=True, application_stage=app.stage.value)
