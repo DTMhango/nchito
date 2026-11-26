@@ -11,6 +11,7 @@ from app.api.routers import (
     data,
     health,
     insights,
+    interview,
     jobs,
     jobs_corrections,
     kit,
@@ -42,6 +43,7 @@ ALL_ROUTERS: list[APIRouter] = [
     connections.connections_router,
     connections.tokens_router,
     insights.router,
+    interview.router,
     data.router,
     llm_api.router,
 ]

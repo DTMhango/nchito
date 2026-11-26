@@ -139,7 +139,7 @@ async def test_spend_summary_and_meter(owner_client: httpx.AsyncClient, adapter:
 
 async def test_prompts_seed_version_activate_and_record_history(owner_client: httpx.AsyncClient) -> None:
     prompts = (await owner_client.get("/api/kit/prompts")).json()
-    assert {p["stage"] for p in prompts} == {"extract", "score", "tailor", "claim_check", "classify_email"}
+    assert {p["stage"] for p in prompts} == {"extract", "score", "tailor", "claim_check", "classify_email", "interview"}
     assert all(p["active"] and p["version"] == 1 for p in prompts)
     r = await owner_client.post("/api/kit/prompts", json={"stage": "score", "text": "Score strictly.", "note": "v2"})
     assert r.status_code == 201 and r.json()["version"] == 2 and r.json()["active"] is False
