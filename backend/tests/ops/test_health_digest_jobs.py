@@ -147,6 +147,12 @@ async def test_detail_requires_the_owner(client) -> None:
 # ----- digest ------------------------------------------------------------------------------------
 
 
+def soon() -> datetime:
+    """Just after the real clock: seeded rows are stamped by the database clock, which runs past ``NOW`` (fixed at
+    import) when the suite is long."""
+    return datetime.now(UTC) + timedelta(minutes=1)
+
+
 async def seed_digest_data(session) -> None:
     job = await make_job(session, "Senior Actuary", "Acme Ltd")
     quiet = await make_job(session, "Intern", "Beta Ltd")
@@ -163,7 +169,7 @@ async def seed_digest_data(session) -> None:
 
 async def test_render_digest_lists_matches_needs_you_sent_and_spend(session) -> None:
     await seed_digest_data(session)
-    result = await digest.render_digest(session, since=NOW - timedelta(days=1), until=NOW + timedelta(minutes=1))
+    result = await digest.render_digest(session, since=NOW - timedelta(days=1), until=soon())
     assert result.counts["matches"] == 1 and result.counts["needs_you"] == 1 and result.counts["sent"] == 1
     assert "88  Senior Actuary, Acme Ltd" in result.body and "Intern" not in result.body
     assert "Sign in at Acme" in result.body and "Data Analyst, Gamma Ltd" in result.body
@@ -175,7 +181,7 @@ async def test_generic_detail_level_leaves_names_out_of_the_digest(session) -> N
     await seed_digest_data(session)
     await settings_service.set_many(session, {"notifications.detail_level": "generic"}, actor="test")
     await session.commit()
-    result = await digest.render_digest(session, since=NOW - timedelta(days=1), until=NOW + timedelta(minutes=1))
+    result = await digest.render_digest(session, since=NOW - timedelta(days=1), until=soon())
     assert "Acme" not in result.body and "Needs you: 1" in result.body
 
 
