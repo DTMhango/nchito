@@ -1284,6 +1284,7 @@ export function assessmentFor(job: MockJob, i: number): AssessmentOut {
     ],
     model: "mock-scorer",
     cost_minor: 2,
+    cost_micros: 20000,
     cost_currency: "USD",
     override: null,
     is_conflict_winner: job.conflict_state === "winner",

@@ -224,6 +224,7 @@ function runs(): Run[] {
       { source_id: "src-ashby", status: "ok", found: 15, new: 3, error: null },
     ],
     cost_minor: 184,
+    cost_micros: 1840000,
     config_versions: {},
     status: "partial",
     started_at: ago(minutesAgo),
@@ -254,6 +255,7 @@ function runs(): Run[] {
         },
       ],
       cost_minor: 121,
+      cost_micros: 1210000,
     }),
     done("run-3", 60 * 30, {
       kind: "expiry_check",
@@ -262,6 +264,7 @@ function runs(): Run[] {
       counts: { checked: 63, still_open: 58, closed: 4, unknown: 1 },
       source_results: [],
       cost_minor: 0,
+      cost_micros: 0,
     }),
     done("run-4", 60 * 52, {
       dry_run: true,
@@ -270,6 +273,7 @@ function runs(): Run[] {
       status: "succeeded",
       counts: funnel(205, 31, 18, 7, 0, 0),
       cost_minor: 0,
+      cost_micros: 0,
       proposed_actions: PROPOSED,
     }),
     done("run-5", 60 * 77, {
@@ -293,6 +297,7 @@ function runs(): Run[] {
       ],
       error: "Every source failed, so nothing was checked.",
       cost_minor: 0,
+      cost_micros: 0,
     }),
   ]
 }
@@ -417,6 +422,7 @@ export function tickRun(run: Run): Run {
     next.status = "succeeded"
     next.finished_at = new Date().toISOString()
     next.cost_minor = run.dry_run ? 0 : 96
+    next.cost_micros = run.dry_run ? 0 : 960_000
     if (run.dry_run) next.proposed_actions = PROPOSED
   } else if (run.status === "queued" && p > 0.05) {
     next.status = "running"

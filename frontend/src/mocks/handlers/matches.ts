@@ -5,7 +5,7 @@
  */
 import { delay, http, HttpResponse } from "msw"
 import { db } from "@/mocks/db"
-import type { RecheckResult } from "@/lib/api/pending"
+import type { RecheckResult } from "@/lib/api/types"
 import type {
   AppliedMyselfIn,
   AssessmentOut,

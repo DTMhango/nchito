@@ -379,6 +379,7 @@ export function buildToday(m: MockApplications): TodayOut {
       finished_at: ago(0.29),
       counts: { found: 214, new: 41, passed_filters: 23, above_threshold: 11 },
       cost_minor: 4,
+      cost_micros: 40000,
     },
     funnel: [
       { stage: "found", count: 214 },
@@ -457,6 +458,10 @@ export function buildToday(m: MockApplications): TodayOut {
       cap_minor: 5000,
       currency: "USD",
       estimated_unbilled_minor: 60,
+      month_to_date_micros: 18_400_000,
+      reserved_micros: 1_200_000,
+      cap_micros: 50_000_000,
+      estimated_unbilled_micros: 600_000,
     },
   }
 }

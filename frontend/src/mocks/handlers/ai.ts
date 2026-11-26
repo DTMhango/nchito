@@ -94,35 +94,68 @@ function seed(): AiState {
       timezone: "Africa/Lusaka",
       currency: "USD",
       cap_minor: null,
+      cap_micros: null,
       per_run_cap_minor: null,
+      per_run_cap_micros: null,
       warning_percent: 80,
       month_to_date_minor: 412,
       reserved_minor: 6,
       estimated_unbilled_minor: 35,
+      month_to_date_micros: 4_120_000,
+      reserved_micros: 60_000,
+      estimated_unbilled_micros: 350_000,
       remaining_minor: null,
+      remaining_micros: null,
       warning_reached: false,
       by_stage: [
-        { key: "score", billed_minor: 220, unbilled_minor: 0, calls: 310 },
-        { key: "tailor", billed_minor: 150, unbilled_minor: 35, calls: 9 },
-        { key: "extract", billed_minor: 42, unbilled_minor: 0, calls: 120 },
+        {
+          key: "score",
+          billed_minor: 220,
+          unbilled_minor: 0,
+          billed_micros: 2200000,
+          unbilled_micros: 0,
+          calls: 310,
+        },
+        {
+          key: "tailor",
+          billed_minor: 150,
+          unbilled_minor: 35,
+          billed_micros: 1500000,
+          unbilled_micros: 350000,
+          calls: 9,
+        },
+        {
+          key: "extract",
+          billed_minor: 42,
+          unbilled_minor: 0,
+          billed_micros: 420000,
+          unbilled_micros: 0,
+          calls: 120,
+        },
       ],
       by_model: [
         {
           key: "anthropic/claude-haiku-5-5",
           billed_minor: 262,
+          billed_micros: 2620000,
           unbilled_minor: 0,
+          unbilled_micros: 0,
           calls: 430,
         },
         {
           key: "anthropic/claude-sonnet-5-5",
           billed_minor: 150,
+          billed_micros: 1500000,
           unbilled_minor: 0,
+          unbilled_micros: 0,
           calls: 6,
         },
         {
           key: "claude_cli/claude-sonnet-5-5",
           billed_minor: 0,
+          billed_micros: 0,
           unbilled_minor: 35,
+          unbilled_micros: 350000,
           calls: 3,
         },
       ],
@@ -131,6 +164,8 @@ function seed(): AiState {
         day: day(d),
         billed_minor: [40, 95, 60, 120, 52, 45][i],
         unbilled_minor: i === 3 ? 35 : 0,
+        billed_micros: [40, 95, 60, 120, 52, 45][i] * 10000,
+        unbilled_micros: i === 3 ? 350000 : 0,
       })),
     },
   }
@@ -170,6 +205,20 @@ function syncSpend() {
   state.spend.warning_percent = state.settings[
     "budget.warning_percent"
   ] as number
+  const micros = (v: unknown) => (v == null ? null : (v as number))
+  state.spend.cap_micros = micros(state.settings["budget.monthly_cap_micros"])
+  state.spend.per_run_cap_micros = micros(
+    state.settings["budget.per_run_cap_micros"]
+  )
+  state.spend.remaining_micros =
+    state.spend.cap_micros === null
+      ? null
+      : Math.max(
+          state.spend.cap_micros -
+            state.spend.month_to_date_micros -
+            state.spend.reserved_micros,
+          0
+        )
   state.spend.remaining_minor =
     cap === null
       ? null
@@ -335,6 +384,10 @@ export const aiHandlers = [
       cap_minor: s.cap_minor,
       currency: s.currency,
       estimated_unbilled_minor: s.estimated_unbilled_minor,
+      month_to_date_micros: s.month_to_date_micros,
+      reserved_micros: s.reserved_micros,
+      cap_micros: s.cap_micros,
+      estimated_unbilled_micros: s.estimated_unbilled_micros,
     } satisfies S["SpendMeter"])
   }),
 

@@ -232,6 +232,7 @@ export const sourcesHandlers = [
       proposed_actions: body.dry_run ? PROPOSED : [],
       source_results: [],
       cost_minor: 0,
+      cost_micros: 0,
       config_versions: {},
       status: "queued",
       started_at: now(),

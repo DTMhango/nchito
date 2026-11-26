@@ -1,5 +1,5 @@
 import { api, unwrap } from "@/lib/api/client"
-import type { RecheckResult } from "@/lib/api/pending"
+import type { RecheckResult } from "@/lib/api/types"
 
 export type { RecheckResult }
 
@@ -9,8 +9,7 @@ export const recheckJob = (id: string) =>
     api.POST("/api/jobs/{job_id}/recheck", {
       params: { path: { job_id: id } },
     })
-    // The regenerated contract returns RecheckResult; see lib/api/pending.ts.
-  ) as unknown as Promise<RecheckResult>
+  )
 
 /** One short sentence for a toast or an inline note. */
 export function recheckSummary(r: RecheckResult): string {
