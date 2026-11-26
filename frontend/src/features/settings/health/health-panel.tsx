@@ -58,7 +58,12 @@ export function HealthPanel() {
             className="divide-y divide-border panel"
           >
             {h.components.map((c) => {
-              const st = statusOf(c.status)
+              const base = statusOf(c.status)
+              // A backup or sweep that has not happened yet is "none yet" (the detail says how old the
+              // instance is), not an unknown state.
+              const noneYet =
+                c.status === "unknown" && c.detail?.startsWith("None yet")
+              const st = noneYet ? { ...base, label: "None yet" } : base
               return (
                 <li
                   key={c.name}

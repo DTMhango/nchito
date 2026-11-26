@@ -131,12 +131,27 @@ async def last_success(session: AsyncSession, kind: RunKind) -> datetime | None:
         Run.kind == kind, Run.status.in_((RunStatus.succeeded, RunStatus.partial))))
 
 
+def _age_words(hours: float) -> str:
+    if hours < 1:
+        return "under an hour"
+    if hours < 48:
+        return f"{hours:.0f} h"
+    return f"{hours / 24:.0f} days"
+
+
 def _age_component(name: str, last: datetime | None, now: datetime, stale_hours: int, never: str,
                    *, expected: bool, since: datetime | None) -> Component:
     """``since`` is when the instance was set up: nothing is overdue before one full interval has passed."""
     if last is None:
-        overdue = expected and since is not None and (now - since).total_seconds() / 3600 > stale_hours
-        return Component(name=name, status="warn" if overdue else "unknown", detail=never)
+        age_hours = None if since is None else max((now - since).total_seconds() / 3600, 0.0)
+        overdue = expected and age_hours is not None and age_hours > stale_hours
+        if age_hours is None:
+            return Component(name=name, status="unknown", detail="None yet")
+        note = f"None yet. This instance is {_age_words(age_hours)} old"
+        if overdue:
+            note += f", so one is overdue (limit {stale_hours} h)"
+        return Component(name=name, status="warn" if overdue else "unknown", value=round(age_hours, 1),
+                         detail=note)
     hours = (now - last).total_seconds() / 3600
     status: Status = "ok" if hours <= stale_hours else "warn"
     return Component(name=name, status=status, at=last, value=round(hours, 1),

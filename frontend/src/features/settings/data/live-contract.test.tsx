@@ -158,6 +158,33 @@ describe("Data against the wave 2 contract", () => {
 })
 
 describe("Health, notifications and history against the wave 2 contract", () => {
+  it("says none yet, with the instance age, for a backup that has not happened", async () => {
+    server.use(
+      http.get("*/api/health/detail", () => {
+        const body = structuredClone(dataMock.health)
+        for (const c of body.components) {
+          if (c.name === "sweep") {
+            c.status = "unknown"
+            c.detail = "None yet. This instance is 5 h old"
+          }
+          if (c.name === "backup") {
+            c.status = "warn"
+            c.detail =
+              "None yet. This instance is 5 days old, so one is overdue (limit 36 h)"
+          }
+        }
+        return HttpResponse.json(body)
+      })
+    )
+    renderApp("/settings/health")
+    const sweep = await screen.findByRole("listitem", { name: "Last sweep" })
+    expect(within(sweep).getByText("None yet")).toBeInTheDocument()
+    expect(within(sweep).getByText(/5 h old/)).toBeInTheDocument()
+    const backup = screen.getByRole("listitem", { name: "Last backup" })
+    expect(within(backup).getByText("Needs a look")).toBeInTheDocument()
+    expect(within(backup).getByText(/overdue/)).toBeInTheDocument()
+  })
+
   it("never shows an unknown component as OK", async () => {
     renderApp("/settings/health")
     const sweep = await screen.findByRole("listitem", { name: "Last sweep" })
