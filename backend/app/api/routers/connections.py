@@ -14,7 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
+from app.connect import mail_connections
 from app.connect import records as ops_records
+from app.connect.mailbox import MailError
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.crypto import mask
@@ -117,11 +119,12 @@ def _masked(conn: Connection) -> dict[str, str]:
 
 
 async def _get_llm(session: AsyncSession, connection_id: uuid.UUID) -> Connection:
-    """A connection this build manages: LLM providers and Drive, Telegram and webhook records."""
+    """A record this build manages: an LLM provider, a mailbox, or a Drive, Telegram or webhook record."""
     conn = await session.get(Connection, connection_id)
     if conn is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="connection not found")
-    if not (provider_records.is_llm(conn.provider.value) or ops_records.is_ops(conn.provider.value)):
+    if not (provider_records.is_llm(conn.provider.value) or mail_connections.is_mail(conn.provider.value)
+            or ops_records.is_ops(conn.provider.value)):
         not_implemented(2, "connect")
     return conn
 
@@ -135,7 +138,8 @@ async def list_connections(session: SessionDep) -> list[ConnectionOut]:
 @connections_router.post("", response_model=ConnectionOut, status_code=status.HTTP_201_CREATED,
                          name="connections_create")
 async def create_connection(body: ConnectionCreate, session: SessionDep, principal: PrincipalDep) -> ConnectionOut:
-    """LLM providers (wave 1). Keys are encrypted at rest and only ever returned masked."""
+    """LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are
+    encrypted at rest and only ever returned masked."""
     if ops_records.is_ops(body.provider):
         try:
             conn = await ops_records.create(session, provider=body.provider, label=body.label, config=body.config,
@@ -144,11 +148,13 @@ async def create_connection(body: ConnectionCreate, session: SessionDep, princip
             raise HTTPException(422, detail=str(exc)) from exc
         await session.refresh(conn)
         return _out(conn)
-    if not provider_records.is_llm(body.provider):
+    is_mail = mail_connections.is_mail(body.provider)
+    if not (provider_records.is_llm(body.provider) or is_mail):
         not_implemented(2, "connect")
+    creator = mail_connections.create if is_mail else provider_records.create
     try:
-        conn = await provider_records.create(session, provider=body.provider, label=body.label, config=body.config,
-                                             secrets=body.secrets, actor=principal.actor)
+        conn = await creator(session, provider=body.provider, label=body.label, config=body.config,
+                             secrets=body.secrets, actor=principal.actor)
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc)) from exc
     await session.refresh(conn)
@@ -168,9 +174,10 @@ async def update_connection(connection_id: uuid.UUID, body: ConnectionUpdate, se
             raise HTTPException(422, detail=str(exc)) from exc
         await session.refresh(conn)
         return _out(conn)
+    updater = mail_connections.update if mail_connections.is_mail(conn.provider.value) else provider_records.update
     try:
-        await provider_records.update(session, conn, label=body.label, config=body.config, secrets=body.secrets,
-                                      enabled=body.enabled, actor=principal.actor)
+        await updater(session, conn, label=body.label, config=body.config, secrets=body.secrets,
+                      enabled=body.enabled, actor=principal.actor)
     except ValueError as exc:
         raise HTTPException(422, detail=str(exc)) from exc
     await session.refresh(conn)
@@ -194,6 +201,13 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
     if ops_records.is_ops(conn.provider.value):
         ok, detail = await ops_records.run_test(session, conn)
         return ConnectionTestOut(ok=ok, detail=detail)
+    if mail_connections.is_mail(conn.provider.value):
+        ok, detail = await mail_connections.test(conn)
+        conn.health = "ok" if ok else "failing"
+        conn.last_checked_at = utcnow()
+        await audit.record(session, actor=principal.actor, action="connection.tested", subject_type="connection",
+                           subject_id=conn.id, detail={"provider": conn.provider.value, "ok": ok})
+        return ConnectionTestOut(ok=ok, detail=detail)
     result = await checks.run_test(service, stage="extract", model=conn.config.get("test_model"),
                                    provider=conn.provider.value, credentials=provider_records.credentials_of(conn))
     await checks.record(session, result, actor=principal.actor)
@@ -205,11 +219,13 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
 
 @connections_router.post("/oauth/{provider}/start", response_model=OAuthStartOut, name="connections_oauth_start")
 async def oauth_start(provider: Literal["gmail", "gdrive", "msgraph", "onedrive"]) -> OAuthStartOut:
-    if provider == "gdrive":
-        try:
+    try:
+        if provider == "gdrive":
             return OAuthStartOut(authorize_url=ops_records.oauth_start_url())
-        except ops_records.OAuthNotConfigured as exc:
-            raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        if provider == "gmail":
+            return OAuthStartOut(authorize_url=mail_connections.oauth_start())
+    except (ops_records.OAuthNotConfigured, MailError) as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     not_implemented(2, "connect")
 
 
@@ -225,6 +241,13 @@ async def oauth_callback(provider: Literal["gmail", "gdrive", "msgraph", "onedri
         except (ops_records.OAuthNotConfigured, ops_records.gdrive.DriveError) as exc:
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
         return RedirectResponse("/settings/connections?connected=gdrive",
+                                status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    if provider == "gmail":
+        try:
+            await mail_connections.oauth_callback(session, code=code, state=state, actor=principal.actor)
+        except MailError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return RedirectResponse("/settings/connections?connected=gmail",
                                 status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     not_implemented(2, "connect")
 

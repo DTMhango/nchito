@@ -32,8 +32,6 @@ class EnvConfig(BaseSettings):
     files_dir: Path = Field(default=Path("./data/files"))
     backup_dir: Path = Field(default=Path("./data/backups"), description="Where backups are written (BACKUP_DIR).")
     pg_bin_dir: Path | None = Field(default=None, description="Folder holding pg_dump and pg_restore, if not on PATH.")
-    google_client_id: str | None = Field(default=None, description="Google OAuth client (Drive connection).")
-    google_client_secret: str | None = None
     spa_dir: Path = Field(default=Path("/app/static"), description="Built SPA served at / when present.")
     csrf_trusted_origins: list[str] = Field(default_factory=list)
 
@@ -48,6 +46,10 @@ class EnvConfig(BaseSettings):
     worker_heartbeat_seconds: int = Field(default=30, ge=5, le=600)
     worker_stale_after_seconds: int = Field(default=180, ge=15, le=3600)
     scheduler_tick_seconds: int = Field(default=60, ge=10, le=600)
+
+    google_oauth_client_id: str | None = Field(default=None, description="Google OAuth client id (Gmail and Drive).")
+    google_oauth_client_secret: str | None = Field(default=None,
+                                                   description="Google OAuth client secret (Gmail and Drive).")
 
     s3_endpoint: str | None = None
     s3_bucket: str | None = None

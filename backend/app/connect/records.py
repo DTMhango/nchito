@@ -207,10 +207,11 @@ class OAuthNotConfigured(RuntimeError):
 
 def oauth_start_url() -> str:
     cfg = get_config()
-    if not cfg.google_client_id or not cfg.google_client_secret:
-        raise OAuthNotConfigured("Google sign-in is not set up: set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET")
+    if not cfg.google_oauth_client_id or not cfg.google_oauth_client_secret:
+        raise OAuthNotConfigured(
+            "Google sign-in is not set up: set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET")
     state = _serializer().dumps({"p": "gdrive", "n": secrets.token_urlsafe(8)})
-    return gdrive.authorize_url(client_id=cfg.google_client_id, redirect_uri=redirect_uri(), state=state)
+    return gdrive.authorize_url(client_id=cfg.google_oauth_client_id, redirect_uri=redirect_uri(), state=state)
 
 
 def check_state(state: str) -> bool:
@@ -224,10 +225,10 @@ def check_state(state: str) -> bool:
 async def oauth_finish(session: AsyncSession, *, code: str, actor: str,
                        transport: HttpTransport | None = None) -> Connection:
     cfg = get_config()
-    if not cfg.google_client_id or not cfg.google_client_secret:
+    if not cfg.google_oauth_client_id or not cfg.google_oauth_client_secret:
         raise OAuthNotConfigured("Google sign-in is not set up")
-    tokens = await gdrive.exchange_code(transport or get_transport(), client_id=cfg.google_client_id,
-                                        client_secret=cfg.google_client_secret, redirect_uri=redirect_uri(),
+    tokens = await gdrive.exchange_code(transport or get_transport(), client_id=cfg.google_oauth_client_id,
+                                        client_secret=cfg.google_oauth_client_secret, redirect_uri=redirect_uri(),
                                         code=code)
     app_name = await settings_service.get_value(session, "general.app_name")
     conn = await _first(session, "gdrive")
@@ -256,7 +257,7 @@ async def drive_store(session: AsyncSession, conn: Connection | None = None, *,
     if conn is None:
         raise gdrive.DriveError("Google Drive is not connected")
     cfg = get_config()
-    if not cfg.google_client_id or not cfg.google_client_secret:
+    if not cfg.google_oauth_client_id or not cfg.google_oauth_client_secret:
         raise gdrive.DriveError("Google sign-in is not set up on this server")
     stored = json.loads(decrypt(conn.secrets_enc)) if conn.secrets_enc else {}
     if "tokens" not in stored:
@@ -278,7 +279,7 @@ async def drive_store(session: AsyncSession, conn: Connection | None = None, *,
 
     return gdrive.GoogleDriveStore(
         transport or get_transport(), gdrive.DriveTokens.from_json(stored["tokens"]),
-        client_id=cfg.google_client_id, client_secret=cfg.google_client_secret,
+        client_id=cfg.google_oauth_client_id, client_secret=cfg.google_oauth_client_secret,
         root_folder_name=str(conn.config.get("root_folder_name") or "Nchito"),
         root_folder_id=conn.config.get("root_folder_id"), on_tokens_changed=tokens_changed,
         on_root_created=root_created, recorder=recorder, now=time.time)

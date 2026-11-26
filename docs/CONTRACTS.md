@@ -462,7 +462,7 @@ the registry under its own group prefix only.
 - **Connections**: `telegram` (config `chat_id`, secret `bot_token`), `webhook` (config `url`, secret `signing_secret`,
   at least 16 characters) and `gdrive` use the existing create/update/delete/test endpoints. `gdrive` is created only
   by the OAuth callback (`POST /api/connections/oauth/gdrive/start`, `GET .../callback`, 307 to
-  `/settings/connections?connected=gdrive`); start answers 409 when `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are not set.
+  `/settings/connections?connected=gdrive`); start answers 409 when `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` are not set.
   Drive uses the `drive.file` scope (only files Nchito creates, in one folder). Tokens are Fernet-encrypted in
   `Connection.secrets_enc` and shown masked; a refreshed token and the root folder id are written back.
 - **Webhook signature**: headers `X-Nchito-Timestamp`, `X-Nchito-Event-Id` (idempotency key), `X-Nchito-Signature` =
@@ -486,7 +486,7 @@ the registry under its own group prefix only.
   needs_you_title, alert_title, digest_title, digest_time, digest_skip_empty, digest_max_items, lookback_hours,
   retry_attempts, retry_minutes}`, `retention.{cron, notifications_days, temp_files_days}`,
   `health.{sweep_stale_hours, backup_stale_hours, disk_min_free_mb}` (new group `health`). Env: `BACKUP_DIR`, `PG_BIN_DIR`,
-  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+  `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`.
 
 ## Wave 2 render additions
 
@@ -618,3 +618,28 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   refused`, `reconcile.checked|owner_asked`, `restore.paused|resumed` (each also on the application timeline).
 - **Settings:** `automation.dispatch_max_retries` (1), `reconcile.check_every_minutes` (15),
   `reconcile.in_flight_timeout_minutes` (15); the give-up age is `reconcile.confirmation_wait_hours` (24).
+
+## Wave 2 email additions
+
+- `MailClassification` gains `information_request` (migration `0007_email`, which also adds
+  `mail_thread.sender` and `mail_thread.last_message_at`). `MailThreadOut` gains `sender` and
+  `last_message_at`; `MailThreadLink.classification` and `MailThreadOut.classification` accept the new value.
+- `GET /api/mail-threads` and `PUT /api/mail-threads/{id}` are real. Linking a thread proposes a stage change
+  (pending action) exactly as an automatic match would; it never changes a stage silently.
+- Mailbox connections: `POST /api/connections` accepts `imap_smtp` (config: `from_address`, `username`, `imap_host`,
+  `imap_port`, `imap_security`, `read_folder`, `sent_folder`, `smtp_host`, `smtp_port`, `smtp_security`; secret:
+  `password`). Gmail connects only through `POST /api/connections/oauth/gmail/start` and the callback (config:
+  `from_address`, `read_label`, `read_query`, optional `client_id`; env `GOOGLE_OAUTH_CLIENT_ID` and
+  `GOOGLE_OAUTH_CLIENT_SECRET`). `PUT` merges config; sync bookkeeping keys are server-written. `/test` runs the
+  mailbox health check. The OAuth callback redirects (307) to `/settings/connections?connected=gmail`.
+- `Mailbox`: `MailMessage` gains `body_html`; errors are `MailError`, `MailConfigError`, `MailAuthError`,
+  `MailSendError` (a definite refusal; an unknown outcome is `send` returning `None`).
+- `EmailChannel(attachments=..., resolver=..., hasher=...)` in `app/apply/channels/email.py`. It reads the
+  `DispatchAttempt`, requires a consumed `SubmitPermit` for the same packet hash, and writes nothing: the apply
+  layer records the `DispatchOutcome`. Packet hash default: sha256 of canonical JSON (sorted keys, compact
+  separators) of `PacketContents.model_dump(mode="json")`; pass `hasher=` if the apply stream's differs.
+- Stage proposals from mail are `PendingAction` rows with `detail.kind == "mail_stage_proposal"`
+  (`confirm_submission` for acknowledgements, `follow_up` otherwise). The apply stream's resolve flow should call
+  `app.connect.mail_sync.apply_proposal(session, action, actor=...)` when the owner approves one.
+- Source connector `alert_email` (config `connection_id`, `senders`). Settings group `mail.*`.
+- Periodic task `mail_check` (system queue, every minute, gated by `mail.check_interval_minutes`).

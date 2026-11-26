@@ -25,7 +25,10 @@ but no worker heartbeat is fresh; `down` (HTTP 503) means the database is unreac
 
 1. Create a Compose app in Dokploy from this repository, compose file `docker-compose.dokploy.yml`.
 2. Environment: `DOMAIN`, `SECRET_KEY` (long random), `POSTGRES_PASSWORD`, `ENCRYPTION_KEY`
-   (`docker run --rm <image> nchito gen-key`), optionally `APP_NAME` and `S3_*`.
+   (`docker run --rm <image> nchito gen-key`), optionally `APP_NAME`, `S3_*` and
+   `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` (one Google OAuth client for both the Gmail and the
+   Drive connection; register `https://$DOMAIN/api/connections/oauth/gmail/callback` and
+   `.../oauth/gdrive/callback` as redirect URIs).
 3. Deploy. Traefik routes `https://$DOMAIN` to `web:8000` on the `dokploy-network`.
 4. Keep a copy of `ENCRYPTION_KEY` outside the server. It is never stored in the database or
    in backups; without it, stored provider tokens cannot be decrypted and must be reconnected.

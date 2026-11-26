@@ -88,23 +88,23 @@ async def test_webhook_connection_test_is_signed_and_secret_update_keeps_old_whe
     assert (await owner_client.delete(f"/api/connections/{made['id']}")).status_code == 204
 
 
-async def test_mail_and_other_providers_stay_501_for_now(owner_client) -> None:
-    r = await make(owner_client, "gmail", {}, {})
+async def test_providers_no_stream_manages_stay_501(owner_client) -> None:
+    r = await make(owner_client, "msgraph", {}, {})
     assert r.status_code == 501
 
 
 async def test_drive_oauth_needs_server_credentials(owner_client) -> None:
     cfg = get_config()
-    assert cfg.google_client_id is None
+    assert cfg.google_oauth_client_id is None
     r = await owner_client.post("/api/connections/oauth/gdrive/start")
-    assert r.status_code == 409 and "GOOGLE_CLIENT_ID" in r.json()["detail"]
+    assert r.status_code == 409 and "GOOGLE_OAUTH_CLIENT_ID" in r.json()["detail"]
 
 
 async def test_drive_oauth_round_trip_creates_the_connection_and_a_working_store(owner_client, session,
                                                                                  monkeypatch) -> None:
     cfg = get_config()
-    monkeypatch.setattr(cfg, "google_client_id", "client-id.example.com")
-    monkeypatch.setattr(cfg, "google_client_secret", "client-secret-value")
+    monkeypatch.setattr(cfg, "google_oauth_client_id", "client-id.example.com")
+    monkeypatch.setattr(cfg, "google_oauth_client_secret", "client-secret-value")
     start = await owner_client.post("/api/connections/oauth/gdrive/start")
     assert start.status_code == 200
     url = urlsplit(start.json()["authorize_url"])

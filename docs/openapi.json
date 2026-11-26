@@ -11248,6 +11248,18 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
           }
         ],
         "responses": {
@@ -11290,6 +11302,7 @@
           "applications"
         ],
         "summary": "Mail Threads Link",
+        "description": "The owner settles a review: link the thread to an application (or unlink it) and/or fix its kind.\nLinking applies the same proposal rules as an automatic match, but never silently changes a stage.",
         "operationId": "mail_threads_link",
         "parameters": [
           {
@@ -12747,7 +12760,7 @@
           "connections"
         ],
         "summary": "Connections Create",
-        "description": "LLM providers (wave 1). Keys are encrypted at rest and only ever returned masked.",
+        "description": "LLM providers and IMAP/SMTP mailboxes (Gmail connects through OAuth). Secrets are encrypted at rest and\nonly ever returned masked.",
         "operationId": "connections_create",
         "requestBody": {
           "content": {
@@ -22137,6 +22150,7 @@
                   "confirmation",
                   "rejection",
                   "interview",
+                  "information_request",
                   "other"
                 ]
               },
@@ -22199,6 +22213,7 @@
               "confirmation",
               "rejection",
               "interview",
+              "information_request",
               "other"
             ],
             "title": "Classification"
@@ -22217,6 +22232,29 @@
           "needs_review": {
             "type": "boolean",
             "title": "Needs Review"
+          },
+          "sender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
           }
         },
         "type": "object",

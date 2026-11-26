@@ -16,6 +16,8 @@ x-app: &app
     APP_NAME: ${APP_NAME:-Nchito}
     FILES_DIR: /data/files
     BACKUP_DIR: /data/backups
+    GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+    GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
   volumes:
     - files:/data/files

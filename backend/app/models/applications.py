@@ -389,6 +389,7 @@ class MailClassification(enum.StrEnum):
     confirmation = "confirmation"
     rejection = "rejection"
     interview = "interview"
+    information_request = "information_request"
     other = "other"
 
 
@@ -405,3 +406,5 @@ class MailThread(Base, Entity):
                                                                default=MailClassification.other)
     match_confidence: Mapped[float | None] = mapped_column()
     needs_review: Mapped[bool] = mapped_column(Boolean, default=False)
+    sender: Mapped[str | None] = mapped_column(String(320), doc="Address of the latest inbound message")
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

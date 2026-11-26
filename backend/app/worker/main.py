@@ -11,7 +11,7 @@ from app.apply import tasks as apply_tasks  # noqa: F401  (registers dispatch an
 from app.core.db import dispose_engine
 from app.ops import tasks as ops_tasks  # noqa: F401  (registers the periodic ops tick)
 from app.pipeline import wiring
-from app.worker import tracking_tasks  # noqa: F401  (registers the periodic tracking reminders)
+from app.worker import mail_tasks, tracking_tasks  # noqa: F401  (registers the periodic tasks)
 from app.worker.heartbeat import heartbeat_loop
 from app.worker.queue import RUNS_QUEUE, SYSTEM_QUEUE, queue_app
 
