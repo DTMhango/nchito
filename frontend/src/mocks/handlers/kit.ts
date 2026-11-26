@@ -212,7 +212,7 @@ export const kitHandlers = [
               title: String(
                 x.name ?? x.title ?? x.org ?? x.code ?? x.key ?? "Item"
               ),
-              group: entity,
+              group: String(x.group ?? entity),
               stale_first_rank: i,
               conflicts_with: [],
             }))

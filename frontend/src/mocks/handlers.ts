@@ -9,6 +9,7 @@ import type {
 } from "@/lib/api/types"
 import { db } from "./db"
 import { aiHandlers } from "./handlers/ai"
+import { dataHandlers } from "./handlers/data"
 import { kitHandlers } from "./handlers/kit"
 import { sourcesHandlers } from "./handlers/sources"
 import { campaignHandlers } from "./handlers/campaigns"
@@ -33,6 +34,8 @@ export const handlers = [
   // 2. Autopilot: approvals, packets, dispatches, pause; beats the wave 0 autopilot stub below.
   ...studioHandlers,
   ...autopilotHandlers,
+  // Data, non-AI connections and health: before the AI handlers (they fall through for LLM providers).
+  ...dataHandlers,
   ...kitHandlers,
   ...sourcesHandlers,
   http.get("*/api/health", () =>

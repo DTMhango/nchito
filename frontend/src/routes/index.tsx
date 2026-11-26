@@ -8,7 +8,7 @@
  *       /today /matches /applications /jobs/$id?tab= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
- *       /settings/{appearance,ai,connections,notifications,runners,data,security,activity,history}
+ *       /settings/{appearance,ai,connections,notifications,runners,data,health,security,activity,history}
  *       /dev/components                   dev builds only
  *
  * To add a screen: write the page in src/features/<area>/, add a createRoute below under
@@ -139,6 +139,22 @@ const HistoryPage = lazyPage(
   () => import("@/features/settings/history-page"),
   "HistoryPage"
 )
+const ConnectionsPage = lazyPage(
+  () => import("@/features/settings/connections/connections-page"),
+  "ConnectionsPage"
+)
+const DataPage = lazyPage(
+  () => import("@/features/settings/data/data-page"),
+  "DataPage"
+)
+const NotificationsPage = lazyPage(
+  () => import("@/features/settings/notifications/notifications-page"),
+  "NotificationsPage"
+)
+const HealthPanel = lazyPage(
+  () => import("@/features/settings/health/health-panel"),
+  "HealthPanel"
+)
 const SecurityPage = lazyPage(
   () => import("@/features/settings/security-page"),
   "SecurityPage"
@@ -186,7 +202,7 @@ const authedRoute = createRoute({
 })
 
 const onboardingSearch = z.object({
-  step: z.coerce.number().int().min(1).max(6).catch(2).default(2),
+  step: z.coerce.number().int().min(1).max(8).catch(1).default(1),
 })
 const onboardingRoute = createRoute({
   getParentRoute: () => authedRoute,
@@ -367,7 +383,7 @@ const appearanceRoute = createRoute({
   staticData: { title: "Appearance" },
   component: AppearancePage,
 })
-type SettingsKey = "ai" | "connections" | "runners" | "data"
+type SettingsKey = "runners"
 const groupRoute = (path: SettingsPageKey) =>
   createRoute({
     getParentRoute: () => settingsRoute,
@@ -382,10 +398,16 @@ const groupRoutes = [
   groupRoute("documents"),
   groupRoute("retention"),
   groupRoute("reconcile"),
-  groupRoute("notifications"),
 ] as const
 const ownRoute = (
-  path: "security" | "activity" | "history",
+  path:
+    | "security"
+    | "activity"
+    | "history"
+    | "connections"
+    | "data"
+    | "notifications"
+    | "health",
   C: ComponentType
 ) =>
   createRoute({
@@ -397,6 +419,10 @@ const ownRoutes = [
   ownRoute("security", SecurityPage),
   ownRoute("activity", ActivityPage),
   ownRoute("history", HistoryPage),
+  ownRoute("connections", ConnectionsPage),
+  ownRoute("data", DataPage),
+  ownRoute("notifications", NotificationsPage),
+  ownRoute("health", HealthPanel),
 ] as const
 const settingsChild = (path: SettingsKey) =>
   createRoute({
@@ -410,12 +436,7 @@ const aiRoute = createRoute({
   staticData: { title: "AI" },
   component: AiSettingsPage,
 })
-const settingsChildren = [
-  aiRoute,
-  settingsChild("connections"),
-  settingsChild("runners"),
-  settingsChild("data"),
-] as const
+const settingsChildren = [aiRoute, settingsChild("runners")] as const
 
 // ---- dev ----
 const devComponentsRoute = createRoute({

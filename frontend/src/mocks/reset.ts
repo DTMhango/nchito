@@ -2,6 +2,7 @@
 import { resetAiMock } from "./handlers/ai"
 import { resetAutopilotMock } from "./handlers/autopilot"
 import { resetApplicationsMock } from "./handlers/applications"
+import { resetDataMock } from "./handlers/data"
 import { resetCampaignMocks } from "./handlers/campaigns"
 import { resetJobsMock } from "./handlers/jobs"
 import { resetKitMock } from "./handlers/kit"
@@ -22,4 +23,5 @@ export function resetAllMocks() {
   resetSourcesMock()
   // After the Kit, Matches and Applications: the Studio seed reads all three.
   resetStudioMock()
+  resetDataMock()
 }

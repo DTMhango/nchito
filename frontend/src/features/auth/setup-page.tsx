@@ -89,7 +89,7 @@ export function SetupPage() {
       qc.removeQueries({ queryKey: keys.setup })
       qc.removeQueries({ queryKey: keys.me })
       await qc.fetchQuery(meQuery())
-      await router.navigate({ to: "/onboarding", search: { step: 2 } })
+      await router.navigate({ to: "/onboarding", search: { step: 1 } })
     },
   })
 
