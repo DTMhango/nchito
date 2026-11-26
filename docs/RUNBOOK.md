@@ -1,7 +1,7 @@
 # Runbook
 
 Operating one Nchito instance. Sections marked *(wave 2)* are completed when backups,
-restore-paused and reconciliation land; until then they describe the intended procedure.
+restore-paused and reconciliation land; backups, retention, notifications and health are described as built.
 
 ## Services
 
@@ -58,23 +58,67 @@ Business settings (thresholds, caps, quiet hours, models, budgets, themes) are c
 app (Settings) and are versioned and audited. Deployment settings are env vars listed in
 `.env.example`. Changing env requires `docker compose up -d` to recreate the containers.
 
-## Backups and restore *(wave 2)*
+## Backups and restore
 
-- Nightly `pg_dump` plus the files volume, encrypted, `backups.keep` copies (default 14), to a
-  local path, an S3-compatible store or Drive (`backups.target`).
-- Restore into a clean database:
+**What a backup is.** One file, `nchito-<UTC time>.backup`, in `BACKUP_DIR` (default `./data/backups`; in
+Docker mount a volume at `/data/backups` and set `BACKUP_DIR=/data/backups`). It is a tar of `manifest.json`,
+`db.dump` (`pg_dump`, custom format) and `files/` (the vault, documents and submitted snapshots; `files/tmp` is
+skipped), encrypted with Fernet using `ENCRYPTION_KEY`. The key is **not** in the backup: keep a copy of it
+elsewhere, or the backup cannot be opened. The dump and the row counts in the manifest come from one snapshot,
+so a restore is checked against them exactly.
 
-      docker compose down
-      docker volume rm nchito_pgdata
-      docker compose up -d db
-      # decrypt the dump, then:
-      docker compose exec -T db pg_restore -U nchito -d nchito --clean --if-exists < nchito.dump
-      # restore the files volume from the same backup
-      docker compose up -d
+**Schedule and keep.** Nightly by `backups.cron` (default 02:00 in the owner's time zone); `backups.keep`
+copies are kept (default 14; older ones are deleted together with their remote copy). `backups.target` `gdrive` also
+uploads each archive to the connected Google Drive folder (`backups/`); `local` only writes locally. A failed upload
+keeps the local copy and marks the run partial. The `s3` target is not available in this build: the backup stays
+local. `pg_dump` and `pg_restore` must be in the image (`postgresql-client`, the same major version as the database;
+set `PG_BIN_DIR` if they are not on PATH). Run one now with Settings, Data, or `nchito backup`.
 
-- **An instance started from a restored backup starts paused**, reconciles its outbox against
-  the mailbox's sent items, and waits for the owner to resume (DESIGN.md 18.3). Never resume
-  before checking the reconciliation list.
+**Restore (new or wiped server).**
+
+    # 1. same ENCRYPTION_KEY in the environment as when the backup was made
+    docker compose up -d db
+    nchito restore /path/nchito-20261126T000000Z.backup --inspect     # shows date, schema revision, file count
+    nchito restore /path/nchito-20261126T000000Z.backup --yes         # replaces data in DATABASE_URL and FILES_DIR
+    nchito migrate                                                    # only if this release is newer than the backup
+    docker compose up -d
+
+What it does, in order: decrypts and unpacks to a temporary folder; checks the vault hash; loads the database in one
+transaction (`--clean --if-exists`); compares every table's row count with the manifest; moves the current files
+folder aside to `<FILES_DIR>.before-restore-<time>` (never deletes it) and puts the backup's files in place; sets
+`automation.paused` and audits `backup.restored`. If the PostgreSQL client tools are newer than the server and
+`pg_restore` rejects a setting, the restore falls back to `psql`, which gives the same result. A wrong key, a damaged
+file or a manifest mismatch stops before anything is replaced.
+
+To rehearse: `nchito restore <file> --yes --database-url postgresql://user:pw@host/scratch --files-dir /tmp/scratch-files`.
+
+- **An instance started from a restored backup starts paused**, reconciles its outbox against the mailbox's sent
+  items, and waits for the owner to resume (DESIGN.md 18.3). Never resume before checking the reconciliation list.
+
+## Retention
+
+`retention.cron` (default 04:30) runs: below-threshold roles lose their full text after
+`retention.below_threshold_text_days`; roles never applied to archive after `retention.unsubmitted_archive_days`;
+notifications older than `retention.notifications_days` and files in `FILES_DIR/tmp` older than
+`retention.temp_files_days` are deleted; backups beyond `backups.keep` are pruned. It never deletes applications,
+packets, permits, dispatch attempts, the audit, sightings, the ledger or the vault; the run counts those tables
+before and after and rolls back if any row went missing. Run it now with Settings, Data, or
+`POST /api/data/retention/run`.
+
+## Notifications, digest and health alerts
+
+Channels: Telegram (bot token from BotFather and your chat id), a signed webhook, and email (mail stream). Add them
+in Settings, Connections, then list them in `notifications.channels`. Telegram buttons are links into the app;
+approving always needs your signed-in session. `notifications.events` chooses what notifies; quiet hours
+(`notifications.quiet_hours_*`) hold messages until they end; `notifications.detail_level` `generic` keeps role and
+employer names out of Telegram. A failed send is retried (`notifications.retry_attempts`, doubling from
+`notifications.retry_minutes`) and then audited as `notification.delivery_failed`; it never stops a sweep. The digest
+is sent once a day, after the daily sweep or at `notifications.digest_time` (`notifications.digest`).
+
+`GET /api/health/live` and `/ready` are for the platform; `/api/health/detail` (signed in) shows worker heartbeat age,
+last successful sweep and backup, disk, queue depth and each connection. One alert is raised when a component starts
+failing and one when it recovers. Webhook receivers verify `X-Nchito-Signature` (HMAC-SHA256 of
+`"<X-Nchito-Timestamp>.<body>"`) and may drop a repeated `X-Nchito-Event-Id`.
 
 ## Incidents
 
