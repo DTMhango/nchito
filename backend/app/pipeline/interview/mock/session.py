@@ -217,7 +217,8 @@ def _dimensions(values: Mapping[str, Any]) -> list[str]:
 
 def _checked(fb: Any, ctx: Ctx, turns: Sequence[InterviewMockTurn]) -> dict[str, Any]:
     return mock_checks.checked_feedback(fb, ctx.kit, owner_answers(turns), ctx.cfg,
-                                        job_terms=checks.job_terms(ctx.job), dimensions=_dimensions(ctx.values),
+                                        job_terms=checks.job_terms(ctx.job),
+                                        posting_terms=checks.posting_terms(ctx.job), dimensions=_dimensions(ctx.values),
                                         top=int(ctx.values["interview.mock.score_max"]))
 
 

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from app.pipeline.checks.findings import Finding
 from app.pipeline.checks.items import Item
 from app.pipeline.checks.kit import FactView, KitView
+from app.pipeline.checks.tools import ToolTerms, tool_findings
 from app.schemas.json_types import ApplicationSpec
 
 TRACE = "fact_trace"
@@ -194,11 +195,15 @@ _CLAIM_TOKEN = re.compile(r"\d")
 
 
 def trace(spec: ApplicationSpec, items: Sequence[Item], kit: KitView, *, qualification_terms: Sequence[str],
-          job_terms: Iterable[str] = ()) -> tuple[list[Finding], Mapping[str, list[FactView]]]:
-    """All fact-tracing findings, and the usable facts each item cites (keyed by path)."""
+          job_terms: Iterable[str] = (), tools: ToolTerms | None = None,
+          posting_terms: Sequence[str] = ()) -> tuple[list[Finding], Mapping[str, list[FactView]]]:
+    """All fact-tracing findings, and the usable facts each item cites (keyed by path). Tool tracing
+    (:mod:`app.pipeline.checks.tools`) always runs: with no ``tools`` settings it still checks the Kit's
+    skills and the posting's ``posting_terms``."""
     job_terms = list(job_terms)
     out = experience_titles(spec, kit)
     cited: dict[str, list[FactView]] = {}
+    sources: dict[str, str] = {}
     for item in items:
         facts, problems = cited_facts(item, kit)
         cited[item.path] = facts
@@ -211,7 +216,9 @@ def trace(spec: ApplicationSpec, items: Sequence[Item], kit: KitView, *, qualifi
             out += employers(item, "", kit, job_terms)
             continue
         source = _source_text(facts, kit, item)
+        sources[item.path] = source
         out += figures(item, source)
         out += employers(item, source, kit, job_terms)
         out += qualifications(item, source, qualification_terms)
+    out += tool_findings(items, sources, kit, tools or ToolTerms(), posting=posting_terms, job_terms=job_terms)
     return out, cited

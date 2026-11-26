@@ -50,7 +50,8 @@ def _reasons(findings: Sequence[Finding], kit: KitView) -> tuple[list[str], bool
 
 
 def check_suggested(claims: Iterable[sh.Claim], kit: KitView, answers: Mapping[int, str], cfg: CheckSettings, *,
-                    job_terms: Iterable[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+                    job_terms: Iterable[str], posting_terms: Sequence[str] = ()
+                    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """``(kept, removed)``. Kept items carry their sources (Kit fact or "your words"); removed items carry the
     reasons, and no text when a keep-out fact was involved."""
     ext = with_owner_words(kit, answers)
@@ -60,7 +61,8 @@ def check_suggested(claims: Iterable[sh.Claim], kit: KitView, answers: Mapping[i
     for claim in claims:
         if not claim.text.strip():
             continue
-        result = truth.check("why_you", sh.WhyYou(points=[sh.TalkingPoint(point=claim)]), ext, cfg, job_terms=terms)
+        result = truth.check("why_you", sh.WhyYou(points=[sh.TalkingPoint(point=claim)]), ext, cfg, job_terms=terms,
+                             posting_terms=posting_terms)
         blocks = truth.blocking(result.findings)
         if not claim.fact_ids:
             blocks.append(Finding(tracing.TRACE, "block", NO_CITATION, "points[0].point"))
@@ -87,8 +89,10 @@ def clamp_scores(scores: Iterable[Any], dimensions: Sequence[str], top: int) -> 
 
 
 def checked_feedback(fb: AnswerFeedback, kit: KitView, answers: Mapping[int, str], cfg: CheckSettings, *,
-                     job_terms: Iterable[str], dimensions: Sequence[str], top: int) -> dict[str, Any]:
-    kept, removed = check_suggested(fb.suggested, kit, answers, cfg, job_terms=job_terms)
+                     job_terms: Iterable[str], dimensions: Sequence[str], top: int,
+                     posting_terms: Sequence[str] = ()) -> dict[str, Any]:
+    kept, removed = check_suggested(fb.suggested, kit, answers, cfg, job_terms=job_terms,
+                                    posting_terms=posting_terms)
     other = "\n".join([fb.structure, fb.relevance, fb.specificity, *fb.strong, *fb.tighten])
     leaks = guard.keep_out_findings([], [Document(scope=truth.SCOPE, text=other, fact_codes=frozenset())], kit)
     data: dict[str, Any] = {

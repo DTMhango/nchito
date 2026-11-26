@@ -32,6 +32,8 @@ from app.pipeline.checks.findings import Finding, Status, summarise, worst
 from app.pipeline.checks.items import Item, cited_codes, content_hash, documents
 from app.pipeline.checks.items import items as spec_items
 from app.pipeline.checks.kit import FactView, KitView
+from app.pipeline.checks.tools import ToolTerms
+from app.pipeline.checks.tools import posting_terms as _posting_terms
 from app.schemas.json_types import ApplicationSpec, CheckResult, DraftAnswer
 
 ANSWERS = "answers"
@@ -47,6 +49,7 @@ class CheckSettings:
     bullets_per_role: int | None = None
     claim_check_enabled: bool = False
     claim_check_severity: Status = "warn"
+    tools: ToolTerms = field(default_factory=ToolTerms)
 
 
 async def check_settings(session: AsyncSession, values: Mapping[str, Any] | None = None) -> CheckSettings:
@@ -61,6 +64,9 @@ async def check_settings(session: AsyncSession, values: Mapping[str, Any] | None
         bullets_per_role=template.limits.bullets_per_role if template is not None else None,
         claim_check_enabled=bool(v["tailoring.claim_check_enabled"]),
         claim_check_severity=v["tailoring.claim_check_severity"],
+        tools=ToolTerms(terms=tuple(v["tailoring.tool_terms"]), ignore=tuple(v["tailoring.tool_ignore_terms"]),
+                        role_phrases=tuple(v["tailoring.tool_role_phrases"]),
+                        token_detection=bool(v["tailoring.tool_token_detection"])),
     )
 
 
@@ -84,7 +90,7 @@ def answer_findings(answers: Sequence[DraftAnswer]) -> list[Finding]:
 def deterministic(spec: ApplicationSpec, kit: KitView, cfg: CheckSettings, *, answers: Sequence[DraftAnswer] = (),
                   waived: Iterable[str] = (), job_terms: Iterable[str] = (), extra_documents: Sequence[Document] = (),
                   file_names: Sequence[str] = (), attachments: Sequence[Attachment] = (),
-                  released: Iterable[str] = ()) -> Outcome:
+                  released: Iterable[str] = (), posting_terms: Sequence[str] = ()) -> Outcome:
     """Every code check. Pure: the same spec, Kit and settings always give the same findings.
 
     ``extra_documents``, ``file_names``, ``attachments`` and ``released`` let the packet check run the
@@ -92,7 +98,7 @@ def deterministic(spec: ApplicationSpec, kit: KitView, cfg: CheckSettings, *, an
     located = spec_items(spec)
     docs = documents(spec, answers, extra_documents)
     findings, cited = tracing.trace(spec, located, kit, qualification_terms=cfg.qualification_terms,
-                                    job_terms=job_terms)
+                                    job_terms=job_terms, tools=cfg.tools, posting_terms=posting_terms)
     findings += drift(located, cited, cfg.drift_terms)
     findings += guard.keep_out_findings(located, docs, kit)
     findings += guard.guardrail_findings(kit, docs, waived=waived, file_names=file_names, attachments=attachments,
@@ -117,6 +123,13 @@ def job_terms(job: Job) -> list[str]:
     return [t for t in (job.employer, job.canonical_employer, job.recruiter, job.title) if t]
 
 
+def posting_terms(job: Job) -> list[str]:
+    """The posting's requirement terms (skills it asks for), for tool tracing."""
+    facets = job.facets
+    return _posting_terms(facets.required_skills if facets else (), facets.preferred_skills if facets else (),
+                          (r.skill for r in (job.requirements or [])))
+
+
 async def latest_version(session: AsyncSession, application_id: uuid.UUID) -> ApplicationSpecVersion | None:
     return await session.scalar(select(ApplicationSpecVersion).where(
         ApplicationSpecVersion.application_id == application_id).order_by(ApplicationSpecVersion.version.desc())
@@ -138,7 +151,8 @@ async def check_version(session: AsyncSession, version: ApplicationSpecVersion, 
     job, kit = await context(session, app)
     cfg = await check_settings(session)
     outcome = deterministic(version.spec, kit, cfg, answers=version.answers,
-                            waived=await waivers.waived_ids(session, app.id), job_terms=job_terms(job))
+                            waived=await waivers.waived_ids(session, app.id), job_terms=job_terms(job),
+                            posting_terms=posting_terms(job))
     cost = 0
     if client is not None and cfg.claim_check_enabled:
         values = await settings_service.values(session)

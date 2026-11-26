@@ -235,3 +235,16 @@ async def test_budget_refusal_parks_the_draft(channel):
         assert m.status == "budget_paused" and m.paragraphs == []
         actions = (await s.scalars(select(AuditEvent.action).where(AuditEvent.action == "message.drafted"))).all()
         assert actions
+
+
+async def test_an_invented_tool_in_a_message_citing_a_real_fact_is_caught(channel):
+    app_id = await sent_app()
+    msg_id = await draft(app_id, client=llm(reply("Dear hiring team,", (
+        "Since applying I cut monthly reporting time by 40% by automating the sales pack in Kubernetes.",
+        ["F-1"]), "Kind regards,")))
+    async with maker()() as s:
+        m = await s.get(OutboundMessage, msg_id)
+        assert any(r.check == "fact_trace" and r.status == "block" and "Kubernetes" in (r.detail or "")
+                   for r in m.check_results), m.check_results
+    with pytest.raises(sending.SendError):
+        await approve(msg_id)

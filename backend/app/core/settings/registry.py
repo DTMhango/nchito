@@ -603,6 +603,34 @@ _terms("tailoring.qualification_terms", "Qualification words",
         "certificate", "certified", "certification", "chartered", "acca", "cima", "cfa", "cpa", "frm", "pmp",
         "fellow"],
        ["mba", "phd", "cfa"])
+_terms("tailoring.tool_terms", "Tool and technology names",
+       "Tools, technologies and skills always checked in generated text, on top of your Kit's skills and the "
+       "posting's requirements. A draft may name one as yours only when a cited fact or a confirmed skill does.",
+       ["Python", "SQL", "Excel", "VBA", "Power BI", "Tableau", "Looker", "SAP", "Oracle", "Sage", "Pastel",
+        "QuickBooks", "Xero", "Salesforce", "HubSpot", "Dynamics 365", "AWS", "Azure", "GCP", "Docker",
+        "Kubernetes", "Terraform", "Java", "JavaScript", "TypeScript", "React", "Node.js", "C#", "C++",
+        "Spark", "Hadoop", "Snowflake", "Databricks", "Airflow", "dbt", "Stata", "SPSS", "MATLAB", "Jira",
+        "Git", "Linux", "PostgreSQL", "MySQL", "MongoDB", "IFRS", "GAAP", "Six Sigma", "Prince2", "Agile",
+        "Scrum"],
+       ["Python", "Power BI"])
+_terms("tailoring.tool_ignore_terms", "Not tool names",
+       "Capitalised or technical-looking words that are not tools (job titles, currencies, common acronyms). "
+       "The tool check skips them.",
+       ["CV", "CEO", "CFO", "COO", "CTO", "CIO", "MD", "HR", "IT", "ICT", "KPI", "KPIs", "OKR", "OKRs", "UK", "US",
+        "USA", "EU", "UN", "SADC", "COMESA", "NGO", "NGOs", "USD", "ZMW", "GBP", "EUR", "ZAR", "KES", "MWK", "FY",
+        "Q1", "Q2", "Q3", "Q4", "AM", "PM", "OK", "II", "III", "IV"],
+       ["CV", "KPI"])
+_terms("tailoring.tool_role_phrases", "Wording that names a tool without claiming it",
+       "A sentence with one of these phrases names a tool as the role's or as a gap, not as yours, so the tool "
+       "check lets it through (\"the role uses Kafka\").",
+       ["the role uses", "the role requires", "this role uses", "this role requires", "the team uses",
+        "your team uses", "you use", "which uses", "the posting", "the advert", "you are looking for",
+        "looking for", "would learn", "keen to learn", "to learn", "not yet used", "have not used",
+        "haven't used", "no experience with", "new to me", "a gap"],
+       ["the role uses", "the team uses"])
+_bool("tailoring.tool_token_detection", "Catch unknown technical names",
+      "Also treat technical-looking words that are on no list (CamelCase like PostgreSQL, acronyms like AWS, "
+      "C++, Node.js) as tool names that must be backed by a cited fact or a confirmed skill.", True)
 
 # Interview pack (10.3a)
 INTERVIEW_SECTIONS = ("role_brief", "why_you", "questions", "stories", "questions_to_ask", "gaps", "pay_sheet",

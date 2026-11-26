@@ -292,7 +292,8 @@ async def _generate(session: AsyncSession, client: LLMClient, pack: InterviewPac
         cost += usage.cost_micros
         used = usage.model
         content = _content(section, reply, values, ctx.basis, previous)
-        result = truth.check(section, content, ctx.kit, cfg, job_terms=job_terms)
+        result = truth.check(section, content, ctx.kit, cfg, job_terms=job_terms,
+                             posting_terms=checks.posting_terms(ctx.job))
         findings = list(result.findings)
         run = list(truth.CHECKS_RUN)
         # The model pass only adds findings, so it runs only on text the code checks passed: a blocked
@@ -331,7 +332,7 @@ async def _code_section(session: AsyncSession, pack: InterviewPack, section: str
         current = await current_versions(session, pack.id)
         flagged = {k for k, v in current.items() if v.flagged}
         content = crib.build(_parsed({k: v for k, v in current.items() if k != "crib_sheet"}), flagged)
-    result = truth.check(section, content, ctx.kit, cfg, job_terms=job_terms)
+    result = truth.check(section, content, ctx.kit, cfg, job_terms=job_terms, posting_terms=checks.posting_terms(job))
     return await store(session, pack, section, content, result.findings, truth.CHECKS_RUN, origin="code",
                        actor=actor, request_key=request_key)
 
@@ -474,7 +475,8 @@ async def edit(session: AsyncSession, pack: InterviewPack, section: str, content
     values = await settings_service.values(session)
     cfg = await checks.check_settings(session, values)
     kit = await load_kit(session, app)
-    result = truth.check(section, parsed, kit, cfg, job_terms=checks.job_terms(job))
+    result = truth.check(section, parsed, kit, cfg, job_terms=checks.job_terms(job),
+                         posting_terms=checks.posting_terms(job))
     row = await store(session, pack, section, parsed, result.findings, truth.CHECKS_RUN, origin="owner", actor=actor)
     if section != "crib_sheet":
         await _refresh_crib(session, pack, job, app, kit, values, cfg, actor)

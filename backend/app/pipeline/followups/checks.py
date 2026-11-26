@@ -141,7 +141,8 @@ async def run(session: AsyncSession, msg: OutboundMessage, ctx: MessageContext, 
     owner_text = [str(msg.context.get("slot") or ""), *(v for *_, v in confirmed if v)]
     spec = ApplicationSpec(letter=mask(msg.paragraphs, owner_text))
     email = Document(scope="email", text=f"{msg.subject}\n\n{body_of(msg.paragraphs)}")
-    outcome = checks.deterministic(spec, kit, cfg, job_terms=checks.job_terms(ctx.job), extra_documents=[email])
+    outcome = checks.deterministic(spec, kit, cfg, job_terms=checks.job_terms(ctx.job),
+                                  posting_terms=checks.posting_terms(ctx.job), extra_documents=[email])
     findings = [f for f in outcome.findings if f.check.split(".", 1)[0] in CODE_CHECKS]
     found, asks = commitment_findings(msg.paragraphs, confirmed)
     findings += found + recipient_findings(msg)

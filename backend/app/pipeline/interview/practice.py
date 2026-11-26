@@ -70,7 +70,8 @@ async def attempt(session: AsyncSession, client: LLMClient, pack: InterviewPack,
     if out.suggested_answer is not None:
         cfg = await checks.check_settings(session, values)
         content = sh.WhyYou(points=[sh.TalkingPoint(point=out.suggested_answer)])
-        findings = truth.check("why_you", content, kit, cfg, job_terms=checks.job_terms(job)).findings
+        findings = truth.check("why_you", content, kit, cfg, job_terms=checks.job_terms(job),
+                               posting_terms=checks.posting_terms(job)).findings
     row.feedback = out.model_dump(mode="json")
     row.check_results = summarise(findings, truth.CHECKS_RUN) if out.suggested_answer is not None else []
     row.status, row.error = "done", None
