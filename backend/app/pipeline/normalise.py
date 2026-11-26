@@ -30,7 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import conditions
 from app.core.settings import service as settings_service
-from app.llm.client import BudgetExceeded, LLMClient, Message, TextPart, Usage
+from app.llm.client import BudgetExceeded, BudgetExhausted, LLMClient, Message, TextPart, Usage
 from app.llm.untrusted import data_block
 from app.models.search import (
     Availability,
@@ -402,6 +402,7 @@ class Extraction:
     usage: Usage | None = None
     cached: bool = False
     skipped: str | None = None  # "budget" | "error" when no extraction was made
+    budget: BudgetExhausted | None = None  # the refusal, when skipped for budget
 
 
 async def extract(session: AsyncSession, llm: LLMClient, norm: NormalisedJob) -> Extraction:
@@ -413,10 +414,10 @@ async def extract(session: AsyncSession, llm: LLMClient, norm: NormalisedJob) ->
         return Extraction(ExtractionOut.model_validate(hit.result), cached=True)
     messages = build_messages(norm)
     try:
-        ceiling = await llm.estimate_cost_micros("extract", messages)
+        ceiling = await llm.estimate_cost_micros("extract", messages, schema=ExtractionOut)
         out, usage = await llm.complete("extract", messages, ExtractionOut, max_cost_micros=ceiling)
-    except BudgetExceeded:
-        return Extraction(None, skipped="budget")
+    except BudgetExceeded as exc:
+        return Extraction(None, skipped="budget", budget=exc if isinstance(exc, BudgetExhausted) else None)
     except Exception:  # a provider or schema failure must not fail the sweep; the job stays pending
         return Extraction(None, skipped="error")
     session.add(ExtractionCache(cache_key=key, content_hash=norm.content_hash, prompt_version=PROMPT_VERSION,

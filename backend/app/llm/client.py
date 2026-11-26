@@ -104,6 +104,8 @@ class LLMClient(Protocol):
     ) -> tuple[ResultT, Usage]:
         ...
 
-    async def estimate_cost_micros(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None) -> int:
-        """Upper bound on the cost of ``complete`` with these messages (used for reservations)."""
+    async def estimate_cost_micros(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None,
+                                   schema: type[BaseModel] | None = None) -> int:
+        """Upper bound on the cost of ``complete`` with these messages (used for reservations). Pass the
+        same ``schema`` as ``complete``: its instructions are part of the prompt and of the cost."""
         ...

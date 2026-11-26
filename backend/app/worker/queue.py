@@ -94,6 +94,11 @@ async def scheduler_tick(timestamp: int) -> None:
     async with get_sessionmaker()() as session:
         result = await tick(session, SystemClock(), enqueue_run)
         await session.commit()
+        from app.pipeline.orchestrator import resume_paused
+
+        resumed = await resume_paused(session, enqueue_run)  # runs paused for budget, once the cap allows
+    if resumed:
+        log.info("tick: resumed %d run(s) paused for budget", len(resumed))
     if result.enqueued or result.skipped_overlap or result.skipped_missed:
         log.info("tick: enqueued=%d overlap=%d missed=%d", len(result.enqueued), len(result.skipped_overlap),
                  len(result.skipped_missed))

@@ -130,7 +130,7 @@ async def process_capture(session: AsyncSession, job_id: uuid.UUID) -> CaptureRe
     now = DEPS.clock.now()
     threshold = await settings_service.get_value(session, "matching.dedupe_similarity")
     norm = await normalise.parse_with_aliases(session, raw)
-    llm = await DEPS.llm_factory(session) if DEPS.llm_factory else None
+    llm = await DEPS.llm_factory(session, None) if DEPS.llm_factory else None
     extraction = await normalise.extract(session, llm, norm) if llm is not None else None
     if extraction and extraction.out is not None:
         employer, title = normalise.identity_from(extraction.out, norm.raw_text)

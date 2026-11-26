@@ -35,6 +35,7 @@ from app.core.clock import Clock, SystemClock
 from app.core.events import publish
 from app.core.settings import service as settings_service
 from app.llm.client import LLMClient
+from app.llm.ledger import month_bounds
 from app.models.applications import Application
 from app.models.search import (
     Availability,
@@ -48,7 +49,7 @@ from app.models.search import (
     Source,
     WatchedEmployer,
 )
-from app.pipeline import dedupe, normalise
+from app.pipeline import dedupe, dry_run, normalise
 from app.pipeline.runs import handler_for, register
 from app.schemas.json_types import RateLimit, SourceHealth, SourceRunResult
 from app.sources.base import RawJob, SearchContext, SourceConnector
@@ -58,8 +59,8 @@ from app.sources.registry import build_connector, effective_config
 log = logging.getLogger(__name__)
 
 SourceFactory = Callable[[Source], SourceConnector]
-LlmFactory = Callable[[AsyncSession], Awaitable[LLMClient | None]]
-ScoreHook = Callable[[Run, list[uuid.UUID]], Awaitable[None]]
+LlmFactory = Callable[[AsyncSession, Run | None], Awaitable[LLMClient | None]]
+ScoreHook = Callable[[AsyncSession, Run, list[uuid.UUID], LLMClient | None], Awaitable["ScoreOutcome | None"]]
 
 STAGE_KEYS = ("found", "new", "passed_filters", "above_threshold", "tailored", "applied")  # Runs screen
 MAX_PROPOSED = 200
@@ -100,7 +101,16 @@ def reset_deps() -> None:
 # ----- scoring hand-off ---------------------------------------------------------------------
 
 
-async def _no_scoring(run: Run, job_ids: list[uuid.UUID]) -> None:
+@dataclass
+class ScoreOutcome:
+    """What the scoring stage reports back: its spend, and the budget scope if it parked work."""
+
+    cost_micros: int = 0
+    budget_scope: str | None = None
+
+
+async def _no_scoring(session: AsyncSession, run: Run, job_ids: list[uuid.UUID],
+                      llm: LLMClient | None) -> ScoreOutcome | None:
     return None
 
 
@@ -108,7 +118,9 @@ _score_hook: ScoreHook = _no_scoring
 
 
 def register_score_hook(hook: ScoreHook) -> None:
-    """The scoring stream registers ``score_jobs(run, job_ids)`` here. Last registration wins."""
+    """The scoring stage registers ``(session, run, job_ids, llm) -> ScoreOutcome`` here (see
+    ``pipeline/wiring.py``). ``llm`` is the run's client, or ``None`` when the budget is already out.
+    Last registration wins."""
     global _score_hook
     _score_hook = hook
 
@@ -185,6 +197,104 @@ def _valid(raw: RawJob) -> bool:
 
 # ----- the sweep -----------------------------------------------------------------------------
 
+BUDGET_REASONS = {
+    "no_cap": "no monthly AI budget cap is set, so paid stages (extraction, scoring) did not run; "
+              "set a cap in Settings > AI",
+    "monthly": "the monthly AI budget cap was reached",
+    "per_run": "the per-run AI budget cap was reached",
+    "call": "one call's estimate is above its own limit",
+    "no_client": "no AI client is configured, so scoring did not run",
+}
+
+
+def budget_reason(scope: str) -> str:
+    return BUDGET_REASONS.get(scope, f"the AI budget refused a call ({scope})")
+
+
+@dataclass
+class _Paid:
+    """The paid stages of one run: the client, and the first budget refusal (after which no more
+    paid calls are made in this run; the work is parked and resumes later)."""
+
+    llm: LLMClient | None
+    budget_scope: str | None = None
+    cost: int = 0
+
+    @property
+    def open(self) -> bool:
+        return self.llm is not None and self.budget_scope is None
+
+
+async def _extract_job(session: AsyncSession, job: Job, norm: normalise.NormalisedJob, paid: _Paid,
+                       aliases: dict[str, str], counts: Counter[str]) -> None:
+    """Extract facets for one job, or leave it pending (budget or no client)."""
+    if not paid.open:
+        counts["extract_skipped"] += 1
+        if normalise.PENDING_TAG not in job.tags:
+            job.tags = [*job.tags, normalise.PENDING_TAG]
+        return
+    assert paid.llm is not None
+    extraction = await normalise.extract(session, paid.llm, norm)
+    if extraction.out is None:
+        counts["extract_skipped"] += 1
+        if extraction.skipped == "budget":
+            paid.budget_scope = extraction.budget.scope if extraction.budget else "monthly"
+        if normalise.PENDING_TAG not in job.tags:
+            job.tags = [*job.tags, normalise.PENDING_TAG]
+        return
+    normalise.apply_extraction(job, extraction.out, aliases)
+    if normalise.PENDING_TAG in job.tags:
+        job.tags = [t for t in job.tags if t != normalise.PENDING_TAG]
+    counts["extract_cached" if extraction.cached else "extracted"] += 1
+    if extraction.usage:
+        paid.cost += extraction.usage.cost_micros
+
+
+def _since(campaign: Campaign, source: Source, overlap_days: int) -> datetime | None:
+    """Each source keeps its own window: its last successful sweep for this campaign minus the overlap."""
+    mark = (campaign.source_checkpoints or {}).get(str(source.id)) or campaign.last_sweep_checkpoint
+    return mark - timedelta(days=overlap_days) if mark else None
+
+
+async def _hand_off(session: AsyncSession, run: Run, job_ids: list[uuid.UUID], paid: _Paid) -> None:
+    """Scoring stage. A failing scorer never fails intake (the Matches screen can re-run it)."""
+    if not job_ids:
+        return
+    try:
+        outcome = await _score_hook(session, run, list(dict.fromkeys(job_ids)), paid.llm if paid.open else None)
+    except Exception as exc:
+        log.exception("score_jobs hook failed for run %s", run.id)
+        await session.rollback()
+        await session.refresh(run)
+        run.error = ((run.error + "; ") if run.error else "") + f"scoring hand-off failed: {exc}"[:500]
+        return
+    if outcome is not None:
+        paid.cost += outcome.cost_micros
+        if outcome.budget_scope and paid.budget_scope is None:
+            paid.budget_scope = outcome.budget_scope
+
+
+async def _finish_paid(session: AsyncSession, run: Run, campaign: Campaign, job_ids: list[uuid.UUID],
+                       paid: _Paid, status: RunStatus, now: datetime) -> RunStatus:
+    """Cost, dry-run proposals, and the budget pause. Shared by a sweep and its resumption."""
+    run.cost_micros = (run.cost_micros or 0) + paid.cost
+    run.config_versions = {**run.config_versions, "job_ids": [str(i) for i in dict.fromkeys(job_ids)]}
+    if run.dry_run:
+        proposals = await dry_run.propose_actions(session, campaign, job_ids, now=now, limit=MAX_PROPOSED)
+        run.config_versions = {**run.config_versions, "proposed_actions": proposals}
+    if paid.budget_scope is not None and status in (RunStatus.succeeded, RunStatus.partial):
+        values = await settings_service.values(session)
+        tz = values["general.timezone"]
+        run.config_versions = {**run.config_versions, "paused": {
+            "scope": paid.budget_scope, "cap_minor": values["budget.monthly_cap_minor"],
+            "per_run_cap_minor": values["budget.per_run_cap_minor"], "month": month_bounds(now, tz)[2]}}
+        note = f"Paused for budget: {budget_reason(paid.budget_scope)}. Parked work resumes when the cap allows."
+        run.error = ((run.error + "; ") if run.error else "") + note
+        status = RunStatus.paused
+    await publish(session, "run.progress", {"run_id": str(run.id), "stage": "done", "counts": dict(run.counts)})
+    await session.commit()
+    return status
+
 
 async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = None) -> RunStatus:
     deps = deps or DEPS
@@ -193,6 +303,8 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
     if campaign is None:
         run.error = "a sweep needs a campaign"
         return RunStatus.failed
+    if (run.config_versions or {}).get("resume"):
+        return await resume_sweep(session, run, campaign, deps)
     if campaign.status != CampaignStatus.active and run.trigger != "manual":
         run.error = f"campaign is {campaign.status.value}"
         return RunStatus.skipped
@@ -208,35 +320,33 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
     overlap_days: int = states["schedule.overlap_days"].value
     threshold: float = states["matching.dedupe_similarity"].value
     model: str = states["ai.model_extract"].value
-    since = campaign.last_sweep_checkpoint - timedelta(days=overlap_days) if campaign.last_sweep_checkpoint else None
     tag_rules = await normalise.load_tag_rules(session)
+    sources = await _sources_for(session, campaign)
+    windows = {s.id: _since(campaign, s, overlap_days) for s in sources}
     run.config_versions = {
         "settings": {k: states[k].version for k in ("schedule.overlap_days", "matching.dedupe_similarity",
                                                      "ai.model_extract")},
         "prompt_extract": normalise.PROMPT_VERSION, "model_extract": model,
-        "since": since.isoformat() if since else None,
+        "since": {str(k): v.isoformat() if v else None for k, v in windows.items()},
         "campaign_updated_at": campaign.updated_at.isoformat() if campaign.updated_at else None,
         "tag_rules": len(tag_rules)}
-
-    sources = await _sources_for(session, campaign)
     if not sources:
         run.error = "no enabled sources allow search for this campaign"
         return RunStatus.failed
     watched = list((await session.scalars(select(WatchedEmployer))).all())
     counts: Counter[str] = Counter({k: 0 for k in STAGE_KEYS})
-    proposed: list[dict[str, Any]] = []
     await _progress(session, run, "search", counts)
 
     found = await asyncio.gather(*[
-        _search_one(s, effective_config(s, watched), campaign, since, deps) for s in sources])
+        _search_one(s, effective_config(s, watched), campaign, windows[s.id], deps) for s in sources])
     if await _cancelled(session, run):
         return RunStatus.cancelled
 
-    llm = None if run.dry_run or deps.llm_factory is None else await deps.llm_factory(session)
+    paid = _Paid(None if deps.llm_factory is None else await deps.llm_factory(session, run))
     aliases = await normalise.load_skill_aliases(session)
     handoff: list[uuid.UUID] = []
     results: list[SourceRunResult] = []
-    cost = 0
+    checkpoints = dict(campaign.source_checkpoints or {})
     for item in found:
         source = item.source
         if item.jobs is None:
@@ -252,16 +362,6 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
                 counts["invalid"] += 1
                 continue
             norm = await normalise.parse_with_aliases(session, raw)
-            if run.dry_run:
-                match = await dedupe.find_match(session, norm, source_id=source.id, threshold=threshold)
-                counts["new" if match is None else "duplicate"] += 1
-                new_here += match is None
-                if len(proposed) < MAX_PROPOSED:
-                    proposed.append({
-                        "job_id": str(match.id) if match else None, "title": norm.title, "employer": norm.employer,
-                        "action": "add_to_matches" if match is None else "skip",
-                        "reason": "New posting: not seen before." if match is None else "Already known."})
-                continue
             result = await dedupe.register(session, norm, source_id=source.id, now=started, threshold=threshold)
             counts[result.outcome.value] += 1
             job = result.job
@@ -275,32 +375,19 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
             needs_model = result.outcome in (dedupe.Outcome.new, dedupe.Outcome.reposted) \
                 or normalise.PENDING_TAG in job.tags
             if needs_model:
-                if llm is None:
-                    counts["extract_skipped"] += 1
-                    if normalise.PENDING_TAG not in job.tags:
-                        job.tags = [*job.tags, normalise.PENDING_TAG]
-                else:
-                    extraction = await normalise.extract(session, llm, norm)
-                    if extraction.out is None:
-                        counts["extract_skipped"] += 1
-                        if normalise.PENDING_TAG not in job.tags:
-                            job.tags = [*job.tags, normalise.PENDING_TAG]
-                    else:
-                        normalise.apply_extraction(job, extraction.out, aliases)
-                        counts["extract_cached" if extraction.cached else "extracted"] += 1
-                        if extraction.usage:
-                            cost += extraction.usage.cost_micros
+                await _extract_job(session, job, norm, paid, aliases, counts)
                 counts["tagged"] += len(normalise.apply_tag_rules(job, tag_rules))
-            if needs_model or result.outcome == dedupe.Outcome.new:
+            if needs_model or result.outcome == dedupe.Outcome.new or run.dry_run:
                 handoff.append(job.id)
+            if needs_model or result.outcome == dedupe.Outcome.new:
                 await publish(session, "job.created" if result.outcome == dedupe.Outcome.new else "job.updated",
                               {"job_id": str(job.id)})
         results.append(SourceRunResult(source_id=str(source.id), status="ok", found=len(item.jobs), new=new_here,
                                        error="; ".join(item.warnings)[:500] or None))
         if not run.dry_run:
             _record_health(source, item, started)
+            checkpoints[str(source.id)] = started  # this source's window moves on its own success
         run.source_results = list(results)
-        run.cost_micros = cost
         await _progress(session, run, f"source:{source.name}", counts)
         if await _cancelled(session, run):
             return RunStatus.cancelled
@@ -308,25 +395,77 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
     failed = sum(r.status == "failed" for r in results)
     status = RunStatus.failed if failed == len(results) else RunStatus.partial if failed else RunStatus.succeeded
     run.source_results = results
-    run.cost_micros = cost
-    counts["handed_to_scoring"] = 0 if run.dry_run else len(handoff)
-    run.counts = dict(counts)
-    if run.dry_run:
-        run.config_versions = {**run.config_versions, "proposed_actions": proposed}
     if failed:
         run.error = "; ".join(f"{r.source_id}: {r.error}" for r in results if r.status == "failed")[:2000]
-    if status == RunStatus.succeeded and not run.dry_run:
-        campaign.last_sweep_checkpoint = started  # moves only on full success
-    await publish(session, "run.progress", {"run_id": str(run.id), "stage": "done", "counts": dict(counts)})
+    if not run.dry_run:
+        campaign.source_checkpoints = checkpoints
+        if status == RunStatus.succeeded:
+            campaign.last_sweep_checkpoint = started  # every source succeeded
+    counts["handed_to_scoring"] = len(set(handoff))
+    run.counts = dict(counts)
     await session.commit()
 
-    if handoff and not run.dry_run:
-        try:
-            await _score_hook(run, list(dict.fromkeys(handoff)))
-        except Exception as exc:  # intake is saved; scoring can be re-run from the Matches screen
-            log.exception("score_jobs hook failed for run %s", run.id)
-            run.error = ((run.error + "; ") if run.error else "") + f"scoring hand-off failed: {exc}"[:500]
-    return status
+    await _hand_off(session, run, handoff, paid)
+    return await _finish_paid(session, run, campaign, handoff, paid, status, started)
+
+
+async def resume_sweep(session: AsyncSession, run: Run, campaign: Campaign, deps: IntakeDeps) -> RunStatus:
+    """Finish a run paused for budget: extract its pending jobs, score its parked ones. No source is read
+    again and no checkpoint moves."""
+    now = deps.clock.now()
+    job_ids = [uuid.UUID(i) for i in run.config_versions.get("job_ids", [])]
+    run.config_versions = {k: v for k, v in run.config_versions.items() if k not in ("resume", "paused")}
+    paid = _Paid(None if deps.llm_factory is None else await deps.llm_factory(session, run))
+    aliases = await normalise.load_skill_aliases(session)
+    tag_rules = await normalise.load_tag_rules(session)
+    counts: Counter[str] = Counter(run.counts or {})
+    for job in (await session.scalars(select(Job).where(Job.id.in_(job_ids)))).all():
+        if normalise.PENDING_TAG in job.tags:
+            counts["extract_skipped"] -= 1
+            norm = await normalise.parse_with_aliases(session, RawJob(
+                source_url=job.apply_url or "", title=job.title, employer=job.employer,
+                raw_text=job.raw_text or "", apply_url=job.apply_url))
+            await _extract_job(session, job, norm, paid, aliases, counts)
+            counts["tagged"] += len(normalise.apply_tag_rules(job, tag_rules))
+    run.counts = {k: max(v, 0) for k, v in counts.items()}
+    run.error = None
+    await session.commit()
+    await _hand_off(session, run, job_ids, paid)
+    failed = any(r.status == "failed" for r in run.source_results)
+    return await _finish_paid(session, run, campaign, job_ids, paid,
+                              RunStatus.partial if failed else RunStatus.succeeded, now)
+
+
+async def resume_paused(session: AsyncSession, enqueue: Callable[[Run], Awaitable[None]],
+                        clock: Clock | None = None) -> list[Run]:
+    """Re-queue runs paused for budget once the budget allows: a cap is set and it (or the per-run cap)
+    changed since the pause, or a new budget month began. Called by the scheduler tick."""
+    paused = list((await session.scalars(select(Run).where(Run.status == RunStatus.paused)
+                                         .order_by(Run.created_at))).all())
+    if not paused:
+        return []
+    values = await settings_service.values(session)
+    if values["budget.monthly_cap_minor"] is None:
+        return []
+    month = month_bounds((clock or SystemClock()).now(), values["general.timezone"])[2]
+    resumed: list[Run] = []
+    for run in paused:
+        mark = (run.config_versions or {}).get("paused") or {}
+        changed = (mark.get("cap_minor") != values["budget.monthly_cap_minor"]
+                   or mark.get("per_run_cap_minor") != values["budget.per_run_cap_minor"]
+                   or mark.get("month") != month)
+        if not changed:
+            continue
+        run.config_versions = {**run.config_versions, "resume": True}
+        run.status = RunStatus.queued
+        run.finished_at = None
+        await audit.record(session, actor="system", action="run.resumed", subject_type="run", subject_id=run.id,
+                           detail={"after": mark.get("scope")})
+        resumed.append(run)
+    await session.commit()
+    for run in resumed:
+        await enqueue(run)
+    return resumed
 
 
 # ----- expiry recheck ------------------------------------------------------------------------

@@ -107,8 +107,9 @@ class LLMService:
         return CallPlan(route=route, credentials=credentials, price=price, currency=currency, request=request,
                         estimate_micros=estimate, retries=values["ai.max_retries"])
 
-    async def estimate_cost_micros(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None) -> int:
-        return (await self.plan(stage, messages, None, model)).estimate_micros
+    async def estimate_cost_micros(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None,
+                                   schema: type[BaseModel] | None = None) -> int:
+        return (await self.plan(stage, messages, schema, model)).estimate_micros
 
     async def complete(self, stage: Stage, messages: Sequence[Message], schema: type[ResultT], *,
                        max_cost_micros: int, model: str | None = None) -> tuple[ResultT, Usage]:

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
 from sqlalchemy import select
 
+from app.api.routers.jobs import get_capture_enqueue
 from app.models.platform import SettingRevision
 from app.models.search import Job, JobSighting
 
@@ -14,7 +16,22 @@ async def test_capture_requires_owner(client):
     assert (await client.post("/api/jobs/capture", json={"url": "https://jobs.example.com/1"})).status_code == 401
 
 
-async def test_capture_link_and_text(owner_client, session):
+@pytest.fixture
+def queued(app):
+    ids: list[uuid.UUID] = []
+
+    async def factory():
+        async def enqueue(job_id):
+            ids.append(job_id)
+
+        return enqueue
+
+    app.dependency_overrides[get_capture_enqueue] = factory
+    yield ids
+    app.dependency_overrides.pop(get_capture_enqueue, None)
+
+
+async def test_capture_link_and_text(owner_client, session, queued):
     r = await owner_client.post("/api/jobs/capture", json={"url": "https://jobs.example.com/roles/42",
                                                           "text": "Senior Data Analyst\nRemote, Africa"})
     assert r.status_code == 202, r.text
@@ -23,6 +40,7 @@ async def test_capture_link_and_text(owner_client, session):
     job = await session.get(Job, uuid.UUID(body["id"]))
     assert job.title == "Senior Data Analyst" and job.apply_url == "https://jobs.example.com/roles/42"
     assert job.tags == ["captured"] and job.availability.value == "unknown" and job.triage == "new"
+    assert queued == [job.id]  # handed to the worker's process_capture
     sightings = (await session.scalars(select(JobSighting).where(JobSighting.job_id == job.id))).all()
     assert [s.url for s in sightings] == ["https://jobs.example.com/roles/42"]
 

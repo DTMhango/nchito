@@ -33,8 +33,9 @@ class ProposedAction(BaseModel):
     job_id: uuid.UUID | None = Field(description="None when the posting is new and has no job yet")
     title: str
     employer: str
-    action: str
+    action: str = Field(description="apply, ask_owner, prepare, add_to_matches, review, skip or parked")
     reason: str
+    score: int | None = None
 
 
 class RunOut(Timestamps):
@@ -52,7 +53,7 @@ class RunOut(Timestamps):
     source_results: list[SourceRunResult]
     cost_minor: int
     config_versions: dict[str, Any]
-    status: Literal["queued", "running", "succeeded", "failed", "partial", "cancelled", "skipped"]
+    status: Literal["queued", "running", "succeeded", "failed", "partial", "cancelled", "skipped", "paused"]
     started_at: datetime | None
     finished_at: datetime | None
     error: str | None

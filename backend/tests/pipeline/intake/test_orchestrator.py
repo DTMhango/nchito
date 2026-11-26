@@ -51,7 +51,7 @@ async def test_sweep_ingests_extracts_and_hands_ids_to_scoring(session, rig):
     assert campaign.last_sweep_checkpoint == NOW
 
 
-async def test_one_failing_source_does_not_fail_the_run_and_checkpoint_stays(session, rig):
+async def test_one_failing_source_does_not_fail_the_run_and_delays_only_itself(session, rig):
     sources, campaign, run = await setup(session, rig, names=("A", "B"))
     rig.connector("A", jobs=[raw(req="R1")])
     rig.connector("B", error=SourceError("HTTP 503"))
@@ -60,8 +60,23 @@ async def test_one_failing_source_does_not_fail_the_run_and_checkpoint_stays(ses
     by_name = {r.source_id: r for r in run.source_results}
     assert by_name[str(sources[0].id)].status == "ok" and by_name[str(sources[1].id)].status == "failed"
     assert "503" in by_name[str(sources[1].id)].error
-    assert campaign.last_sweep_checkpoint is None  # partial: checkpoint does not move
+    assert campaign.last_sweep_checkpoint is None  # partial: the all-sources checkpoint does not move
+    assert campaign.source_checkpoints == {str(sources[0].id): NOW}  # but the healthy source's does
     assert sources[1].health.consecutive_failures == 1 and sources[0].last_success_at == NOW
+
+    # Next sweep: A reads from its own checkpoint, B (still never successful) from the beginning.
+    run.status = RunStatus.partial
+    rig.clock.advance(days=1)
+    rig.connectors["B"].error = None
+    run2 = Run(kind=RunKind.sweep, trigger="schedule", campaign_id=campaign.id, status=RunStatus.running)
+    session.add(run2)
+    await session.flush()
+    assert await orchestrator.run_sweep(session, run2) == RunStatus.succeeded
+    assert rig.connectors["A"].since_seen[-1] == NOW - timedelta(days=2)  # overlap_days default 2
+    assert rig.connectors["B"].since_seen[-1] is None
+    later = NOW + timedelta(days=1)
+    assert campaign.source_checkpoints == {str(sources[0].id): later, str(sources[1].id): later}
+    assert campaign.last_sweep_checkpoint == later
 
 
 async def test_failed_sweep_does_not_advance_checkpoint(session, rig):
@@ -90,16 +105,21 @@ async def test_window_is_checkpoint_minus_overlap_and_overlap_is_deduplicated(se
     assert await session.scalar(select(func.count()).select_from(JobSighting)) == 2
 
 
-async def test_dry_run_writes_nothing_and_proposes_actions(session, rig):
+async def test_dry_run_runs_the_pipeline_but_moves_no_checkpoint_and_proposes_actions(session, rig):
     sources, campaign, run = await setup(session, rig)
     run.dry_run = True
     rig.connector("A", jobs=[raw(req="R1", title="Claims Analyst")])
+    rig.llm.respond = EXTRACT
     status = await orchestrator.run_sweep(session, run)
-    assert status == RunStatus.succeeded and await job_count(session) == 0
-    assert run.counts["new"] == 1 and rig.llm.calls == [] and rig.scored == []
-    assert campaign.last_sweep_checkpoint is None and sources[0].last_success_at is None
+    job = await session.scalar(select(Job))
+    assert status == RunStatus.succeeded and job.facets.work_model.value == "remote"  # found and normalised
+    assert run.counts["new"] == 1 and len(rig.llm.calls) == 1 and rig.scored == [(run, [job.id])]
+    assert campaign.last_sweep_checkpoint is None and campaign.source_checkpoints == {}
+    assert sources[0].last_success_at is None
+    assert await session.scalar(select(func.count()).select_from(Application)) == 0
     action, = run.config_versions["proposed_actions"]
-    assert action["title"] == "Claims Analyst" and action["action"] == "add_to_matches" and action["job_id"] is None
+    assert action["title"] == "Claims Analyst" and action["job_id"] == str(job.id)
+    assert action["action"] == "parked"  # the rig's scorer scored nothing
 
 
 async def test_budget_cap_leaves_jobs_pending_extraction_and_retries_later(session, rig):
@@ -107,9 +127,11 @@ async def test_budget_cap_leaves_jobs_pending_extraction_and_retries_later(sessi
     job = raw(req="R1")
     rig.connector("A", jobs=[job])
     rig.llm.raise_budget = True
-    await orchestrator.run_sweep(session, run)
+    status = await orchestrator.run_sweep(session, run)
     stored = await session.scalar(select(Job))
     assert run.counts["extract_skipped"] == 1 and normalise.PENDING_TAG in stored.tags
+    assert status == RunStatus.paused and "Paused for budget" in run.error  # not failed
+    assert run.config_versions["paused"]["scope"] == "monthly"
     run.status = RunStatus.succeeded
     rig.llm.raise_budget = False
     rig.llm.respond = EXTRACT
@@ -133,7 +155,7 @@ async def test_scoring_hook_failure_does_not_fail_intake(session, rig):
     _, _, run = await setup(session, rig)
     rig.connector("A", jobs=[raw(req="R1")])
 
-    async def bad(run, ids):
+    async def bad(session, run, ids, llm):
         raise RuntimeError("scorer down")
 
     orchestrator.register_score_hook(bad)

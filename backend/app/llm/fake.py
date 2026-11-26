@@ -59,7 +59,8 @@ class FakeLLMClient:
     def calls_for(self, stage: str) -> list[FakeCall]:
         return [c for c in self.calls if c.stage == stage]
 
-    async def estimate_cost_micros(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None) -> int:
+    async def estimate_cost_micros(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None,
+                                   schema: type[BaseModel] | None = None) -> int:
         render(messages)
         return self.estimate_micros
 

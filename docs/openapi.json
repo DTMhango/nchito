@@ -8130,7 +8130,7 @@
           "jobs"
         ],
         "summary": "Custom Facets Backfill",
-        "description": "Without ``confirm`` returns the cost estimate only; with it, queues the backfill under the budget cap.",
+        "description": "Without ``confirm`` returns the cost estimate only; with it, answers the jobs now, each call budgeted.",
         "operationId": "custom_facets_backfill",
         "parameters": [
           {
@@ -15465,6 +15465,23 @@
           "currency": {
             "type": "string",
             "title": "Currency"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining",
+            "default": 0
+          },
+          "paused_for_budget": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused For Budget",
+            "description": "Budget scope that stopped the backfill"
           }
         },
         "type": "object",
@@ -15473,7 +15490,8 @@
           "estimated_cost_minor",
           "currency"
         ],
-        "title": "BackfillEstimate"
+        "title": "BackfillEstimate",
+        "description": "Without ``confirm``: jobs to answer and the estimate. With it: jobs answered and the spend."
       },
       "BacktestEstimateOut": {
         "properties": {
@@ -23990,11 +24008,23 @@
           },
           "action": {
             "type": "string",
-            "title": "Action"
+            "title": "Action",
+            "description": "apply, ask_owner, prepare, add_to_matches, review, skip or parked"
           },
           "reason": {
             "type": "string",
             "title": "Reason"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
           }
         },
         "type": "object",
@@ -25434,7 +25464,8 @@
               "failed",
               "partial",
               "cancelled",
-              "skipped"
+              "skipped",
+              "paused"
             ],
             "title": "Status"
           },

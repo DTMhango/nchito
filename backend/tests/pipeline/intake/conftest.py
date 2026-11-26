@@ -25,7 +25,7 @@ class Rig:
         self.connectors[name] = ScriptedConnector(**kwargs)
         return self.connectors[name]
 
-    async def llm_factory(self, session):
+    async def llm_factory(self, session, run=None):
         return self.llm
 
 
@@ -36,7 +36,7 @@ def rig() -> Iterator[Rig]:
     orchestrator.configure(source_factory=lambda source: r.connectors[source.name], clock=r.clock,
                            llm_factory=r.llm_factory)
 
-    async def hook(run, ids):
+    async def hook(session, run, ids, llm):
         r.scored.append((run, ids))
 
     orchestrator.register_score_hook(hook)

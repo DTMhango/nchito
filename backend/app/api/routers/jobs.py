@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -25,7 +25,6 @@ from app.core.clock import utcnow
 from app.core.conditions import ConditionResult, ConditionSet, Group, ValueFilter, evaluate, explain
 from app.core.events import publish
 from app.core.settings import service as settings_service
-from app.llm.client import Message, TextPart
 from app.llm.money import micros_to_minor
 from app.models.applications import Application
 from app.models.search import (
@@ -39,7 +38,7 @@ from app.models.search import (
     SkillAlias,
     TagRule,
 )
-from app.pipeline import conflicts, filters, scoring
+from app.pipeline import conflicts, custom_facets, filters, scoring
 from app.pipeline.capture import CaptureError, capture
 from app.pipeline.decisions import decide
 from app.schemas.json_types import CustomFacetValue, JobFacets, Requirement, SavedViewBody, StructuredLocation
@@ -265,9 +264,13 @@ class CustomFacetOut(CustomFacetIn, Timestamps):
 
 
 class BackfillEstimate(BaseModel):
+    """Without ``confirm``: jobs to answer and the estimate. With it: jobs answered and the spend."""
+
     jobs: int
     estimated_cost_minor: int
     currency: str
+    remaining: int = 0
+    paused_for_budget: str | None = Field(default=None, description="Budget scope that stopped the backfill")
 
 
 class SkillAliasIn(ApiModel):
@@ -430,9 +433,25 @@ async def patch_job(job_id: uuid.UUID, body: JobPatch, session: SessionDep, prin
     return await job_detail(session, job)
 
 
+CaptureEnqueue = Callable[[uuid.UUID], Awaitable[None]]
+
+
+async def get_capture_enqueue() -> CaptureEnqueue:
+    """Defers ``process_capture`` to the worker (tests replace this dependency)."""
+
+    async def enqueue(job_id: uuid.UUID) -> None:
+        from app.worker.queue import enqueue_capture, queue_app
+
+        async with queue_app.open_async():
+            await enqueue_capture(job_id)
+
+    return enqueue
+
+
 @router.post("/jobs/capture", response_model=CaptureOut, status_code=status.HTTP_202_ACCEPTED, name="jobs_capture",
              responses={422: {"description": "Neither a link nor text, or a link that is not http(s)"}})
-async def capture_job(body: CaptureIn, principal: PrincipalDep, session: SessionDep) -> CaptureOut:
+async def capture_job(body: CaptureIn, principal: PrincipalDep, session: SessionDep,
+                      enqueue: Annotated[CaptureEnqueue, Depends(get_capture_enqueue)]) -> CaptureOut:
     """Manual capture: persist a Job stub from a pasted link or text (DESIGN 6). Wave 1 runs it
     through the same pipeline as any source."""
     try:
@@ -442,6 +461,8 @@ async def capture_job(body: CaptureIn, principal: PrincipalDep, session: Session
     await audit.record(session, actor=principal.actor, action="job.captured", subject_type="job",
                        subject_id=job.id, detail={"has_url": body.url is not None, "has_text": body.text is not None})
     await publish(session, "job.created", {"job_id": str(job.id)})
+    await session.commit()  # the worker must find the stub when it picks the job up
+    await enqueue(job.id)
     return CaptureOut(id=job.id, status="queued")
 
 
@@ -661,20 +682,22 @@ _simple_crud("/skill-aliases", "skill_aliases", SkillAlias, SkillAliasIn, SkillA
 @router.post("/custom-facets/{item_id}/backfill", response_model=BackfillEstimate, name="custom_facets_backfill",
              status_code=status.HTTP_202_ACCEPTED)
 async def backfill_custom_facet(item_id: uuid.UUID, session: SessionDep, confirm: bool = False) -> BackfillEstimate:
-    """Without ``confirm`` returns the cost estimate only; with it, queues the backfill under the budget cap."""
+    """Without ``confirm`` returns the cost estimate only; with it, answers the jobs now, each call budgeted."""
     facet = await session.get(CustomFacet, item_id)
     if facet is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="custom facet not found")
-    if confirm:
-        not_implemented(WAVE, "custom_facet_backfill")
     client = await scoring.client_for(session)
     if client is None:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail="no AI provider configured")
     jobs = [job for job, _ in await _records(session) if facet.key not in job.custom_facets]
-    cost = 0
-    for job in jobs:
-        messages = [Message(role="system", parts=[TextPart(f"Answer yes, no or not_stated: {facet.question}")]),
-                    Message(role="user", parts=[scoring.wrap_untrusted(job.raw_text or job.title, "job posting")])]
-        cost += await client.estimate_cost_micros("custom_facet", messages)
     currency = await settings_service.get_value(session, "budget.currency")
-    return BackfillEstimate(jobs=len(jobs), estimated_cost_minor=micros_to_minor(cost), currency=currency)
+    if not confirm:
+        cost = await custom_facets.estimate(client, facet, jobs)
+        return BackfillEstimate(jobs=len(jobs), estimated_cost_minor=micros_to_minor(cost), currency=currency)
+    done = await custom_facets.backfill(client, facet, jobs)
+    await audit.record(session, actor="owner", action="custom_facet.backfilled", subject_type="custom_facet",
+                       subject_id=facet.id, detail={"answered": done.answered, "remaining": done.remaining,
+                                                    "budget": done.budget.scope if done.budget else None})
+    return BackfillEstimate(jobs=done.answered, estimated_cost_minor=micros_to_minor(done.cost_micros),
+                            currency=currency, remaining=done.remaining,
+                            paused_for_budget=done.budget.scope if done.budget else None)

@@ -251,7 +251,7 @@ async def model_score(session: AsyncSession, client: LLMClient, job: Job, record
             ratings, gaps = list(hit.ratings), list(hit.gaps)
             cached = True
         else:
-            limit = await client.estimate_cost_micros(STAGE, messages, model=model)
+            limit = await client.estimate_cost_micros(STAGE, messages, model=model, schema=ScoreOut)
             out, usage = await client.complete(STAGE, messages, ScoreOut, max_cost_micros=limit, model=model)
             ratings, gaps = verify_ratings(rubric.body, out, kit), list(out.gaps)
             cost += usage.cost_micros
@@ -314,6 +314,7 @@ class ScoreSummary:
     no_rubric: int = 0
     escalated: int = 0
     cost_micros: int = 0
+    budget_scope: str | None = None  # set when the budget refused a call (the rest are parked)
     employers: set[str] = field(default_factory=set)
 
     def counts(self) -> dict[str, int]:
@@ -329,17 +330,19 @@ SYSTEM_TRIAGE = ("new", "shortlisted", "below_threshold")
 
 async def score_jobs(session: AsyncSession, run: Run | None, job_ids: Sequence[uuid.UUID], *,
                      client: LLMClient | None = None, now: datetime | None = None,
-                     campaign_ids: Sequence[uuid.UUID] | None = None) -> ScoreSummary:
+                     campaign_ids: Sequence[uuid.UUID] | None = None, paid: bool = True) -> ScoreSummary:
     """Filter, then score, each job against each campaign (the run's, or every active one).
 
-    Cost order: a role that fails a hard filter is recorded as ``filtered_out`` and never sent to
+    ``paid=False`` makes no model call (the caller's budget is already out); every role that passes
+    the filters is parked. Cost order: a role that fails a hard filter is recorded as ``filtered_out`` and never sent to
     the model. Budget exhaustion parks the rest as resumable. Conflict groups of every touched
     employer are recomputed at the end.
     """
     from app.pipeline import conflicts
 
     now = now or utcnow()
-    client = client or await client_for(session)
+    # Unpaid: the run's budget is already out, so filter and park and call nothing.
+    client = (client or await client_for(session)) if paid else None
     summary = ScoreSummary()
     if run is not None and run.campaign_id and campaign_ids is None:
         campaign_ids = [run.campaign_id]
@@ -371,13 +374,15 @@ async def score_jobs(session: AsyncSession, run: Run | None, job_ids: Sequence[u
                 summary.no_rubric += 1
                 continue
             if budget_out or client is None:
+                summary.budget_scope = summary.budget_scope or (None if budget_out else "no_client")
                 assessment.state = AssessmentState.parked
                 summary.parked += 1
                 continue
             try:
                 result = await model_score(session, client, job, record, rubric, kit, settings)
-            except BudgetExceeded:
+            except BudgetExceeded as exc:
                 budget_out = True
+                summary.budget_scope = getattr(exc, "scope", "monthly")
                 assessment.state = AssessmentState.parked
                 summary.parked += 1
                 continue
@@ -491,7 +496,7 @@ async def backtest(session: AsyncSession, draft: Rubric, campaign: Campaign, job
         to_score += int(cached is None)
         if cached is None and client is not None:
             estimate += await client.estimate_cost_micros(STAGE, build_messages(prompt, draft.body, kit, job),
-                                                         model=model)
+                                                          model=model, schema=ScoreOut)
         if estimate_only or client is None:
             new_scores[job.id] = None
             continue

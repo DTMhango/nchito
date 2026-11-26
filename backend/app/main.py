@@ -28,6 +28,9 @@ def _operation_id(route: APIRoute) -> str:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    from app.pipeline import wiring
+
+    wiring.install()  # the real AI client for backtests and custom facets; conflict re-evaluation
     await hub.start()
     try:
         yield
