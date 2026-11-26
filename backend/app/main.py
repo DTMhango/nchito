@@ -87,6 +87,13 @@ def create_app(spa_dir: Path | None = None) -> FastAPI:
     for router in ALL_ROUTERS:
         app.include_router(router)
 
+    # Agent gateway (DESIGN 8.3): signed runner file links, and MCP over streamable HTTP at /mcp.
+    from app.gateway.files import router as gateway_files_router
+    from app.gateway.server import gateway_app
+
+    app.include_router(gateway_files_router)
+    app.router.add_route("/mcp", gateway_app, methods=["GET", "POST", "DELETE"], include_in_schema=False)
+
     _mount_spa(app, spa_dir if spa_dir is not None else cfg.spa_dir)
     return app
 

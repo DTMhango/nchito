@@ -191,6 +191,10 @@ class PendingActionType(enum.StrEnum):
     conflict_choice = "conflict_choice"
     answer_review_due = "answer_review_due"
     follow_up = "follow_up"
+    # Runner blockers with no type of their own (wave 3 gateway, DESIGN 8.3, 18.1).
+    unsupported_form = "unsupported_form"
+    redirect_off_domain = "redirect_off_domain"
+    page_instruction = "page_instruction"
 
 
 class PendingStatus(enum.StrEnum):

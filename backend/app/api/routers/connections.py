@@ -20,11 +20,12 @@ from app.connect.mailbox import MailError
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.crypto import mask
+from app.gateway import auth as gateway_auth
 from app.llm import checks, provider_records
 from app.llm.deps import llm_service
 from app.llm.money import micros_to_minor
 from app.llm.service import LLMService
-from app.models.platform import Connection
+from app.models.platform import ApiToken, Connection
 
 connections_router = APIRouter(prefix="/api/connections", tags=["connections"], dependencies=[RequireOwner],
                                responses=NOT_IMPLEMENTED_RESPONSES)
@@ -252,27 +253,79 @@ async def oauth_callback(provider: Literal["gmail", "gdrive", "msgraph", "onedri
     not_implemented(2, "connect")
 
 
+def _token_out(t: ApiToken) -> TokenOut:
+    return TokenOut(id=t.id, created_at=t.created_at, updated_at=t.updated_at, name=t.name, prefix=t.prefix,
+                    scopes=list(t.scopes), runner_kind=t.runner_kind,  # type: ignore[arg-type]
+                    last_used_at=t.last_used_at, revoked_at=t.revoked_at, suspended_at=t.suspended_at,
+                    suspended_reason=t.suspended_reason)
+
+
+async def _token(session: AsyncSession, token_id: uuid.UUID) -> ApiToken:
+    token = await session.get(ApiToken, token_id, with_for_update=True)
+    if token is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="token not found")
+    return token
+
+
 @tokens_router.get("", response_model=list[TokenOut], name="tokens_list")
-async def list_tokens() -> list[TokenOut]:
-    not_implemented(3, "gateway")
+async def list_tokens(session: SessionDep) -> list[TokenOut]:
+    rows = await session.scalars(select(ApiToken).order_by(ApiToken.revoked_at.is_not(None), ApiToken.created_at))
+    return [_token_out(t) for t in rows.all()]
 
 
 @tokens_router.post("", response_model=TokenCreated, status_code=status.HTTP_201_CREATED, name="tokens_create")
-async def create_token(body: TokenCreate) -> TokenCreated:
-    not_implemented(3, "gateway")
+async def create_token(body: TokenCreate, session: SessionDep, principal: PrincipalDep) -> TokenCreated:
+    """A runner token: one runner identity of a declared kind. The token itself is shown only in this reply."""
+    try:
+        made = await gateway_auth.create(session, name=body.name, runner_kind=body.runner_kind,
+                                         scopes=list(body.scopes), by=principal.actor)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    await session.refresh(made.row)
+    return TokenCreated(**_token_out(made.row).model_dump(), token=made.secret)
 
 
 @tokens_router.post("/{token_id}/revoke", response_model=TokenOut, name="tokens_revoke")
-async def revoke_token(token_id: uuid.UUID) -> TokenOut:
-    not_implemented(3, "gateway")
+async def revoke_token(token_id: uuid.UUID, session: SessionDep, principal: PrincipalDep) -> TokenOut:
+    """Revoke at once: the token is refused from now on and the tasks it held go back to the queue."""
+    token = await _token(session, token_id)
+    await gateway_auth.revoke(session, token, by=principal.actor, now=utcnow())
+    await session.refresh(token)
+    return _token_out(token)
 
 
 @tokens_router.post("/{token_id}/reinstate", response_model=TokenOut, name="tokens_reinstate")
-async def reinstate_token(token_id: uuid.UUID) -> TokenOut:
+async def reinstate_token(token_id: uuid.UUID, session: SessionDep, principal: PrincipalDep) -> TokenOut:
     """Lift a suspension (after a submission without a permit was detected)."""
-    not_implemented(3, "gateway")
+    token = await _token(session, token_id)
+    try:
+        await gateway_auth.reinstate(session, token, by=principal.actor)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await session.refresh(token)
+    return _token_out(token)
 
 
 @tokens_router.get("/runners", response_model=list[RunnerStatus], name="tokens_runner_status")
-async def runner_status() -> list[RunnerStatus]:
-    not_implemented(3, "gateway")
+async def runner_status(session: SessionDep) -> list[RunnerStatus]:
+    """Each live runner: last seen (its last gateway call), online within ``runners.stale_after_minutes``,
+    and the task it holds."""
+    from datetime import timedelta
+
+    from app.core.settings import service as settings_service
+    from app.models.applications import AgentTask, AgentTaskStatus
+
+    stale = int(await settings_service.get_value(session, "runners.stale_after_minutes"))
+    now = utcnow()
+    out = []
+    for t in (await session.scalars(select(ApiToken).where(ApiToken.revoked_at.is_(None))
+                                    .order_by(ApiToken.created_at))).all():
+        current = await session.scalar(select(AgentTask.id).where(
+            AgentTask.claimed_by_token_id == t.id, AgentTask.status == AgentTaskStatus.claimed)
+            .order_by(AgentTask.claimed_at).limit(1))
+        seen = t.last_used_at
+        out.append(RunnerStatus(token_id=t.id, name=t.name, runner_kind=t.runner_kind,  # type: ignore[arg-type]
+                                last_seen_at=seen, online=bool(seen and seen > now - timedelta(minutes=stale)
+                                                                and t.suspended_at is None),
+                                current_task_id=current))
+    return out

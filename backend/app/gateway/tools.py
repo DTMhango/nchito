@@ -36,6 +36,9 @@ class _M(BaseModel):
 
 class NextTaskIn(_M):
     kinds: list[Literal["apply", "sweep_site", "check_posting"]] | None = None
+    dry_run: bool = Field(default=False, description="Rehearsal: the claim is given back when the task ends, "
+                                                      "submit permits are always refused and nothing is recorded "
+                                                      "on the application")
 
 
 class TaskRules(_M):
@@ -119,8 +122,8 @@ class SaveCheckpointOut(_M):
 
 class RaiseBlockerIn(_M):
     task_id: str
-    type: Literal["sign_in", "create_account", "captcha", "assessment", "declaration", "unsupported_form",
-                  "redirect_off_domain", "unknown_question", "page_instruction"]
+    type: Literal["sign_in", "create_account", "verification_code", "captcha", "assessment", "declaration",
+                  "unsupported_form", "redirect_off_domain", "unknown_question", "page_instruction"]
     detail: str
     url: str | None = None
 
@@ -190,6 +193,44 @@ class ReportJobsOut(_M):
     duplicates: int
 
 
+# ----- wave 3 additions: report_check / release_task / evidence_upload_url ------------------
+
+
+class ReportCheckIn(_M):
+    task_id: str
+    status: Literal["open", "closed", "unknown"] = Field(
+        description="A check that failed or could not tell is unknown, never closed")
+    evidence: str | None = Field(default=None, description="What on the page showed it (text, as data)")
+    screenshot_ref: str | None = None
+
+
+class ReportCheckOut(_M):
+    recorded: bool
+    availability: Literal["open", "closed", "unknown"]
+
+
+class ReleaseTaskIn(_M):
+    task_id: str
+    reason: str
+
+
+class ReleaseTaskOut(_M):
+    released: bool
+    task_status: str
+
+
+class EvidenceUploadIn(_M):
+    task_id: str
+    content_type: Literal["image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain"]
+
+
+class EvidenceUploadOut(_M):
+    upload_url: str = Field(description="PUT the raw bytes here (short-lived signed URL, one upload)")
+    ref: str = Field(description="Use as screenshot_ref in save_checkpoint and report_result")
+    max_bytes: int
+    expires_at: str
+
+
 TOOLS: dict[str, tuple[type[BaseModel], type[BaseModel], str]] = {
     "next_task": (NextTaskIn, NextTaskOut, "Claim the next task for this runner."),
     "get_packet": (GetPacketIn, GetPacketOut, "Field values, answers and signed file URLs for this task's form."),
@@ -200,6 +241,10 @@ TOOLS: dict[str, tuple[type[BaseModel], type[BaseModel], str]] = {
                               "Call immediately before Submit with what was actually entered."),
     "report_result": (ReportResultIn, ReportResultOut, "Report submitted / uncertain / failed with evidence."),
     "report_jobs": (ReportJobsIn, ReportJobsOut, "Sweep tasks: postings found, with the URL actually visited."),
+    "report_check": (ReportCheckIn, ReportCheckOut, "Check tasks: is the posting open, closed or unknown."),
+    "release_task": (ReleaseTaskIn, ReleaseTaskOut, "Give a claimed task back to the queue (from its checkpoint)."),
+    "evidence_upload_url": (EvidenceUploadIn, EvidenceUploadOut,
+                            "A short-lived URL to upload a screenshot or confirmation; returns its reference."),
 }
 
 
