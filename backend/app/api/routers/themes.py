@@ -166,10 +166,15 @@ async def duplicate_theme(theme_id: str, body: ThemeDuplicateIn, principal: Prin
     return await service.to_out(session, theme)
 
 
-@router.put("/{theme_id}/default", response_model=ThemeOut, operation_id="themes_set_default")
+@router.put("/{theme_id}/default", response_model=ThemeOut, operation_id="themes_set_default",
+            responses={409: {"description": "The theme needs review (body text below AA, not accepted)"}})
 async def set_default(theme_id: str, principal: PrincipalDep, session: SessionDep) -> ThemeOut:
     theme = await _load(session, theme_id)
-    await service.set_default(session, theme, actor=principal.actor)
+    try:
+        await service.set_default(session, theme, actor=principal.actor)
+    except service.ThemeNeedsReview as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": "theme_needs_review", "reason": str(exc)}) \
+            from exc
     return await service.to_out(session, theme)
 
 

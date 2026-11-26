@@ -11,7 +11,7 @@ from tests.conftest import REPO
 SLUGS = ["copperbelt", "midnight-ledger", "savanna-dusk", "paper", "workshop", "high-contrast"]
 NAMES = ["Copperbelt", "Midnight Ledger", "Savanna Dusk", "Paper", "Workshop", "High contrast"]
 # The frontend corrected two mockup values for contrast; everything else is lifted verbatim.
-STUDIO_KEYS = {"is_default", "revision", "can_undo", "can_redo", "contrast_waiver"}
+STUDIO_KEYS = {"is_default", "revision", "can_undo", "can_redo", "contrast_waiver", "needs_review"}
 MOCKUP_CORRECTIONS = {("copperbelt", "light", "text-faint"), ("savanna-dusk", "light", "text-faint")}
 
 
@@ -27,7 +27,8 @@ async def test_list_builtins_public(client):
     assert all(t["builtin"] for t in themes)
     first = themes[0]
     assert set(first) == {"id", "name", "builtin", "description", "fonts", "radius", "density", "light", "dark",
-                          "chart", "score", "is_default", "revision", "can_undo", "can_redo", "contrast_waiver"}
+                          "chart", "score", "is_default", "revision", "can_undo", "can_redo", "contrast_waiver",
+                          "needs_review"}
     assert first["is_default"] is True and not any(t["is_default"] for t in themes[1:])
     assert first["light"]["bg"] == "#F2F5F3" and first["dark"]["bg"] == "#0C1513"
     assert first["dark"]["chart-1"] == "#3FBF9A"

@@ -247,3 +247,57 @@ describe("Appearance: theme files", () => {
     ).toBeInTheDocument()
   })
 })
+
+describe("Theme from a Kit that needs review", () => {
+  it("is not applied until its low contrast is accepted and saved", async () => {
+    const { id: _id, builtin: _b, ...body } = BUILTIN_THEMES[0]
+    void _id
+    void _b
+    const dim = {
+      ...body,
+      name: "Dim kit",
+      light: { ...body.light, text: LOW_CONTRAST_TEXT },
+    }
+    db.update((s) => {
+      s.customThemes.push({
+        ...dim,
+        id: "dim",
+        builtin: false,
+        needs_review: true,
+      })
+      s.themeRevisions.dim = [
+        {
+          number: 1,
+          parent: null,
+          note: "Imported from a Kit",
+          actor: "owner",
+          created_at: new Date().toISOString(),
+          body: dim,
+        },
+      ]
+      s.themeCurrent.dim = 1
+    })
+    const user = setupUser()
+    await openStudio("dim")
+    expect(screen.getAllByText("Needs review").length).toBeGreaterThan(0)
+    expect(screen.getByText(/came in a Kit import/)).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: /Use this theme/ })
+    ).toBeDisabled()
+    expect(screen.getByRole("button", { name: /Make default/ })).toBeDisabled()
+    const save = screen.getByRole("button", { name: /^Save$/ })
+    expect(save).toBeDisabled()
+    await user.click(
+      screen.getByRole("checkbox", { name: /I accept low contrast/ })
+    )
+    expect(save).toBeEnabled()
+    await user.click(save)
+    await screen.findByText("Theme saved.")
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Use this theme/ })
+      ).toBeEnabled()
+    )
+    expect(screen.queryByText(/came in a Kit import/)).not.toBeInTheDocument()
+  })
+})

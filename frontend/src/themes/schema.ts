@@ -96,6 +96,8 @@ export const themeSchema = z.object({
   dark: tokenMap,
   chart: z.array(z.string()).min(1),
   score: z.object({ low: z.string(), mid: z.string(), high: z.string() }),
+  /** Arrived in a Kit with body text below AA and not accepted yet: shown, never applied. */
+  needs_review: z.boolean().optional(),
 })
 
 export type Theme = z.infer<typeof themeSchema>

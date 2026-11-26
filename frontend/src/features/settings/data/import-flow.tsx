@@ -1,6 +1,7 @@
 import { useId, useState } from "react"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { FileUp } from "lucide-react"
+import { Link } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Chip } from "@/components/chip"
@@ -302,6 +303,35 @@ export function ImportFlow({
           Imported. {result.created} added, {result.updated} replaced,{" "}
           {result.needs_review} waiting for your review.
         </p>
+      )}
+      {result && result.themes_need_review.length > 0 && (
+        <div
+          role="alert"
+          className="grid gap-1 rounded-sm bg-warn-soft px-3 py-2 text-[0.88rem]"
+        >
+          <b className="font-semibold text-warn">
+            {result.themes_need_review.length === 1
+              ? "One theme needs review"
+              : `${result.themes_need_review.length} themes need review`}
+          </b>
+          <span>
+            Body text is below WCAG AA contrast, so these were not applied. Fix
+            or accept the colours in the theme studio:{" "}
+            {result.themes_need_review.map((t, i) => (
+              <span key={t.id}>
+                {i > 0 && ", "}
+                <Link
+                  to="/theme-studio/$themeId"
+                  params={{ themeId: t.id }}
+                  className="underline"
+                >
+                  {t.name}
+                </Link>
+              </span>
+            ))}
+            .
+          </span>
+        </div>
       )}
     </div>
   )

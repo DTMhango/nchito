@@ -1,5 +1,5 @@
 import { useRef, type ReactNode } from "react"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   Check,
   Download,
@@ -52,6 +52,7 @@ const TOKEN_NAMES = [
 /** Settings, Appearance (DESIGN 10.4): theme gallery and every appearance preference. */
 export function AppearancePage() {
   const { themes, theme, appearance, mode, setAppearance } = useTheme()
+  const navigate = useNavigate()
   const fileInput = useRef<HTMLInputElement>(null)
   const files = useThemeFiles()
   const radius = appearance.radius ?? theme.radius
@@ -84,8 +85,15 @@ export function AppearancePage() {
                 key={t.id}
                 type="button"
                 aria-pressed={active}
-                aria-label={`${t.name}${active ? ", in use" : ""}`}
+                aria-label={`${t.name}${active ? ", in use" : ""}${t.needs_review ? ", needs review" : ""}`}
                 onClick={() => {
+                  if (t.needs_review) {
+                    void navigate({
+                      to: "/theme-studio/$themeId",
+                      params: { themeId: t.id },
+                    })
+                    return
+                  }
                   setAppearance({ theme_id: t.id })
                   if (!active) toast.success(`${t.name} theme on.`)
                 }}
@@ -103,6 +111,7 @@ export function AppearancePage() {
                 <span className="flex items-center gap-2 font-semibold">
                   {t.name}
                   {active && <Chip tone="primary">In use</Chip>}
+                  {t.needs_review && <Chip tone="warn">Needs review</Chip>}
                 </span>
                 <span className="text-[0.8rem] text-faint">
                   {t.description ? `${t.description} · ` : ""}

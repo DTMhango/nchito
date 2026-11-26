@@ -289,3 +289,93 @@ async def test_themes_round_trip_through_share_setup_kit(session):
     assert back is not None and not back.builtin
     assert service.body_of(back).model_dump() == body.model_dump()
     assert back.current_revision == 1  # imported themes start a revision history too
+
+
+# ---- Kit import runs the studio's checks ----
+
+def _kit(*themes: dict) -> dict:
+    return {"kind": "share_setup", "exported_at": "2026-11-01T00:00:00+00:00", "app_version": "test",
+            "themes": list(themes)}
+
+
+def _dim_theme(name: str = "Dim kit") -> dict:
+    dim = _body(name)
+    dim["light"] = {**dim["light"], "text": "#C8C8C8"}
+    return dim
+
+
+@pytest.mark.nodb
+def test_kit_theme_token_validation_is_the_studios():
+    from pydantic import ValidationError
+
+    from app.kit.schema import KitFile
+
+    bad = _body("Hostile")
+    bad["light"] = {**bad["light"], "bg": "url(https://tracker.example/x.png)"}
+    with pytest.raises(ValidationError):
+        KitFile.model_validate(_kit(bad))
+
+
+@pytest.mark.nodb
+def test_kit_preview_notices_low_contrast_theme():
+    from app.kit.importers.kitfile import theme_notices
+    from app.kit.schema import KitFile
+
+    notices = theme_notices(KitFile.model_validate(_kit(_dim_theme(), _body("Fine"))))
+    assert len(notices) == 1 and "Dim kit" in notices[0] and "needs review" in notices[0]
+
+
+async def test_kit_theme_failing_body_text_imports_needing_review(session):
+    from sqlalchemy import select
+
+    from app.core.settings import service as settings_service
+    from app.kit.importers.kitfile import ParsedKit, apply
+    from app.kit.schema import KitFile
+    from app.models.platform import Theme
+    from app.themes import service
+
+    result = await apply(session, ParsedKit(kit=KitFile.model_validate(_kit(_dim_theme(), _body("Fine")))))
+    assert [name for _, name in result.themes_need_review] == ["Dim kit"]
+    dim = await session.scalar(select(Theme).where(Theme.name == "Dim kit"))
+    fine = await session.scalar(select(Theme).where(Theme.name == "Fine"))
+    assert service.needs_review(dim) and not service.needs_review(fine)
+    assert (await service.to_out(session, dim)).needs_review
+    with pytest.raises(service.ThemeNeedsReview):
+        await service.set_default(session, dim, actor="test")
+
+    # The active theme updated by a Kit with failing colours stops being applied and loses an old waiver.
+    await settings_service.set_value(session, "appearance.theme_id", service.api_id(fine), actor="test")
+    fine.contrast_waiver = None
+    again = _dim_theme("Fine")
+    await apply(session, ParsedKit(kit=KitFile.model_validate(_kit(again))))
+    await session.refresh(fine)
+    assert service.needs_review(fine)
+    assert await settings_service.get_value(session, "appearance.theme_id") == await service.default_theme_id(session)
+
+
+async def test_theme_needing_review_cannot_be_applied_until_saved_in_studio(owner_client, session):
+    from app.kit.importers.kitfile import ParsedKit, apply
+    from app.kit.schema import KitFile
+
+    await apply(session, ParsedKit(kit=KitFile.model_validate(_kit(_dim_theme()))))
+    await session.commit()
+    themes = (await owner_client.get("/api/themes")).json()
+    dim = next(t for t in themes if t["name"] == "Dim kit")
+    assert dim["needs_review"] is True
+    assert not any(t["needs_review"] for t in themes if t["builtin"])
+    r = await owner_client.put("/api/settings/appearance.theme_id", json={"value": dim["id"]})
+    assert r.status_code == 422 and "needs review" in r.text
+    appearance = (await owner_client.get("/api/settings/appearance")).json()
+    r = await owner_client.put("/api/settings/appearance", json={**appearance, "theme_id": dim["id"]})
+    assert r.status_code == 422
+    r = await owner_client.put(f"/api/themes/{dim['id']}/default")
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "theme_needs_review"
+    copy = await owner_client.post(f"/api/themes/{dim['id']}/duplicate", json={})
+    assert copy.status_code == 201 and copy.json()["needs_review"] is True
+
+    # Reviewing it in the studio (an explicit acceptance) clears the flag.
+    body = {k: v for k, v in dim.items() if k in ThemeBody.model_fields}
+    r = await owner_client.put(f"/api/themes/{dim['id']}", json={**body, "accept_low_contrast": True})
+    assert r.status_code == 200 and r.json()["needs_review"] is False and r.json()["contrast_waiver"]
+    r = await owner_client.put("/api/settings/appearance.theme_id", json={"value": dim["id"]})
+    assert r.status_code == 200

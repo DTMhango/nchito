@@ -83,10 +83,17 @@ class ImportCommitIn(BaseModel):
     exclude_keys: list[str] = Field(default_factory=list)
 
 
+class ThemeRefOut(BaseModel):
+    id: str
+    name: str
+
+
 class ImportCommitOut(BaseModel):
     created: int
     updated: int
     needs_review: int
+    themes_need_review: list[ThemeRefOut] = Field(default_factory=list, description=(
+        "Imported themes whose body text fails WCAG AA: kept, marked needs review, never applied"))
 
 
 class BackupOut(BaseModel):
@@ -230,6 +237,7 @@ async def import_preview(
         if source == "kit_file":
             parsed = kitfile.parse_kit_zip(data, limits)
             diff = _diff_items(await kitfile.plan(session, parsed.kit))
+            notices += kitfile.theme_notices(parsed.kit)
             kit_zip = data
         elif source in ("old_kit_zip", "free_form"):
             codes, next_no = await _existing_facts(session)
@@ -274,11 +282,13 @@ async def import_commit(body: ImportCommitIn, session: SessionDep, principal: Pr
     if staged is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="this import has expired; upload it again")
     created = updated = review = 0
+    themes_need_review: list[ThemeRefOut] = []
     try:
         if staged.kit_zip is not None:
             parsed = kitfile.parse_kit_zip(staged.kit_zip, await _limits(session))
             applied = await kitfile.apply(session, parsed, exclude=set(body.exclude_keys), actor=principal.actor)
             created, updated, review = applied.created, applied.updated, applied.needs_review
+            themes_need_review = [ThemeRefOut(id=i, name=n) for i, n in applied.themes_need_review]
         if staged.history_csv is not None and not any(k.startswith("application_history:") for k in body.exclude_keys):
             result = await history.commit(session, history.parse_csv(staged.history_csv), actor=principal.actor)
             created, updated = created + result.created, updated + result.updated
@@ -286,7 +296,8 @@ async def import_commit(body: ImportCommitIn, session: SessionDep, principal: Pr
         raise HTTPException(422, detail=str(exc)) from exc
     await session.flush()
     staging.discard(files_dir, body.import_id)
-    return ImportCommitOut(created=created, updated=updated, needs_review=review)
+    return ImportCommitOut(created=created, updated=updated, needs_review=review,
+                           themes_need_review=themes_need_review)
 
 
 CONFIG_HISTORY_PAGE = 50

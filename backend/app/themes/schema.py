@@ -113,6 +113,9 @@ class ThemeOut(ThemeBody):
     can_undo: bool = False
     can_redo: bool = False
     contrast_waiver: ContrastWaiver | None = None
+    needs_review: bool = Field(default=False, description=(
+        "Body text below WCAG AA without the owner's acceptance (arrived in a Kit import): cannot be made active "
+        "or default until saved in the theme studio (fixed, or accepted)"))
 
 
 class ThemeDuplicateIn(BaseModel):

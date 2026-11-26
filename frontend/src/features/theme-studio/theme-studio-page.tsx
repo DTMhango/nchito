@@ -55,6 +55,7 @@ import { StudioPreview } from "./preview"
 import { TokenField } from "./token-field"
 
 const GROUPS = TOKEN_SPEC.groups.filter((g) => g.key !== "chart")
+const REVIEW_FIRST = "Fix or accept the low contrast and save first"
 
 /** Theme studio (DESIGN 10.4): edit a theme with a live, scoped preview and a contrast check. */
 export function ThemeStudioPage({ themeId }: { themeId: string }) {
@@ -106,7 +107,12 @@ function Studio({ theme }: { theme: ThemeOut }) {
   const results = useMemo(() => contrastResults(draft), [draft])
   const blocking = results.filter((r) => r.blocking)
   const blocked = blocking.length > 0 && !accept
-  const canSave = !readOnly && dirty && issues.length === 0 && !blocked
+  // A theme that arrived in a Kit with low body contrast can be saved as is once accepted.
+  const canSave =
+    !readOnly &&
+    (dirty || !!theme.needs_review) &&
+    issues.length === 0 &&
+    !blocked
 
   // The draft as a renderable theme (for the scoped preview only; the app root is untouched).
   const previewTheme: Theme = useMemo(() => {
@@ -281,6 +287,7 @@ function Studio({ theme }: { theme: ThemeOut }) {
             )}
             {active && <Chip tone="primary">In use</Chip>}
             {theme.is_default && <Chip tone="info">Default</Chip>}
+            {theme.needs_review && <Chip tone="warn">Needs review</Chip>}
             {dirty && <Chip tone="warn">Unsaved</Chip>}
             {theme.revision != null && !dirty && (
               <span className="text-[0.8rem] font-normal text-faint">
@@ -346,17 +353,29 @@ function Studio({ theme }: { theme: ThemeOut }) {
           <Button
             variant="outline"
             size="sm"
-            disabled={theme.is_default || dirty}
+            disabled={theme.is_default || dirty || theme.needs_review}
             onClick={() => makeDefault.mutate()}
-            title={dirty ? "Save first" : undefined}
+            title={
+              dirty
+                ? "Save first"
+                : theme.needs_review
+                  ? REVIEW_FIRST
+                  : undefined
+            }
           >
             <Star aria-hidden="true" /> Make default
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={active || dirty}
-            title={dirty ? "Save first" : undefined}
+            disabled={active || dirty || theme.needs_review}
+            title={
+              dirty
+                ? "Save first"
+                : theme.needs_review
+                  ? REVIEW_FIRST
+                  : undefined
+            }
             onClick={() => {
               app.setAppearance({ theme_id: theme.id })
               toast.success(`${theme.name} theme on.`)
@@ -406,6 +425,12 @@ function Studio({ theme }: { theme: ThemeOut }) {
           role="alert"
           className="mb-4 grid gap-2 rounded-md border border-danger bg-danger-soft px-3 py-2.5 text-[0.88rem]"
         >
+          {theme.needs_review && (
+            <span className="text-foreground">
+              This theme came in a Kit import, so it isn't applied until you fix
+              or accept its contrast here.
+            </span>
+          )}
           <b className="font-semibold text-danger">
             Body text is below WCAG AA in {blocking.length}{" "}
             {blocking.length === 1 ? "place" : "places"}, so the theme can't be

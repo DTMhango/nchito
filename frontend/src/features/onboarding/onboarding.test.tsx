@@ -382,3 +382,34 @@ describe("Set-up guide: AI notice for an old folder", () => {
     )
   })
 })
+
+describe("theme step", () => {
+  it("offers the owner's studio themes; one needing review cannot be picked", async () => {
+    const { db } = await import("@/mocks/db")
+    const { BUILTIN_THEMES } = await import("@/themes")
+    const { id: _id, builtin: _b, ...body } = BUILTIN_THEMES[0]
+    void _id
+    void _b
+    db.update((s) => {
+      s.customThemes.push({
+        ...body,
+        id: "studio-made",
+        builtin: false,
+        name: "Studio made",
+      })
+      s.customThemes.push({
+        ...body,
+        id: "from-kit",
+        builtin: false,
+        name: "From a kit",
+        needs_review: true,
+      })
+    })
+    renderApp("/onboarding?step=8")
+    const mine = await screen.findByRole("button", { name: /Studio made/ })
+    expect(mine).toBeEnabled()
+    const flagged = await screen.findByRole("button", { name: /From a kit/ })
+    expect(flagged).toBeDisabled()
+    expect(within(flagged).getByText("Needs review")).toBeInTheDocument()
+  })
+})

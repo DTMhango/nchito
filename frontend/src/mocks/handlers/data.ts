@@ -397,6 +397,7 @@ export const dataHandlers = [
       created: taken.filter((d) => d.change === "add").length,
       updated: taken.filter((d) => d.change !== "add").length,
       needs_review: p.source === "kit_file" ? 0 : taken.length,
+      themes_need_review: [],
     } satisfies S["ImportCommitOut"])
   }),
 

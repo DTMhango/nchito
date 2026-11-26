@@ -24,7 +24,8 @@ from app.themes.schema import EXPORT_FORMAT, ThemeBody, ThemeExport, ThemeOut, b
 from app.themes.tokens import PairResult, evaluate_contrast
 
 # ThemeOut fields that an exported full theme may carry; import ignores them.
-_OUT_ONLY = frozenset({"id", "builtin", "is_default", "revision", "can_undo", "can_redo", "contrast_waiver"})
+_OUT_ONLY = frozenset({"id", "builtin", "is_default", "revision", "can_undo", "can_redo", "contrast_waiver",
+                       "needs_review"})
 
 
 class BuiltinThemeError(PermissionError):
@@ -86,6 +87,7 @@ async def to_out(session: AsyncSession, theme: Theme, default_id: str | None = N
         radius=theme.radius, density=theme.density, light=theme.light, dark=theme.dark,  # type: ignore[arg-type]
         chart=theme.chart, score=theme.score, is_default=api_id(theme) == default_id,
         revision=theme.current_revision, can_undo=can_undo, can_redo=can_redo, contrast_waiver=theme.contrast_waiver,
+        needs_review=needs_review(theme),
     )
 
 
@@ -107,9 +109,31 @@ def contrast_report(body: ThemeBody) -> list[PairResult]:
             *evaluate_contrast(body.dark, "dark", body.chart, score)]
 
 
+def blocking_pairs(body: ThemeBody) -> list[PairResult]:
+    """Body-text pairs below WCAG AA: the studio's save block, also applied to themes arriving in a Kit."""
+    return [r for r in contrast_report(body) if r.blocking]
+
+
+def needs_review(theme: Theme) -> bool:
+    """An owner theme whose body text fails AA and that the owner has not accepted (it arrived through a
+    Kit import, which cannot carry an acceptance). It cannot be applied until reviewed in the studio."""
+    return not theme.builtin and theme.contrast_waiver is None and bool(blocking_pairs(body_of(theme)))
+
+
+class ThemeNeedsReview(ValueError):
+    def __init__(self) -> None:
+        super().__init__("this theme's body text is below WCAG AA and needs review in the theme studio first")
+
+
+def check_applicable(theme: Theme) -> None:
+    """Raise ThemeNeedsReview for a theme that may not be made active or default yet."""
+    if needs_review(theme):
+        raise ThemeNeedsReview()
+
+
 def _waiver(body: ThemeBody, accept: bool, actor: str) -> ContrastWaiver | None:
     """None when body text passes AA; the recorded waiver when the owner accepted; else LowContrast."""
-    failures = [r for r in contrast_report(body) if r.blocking]
+    failures = blocking_pairs(body)
     if not failures:
         return None
     if not accept:
@@ -266,8 +290,10 @@ async def _free_name(session: AsyncSession, wanted: str) -> str:
 async def duplicate_theme(session: AsyncSession, source: Theme, name: str | None, *, actor: str) -> Theme:
     body = body_of(source).model_copy(update={"name": await _free_name(session, name or f"{source.name} copy")})
     # A copy of a theme that already carries a waiver keeps it; built-ins pass AA.
+    # A copy of a theme that needs review needs review too (no acceptance is invented for it).
     accept = source.contrast_waiver is not None
-    return await create_theme(session, body, actor=actor, accept_low_contrast=accept, check_contrast=True,
+    return await create_theme(session, body, actor=actor, accept_low_contrast=accept,
+                              check_contrast=not needs_review(source),
                               note=f"Duplicated from {source.name}")
 
 
@@ -284,6 +310,7 @@ async def delete_theme(session: AsyncSession, theme: Theme) -> None:
 
 
 async def set_default(session: AsyncSession, theme: Theme, *, actor: str) -> None:
+    check_applicable(theme)
     await settings_service.set_value(session, "themes.default_theme_id", api_id(theme), actor=actor,
                                      reason="set from the theme studio")
 

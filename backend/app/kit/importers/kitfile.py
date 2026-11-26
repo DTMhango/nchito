@@ -30,6 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.apply import stages
 from app.core import audit
 from app.core.clock import utcnow
+from app.core.settings import service as settings_service
+from app.core.settings.registry import REGISTRY
 from app.kit import export
 from app.kit.loader import LoadReport, load_kit
 from app.kit.schema import KIT_SCHEMA_VERSION, KitFile
@@ -289,6 +291,7 @@ class ApplyResult:
     created: int = 0
     updated: int = 0
     needs_review: int = 0
+    themes_need_review: list[tuple[str, str]] = field(default_factory=list)  # (api id, name)
     report: LoadReport | None = None
     other: Counter[str] = field(default_factory=Counter)
 
@@ -330,6 +333,7 @@ async def apply(session: AsyncSession, parsed: ParsedKit, *, exclude: set[str] |
     for t in kit.themes:
         count("theme", await _theme(session, t))
     await session.flush()
+    result.themes_need_review = await _themes_needing_review(session, [t.name for t in kit.themes], actor)
     for c in kit.campaigns:
         count("campaign", await _campaign(session, c))
     for h in kit.history:
@@ -444,11 +448,41 @@ async def _view(session: AsyncSession, v: Any) -> str:
     return "updated"
 
 
+async def _themes_needing_review(session: AsyncSession, names: list[str], actor: str) -> list[tuple[str, str]]:
+    """Names of the imported themes that need review. If the active theme is one of them, the app
+    goes back to the default theme (a theme that needs review is never applied)."""
+    if not names:
+        return []
+    rows = (await session.scalars(select(Theme).where(Theme.name.in_(names), Theme.builtin.is_(False)))).all()
+    flagged = [t for t in rows if theme_service.needs_review(t)]
+    active = str(await settings_service.get_value(session, "appearance.theme_id"))
+    if any(theme_service.api_id(t) == active for t in flagged):
+        fallback = await theme_service.default_theme_id(session)
+        default = await theme_service.get_theme(session, fallback)
+        if default is None or theme_service.needs_review(default):
+            fallback = str(REGISTRY["appearance.theme_id"].effective_default())
+        await settings_service.set_value(session, "appearance.theme_id", fallback, actor=actor,
+                                         reason="the active theme arrived in a Kit import and needs review")
+    for t in flagged:
+        await audit.record(session, actor=actor, action="theme.needs_review", subject_type="theme",
+                           subject_id=t.id, detail={"name": t.name, "source": "kit_import"})
+    return sorted(((theme_service.api_id(t), t.name) for t in flagged), key=lambda p: p[1].casefold())
+
+
+def theme_notices(kit: KitFile) -> list[str]:
+    """Preview notices for Kit themes whose body text fails the studio's contrast check."""
+    return [f"Theme {t.name!r}: body text is below WCAG AA contrast. It will be imported marked "
+            "'needs review' and cannot be applied until you fix or accept it in the theme studio."
+            for t in kit.themes if theme_service.blocking_pairs(ThemeBody.model_validate(t.model_dump()))]
+
+
 async def _theme(session: AsyncSession, t: Any) -> str:
+    """Themes run the studio's token validation (``ThemeBody``) and contrast check. A Kit carries no
+    contrast acceptance, so a theme whose body text fails AA lands without one: ``needs_review``."""
     rows = (await session.scalars(select(Theme).where(Theme.name == t.name, Theme.builtin.is_(False)))).all()
     body = ThemeBody.model_validate(t.model_dump())
     if not rows:
-        await theme_service.create_theme(session, body)
+        await theme_service.create_theme(session, body, note="Imported from a Kit")
         return "created"
     same = (rows[0].light == body.light and rows[0].dark == body.dark and rows[0].radius == body.radius
             and rows[0].density == body.density and rows[0].chart == body.chart
@@ -456,7 +490,9 @@ async def _theme(session: AsyncSession, t: Any) -> str:
             and rows[0].score.model_dump() == body.score.model_dump() and rows[0].description == body.description)
     if same:
         return "unchanged"
-    await theme_service.update_theme(session, rows[0], body)
+    theme = await theme_service.update_theme(session, rows[0], body, note="Imported from a Kit")
+    if theme_service.blocking_pairs(body):
+        theme.contrast_waiver = None  # an earlier acceptance was for other colours
     return "updated"
 
 

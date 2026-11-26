@@ -34,6 +34,7 @@ const OUT_ONLY = [
   "can_undo",
   "can_redo",
   "contrast_waiver",
+  "needs_review",
 ]
 
 const unauthorized = () =>
@@ -70,6 +71,7 @@ function toOut(t: Theme): ThemeOut {
       !!cur && cur.parent !== null && list.some((r) => r.number === cur.parent),
     can_redo: list.some((r) => r.parent === current),
     contrast_waiver: waivers.get(t.id) ?? null,
+    needs_review: !waivers.get(t.id) && !!t.needs_review,
   } as ThemeOut
 }
 
