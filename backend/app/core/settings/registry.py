@@ -16,6 +16,8 @@ Deployment choices (database URL, secrets, base URL) live in env (``app.core.con
 from __future__ import annotations
 
 import re
+import string
+from collections.abc import Callable
 from typing import Any
 
 from app.core.config import get_config
@@ -51,6 +53,7 @@ GROUPS: dict[str, str] = {
     "retention": "Retention",
     "backups": "Backups",
     "notifications": "Notifications",
+    "health": "Health",
     "runners": "Runners",
 }
 
@@ -58,6 +61,10 @@ AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
 UNKNOWN_POLICIES = ("review", "pass_with_penalty", "pass_blocks_auto", "fail")
 ANSWER_SCOPES = ("this_application", "this_employer", "this_country", "all_matching")
 NOTIFICATION_CHANNELS = ("telegram", "email", "webhook")
+# Notification kinds the owner can switch on or off (the digest is governed by notifications.digest).
+NOTIFIABLE_KINDS = ("pending_action", "pending_action_stale", "application_sent", "reply_received", "run_failed",
+                    "budget", "health", "backup")
+TITLE_FIELDS = frozenset({"title", "app_name", "date", "count"})
 
 _DEFS: list[SettingDef] = []
 
@@ -132,6 +139,22 @@ def _model(key: str, label: str, description: str, default: str, example: str) -
 def _cron(key: str, label: str, description: str, default: str, example: str) -> None:
     _add(key, "cron", label, description, default, example, str, validators=(cron_expr,),
          invalid_example="every day at six", has_invalid_example=True)
+
+
+def _title_template(allowed: frozenset[str]) -> Callable[[Any], None]:
+    """A wording template may use only the named ``{fields}`` and must not be empty."""
+
+    def check(value: Any) -> None:
+        non_empty(value)
+        try:
+            fields = {name for _, name, _, _ in string.Formatter().parse(str(value)) if name is not None}
+        except ValueError as exc:
+            raise SettingValueError(f"not a valid template: {exc}") from exc
+        unknown = fields - allowed
+        if unknown:
+            raise SettingValueError(f"unknown field(s) {sorted(unknown)}; allowed: {sorted(allowed)}")
+
+    return check
 
 
 # ---------------------------------------------------------------------------------------
@@ -335,6 +358,13 @@ _int("retention.below_threshold_text_days", "Below-threshold text",
      "Drop full posting text of below-threshold roles after this many days.", 30, 14, 1, 3650, "days")
 _int("retention.unsubmitted_archive_days", "Archive unsubmitted roles",
      "Archive roles never applied to after this many days.", 60, 90, 1, 3650, "days")
+_cron("retention.cron", "Retention schedule", "When the retention job runs.", "30 4 * * *", "0 5 * * 0")
+_int("retention.notifications_days", "Keep notifications",
+     "Delete notifications older than this many days. Applications, the audit and duplicate-protection "
+     "history are never deleted.", 90, 30, 7, 3650, "days")
+_int("retention.temp_files_days", "Keep temporary files",
+     "Delete files in the temporary folder older than this many days. Submitted snapshots and the vault are "
+     "never touched.", 7, 1, 1, 365, "days")
 
 # Backups (14)
 _cron("backups.cron", "Backup schedule", "When the nightly backup runs.", "0 2 * * *", "30 3 * * *")
@@ -348,6 +378,57 @@ _add("notifications.channels", "list", "Channels",
      "Where notifications go. Empty until a channel is connected.",
      [], ["telegram"], list[str], choices=NOTIFICATION_CHANNELS, validators=(unique_items,),
      invalid_example=["pigeon"], has_invalid_example=True)
+_add("notifications.events", "list", "Events that notify",
+     "Which kinds of event send a message to the channels. The digest has its own setting.",
+     ["pending_action", "pending_action_stale", "reply_received", "run_failed", "budget", "health", "backup"],
+     ["pending_action"], list[str], choices=NOTIFIABLE_KINDS, validators=(unique_items,),
+     invalid_example=["everything"], has_invalid_example=True)
+_bool("notifications.quiet_hours_enabled", "Notification quiet hours",
+      "Hold messages during quiet hours and send them when quiet hours end.", True)
+_add("notifications.quiet_hours_start", "time", "Notification quiet hours start",
+     "No message is sent after this time (owner's time zone).",
+     "21:00", "22:30", str, validators=(time_of_day,), invalid_example="25:00", has_invalid_example=True)
+_add("notifications.quiet_hours_end", "time", "Notification quiet hours end",
+     "Held messages are sent from this time.",
+     "07:00", "06:00", str, validators=(time_of_day,), invalid_example="7am", has_invalid_example=True)
+_enum("notifications.detail_level", "Message detail",
+      "titles: role and employer names appear in messages. generic: messages only say that something needs you.",
+      "titles", "generic", ("titles", "generic"))
+_add("notifications.needs_you_title", "string", "Wording: needs you",
+     "Title of a message about something waiting for you. Fields: {title}, {app_name}, {date}, {count}.",
+     "Needs you: {title}", "{app_name}: {title}", str, validators=(_title_template(TITLE_FIELDS), max_length(120)),
+     invalid_example="Needs you: {nonsense}", has_invalid_example=True)
+_add("notifications.alert_title", "string", "Wording: other alerts",
+     "Title of replies, failures, budget and health messages. Fields: {title}, {app_name}, {date}, {count}.",
+     "{title}", "{app_name}: {title}", str, validators=(_title_template(TITLE_FIELDS), max_length(120)),
+     invalid_example="{missing", has_invalid_example=True)
+_add("notifications.digest_title", "string", "Wording: digest title",
+     "Title of the digest. Fields: {app_name}, {date}, {count}.",
+     "{app_name} digest for {date}", "Daily summary, {date}", str,
+     validators=(_title_template(frozenset({"app_name", "date", "count"})), max_length(120)),
+     invalid_example="Digest {title}", has_invalid_example=True)
+_add("notifications.digest_time", "time", "Morning digest time",
+     "When the digest is sent if the digest setting is 'morning' (owner's time zone).",
+     "07:30", "08:15", str, validators=(time_of_day,), invalid_example="7.30", has_invalid_example=True)
+_bool("notifications.digest_skip_empty", "Skip an empty digest",
+      "Send no digest on a day with nothing to report.", True)
+_int("notifications.digest_max_items", "Digest list length", "Most roles or actions listed per digest section.",
+     5, 10, 1, 25)
+_int("notifications.lookback_hours", "Notification look-back",
+     "Only events newer than this are sent, so enabling a channel does not flood it with old items.",
+     48, 24, 1, 720, "hours")
+_int("notifications.retry_attempts", "Delivery attempts", "Give up on a message after this many failed attempts.",
+     3, 5, 1, 20)
+_int("notifications.retry_minutes", "Retry wait",
+     "Wait this long before the second attempt; each further wait doubles.", 10, 5, 1, 1440, "minutes")
+
+# Health
+_int("health.sweep_stale_hours", "Sweep overdue after",
+     "Raise an alert when no sweep has succeeded for this long.", 36, 72, 1, 720, "hours")
+_int("health.backup_stale_hours", "Backup overdue after",
+     "Raise an alert when no backup has succeeded for this long.", 36, 72, 1, 720, "hours")
+_int("health.disk_min_free_mb", "Low disk space", "Raise an alert when the files volume has less free space.",
+     500, 2000, 10, 10_000_000, "MB")
 
 # Runners (8.3)
 _bool("runners.server_runner_enabled", "Server runner",
