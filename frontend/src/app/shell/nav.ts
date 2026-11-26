@@ -124,6 +124,7 @@ export const SETTINGS_SECTIONS = [
   { to: "/settings/notifications", label: "Notifications" },
   { to: "/settings/runners", label: "Runners" },
   { to: "/settings/data", label: "Data" },
+  { to: "/settings/health", label: "System health" },
   { to: "/settings/security", label: "Security" },
   { to: "/settings/activity", label: "Activity log" },
   { to: "/settings/history", label: "Configuration history" },
