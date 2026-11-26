@@ -67,7 +67,8 @@ async def test_reply_matches_by_reference_and_proposes_instead_of_changing_the_s
     assert result.proposed == 1 and result.applied == 0
     await session.refresh(setup.app)
     assert setup.app.stage == Stage.submitted  # only proposed
-    (action,) = await pendings(session)
+    # the invitation also proposes an interview event (wave 4 calendar); this test is about the stage proposal
+    (action,) = [p for p in await pendings(session) if p.detail["kind"] == mail_sync.PROPOSAL_KIND]
     assert action.application_id == setup.app.id and action.detail["proposed_stage"] == "interview"
     assert action.detail["kind"] == mail_sync.PROPOSAL_KIND
 

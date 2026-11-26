@@ -66,6 +66,7 @@ class MailMessage:
     body_text: str
     headers: dict[str, str] = field(default_factory=dict)  # lower-cased names; Message-ID, References, ...
     body_html: str = ""
+    calendars: tuple[bytes, ...] = ()  # calendar (.ics) parts, size-capped; untrusted, read only by the calendar
 
 
 @runtime_checkable

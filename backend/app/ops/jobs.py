@@ -137,6 +137,13 @@ async def tick(session_factory, now: datetime | None = None) -> dict[str, object
         await run_retention_job(s)
         return True
 
+    async def calendar_step(s: AsyncSession) -> int:
+        from app.pipeline import events, events_google
+
+        due = await events.run_due(s, now)
+        await events_google.sync_pending(s)
+        return due.reminders + due.debriefs
+
     async def deliver(s: AsyncSession) -> int:
         return (await notifications.deliver_due(s, now)).sent
 
@@ -144,6 +151,7 @@ async def tick(session_factory, now: datetime | None = None) -> dict[str, object
     await step("retention", retention_step)
     await step("health", health_step)
     await step("collect", collect)
+    await step("calendar", calendar_step)
     await step("digest", digest_step)
     await step("deliver", deliver)  # last, so what the steps above created goes out in the same minute
     return done

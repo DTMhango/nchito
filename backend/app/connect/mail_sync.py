@@ -317,6 +317,20 @@ async def process_message(session: AsyncSession, conn: Connection, msg: MailMess
         res.linked += 1
         await act_on_thread(session, thread, match.application, cls.category, msg.provider_message_id,
                             list(values["mail.auto_apply_classes"]), res)
+        if cls.category == "interview":
+            await _propose_event(session, match.application, msg, values, llm)
+
+
+async def _propose_event(session: AsyncSession, app: Application, msg: MailMessage, values: dict[str, Any],
+                         llm: LLMClient | None) -> None:
+    """An interview invitation becomes a proposed event for the owner to confirm. It never breaks a mail check."""
+    from app.pipeline import events
+
+    try:
+        async with session.begin_nested():
+            await events.propose_from_message(session, app, msg, values=values, llm=llm)
+    except Exception:
+        log.exception("could not propose an interview event from message %s", msg.provider_message_id)
 
 
 async def _ignored_senders(session: AsyncSession) -> list[str]:

@@ -9,6 +9,7 @@ from app.api.routers import (
     campaigns,
     connections,
     data,
+    events,
     health,
     insights,
     interview,
@@ -48,6 +49,7 @@ ALL_ROUTERS: list[APIRouter] = [
     connections.tokens_router,
     insights.router,
     interview.router,
+    *events.ROUTERS,
     data.router,
     llm_api.router,
 ]

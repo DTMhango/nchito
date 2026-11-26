@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, Page, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.connect import mail_connections, search_api
+from app.connect import calendar_records, gcalendar, mail_connections, search_api
 from app.connect import records as ops_records
 from app.connect.mailbox import MailError
 from app.core import audit
@@ -35,7 +35,7 @@ tokens_router = APIRouter(prefix="/api/tokens", tags=["tokens"], dependencies=[R
                           responses=NOT_IMPLEMENTED_RESPONSES)
 
 ProviderT = Literal["anthropic", "openai_compatible", "gmail", "imap_smtp", "gdrive", "msgraph", "onedrive",
-                    "telegram", "webhook", "s3", "search_api"]
+                    "telegram", "webhook", "s3", "search_api", "gcalendar"]
 
 
 class ConnectionOut(Timestamps):
@@ -118,7 +118,7 @@ def _out(conn: Connection) -> ConnectionOut:
 
 
 def _masked(conn: Connection) -> dict[str, str]:
-    if conn.provider.value == "gdrive":  # OAuth tokens: a nested record, never shown
+    if conn.provider.value in ("gdrive", "gcalendar"):  # OAuth tokens: a nested record, never shown
         return {"tokens": mask("x" * 8)} if conn.secrets_enc else {}
     return provider_records.masked_secrets(conn)
 
@@ -129,7 +129,8 @@ async def _get_llm(session: AsyncSession, connection_id: uuid.UUID) -> Connectio
     if conn is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="connection not found")
     if not (provider_records.is_llm(conn.provider.value) or mail_connections.is_mail(conn.provider.value)
-            or ops_records.is_ops(conn.provider.value) or search_api.is_search(conn.provider.value)):
+            or ops_records.is_ops(conn.provider.value) or search_api.is_search(conn.provider.value)
+            or calendar_records.is_calendar(conn.provider.value)):
         not_implemented(2, "connect")
     return conn
 
@@ -146,6 +147,8 @@ async def create_connection(body: ConnectionCreate, session: SessionDep, princip
     """LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are
     encrypted at rest and only ever returned masked. ``search_api``: the web search source's key (secret
     ``api_key``; config ``endpoint`` and the response shape)."""
+    if calendar_records.is_calendar(body.provider):
+        raise HTTPException(422, detail="connect Google Calendar with the Connect button, not by pasting keys")
     if search_api.is_search(body.provider):
         try:
             conn = await search_api.create(session, label=body.label, config=body.config, secrets=body.secrets,
@@ -180,6 +183,16 @@ async def update_connection(connection_id: uuid.UUID, body: ConnectionUpdate, se
                             principal: PrincipalDep) -> ConnectionOut:
     """Omitted fields stay; a blank secret value keeps the stored one."""
     conn = await _get_llm(session, connection_id)
+    if calendar_records.is_calendar(conn.provider.value):
+        if body.label is not None:
+            conn.label = body.label
+        if body.enabled is not None and body.enabled != conn.enabled:
+            try:
+                await calendar_records.set_enabled(session, conn, body.enabled, actor=principal.actor)
+            except (gcalendar.CalendarError, calendar_records.OAuthNotConfigured) as exc:
+                raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        await session.refresh(conn)
+        return _out(conn)
     if search_api.is_search(conn.provider.value):
         try:
             await search_api.update(session, conn, label=body.label, config=body.config, secrets=body.secrets,
@@ -220,6 +233,9 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
                           service: Annotated[LLMService, Depends(llm_service)]) -> ConnectionTestOut:
     """One tiny budgeted request with this provider record (model: config ``test_model`` or the extract model)."""
     conn = await _get_llm(session, connection_id)
+    if calendar_records.is_calendar(conn.provider.value):
+        ok, detail = await calendar_records.run_test(session, conn)
+        return ConnectionTestOut(ok=ok, detail=detail)
     if ops_records.is_ops(conn.provider.value):
         ok, detail = await ops_records.run_test(session, conn)
         return ConnectionTestOut(ok=ok, detail=detail)
@@ -247,8 +263,10 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
 
 
 @connections_router.post("/oauth/{provider}/start", response_model=OAuthStartOut, name="connections_oauth_start")
-async def oauth_start(provider: Literal["gmail", "gdrive", "msgraph", "onedrive"]) -> OAuthStartOut:
+async def oauth_start(provider: Literal["gmail", "gdrive", "gcalendar", "msgraph", "onedrive"]) -> OAuthStartOut:
     try:
+        if provider == "gcalendar":
+            return OAuthStartOut(authorize_url=calendar_records.oauth_start_url())
         if provider == "gdrive":
             return OAuthStartOut(authorize_url=ops_records.oauth_start_url())
         if provider == "gmail":
@@ -260,8 +278,17 @@ async def oauth_start(provider: Literal["gmail", "gdrive", "msgraph", "onedrive"
 
 @connections_router.get("/oauth/{provider}/callback", name="connections_oauth_callback",
                         responses={307: {"description": "Back to the Connections screen"}})
-async def oauth_callback(provider: Literal["gmail", "gdrive", "msgraph", "onedrive"], code: str, state: str,
-                         session: SessionDep, principal: PrincipalDep) -> Response:
+async def oauth_callback(provider: Literal["gmail", "gdrive", "gcalendar", "msgraph", "onedrive"], code: str,
+                         state: str, session: SessionDep, principal: PrincipalDep) -> Response:
+    if provider == "gcalendar":
+        if not calendar_records.check_state(state):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="the sign-in link expired; start again")
+        try:
+            await calendar_records.oauth_finish(session, code=code, actor=principal.actor)
+        except (calendar_records.OAuthNotConfigured, gcalendar.CalendarError) as exc:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        return RedirectResponse("/settings/connections?connected=gcalendar",
+                                status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     if provider == "gdrive":
         if not ops_records.check_state(state):
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="the sign-in link expired; start again")

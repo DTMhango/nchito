@@ -203,6 +203,7 @@ class ConnectionProvider(enum.StrEnum):
     webhook = "webhook"
     s3 = "s3"
     search_api = "search_api"  # the web search source's provider key (wave 3)
+    gcalendar = "gcalendar"  # Google Calendar, a dedicated calendar the app creates (wave 4)
 
 
 class Connection(Base, Entity):

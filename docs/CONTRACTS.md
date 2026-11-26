@@ -1001,3 +1001,25 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
   The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
   skill asks for it.
+
+## Wave 4 calendar additions
+
+Code: `app/pipeline/events.py` (events, proposals from mail, reminders, debrief), `events_feed.py` (token, feed, `.ics`),
+`events_google.py` (mirror), `app/connect/{ics,invite_text,gcalendar,calendar_records}.py`, router `api/routers/events.py`
+(`events.ROUTERS`: owner router plus the public feed). Migration `0019_calendar` (down_revision `0018_blocker_kind`, so
+`head` stays single): tables `interview_event`, `calendar_feed`; `connection.provider` gains `gcalendar`.
+
+- Events: `GET|POST /api/jobs/{job_id}/events`, `GET /api/interview-events/upcoming`, `GET|PUT /api/interview-events/{id}`,
+  `POST .../confirm|reschedule|cancel|debrief`, `GET .../ics`. Times are wall time plus IANA `timezone`
+  (`YYYY-MM-DDTHH:MM`); responses carry UTC and both wall times. Errors `{code, reason}`.
+- Mail: `MailMessage.calendars` (size-capped `.ics` parts). An interview invitation proposes an event
+  (`status=proposed`, `source=mail`, `candidates` when ambiguous); never confirmed or answered automatically.
+  Pending actions: `interview_event_proposal`, `interview_event_update`, `interview_debrief`, `interview_follow_up`
+  (all `follow_up` type).
+- Calendar out: `GET /api/calendar`, `POST|DELETE /api/calendar/feed` (rotate/revoke), public
+  `GET /api/calendar/feed/{token}.ics`. Detail level setting `calendar.detail_level` (employer|role|full); notes never leave.
+- Google: provider `gcalendar`, OAuth `/api/connections/oauth/gcalendar/*`; scope `calendar.app.created` (the only scope that
+  can create the dedicated calendar without exposing others; `calendar.events` cannot create calendars). Connected = off until
+  `PUT /api/connections/{id} {enabled:true}`.
+- Settings group `calendar.*`; `interview_reminder` added to `notifications.events` kinds and default.
+- Optional model extraction reuses stage `classify_email`; off by default (`calendar.llm_extract`).

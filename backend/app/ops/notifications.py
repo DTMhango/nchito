@@ -54,6 +54,7 @@ GENERIC_TITLES = {
     "health": "Health notice",
     "backup": "Backup notice",
     "digest": "Your digest is ready",
+    "interview_reminder": "An interview is coming up",
 }
 NEEDS_YOU_KINDS = ("pending_action", "pending_action_stale")
 MAX_BODY = 400
