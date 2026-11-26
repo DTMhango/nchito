@@ -304,7 +304,7 @@ describe("Set-up guide: progress from the server", () => {
     }
     renderApp("/onboarding?step=1")
     expect(await screen.findByTestId("next-step")).toHaveTextContent(
-      "Label facts_confirmed. Detail facts_confirmed."
+      "Still to do: Detail facts_confirmed."
     )
     const nav = screen.getByRole("navigation", { name: "Set-up steps" })
     const buttons = within(nav).getAllByRole("button")

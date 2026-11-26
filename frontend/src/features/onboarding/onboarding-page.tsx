@@ -123,7 +123,7 @@ export function OnboardingPage({ step }: { step: number }) {
         <BrandMark />
         <span className="heading text-[1.1rem] font-bold">{appName}</span>
         <span className="text-muted-foreground max-sm:hidden">
-          · Set-up guide
+          Â· Set-up guide
         </span>
         <span
           className="ml-auto num text-sm text-muted-foreground"
@@ -209,7 +209,7 @@ export function OnboardingPage({ step }: { step: number }) {
               className="rounded-sm bg-sunken px-3 py-2 text-sm"
             >
               <span className="font-semibold">Still to do: </span>
-              {server.next.label}. {server.next.detail}
+              {server.next.detail}
             </p>
           )}
 
