@@ -1157,7 +1157,10 @@ Code: `app/pipeline/events.py` (events, proposals from mail, reminders, debrief)
   `tailoring.service.request`, `prepare.prepare_packet`, `approval.approve`, `recheck.recheck_job`): a held role, a
   "never apply" employer, an unchecked draft or an illegal move is refused per item with a stable code (`held`,
   `never_apply`, `spec_not_ready`, `answers_waiting`, `no_packet`, `gates`, `illegal_stage`, `illegal_transition`,
-  `duplicate`, `merged`, ...). A preview tries each item inside a savepoint and rolls it back, so preview counts equal
+  `duplicate`, `merged`, ...). `queue_tailoring` and `send_for_approval` also re-check, at the time of the
+  action, the employer cooldown (`cooldown`) and an exclusion the owner accepted from feedback whose rule is still in
+  the campaign (`feedback_excluded`, reason names the rule; `preferences.accepted_exclusion`), since a role's
+  assessment may predate both (integration). A preview tries each item inside a savepoint and rolls it back, so preview counts equal
   run results. Bulk send is never an approval: `send_for_approval` builds the packet and lets the policy act; each
   approval stays per packet. Undo (tags, snooze, skip, archive) inside `bulk.undo_window_minutes`; an item that changed
   since is left alone (`undo_skipped`, `changed_since`).

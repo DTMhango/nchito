@@ -54,6 +54,8 @@ CODE_TITLES: dict[str, str] = {
     "illegal_transition": "that stage move is not allowed from where it is",
     "held": "it is held in its employer group (outranked by another role)",
     "never_apply": "you never apply to this employer",
+    "cooldown": "its employer is cooling down",
+    "feedback_excluded": "it matches an exclusion you accepted from feedback",
     "no_application": "it has no application yet",
     "duplicate": "it already has an application",
     "merged": "it was merged into another role",
@@ -353,12 +355,34 @@ def _check_work_allowed(job: Job) -> None:
         raise Refuse("merged", "this job was merged into another; use that one")
 
 
+async def _check_policy(ctx: Ctx, job: Job, app: Application | None) -> None:
+    """Employer policy and accepted feedback, checked now (a role's assessment may predate them):
+    never apply, the employer cooldown, and an exclusion the owner accepted from feedback."""
+    from app.pipeline import preferences
+
+    never = await employers.never_apply_reason(ctx.session, job)
+    if never is not None:
+        raise Refuse("never_apply", never)
+    left = (await conflicts.employer_counters(ctx.session, job))["employer_cooldown_days_left"]
+    if left > 0:
+        raise Refuse("cooldown", f"the employer is cooling down for {left} more day(s)")
+    if app is not None and app.campaign_id is not None:
+        campaign_ids: list[uuid.UUID] = [app.campaign_id]
+    else:
+        campaign_ids = list((await ctx.session.scalars(
+            select(Assessment.campaign_id).where(Assessment.job_id == job.id))).all())
+    excluded = await preferences.accepted_exclusion(ctx.session, job.id, campaign_ids)
+    if excluded is not None:
+        raise Refuse("feedback_excluded", excluded)
+
+
 async def _queue_tailoring(ctx: Ctx, subject: Job | Application) -> ItemResult:
     from app.pipeline.tailoring import service as tailoring_service
 
     job = await _job_of(ctx, subject)
     _check_work_allowed(job)
     app = await _application_of(ctx, subject)
+    await _check_policy(ctx, job, app)
     if app is None:
         assert isinstance(subject, Job)
         app = await create_application(ctx.session, subject, None, actor=ctx.actor)
@@ -381,9 +405,7 @@ async def _queue_tailoring(ctx: Ctx, subject: Job | Application) -> ItemResult:
 async def _send_precheck(ctx: Ctx, app: Application, job: Job) -> None:
     """The cheap, deterministic reasons nothing can be built, in the order the owner would meet them."""
     _check_work_allowed(job)
-    never = await employers.never_apply_reason(ctx.session, job)
-    if never is not None:
-        raise Refuse("never_apply", never)
+    await _check_policy(ctx, job, app)
     if app.stage not in approval.APPROVABLE_STAGES:
         raise Refuse("illegal_stage", f"an application in {app.stage.value} cannot be sent for approval")
     version, check = await apply_prepare.spec_state(ctx.session, app)

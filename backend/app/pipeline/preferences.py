@@ -710,6 +710,33 @@ async def accept(session: AsyncSession, suggestion: PreferenceSuggestion, *, act
     return suggestion
 
 
+async def accepted_exclusion(session: AsyncSession, job_id: uuid.UUID, campaign_ids: Iterable[uuid.UUID]
+                             ) -> str | None:
+    """The reason of an exclusion the owner accepted from feedback (a ``tighten_filter`` suggestion whose
+    rule is still in the campaign) that this job matches, or None. Its stored assessment predates the
+    rule, so callers acting on older matches (bulk tailoring and send) check it here."""
+    ids = list(dict.fromkeys(campaign_ids))
+    if not ids:
+        return None
+    accepted = (await session.scalars(select(PreferenceSuggestion).where(
+        PreferenceSuggestion.campaign_id.in_(ids), PreferenceSuggestion.kind == "tighten_filter",
+        PreferenceSuggestion.status == "accepted"))).all()
+    if not accepted:
+        return None
+    records = await load_records(session, now=utcnow(), job_ids=[job_id], include_merged=True)
+    if not records:
+        return None
+    record = records[0][1]
+    for suggestion in accepted:
+        change = CHANGE_ADAPTER.validate_python(suggestion.change)
+        campaign = await session.get(Campaign, suggestion.campaign_id)
+        live = campaign is not None and any(
+            r.effect == "exclude" and r.conditions == change.conditions for r in campaign.criteria.rules)
+        if live and evaluate(change.conditions, record):
+            return f"matches the exclusion you accepted from feedback: {change.reason}"
+    return None
+
+
 async def dismiss(session: AsyncSession, suggestion: PreferenceSuggestion, *, actor: str, note: str | None = None
                   ) -> PreferenceSuggestion:
     if suggestion.status != "open":

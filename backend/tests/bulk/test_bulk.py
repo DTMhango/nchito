@@ -438,3 +438,68 @@ async def test_operation_progress_is_published_and_listed(owner_client, session,
     async with get_sessionmaker()() as s:
         actions = {a for (a,) in (await s.execute(select(AuditEvent.action))).all()}
     assert {"bulk.confirmed", "bulk.finished"} <= actions
+
+
+async def test_bulk_tailor_and_send_skip_an_employer_cooling_down(owner_client, session, worker) -> None:
+    from app.core.clock import utcnow
+
+    ended = await make_job(session, "Analyst", "Cool Co")
+    await make_app(session, ended, Stage.rejected, applied_at=utcnow() - timedelta(days=9),
+                   ended_at=utcnow() - timedelta(days=2))
+    again = await make_job(session, "Senior Analyst", "Cool Co")
+    app = await make_app(session, again, Stage.shortlisted)
+    ok = await make_job(session, "Analyst", "Fine Co")
+    await session.commit()
+    p = (await _preview(owner_client, "jobs", "queue_tailoring", [again.id, ok.id])).json()
+    assert p["will_change"] == 1
+    [g] = p["refused"]
+    assert g["code"] == "cooldown" and "cooling down" in g["samples"][0]["reason"]
+    assert g["title"] == "its employer is cooling down"
+    op = await _run(owner_client, p)
+    assert op["counts"] == {"changed": 1, "refused": 1}
+    items = (await owner_client.get(f"/api/bulk/{p['operation_id']}/items", params={"outcome": "refused"})).json()
+    assert [(i["subject_id"], i["code"]) for i in items["items"]] == [(str(again.id), "cooldown")]
+    p = (await _preview(owner_client, "applications", "send_for_approval", [app.id])).json()
+    assert [g["code"] for g in p["refused"]] == ["cooldown"]
+
+
+async def test_bulk_tailor_and_send_skip_roles_an_accepted_feedback_exclusion_matches(owner_client, session,
+                                                                                     worker) -> None:
+    from app.core.conditions import CampaignRule, ConditionSet, Group, ValueFilter
+    from app.models.preferences import PreferenceSuggestion
+    from app.schemas.json_types import SuggestionEvidence, TightenChange
+
+    campaign = await setup_campaign(session)
+    _, excluded = await setup_app(session, campaign, title="Analyst", employer="One Example", now=NOW,
+                                  stage=Stage.shortlisted, function="sales")
+    _, kept = await setup_app(session, campaign, title="Analyst", employer="Two Example", now=NOW,
+                              stage=Stage.shortlisted)
+    cond = ConditionSet(root=Group(conditions=[ValueFilter(facet="function", include=["sales"])]))
+    change = TightenChange(reason="Disliked function: sales", conditions=cond)
+    suggestion = PreferenceSuggestion(
+        campaign_id=campaign.id, kind="tighten_filter", target="function=sales", title="Exclude sales",
+        change=change.model_dump(mode="json"), evidence=SuggestionEvidence(up=0, down=3, summary="three downs"),
+        evidence_key="k" * 64, status="open")
+    session.add(suggestion)
+    await session.commit()
+
+    # Open (not accepted): nothing is skipped for it.
+    p = (await _preview(owner_client, "applications", "queue_tailoring", [excluded.id, kept.id])).json()
+    assert "feedback_excluded" not in {g["code"] for g in p["refused"]}
+
+    async with get_sessionmaker()() as s:
+        row = await s.get(PreferenceSuggestion, suggestion.id)
+        row.status = "accepted"
+        c = await s.get(type(campaign), campaign.id)
+        c.criteria = c.criteria.model_copy(update={"rules": [
+            *c.criteria.rules, CampaignRule(effect="exclude", conditions=cond, reason=change.reason)]})
+        await s.commit()
+    for action in ("queue_tailoring", "send_for_approval"):
+        p = (await _preview(owner_client, "applications", action, [excluded.id, kept.id])).json()
+        groups = {g["code"]: g for g in p["refused"]}
+        assert "feedback_excluded" in groups, (action, p)
+        assert groups["feedback_excluded"]["samples"][0]["id"] == str(excluded.id)
+        assert "Disliked function: sales" in groups["feedback_excluded"]["samples"][0]["reason"]
+    p = (await _preview(owner_client, "applications", "queue_tailoring", [excluded.id, kept.id])).json()
+    op = await _run(owner_client, p)
+    assert op["counts"].get("refused") == 1 and worker.tailored == [kept.id]
