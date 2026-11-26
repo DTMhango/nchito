@@ -16,6 +16,7 @@ import { resetW3JobUiMock } from "./handlers/w3-job-ui"
 import { resetCalendarMock } from "./handlers/calendar"
 import { resetPreferencesMock } from "./handlers/preferences"
 import { resetFollowupsMock } from "./handlers/followups"
+import { resetMockInterviewMock } from "./handlers/mock-interview"
 
 export function resetAllMocks() {
   resetSettingsMock()
@@ -36,4 +37,5 @@ export function resetAllMocks() {
   resetCalendarMock()
   resetPreferencesMock()
   resetFollowupsMock()
+  resetMockInterviewMock()
 }

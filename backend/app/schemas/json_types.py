@@ -28,6 +28,10 @@ MessageStatus = Literal["draft", "approved", "discarded", "budget_paused", "fail
 MessageSendState = Literal["none", "queued", "sending", "sent", "uncertain", "failed", "cancelled"]
 FollowupDueStatus = Literal["upcoming", "due", "snoozed", "not_needed", "drafted", "sent"]
 WindDownChoice = Literal["keep", "pause", "withdraw"]
+# Interview rounds and mock interviews (wave 4)
+RoundKind = Literal["screen", "technical", "panel", "final", "other"]
+MockMode = Literal["behavioural", "technical", "role", "mixed", "tough"]
+MockStatus = Literal["active", "paused", "failed", "done"]
 
 
 # ----- Job facets (6.1) ---------------------------------------------------------------------

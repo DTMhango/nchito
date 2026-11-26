@@ -18,6 +18,7 @@ import { matchesHandlers } from "./handlers/matches"
 import { studioHandlers } from "./handlers/studio"
 import { autopilotHandlers } from "./handlers/autopilot"
 import { w3JobUiHandlers } from "./handlers/w3-job-ui"
+import { mockInterviewHandlers } from "./handlers/mock-interview"
 import { runnersHandlers } from "./handlers/runners"
 import { insightsHandlers } from "./handlers/insights"
 import { themesHandlers } from "./handlers/themes"
@@ -49,6 +50,7 @@ export const handlers = [
   ...preferencesHandlers,
   // Wave 4 bulk actions and employers (their own paths; no overlap).
   ...bulkHandlers,
+  ...mockInterviewHandlers,
   // Data, non-AI connections and health: before the AI handlers (they fall through for LLM providers).
   ...dataHandlers,
   ...kitHandlers,
