@@ -9526,7 +9526,7 @@ export interface components {
              */
             current_task_title: string | null;
             /** Current Task Type */
-            current_task_type: ("apply" | "check_posting" | "sweep_site") | null;
+            current_task_type: ("apply" | "sweep_site" | "check_posting") | null;
         };
         /** RunnerTaskOut */
         RunnerTaskOut: {
