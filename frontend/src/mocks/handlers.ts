@@ -8,6 +8,14 @@ import type {
   ThemeInput,
 } from "@/lib/api/types"
 import { db } from "./db"
+import { aiHandlers } from "./handlers/ai"
+import { kitHandlers } from "./handlers/kit"
+import { sourcesHandlers } from "./handlers/sources"
+import { campaignHandlers } from "./handlers/campaigns"
+import { applicationsHandlers } from "./handlers/applications"
+import { jobHandlers } from "./handlers/jobs"
+import { settingsHandlers } from "./handlers/settings"
+import { matchesHandlers } from "./handlers/matches"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -17,6 +25,8 @@ const notFound = (what: string) =>
   HttpResponse.json({ detail: `${what} not found.` }, { status: 404 })
 
 export const handlers = [
+  ...kitHandlers,
+  ...sourcesHandlers,
   http.get("*/api/health", () =>
     HttpResponse.json({ status: "ok", mock: true })
   ),
@@ -82,6 +92,7 @@ export const handlers = [
       display_name: owner.display_name,
       timezone: owner.timezone,
       app_name: "Nchito",
+      totp_enabled: owner.totp_secret !== null,
     })
   }),
 
@@ -187,4 +198,13 @@ export const handlers = [
     })
     return HttpResponse.json(db.get().autopilot)
   }),
+  ...aiHandlers,
+  ...campaignHandlers,
+
+  // Today, applications, pending actions (wave 1). Last, so other streams' handlers win on overlap.
+  ...applicationsHandlers,
+  ...jobHandlers,
+  ...settingsHandlers,
+
+  ...matchesHandlers,
 ]

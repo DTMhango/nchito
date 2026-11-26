@@ -106,13 +106,7 @@
     "shadow-pop": "0 12px 32px -12px rgba(0,0,0,.55)",
     "elev-top-color": "var(--t-border-strong)"
   },
-  "chart": [
-    "#1F4FD8",
-    "#15171C",
-    "#1F4FD8",
-    "#2C7439",
-    "#925C00"
-  ],
+  "chart": ["#1F4FD8", "#15171C", "#1F4FD8", "#2C7439", "#925C00"],
   "score": {
     "low": "#B9BCC4",
     "mid": "#4F5563",

@@ -22,6 +22,7 @@ import {
   Outlet,
   redirect,
 } from "@tanstack/react-router"
+import { lazy, type ComponentType } from "react"
 import { z } from "zod"
 import {
   requireNoOwner,
@@ -32,22 +33,107 @@ import {
 import { AppShell } from "@/app/shell/app-shell"
 import { SetupPage } from "@/features/auth/setup-page"
 import { SignInPage } from "@/features/auth/sign-in-page"
-import { TodayPage } from "@/features/today/today-page"
-import { MatchesPage } from "@/features/matches/matches-page"
-import { ApplicationsPage } from "@/features/applications/applications-page"
-import { JOB_TABS, JobPage } from "@/features/jobs/job-page"
-import { StudioPage } from "@/features/studio/studio-page"
-import { AutopilotPage } from "@/features/autopilot/autopilot-page"
-import { KitLayout, KitSection } from "@/features/kit/kit-pages"
-import { CampaignsPage } from "@/features/campaigns/campaigns-page"
-import { SourcesPage } from "@/features/sources/sources-page"
-import { InsightsPage } from "@/features/insights/insights-page"
-import {
-  SettingsLayout,
-  SettingsSection,
-} from "@/features/settings/settings-pages"
-import { AppearancePage } from "@/features/settings/appearance-page"
+import { matchesSearchSchema } from "@/features/matches/filters"
+import { JOB_TABS } from "@/features/jobs/job-tabs"
+import type { SettingsPageKey } from "@/features/settings/settings-group-page"
 import { OnboardingPage } from "@/features/onboarding/onboarding-page"
+
+/**
+ * Screens load on demand, one chunk per area (the shell, sign-in and set-up stay in the main
+ * bundle). The router shows RoutePending (app/router.tsx) while a chunk loads.
+ */
+function lazyPage<
+  K extends string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  M extends Record<K, ComponentType<any>>,
+>(load: () => Promise<M>, name: K) {
+  return lazy(async () => ({ default: (await load())[name] }))
+}
+const TodayPage = lazyPage(
+  () => import("@/features/today/today-page"),
+  "TodayPage"
+)
+const MatchesPage = lazyPage(
+  () => import("@/features/matches/matches-page"),
+  "MatchesPage"
+)
+const ApplicationsPage = lazyPage(
+  () => import("@/features/applications/applications-page"),
+  "ApplicationsPage"
+)
+const JobPage = lazyPage(() => import("@/features/jobs/job-page"), "JobPage")
+const StudioPage = lazyPage(
+  () => import("@/features/studio/studio-page"),
+  "StudioPage"
+)
+const AutopilotPage = lazyPage(
+  () => import("@/features/autopilot/autopilot-page"),
+  "AutopilotPage"
+)
+const KitLayout = lazyPage(
+  () => import("@/features/kit/kit-pages"),
+  "KitLayout"
+)
+const KitSection = lazyPage(
+  () => import("@/features/kit/kit-pages"),
+  "KitSection"
+)
+const CampaignsPage = lazyPage(
+  () => import("@/features/campaigns/campaigns-page"),
+  "CampaignsPage"
+)
+const CampaignEditorPage = lazyPage(
+  () => import("@/features/campaigns/campaign-editor-page"),
+  "CampaignEditorPage"
+)
+const SourcesPage = lazyPage(
+  () => import("@/features/sources/sources-page"),
+  "SourcesPage"
+)
+const RunsPage = lazyPage(
+  () => import("@/features/sources/runs/runs-page"),
+  "RunsPage"
+)
+const RunDetailPage = lazyPage(
+  () => import("@/features/sources/runs/run-detail-page"),
+  "RunDetailPage"
+)
+const InsightsPage = lazyPage(
+  () => import("@/features/insights/insights-page"),
+  "InsightsPage"
+)
+const SettingsLayout = lazyPage(
+  () => import("@/features/settings/settings-pages"),
+  "SettingsLayout"
+)
+const SettingsSection = lazyPage(
+  () => import("@/features/settings/settings-pages"),
+  "SettingsSection"
+)
+const AppearancePage = lazyPage(
+  () => import("@/features/settings/appearance-page"),
+  "AppearancePage"
+)
+const AiSettingsPage = lazyPage(
+  () => import("@/features/settings/ai/ai-page"),
+  "AiSettingsPage"
+)
+const SettingsGroupPage = lazyPage(
+  () => import("@/features/settings/settings-group-page"),
+  "SettingsGroupPage"
+)
+const ActivityPage = lazyPage(
+  () => import("@/features/settings/activity-page"),
+  "ActivityPage"
+)
+const HistoryPage = lazyPage(
+  () => import("@/features/settings/history-page"),
+  "HistoryPage"
+)
+const SecurityPage = lazyPage(
+  () => import("@/features/settings/security-page"),
+  "SecurityPage"
+)
 
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
@@ -121,17 +207,34 @@ const indexRoute = createRoute({
 const page = <P extends string>(
   path: P,
   title: string,
-  component: () => React.ReactNode
+  Component: ComponentType
 ) =>
   createRoute({
     getParentRoute: () => shellRoute,
     path,
     staticData: { title },
-    component,
+    component: () => <Component />,
   })
 
 const todayRoute = page("/today", "Today", TodayPage)
-const matchesRoute = page("/matches", "Matches", MatchesPage)
+const matchesRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/matches",
+  staticData: { title: "Matches" },
+  validateSearch: matchesSearchSchema,
+  component: function MatchesRoute() {
+    const search = matchesRoute.useSearch()
+    const navigate = matchesRoute.useNavigate()
+    return (
+      <MatchesPage
+        search={search}
+        onSearch={(next, opts) =>
+          void navigate({ search: next, replace: opts?.replace })
+        }
+      />
+    )
+  },
+})
 const applicationsRoute = page(
   "/applications",
   "Applications",
@@ -139,7 +242,24 @@ const applicationsRoute = page(
 )
 const studioRoute = page("/studio", "Studio", StudioPage)
 const autopilotRoute = page("/autopilot", "Autopilot", AutopilotPage)
+const runsRoute = page("/autopilot/runs", "Run history", RunsPage)
+const runDetailRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/autopilot/runs/$runId",
+  staticData: { title: "Run" },
+  component: function RunDetailRoute() {
+    return <RunDetailPage runId={runDetailRoute.useParams().runId} />
+  },
+})
 const campaignsRoute = page("/campaigns", "Campaigns", CampaignsPage)
+const campaignEditorRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/campaigns/$id",
+  staticData: { title: "Campaign" },
+  component: function CampaignEditorRoute() {
+    return <CampaignEditorPage id={campaignEditorRoute.useParams().id} />
+  },
+})
 const sourcesRoute = page("/sources", "Sources", SourcesPage)
 const insightsRoute = page("/insights", "Insights", InsightsPage)
 
@@ -210,30 +330,54 @@ const appearanceRoute = createRoute({
   staticData: { title: "Appearance" },
   component: AppearancePage,
 })
-type SettingsKey =
-  | "ai"
-  | "connections"
-  | "notifications"
-  | "runners"
-  | "data"
-  | "security"
-  | "activity"
-  | "history"
+type SettingsKey = "ai" | "connections" | "runners" | "data"
+const groupRoute = (path: SettingsPageKey) =>
+  createRoute({
+    getParentRoute: () => settingsRoute,
+    path,
+    component: () => <SettingsGroupPage page={path} />,
+  })
+const groupRoutes = [
+  groupRoute("general"),
+  groupRoute("schedule"),
+  groupRoute("scoring"),
+  groupRoute("automation"),
+  groupRoute("documents"),
+  groupRoute("retention"),
+  groupRoute("reconcile"),
+  groupRoute("notifications"),
+] as const
+const ownRoute = (
+  path: "security" | "activity" | "history",
+  C: ComponentType
+) =>
+  createRoute({
+    getParentRoute: () => settingsRoute,
+    path,
+    component: () => <C />,
+  })
+const ownRoutes = [
+  ownRoute("security", SecurityPage),
+  ownRoute("activity", ActivityPage),
+  ownRoute("history", HistoryPage),
+] as const
 const settingsChild = (path: SettingsKey) =>
   createRoute({
     getParentRoute: () => settingsRoute,
     path,
     component: () => <SettingsSection section={path} />,
   })
+const aiRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "ai",
+  staticData: { title: "AI" },
+  component: AiSettingsPage,
+})
 const settingsChildren = [
-  settingsChild("ai"),
+  aiRoute,
   settingsChild("connections"),
-  settingsChild("notifications"),
   settingsChild("runners"),
   settingsChild("data"),
-  settingsChild("security"),
-  settingsChild("activity"),
-  settingsChild("history"),
 ] as const
 
 // ---- dev ----
@@ -263,13 +407,18 @@ export const routeTree = rootRoute.addChildren([
       jobRoute,
       studioRoute,
       autopilotRoute,
+      runsRoute,
+      runDetailRoute,
       kitRoute.addChildren([kitIndex, ...kitChildren]),
       campaignsRoute,
+      campaignEditorRoute,
       sourcesRoute,
       insightsRoute,
       settingsRoute.addChildren([
         settingsIndex,
         appearanceRoute,
+        ...groupRoutes,
+        ...ownRoutes,
         ...settingsChildren,
       ]),
       devComponentsRoute,

@@ -100,13 +100,7 @@
     "data-font": "body",
     "label-font": "body"
   },
-  "chart": [
-    "#C7851B",
-    "#7A4FB0",
-    "#376A9C",
-    "#3B7836",
-    "#934E00"
-  ],
+  "chart": ["#C7851B", "#7A4FB0", "#376A9C", "#3B7836", "#934E00"],
   "score": {
     "low": "#C2AF94",
     "mid": "#7A4FB0",

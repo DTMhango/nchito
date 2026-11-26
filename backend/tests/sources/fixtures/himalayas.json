@@ -1,0 +1,80 @@
+{
+ "comments": "21/08/2026: Cursor pagination is now available and is the preferred way to page through the feed. Pass the nextCursor value from each response back as ?cursor=. It is faster than offset and will never return the same job twice. The offset parameter is deprecated and will be removed in a future release. 13/03/2026: The API has been updated to include the companySlug field in the response.",
+ "updatedAt": 1795646672,
+ "offset": 0,
+ "limit": 3,
+ "totalCount": 115714,
+ "nextCursor": "MjAyNi0xMS0yNVQyMjo0NDoyOS44MjA3NDlafDI1ODI1NTg",
+ "jobs": [
+  {
+   "title": "Sr. Director of AI Software Engineering",
+   "excerpt": "About CloudWerx At CloudWerx, we’re building what’s next in cloud, data, and AI, helping organizations turn powerful technology into meaningful, real-world impact.",
+   "companyName": "CloudWerx, Inc.",
+   "companySlug": "cloudwerx-inc",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Director"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "Canada"
+   ],
+   "timezoneRestrictions": [
+    -7,
+    -6,
+    -5,
+    -4,
+    -3.5
+   ],
+   "categories": [
+    "Director-Of-AI-Engineering",
+    "AI-Engineering-Director",
+    "Head-Of-AI-Engineering",
+    "AI-Engineering-Leadership"
+   ],
+   "parentCategories": [],
+   "description": "<h3>About CloudWerx</h3><p>At CloudWerx, we’re building what’s next in cloud, data, and AI, helping organizations turn powerful technology into meaningful, real-world impact. What makes CloudWerx special isn’t just the technology. It’s the people behind it. We’re a global team of builders, problem-solvers, and trusted advisors who are curious by nature, ambitious about what we can create, and not afraid to challenge the way things have always been done.</p><p>Here, great ideas can come from anywhere. You’ll have the trust to take ownership, the freedom to bring your perspective to the table, and the opportunity to make a visible impact as we grow. We’re building something exciting, and we’re looking for talented people who want to build it with us. If you’re curious, collaborative, and energized by solving meaningful problems, we’d love to meet you.</p><p>CloudWerx is hiring for an AI So",
+   "pubDate": 1795646672,
+   "expiryDate": 1800830672,
+   "applicationLink": "https://himalayas.app/companies/cloudwerx-inc/jobs/sr-director-of-ai-software-engineering?utm_source=api",
+   "guid": "https://himalayas.app/companies/cloudwerx-inc/jobs/sr-director-of-ai-software-engineering"
+  },
+  {
+   "title": "Sales Executive (WFH based in Maha Sarakham)",
+   "excerpt": "About us: Cartrack are a world-leading smart mobility SaaS company with over 2,000,000 subscribers across 23 countries and we are looking for a B2B Sales Executive to join our team.",
+   "companyName": "Cartrack",
+   "companySlug": "karooooo",
+   "employmentType": "Full Time",
+   "minSalary": null,
+   "maxSalary": null,
+   "salaryPeriod": "annual",
+   "seniority": [
+    "Mid-level"
+   ],
+   "currency": null,
+   "locationRestrictions": [
+    "Thailand"
+   ],
+   "timezoneRestrictions": [
+    7
+   ],
+   "categories": [
+    "Sales-Executive",
+    "Sales",
+    "Business-Development-Executive",
+    "Account-Executive"
+   ],
+   "parentCategories": [
+    "Sales"
+   ],
+   "description": "<h3>About us:</h3><p><a href=\"https://himalayas.app/companies/karooooo\">Cartrack</a> are a world-leading smart mobility SaaS company with over 2,000,000 subscribers across 23 countries and we are looking for a B2B Sales Executive to join our team. Our teams are collaborative, vibrant and fast-growing and all team members are empowered with the freedom to influence our business with ideas that drive innovation and efficiency.<strong><br><br>Job Description:</strong></p><ul>\n<li><p>Identify and pursue new sales opportunities</p></li>\n<li><p>Exceed sales targets with a focus on generating new business and developing existing customers</p></li>\n<li><p>Acquire new customers by cold calling, networking, and using various Social Media platforms</p></li>\n<li><p>Use CRM to full potential to report, measure and control sales inputs and outcomes</p></li>\n</ul><h3>Qualification:</h3><ul>\n<li><h3>Bac",
+   "pubDate": 1795646670,
+   "expiryDate": 1800830670,
+   "applicationLink": "https://himalayas.app/companies/karooooo/jobs/sales-executive-wfh-based-in-maha-sarakham?utm_source=api",
+   "guid": "https://himalayas.app/companies/karooooo/jobs/sales-executive-wfh-based-in-maha-sarakham"
+  }
+ ]
+}

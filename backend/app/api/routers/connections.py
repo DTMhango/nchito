@@ -4,13 +4,22 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, Timestamps, not_implemented
-from app.api.deps import RequireOwner
+from app.api.deps import PrincipalDep, RequireOwner, SessionDep
+from app.core import audit
+from app.core.clock import utcnow
+from app.llm import checks, provider_records
+from app.llm.deps import llm_service
+from app.llm.money import micros_to_minor
+from app.llm.service import LLMService
+from app.models.platform import Connection
 
 connections_router = APIRouter(prefix="/api/connections", tags=["connections"], dependencies=[RequireOwner],
                                responses=NOT_IMPLEMENTED_RESPONSES)
@@ -51,6 +60,7 @@ class ConnectionTestOut(BaseModel):
     ok: bool
     detail: str | None = None
     cost_minor: int = 0
+    cost_micros: int = 0
 
 
 class OAuthStartOut(BaseModel):
@@ -88,31 +98,80 @@ class RunnerStatus(BaseModel):
     current_task_id: uuid.UUID | None
 
 
+def _out(conn: Connection) -> ConnectionOut:
+    return ConnectionOut(id=conn.id, created_at=conn.created_at, updated_at=conn.updated_at,
+                         provider=conn.provider.value, label=conn.label, config=dict(conn.config),
+                         secrets_masked=provider_records.masked_secrets(conn), scopes_granted=list(conn.scopes_granted),
+                         reads_description=conn.reads_description,
+                         health=conn.health if conn.health in ("ok", "failing") else "unknown",
+                         last_checked_at=conn.last_checked_at, enabled=conn.enabled)
+
+
+async def _get_llm(session: AsyncSession, connection_id: uuid.UUID) -> Connection:
+    conn = await session.get(Connection, connection_id)
+    if conn is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="connection not found")
+    if not provider_records.is_llm(conn.provider.value):
+        not_implemented(2, "connect")
+    return conn
+
+
 @connections_router.get("", response_model=list[ConnectionOut], name="connections_list")
-async def list_connections() -> list[ConnectionOut]:
-    not_implemented(1, "llm")
+async def list_connections(session: SessionDep) -> list[ConnectionOut]:
+    rows = await session.scalars(select(Connection).order_by(Connection.provider, Connection.created_at))
+    return [_out(c) for c in rows.all()]
 
 
 @connections_router.post("", response_model=ConnectionOut, status_code=status.HTTP_201_CREATED,
                          name="connections_create")
-async def create_connection(body: ConnectionCreate) -> ConnectionOut:
-    not_implemented(1, "llm")
+async def create_connection(body: ConnectionCreate, session: SessionDep, principal: PrincipalDep) -> ConnectionOut:
+    """LLM providers (wave 1). Keys are encrypted at rest and only ever returned masked."""
+    if not provider_records.is_llm(body.provider):
+        not_implemented(2, "connect")
+    try:
+        conn = await provider_records.create(session, provider=body.provider, label=body.label, config=body.config,
+                                             secrets=body.secrets, actor=principal.actor)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    await session.refresh(conn)
+    return _out(conn)
 
 
 @connections_router.put("/{connection_id}", response_model=ConnectionOut, name="connections_update")
-async def update_connection(connection_id: uuid.UUID, body: ConnectionUpdate) -> ConnectionOut:
-    not_implemented(1, "llm")
+async def update_connection(connection_id: uuid.UUID, body: ConnectionUpdate, session: SessionDep,
+                            principal: PrincipalDep) -> ConnectionOut:
+    """Omitted fields stay; a blank secret value keeps the stored one."""
+    conn = await _get_llm(session, connection_id)
+    try:
+        await provider_records.update(session, conn, label=body.label, config=body.config, secrets=body.secrets,
+                                      enabled=body.enabled, actor=principal.actor)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    await session.refresh(conn)
+    return _out(conn)
 
 
 @connections_router.delete("/{connection_id}", status_code=status.HTTP_204_NO_CONTENT,
                            response_class=Response, name="connections_delete")
-async def delete_connection(connection_id: uuid.UUID) -> None:
-    not_implemented(1, "llm")
+async def delete_connection(connection_id: uuid.UUID, session: SessionDep, principal: PrincipalDep) -> None:
+    conn = await _get_llm(session, connection_id)
+    await audit.record(session, actor=principal.actor, action="connection.deleted", subject_type="connection",
+                       subject_id=conn.id, detail={"provider": conn.provider.value, "label": conn.label})
+    await session.delete(conn)
 
 
 @connections_router.post("/{connection_id}/test", response_model=ConnectionTestOut, name="connections_test")
-async def test_connection(connection_id: uuid.UUID) -> ConnectionTestOut:
-    not_implemented(1, "llm")
+async def test_connection(connection_id: uuid.UUID, session: SessionDep, principal: PrincipalDep,
+                          service: Annotated[LLMService, Depends(llm_service)]) -> ConnectionTestOut:
+    """One tiny budgeted request with this provider record (model: config ``test_model`` or the extract model)."""
+    conn = await _get_llm(session, connection_id)
+    result = await checks.run_test(service, stage="extract", model=conn.config.get("test_model"),
+                                   provider=conn.provider.value, credentials=provider_records.credentials_of(conn))
+    await checks.record(session, result, actor=principal.actor)
+    conn.health = "ok" if result.ok else "failing"
+    conn.last_checked_at = utcnow()
+    return ConnectionTestOut(ok=result.ok, detail=result.detail, cost_minor=micros_to_minor(result.cost_micros),
+                             cost_micros=result.cost_micros)
 
 
 @connections_router.post("/oauth/{provider}/start", response_model=OAuthStartOut, name="connections_oauth_start")

@@ -8,7 +8,7 @@ never as success.
 Handler invariants:
 - It receives an open session; it must not commit partial results that would move a sweep
   checkpoint on failure (a failed sweep does not move the checkpoint).
-- It returns the final status and fills ``run.counts`` / ``run.source_results`` / ``run.cost_minor``.
+- It returns the final status and fills ``run.counts`` / ``run.source_results`` / ``run.cost_micros``.
 - It must be safe to call again for the same run after a crash (restart resumes without duplicates).
 """
 

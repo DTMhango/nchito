@@ -41,12 +41,10 @@ def test_gateway_tools_have_schemas():
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/kit/facts"),
-    ("GET", "/api/jobs/00000000-0000-4000-8000-000000000001"),
-    ("GET", "/api/campaigns"),
-    ("POST", "/api/rubrics/backtest"),
-    ("GET", "/api/pending-actions"),
-    ("GET", "/api/today"),
+    ("GET", "/api/jobs/00000000-0000-4000-8000-000000000001/interview-pack"),
+    ("GET", "/api/jobs/compare/00000000-0000-4000-8000-000000000001"),
+    ("GET", "/api/mail-threads"),
+    ("GET", "/api/insights"),
 ])
 async def test_later_wave_endpoints_answer_501(owner_client, method, path):
     body = {"rubric_id": str(uuid.uuid4()), "campaign_id": str(uuid.uuid4())} if method == "POST" else None

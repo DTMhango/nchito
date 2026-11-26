@@ -5,6 +5,10 @@ Needs PostgreSQL. Start the throwaway one with ``docker compose -f docker-compos
 create databases. Each xdist worker gets its own database, migrated once; every test starts
 from empty tables plus the seeded built-in themes. No test touches the network beyond that
 database.
+
+Database names always carry a per-run unique suffix (``TEST_DB_SUFFIX`` overrides it), so
+concurrent runs from several checkouts on the shared test server never collide. Every database
+a run creates is dropped at session end.
 """
 
 from __future__ import annotations
@@ -19,7 +23,8 @@ import pytest
 
 ADMIN_URL = os.environ.get("TEST_DATABASE_URL", "postgresql://nchito:nchito@127.0.0.1:55442/nchito_test")
 WORKER = os.environ.get("PYTEST_XDIST_WORKER", "gw0")
-DB_NAME = f"nchito_t_{WORKER}"
+RUN_SUFFIX = os.environ.get("TEST_DB_SUFFIX") or uuid.uuid4().hex[:8]
+DB_NAME = f"nchito_t_{WORKER}_{RUN_SUFFIX}"
 BASE = ADMIN_URL.rsplit("/", 1)[0]
 TEST_DB_URL = f"{BASE}/{DB_NAME}"
 

@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Link } from "@tanstack/react-router"
 import { PanelLeft } from "lucide-react"
 import { BrandMark } from "@/components/brand-mark"
-import { SpendMeter } from "@/components/spend-meter"
+import { LiveSpendMeter } from "@/features/settings/ai/live-spend-meter"
 import {
   Tooltip,
   TooltipContent,
@@ -98,7 +98,7 @@ export function Sidebar({
         {NAV_FOOT.map((item) => (
           <SideLink key={item.to} item={item} collapsed={collapsed} />
         ))}
-        {!collapsed && <SpendMeter spentMinor={0} capMinor={null} />}
+        {!collapsed && <LiveSpendMeter />}
       </div>
     </aside>
   )

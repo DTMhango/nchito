@@ -21,7 +21,7 @@ export type MockDb = {
   appearance: Appearance
   customThemes: Theme[]
   autopilot: AutopilotState
-  captured: { id: string; url?: string; text?: string }[]
+  captured: { id: string; url?: string | null; text?: string | null }[]
 }
 
 export const DEMO_OWNER: OwnerCreate = {

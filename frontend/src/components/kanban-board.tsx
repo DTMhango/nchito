@@ -35,6 +35,8 @@ type KanbanBoardProps<T> = {
    * "I applied myself" instead of creating evidence).
    */
   onMove: (id: string, toColumn: string) => void
+  /** Called when a card is clicked or Enter is pressed on it (quick look). */
+  onOpen?: (id: string) => void
   /** Shown inside a column with no cards. */
   emptyColumn?: (column: KanbanColumn) => ReactNode
   className?: string
@@ -52,6 +54,7 @@ export function KanbanBoard<T>({
   getLabel,
   renderCard,
   onMove,
+  onOpen,
   emptyColumn,
   className,
 }: KanbanBoardProps<T>) {
@@ -87,6 +90,11 @@ export function KanbanBoard<T>({
 
   const onKeyDown = (e: KeyboardEvent<HTMLElement>, item: T) => {
     const col = columns.findIndex((c) => c.id === getColumn(item))
+    if (e.key === "Enter" && onOpen) {
+      e.preventDefault()
+      onOpen(getId(item))
+      return
+    }
     if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
       e.preventDefault()
       const next = col + (e.key === "ArrowRight" ? 1 : -1)
@@ -141,7 +149,7 @@ export function KanbanBoard<T>({
         role="list"
         aria-label="Stages"
         className={cn(
-          "grid auto-cols-[minmax(236px,1fr)] grid-flow-col items-start gap-3 overflow-x-auto pb-3",
+          "relative grid auto-cols-[minmax(236px,1fr)] grid-flow-col items-start gap-3 overflow-x-auto pb-3",
           className
         )}
       >
@@ -155,6 +163,7 @@ export function KanbanBoard<T>({
                   id={getId(item)}
                   helpId={helpId}
                   label={getLabel(item)}
+                  onClick={onOpen ? () => onOpen(getId(item)) : undefined}
                   onKeyDown={(e) => onKeyDown(e, item)}
                 >
                   {renderCard(item)}
@@ -223,11 +232,13 @@ function Card({
   helpId,
   label,
   onKeyDown,
+  onClick,
   children,
 }: {
   id: string
   helpId: string
   label: string
+  onClick?: () => void
   onKeyDown: (e: KeyboardEvent<HTMLElement>) => void
   children: ReactNode
 }) {
@@ -243,6 +254,7 @@ function Card({
       aria-roledescription="card"
       aria-label={label}
       aria-describedby={helpId}
+      onClick={onClick}
       onKeyDown={(e) => {
         onKeyDown(e)
         if (!e.defaultPrevented) listeners?.onKeyDown?.(e)

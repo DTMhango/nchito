@@ -31,7 +31,7 @@ const origin =
   typeof window !== "undefined" ? window.location.origin : "http://localhost"
 
 /**
- * Typed client. Same-origin: in dev Vite proxies /api to the backend, in production the
+ * The one typed client (generated `paths`). Same-origin: in dev Vite proxies /api to the backend, in production the
  * backend serves the SPA. Cookies carry the session.
  */
 export const api = createClient<paths>({
@@ -48,4 +48,20 @@ export async function unwrap<T>(call: Promise<Result<T>>): Promise<T> {
   const { data, error, response } = await call
   if (!response.ok) throw new ApiError(response.status, error)
   return data as T
+}
+
+/**
+ * `bodySerializer` for multipart endpoints: each field becomes a form part; arrays repeat
+ * the field (FastAPI's `list[UploadFile]`), null and undefined are left out.
+ */
+export function toFormData(body: object): FormData {
+  const form = new FormData()
+  for (const [key, value] of Object.entries(body)) {
+    const values = Array.isArray(value) ? value : [value]
+    for (const v of values) {
+      if (v === undefined || v === null) continue
+      form.append(key, v instanceof Blob ? v : String(v))
+    }
+  }
+  return form
 }

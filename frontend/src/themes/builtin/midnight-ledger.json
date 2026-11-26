@@ -102,13 +102,7 @@
     "label-font": "mono",
     "shadow-pop": "0 12px 32px -12px rgba(0,0,0,.55)"
   },
-  "chart": [
-    "#3B4FD8",
-    "#1B8461",
-    "#2B6A9C",
-    "#147050",
-    "#8F6200"
-  ],
+  "chart": ["#3B4FD8", "#1B8461", "#2B6A9C", "#147050", "#8F6200"],
   "score": {
     "low": "#A6ACC4",
     "mid": "#3B4FD8",

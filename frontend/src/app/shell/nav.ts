@@ -112,6 +112,13 @@ export const KIT_SECTIONS = [
 
 export const SETTINGS_SECTIONS = [
   { to: "/settings/appearance", label: "Appearance" },
+  { to: "/settings/general", label: "General" },
+  { to: "/settings/schedule", label: "Schedule" },
+  { to: "/settings/scoring", label: "Scoring" },
+  { to: "/settings/automation", label: "Automation" },
+  { to: "/settings/documents", label: "Documents" },
+  { to: "/settings/retention", label: "Retention" },
+  { to: "/settings/reconcile", label: "Reconcile" },
   { to: "/settings/ai", label: "AI" },
   { to: "/settings/connections", label: "Connections" },
   { to: "/settings/notifications", label: "Notifications" },

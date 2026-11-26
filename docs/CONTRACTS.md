@@ -46,7 +46,9 @@ Contents
 - **Lists**: `Page[T] = {items: T[], total: int | null, next_cursor: string | null}`; pass
   `?cursor=` back. The audit list uses `{items, next_before}` (time cursor).
 - **Ids** are UUID strings. **Times** are ISO 8601 UTC (`...Z`); the client displays them in
-  `general.timezone`. **Money** is `*_minor` integer plus a 3-letter `currency`.
+  `general.timezone`. **Money** is `*_minor` integer plus a 3-letter `currency`. **AI cost** fields also carry an exact integer
+  `*_micros` beside every `*_minor` (millionths of the major unit; `*_minor` is the rounded display value, so a
+  sub-cent call shows 0 there and a true figure in `*_micros`). Use `*_micros` for totals and small amounts.
 - **Auth**: one owner. `POST /api/auth/login` sets the session cookie `nchito_session`
   (httpOnly, SameSite=Lax, Secure when `BASE_URL` is https, signed, server-side session row,
   revocable). The SPA sends it automatically (`credentials: "same-origin"`); it never reads it.
@@ -71,7 +73,10 @@ Contents
 | `POST /api/auth/login` | `{email, password, totp?}` | **204** + cookie. 401 `"invalid email or password"`, `"totp_required"`, `"totp_invalid"`; 429 after `LOGIN_RATE_LIMIT_ATTEMPTS` failures in the window |
 | `POST /api/auth/logout` | | **204**, session revoked, cookie cleared |
 | `GET /api/auth/me` | | `Me = {email, display_name, timezone, app_name, totp_enabled}`; 401 when signed out |
-| `POST /api/auth/password` | `{current_password, new_password}` | 204; 403 if current is wrong |
+| `POST /api/auth/password` | `{current_password, new_password}` | 204; 403 if current is wrong. Revokes every other session |
+| `GET /api/auth/sessions` | | `[{id, created_at, last_seen_at, user_agent, ip, current}]`, active sessions, newest first |
+| `DELETE /api/auth/sessions/{id}` | | **204**; 404 if not an active session of the owner. Revoking the current one signs out. A revoked session gets 401 on its next request |
+| `POST /api/auth/sessions/revoke-others` | | `{revoked: n}` |
 | `POST /api/auth/totp/setup` | | `{secret, otpauth_uri}` (inactive until enabled) |
 | `POST /api/auth/totp/enable` | `{code}` | 204; 422 if the code does not match |
 | `POST /api/auth/totp/disable` | `{password, code}` | 204 |
@@ -126,6 +131,9 @@ data)` inside their transaction; the event is delivered only after commit (Postg
 |---|---|---|
 | `settings.changed` | `{key, version}` | settings service |
 | `run.started` / `run.finished` | `{run_id[, status]}` | worker |
+| `spend.updated` | `{stage}` | ledger (every reservation and closing row; the spend meter refetches `GET /api/ai/spend/meter`) |
+| `budget.warning` / `budget.exhausted` | `{month, ...}` (`scope` on exhausted) | ledger, at most once per month each |
+| `run.progress` | `{run_id, stage, counts}` (stage: `search`, `source:<name>`, `done`) | sweep orchestrator |
 | (wave 1+) `job.created`, `job.updated`, `assessment.updated`, `pending_action.created`, `pending_action.resolved`, `application.updated`, `dispatch.updated`, `notification.created` | `{<entity>_id, ...}` | owning stream |
 
 New event names follow `<entity>.<past tense verb>` and are added to this table.
@@ -133,7 +141,7 @@ New event names follow `<entity>.<past tense verb>` and are added to this table.
 ## 4. Settings registry
 
 `backend/app/core/settings/registry.py` is the **only** place a business setting and its
-default exist. 72 settings in groups `general, appearance, schedule, scoring, matching,
+default exist. 85 settings in groups `general, appearance, schedule, scoring, matching,
 automation, answers, reconcile, ai, budget, documents, retention, backups, notifications,
 runners`. Read them with `await settings_service.values(session)` (one query) or
 `get_value(session, key)`; write with `set_value(session, key, value, actor=..., reason=...)`,
@@ -280,10 +288,10 @@ themselves; nothing else imports a concrete implementation directly.
 |---|---|---|
 | `SourceConnector` | `backend/app/sources/base.py` | `validate_config`, `search(ctx, since) -> list[RawJob]`, `fetch(url) -> RawJob`, `check_open(url) -> open\|closed\|unknown`; class vars `connector, access, default_rate_limit, permitted_actions`; `register_connector`. Read-only, rate limited, failing source never fails a run, unknown stays unknown, network via injected `HttpFetcher` (fixtures in tests) |
 | `Channel` | `backend/app/apply/channels/base.py` | `dispatch(DispatchRequest) -> DispatchOutcome`, `cancel`, `reconcile`; `name`, `enforcement` (server / instructed / owner). Never creates attempts, sends exactly the hashed packet, never resends, evidence required for `sent` |
-| `LLMClient` | `backend/app/llm/client.py` | `complete(stage, messages, schema, *, max_cost_minor, model=None) -> (result, Usage)`, `estimate_cost_minor`. Ledger reservation first, structured output only, untrusted content only in `DataBlock`, no secrets or keep-out facts in prompts, tests use a fake |
+| `LLMClient` | `backend/app/llm/client.py` | `complete(stage, messages, schema, *, max_cost_micros, model=None) -> (result, Usage)`, `estimate_cost_micros`. Costs are integer micros (millionths of the major unit, `app/llm/money.py`), stored and summed in micros, converted to minor units only for display and cap comparison. Ledger reservation first, structured output only, untrusted content only in `DataBlock`, no secrets or keep-out facts in prompts, tests use a fake. Production client: `app.llm.service.LLMService` (`.for_run(run_id)` for the per-run cap). Refusals raise `BudgetExhausted(scope)` (subclass of `BudgetExceeded`; park the work as resumable); route problems raise `LLMConfigError`. Tests import `app.llm.fake.FakeLLMClient`. Stage prompts: `app.llm.prompts.active_prompt(session, stage)`. Score escalation: `app.llm.routing.escalation_model(values, score)`. Untrusted text: `app.llm.untrusted.wrap_untrusted(text, label)` |
 | `Mailbox` | `backend/app/connect/mailbox.py` | `send(OutgoingMail) -> provider id \| None`, `list_messages(since)`, `find_sent(idempotency_key)`, `check()`. Narrowest read, send only from the email channel, no retries, reconcile from sent items |
 | `FileStore` | `backend/app/connect/filestore.py` | `put -> StoredFile(sha256)`, `get`, `delete`, `exists`, `share_link`. App-folder scope, explicit share links recorded in the packet, never deletes duplicate-protection history |
-| `RunHandler` | `backend/app/pipeline/runs.py` | `async (session, run) -> RunStatus`, registered per `RunKind` with `register()`. The worker's `run_pipeline` task calls it; a kind without a handler is recorded `skipped`, never `succeeded`. Idempotent per run; a failed sweep does not move the checkpoint |
+| `RunHandler` | `backend/app/pipeline/runs.py` | `async (session, run) -> RunStatus`, registered per `RunKind` with `register()`. The worker's `run_pipeline` task calls it; a kind without a handler is recorded `skipped`, never `succeeded`. Idempotent per run. Each source keeps its own checkpoint per campaign (`campaign.source_checkpoints`): a failing source delays only itself. A budget refusal parks the remaining paid work and ends the run `paused` (reason in `run.error`); the scheduler tick re-queues it once the cap changes or a new month begins. A dry run runs every stage (jobs, facets and scores are saved, spend is ledgered) but moves no checkpoint, touches no source health and creates no applications or pending actions; `proposed_actions` come from the decision table |
 
 Queue: Procrastinate on PostgreSQL (`backend/app/worker/queue.py`). Queues `system` (scheduler
 tick, every minute, periodic) and `runs`. Sweeps share the lock `"sweep"`, so they run one at
@@ -302,6 +310,18 @@ eligibility -> score -> automation`; a high score cannot rescue an excluded role
 never permits an automatic action; every gate carries a reason and the effective value,
 source and version of each rule it used (the "Why?" panel reads these). Wave 1 (filters and
 scoring stream) implements `decide`; wave 2 (apply) adds permit-time gates to the same function.
+
+Wave 1 additions (all optional, defaulted): `DecisionInput.rubric` (id, version, thresholds),
+`override`, `setting_versions`, `conflict_note`; `GateDecision.would_change_if`;
+`Decision.effective_score` (score after campaign penalty/bonus rules, unknown-data penalties and
+any override) and `mode` (after the unconfirmed-campaign ceiling). Unknown-data policies:
+`review` keeps a mandatory `unknown` (verdict review); `pass_with_penalty` and `pass_blocks_auto`
+keep a non-mandatory `unknown` that blocks automation (the first also deducts
+`scoring.unknown_penalty`); `fail` fails the gate. Permit purpose: wave 2 supplies
+`application["permit_checks"]` (`{name: (outcome, reason)}`); without it the permit is refused.
+Records come from `pipeline/filters.job_record` / `campaign_record`. **Work rights** come from the Kit: `job_record` carries `kit_work_rights` (`app/kit/work_rights.py`), resolved from the CONFIRMED answers about right to work, sponsorship and relocation, honouring each answer's conditions for the country the job requires. Unconfirmed, due-for-review, `never`-class, per-application or per-employer answers never count, and disagreeing answers are unknown. The `work_rights` gate passes (right held, or sponsorship offered), fails (right required and none held) or is unknown under the campaign's unknown-data policy, and its reason names the answer used. Without `kit_work_rights` the old campaign `work_rights` list is used. A dry run raises no pending actions: conflict choices a real run would ask for are collected on `run.config_versions.dry_run_choices` and listed first in `proposed_actions` (`action: "ask_owner"`). Campaigns carry
+`unconfirmed` criteria items (confirmed one by one, `POST /campaigns/{id}/confirm/{item}`);
+backtest is two steps (`/rubrics/backtest/estimate`, then `/rubrics/backtest`).
 
 ## 11. Data model conventions
 
@@ -366,3 +386,44 @@ the registry under its own group prefix only.
 | Browser-channel reconciliation, posting change alerts, compare roles | Sonnet | `app/apply/channels/browser.py`, `app/pipeline/changes.py`, `jobs_compare` |
 | Sign-in handoff, portal accounts | Sonnet | `app/apply/accounts.py`, portal-account endpoints (add to `applications.py`) |
 | Interview pack | Opus (generation, truth checks) + Sonnet (tab) | `app/pipeline/interview/`, interview endpoints, `src/features/job/interview/` |
+
+---
+
+## Wave 1 tracking additions
+
+- Stages change only through `app/apply/stages.py` (`transition`); every change writes an `ApplicationEvent`
+  (`stage_change`: from, to, why, via). The owner cannot move a role into `applying` or a submitted state; "I applied
+  myself" (`POST /api/applications/applied-myself`, `POST /api/jobs/{id}/applied-myself`) is the only manual way.
+  Refused moves answer 409 `{code: "illegal_transition", reason, from, to}`.
+- New: `GET /api/applications/board`, `POST /api/applications/import/{preview,confirm}` (history CSV, multipart;
+  confirm takes `content_hash` from the preview), `POST|GET /api/applications/{id}/files` (owner's own files),
+  `POST /api/pending-actions/{id}/{dismiss,snooze,answer}`. `resolve` handles `dismissed` and `answered` (unknown
+  question); other resolutions stay 501 until wave 2.
+- `ApplicationSummary` gains `snoozed_until`, `snoozed`, `deadline`, `origin`, `owner_attested`, `legacy_fit`;
+  detail gains `notes`, `reference`, `apply_url`, `ended_at`, `allowed_next`. `TodayOut` gains `needs_you_groups`,
+  `last_sweep`, `top_matches`. `PendingActionType` gains `follow_up`; settings `tracking.imminent_deadline_days` and
+  `tracking.stale_pending_days`.
+- Corrections live in `api/routers/jobs_corrections.py` (logic in `pipeline/corrections.py`). The conflicts stream
+  registers its re-evaluation with `corrections.set_conflict_reevaluator(fn)` (default no-op).
+
+## Wave 1 leftovers
+
+- **Sessions**: see section 2 (`/api/auth/sessions*`). Sign-in already creates the record; sign-out, revoke and a
+  password change end sessions; audited `auth.session_revoked`, `auth.sessions_revoked_others`.
+- **Micros**: every cost field gains `*_micros` (runs `cost_micros`, assessments `cost_micros`, `SpendSummary`
+  and its buckets and days, `SpendMeter`, `LastSweep`, connection test, backtest and custom-facet estimates).
+  Caps: settings `budget.monthly_cap_micros` and `budget.per_run_cap_micros` (nullable). Either form is accepted
+  on input; setting micros also sets the rounded minor value, setting minor clears micros; micros wins when both exist.
+- **Recheck**: `POST /api/jobs/{id}/recheck` returns `RecheckOut = {job: JobDetail, availability_before,
+  availability_after, content_changed, changed_fields, reassessed, note}` (was `JobDetail`). A failed check is `unknown`,
+  never `closed`. Changed fields compared: title, text, deadline, pay, apply link, place. A change is re-extracted
+  (cached by content hash) and reassessed against every active campaign.
+- **Skill aliases**: create, update and delete re-canonicalise stored job skills (facets and requirements) from the
+  extraction cache, with no fetch and no model call; audited `skill_alias.recanonicalised`.
+- **Answers in use**: `AnswerOut.pending_applications_using` counts applications before submission whose newest live
+  packet or open pending action (`detail.answer_id`) uses the answer; `GET /api/kit/answers/{id}/usage` lists them
+  (`application_id, job_id, job_title, employer, stage, via`).
+- **Guardrail waivers**: `POST /api/kit/guardrails/{id}/waivers {application_id, reason}` (409 unless the rule is
+  `block, waivable once`; 409 if already waived; 422 blank reason), `GET /api/kit/guardrail-waivers?application_id=`,
+  `DELETE /api/kit/guardrail-waivers/{id}`. `POST /api/kit/guardrails/check` takes an optional `application_id`: a waived
+  violation shows `waived: true` and no longer sets `blocked`. Audited `kit.guardrail.waived`, `kit.guardrail.waiver_removed`.

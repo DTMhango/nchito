@@ -8,6 +8,8 @@ import logging
 import signal
 
 from app.core.db import dispose_engine
+from app.pipeline import wiring
+from app.worker import tracking_tasks  # noqa: F401  (registers the periodic tracking reminders)
 from app.worker.heartbeat import heartbeat_loop
 from app.worker.queue import RUNS_QUEUE, SYSTEM_QUEUE, queue_app
 
@@ -15,6 +17,7 @@ log = logging.getLogger(__name__)
 
 
 async def run_worker() -> None:
+    wiring.install()  # run handlers, the real AI client, scoring as the sweep's last stage, conflicts
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

@@ -11,6 +11,7 @@ from app.api.routers import (
     data,
     insights,
     jobs,
+    jobs_corrections,
     kit,
     pending_actions,
     runs,
@@ -19,6 +20,7 @@ from app.api.routers import (
     system,
     themes,
 )
+from app.llm import api as llm_api
 
 ALL_ROUTERS: list[APIRouter] = [
     auth.setup_router,
@@ -30,6 +32,7 @@ ALL_ROUTERS: list[APIRouter] = [
     campaigns.router,
     sources.router,
     jobs.router,
+    jobs_corrections.router,
     assessments.router,
     applications.router,
     pending_actions.router,
@@ -38,4 +41,5 @@ ALL_ROUTERS: list[APIRouter] = [
     connections.tokens_router,
     insights.router,
     data.router,
+    llm_api.router,
 ]

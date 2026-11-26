@@ -1,0 +1,18 @@
+{
+ "jobPostingInfo": {
+  "id": "abc",
+  "title": "Senior Applied Research Scientist – AI Native Numerical Methods",
+  "jobDescription": "<p>Applied research role. Requires a PhD or equivalent experience.</p><ul><li>Python</li><li>Numerical methods</li></ul>",
+  "location": "US, CA, Remote",
+  "postedOn": "Posted Today",
+  "startDate": "2026-11-25",
+  "timeType": "Full time",
+  "jobReqId": "JR2030637",
+  "jobPostingId": "x",
+  "externalUrl": "https://example.wd5.myworkdayjobs.com/en-US/Site/job/US-CA-Remote/Senior-Applied-Research-Scientist---AI-Native-Numerical-Methods_JR2030637",
+  "canApply": true
+ },
+ "hiringOrganization": {
+  "name": "Example Corp"
+ }
+}

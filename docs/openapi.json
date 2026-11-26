@@ -274,6 +274,96 @@
         }
       }
     },
+    "/api/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sessions List",
+        "description": "Active (not revoked, not expired) sessions of the owner, newest first.",
+        "operationId": "auth_sessions_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionOut"
+                  },
+                  "type": "array",
+                  "title": "Response Auth Sessions List"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions/revoke-others": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sessions Revoke Others",
+        "operationId": "auth_sessions_revoke_others",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Auth Sessions Revoke Others"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sessions Revoke",
+        "operationId": "auth_sessions_revoke",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such active session"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [
@@ -976,6 +1066,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -1645,6 +1737,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -1921,6 +2015,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -2197,6 +2293,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -2473,6 +2571,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -2749,6 +2849,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -2798,7 +2900,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnswerIn"
+                "$ref": "#/components/schemas/app__api__routers__kit__AnswerIn"
               }
             }
           }
@@ -2912,7 +3014,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnswerIn"
+                "$ref": "#/components/schemas/app__api__routers__kit__AnswerIn"
               }
             }
           }
@@ -2995,6 +3097,67 @@
         }
       }
     },
+    "/api/kit/answers/{item_id}/usage": {
+      "get": {
+        "tags": [
+          "kit"
+        ],
+        "summary": "Kit Answers Usage",
+        "description": "Open applications (before submission) whose packet or pending actions use this answer.",
+        "operationId": "kit_answers_usage",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnswerUseOut"
+                  },
+                  "title": "Response Kit Answers Usage"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such answer"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/kit/templates": {
       "get": {
         "tags": [
@@ -3025,6 +3188,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -3301,6 +3466,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -3704,6 +3871,201 @@
         }
       }
     },
+    "/api/kit/guardrails/{item_id}/waivers": {
+      "post": {
+        "tags": [
+          "kit"
+        ],
+        "summary": "Kit Guardrails Waive",
+        "description": "Waive a 'block, waivable once' guardrail for ONE application, with a reason. Audited.",
+        "operationId": "kit_guardrails_waive",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WaiverIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaiverOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not waivable (always block, or only advises), or already waived"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kit/guardrail-waivers": {
+      "get": {
+        "tags": [
+          "kit"
+        ],
+        "summary": "Kit Guardrail Waivers List",
+        "operationId": "kit_guardrail_waivers_list",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "guardrail_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Guardrail Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WaiverOut"
+                  },
+                  "title": "Response Kit Guardrail Waivers List"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kit/guardrail-waivers/{waiver_id}": {
+      "delete": {
+        "tags": [
+          "kit"
+        ],
+        "summary": "Kit Guardrail Waivers Delete",
+        "description": "Take a waiver back: the guardrail blocks that application again. Audited.",
+        "operationId": "kit_guardrail_waivers_delete",
+        "parameters": [
+          {
+            "name": "waiver_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Waiver Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/kit/answers/match": {
       "post": {
         "tags": [
@@ -3813,6 +4175,7 @@
           "kit"
         ],
         "summary": "Kit Prompts List",
+        "description": "Every version, newest first per stage. Defaults are loaded on first read.",
         "operationId": "kit_prompts_list",
         "parameters": [
           {
@@ -4052,6 +4415,7 @@
           "kit"
         ],
         "summary": "Kit Review Decide",
+        "description": "Confirm keeps the record; drop removes it (facts are retired so their code is never reused).\nEdit a record with its own PUT: it stays in the queue until confirmed.",
         "operationId": "kit_review_decide",
         "parameters": [
           {
@@ -4407,238 +4771,6 @@
         }
       }
     },
-    "/api/rubrics": {
-      "get": {
-        "tags": [
-          "campaigns"
-        ],
-        "summary": "Rubrics List",
-        "operationId": "rubrics_list",
-        "parameters": [
-          {
-            "name": "cursor",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Cursor"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "default": 50,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Page_RubricOut_"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "campaigns"
-        ],
-        "summary": "Rubrics Create",
-        "operationId": "rubrics_create",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RubricIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RubricOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/rubrics/{item_id}": {
-      "get": {
-        "tags": [
-          "campaigns"
-        ],
-        "summary": "Rubrics Get",
-        "operationId": "rubrics_get",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Item Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RubricOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "put": {
-        "tags": [
-          "campaigns"
-        ],
-        "summary": "Rubrics Update",
-        "operationId": "rubrics_update",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Item Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/RubricIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/RubricOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/campaigns/{item_id}/status": {
       "post": {
         "tags": [
@@ -4708,7 +4840,7 @@
           "campaigns"
         ],
         "summary": "Campaigns Confirm",
-        "description": "Confirm criteria (principle 2). Required before the mode can go above Prepare.",
+        "description": "Confirm every remaining criteria item (principle 2). Required before the mode can go above Prepare.",
         "operationId": "campaigns_confirm",
         "parameters": [
           {
@@ -4756,12 +4888,87 @@
         }
       }
     },
+    "/api/campaigns/{item_id}/confirm/{item}": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Campaigns Confirm Item",
+        "description": "Confirm one criteria item; the campaign is confirmed (and the mode lock lifts) when none remain.",
+        "operationId": "campaigns_confirm_item",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          },
+          {
+            "name": "item",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "titles",
+                "keywords",
+                "rules",
+                "locations",
+                "work_models",
+                "seniority",
+                "pay_floors",
+                "deprioritise_themes",
+                "unknown_data_policy"
+              ],
+              "type": "string",
+              "title": "Item"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/campaigns/{item_id}/clone": {
       "post": {
         "tags": [
           "campaigns"
         ],
         "summary": "Campaigns Clone",
+        "description": "A copy in draft, needing confirmation again.",
         "operationId": "campaigns_clone",
         "parameters": [
           {
@@ -4873,12 +5080,77 @@
         }
       }
     },
+    "/api/campaigns/{item_id}/rules/from-view": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Campaigns Rule From View",
+        "description": "Convert a saved view into an exclusion, an inclusion, or a scoring penalty or bonus.",
+        "operationId": "campaigns_rule_from_view",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RuleFromViewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CampaignOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/campaigns/{item_id}/preview": {
       "post": {
         "tags": [
           "campaigns"
         ],
         "summary": "Campaigns Preview Rule",
+        "description": "What a rule would match among saved jobs. Reads only.",
         "operationId": "campaigns_preview_rule",
         "parameters": [
           {
@@ -4942,6 +5214,7 @@
           "campaigns"
         ],
         "summary": "Campaigns Dry Run",
+        "description": "Run the decision table over saved jobs with this campaign as it stands; nothing is changed\nexcept the run record (counts per verdict). No model calls and no fetching.",
         "operationId": "campaigns_dry_run",
         "parameters": [
           {
@@ -4962,6 +5235,240 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/DryRunOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rubrics": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics List",
+        "operationId": "rubrics_list",
+        "parameters": [
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RubricOut_"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics Create",
+        "description": "A new rubric family, as draft version 1 (weights must sum to 100).",
+        "operationId": "rubrics_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RubricIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/rubrics/{item_id}": {
+      "get": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics Get",
+        "operationId": "rubrics_get",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics Update",
+        "description": "Edits a draft in place. Editing an active or retired version creates a new draft version.",
+        "operationId": "rubrics_update",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RubricIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RubricOut"
                 }
               }
             }
@@ -5043,12 +5550,65 @@
         }
       }
     },
+    "/api/rubrics/backtest/estimate": {
+      "post": {
+        "tags": [
+          "campaigns"
+        ],
+        "summary": "Rubrics Backtest Estimate",
+        "description": "Step one: how many roles and what the backtest would cost. Spends nothing.",
+        "operationId": "rubrics_backtest_estimate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BacktestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestEstimateOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/rubrics/backtest": {
       "post": {
         "tags": [
           "campaigns"
         ],
         "summary": "Rubrics Backtest",
+        "description": "Step two: score the roles with the draft rubric (old vs new, ranks, threshold crossings).\nStored assessments are not changed.",
         "operationId": "rubrics_backtest",
         "requestBody": {
           "content": {
@@ -6035,59 +6595,6 @@
         }
       }
     },
-    "/api/sources/{item_id}/test": {
-      "post": {
-        "tags": [
-          "sources"
-        ],
-        "summary": "Sources Test",
-        "operationId": "sources_test",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Item Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SourceTestOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/sources/detect": {
       "post": {
         "tags": [
@@ -6139,12 +6646,115 @@
         }
       }
     },
+    "/api/sources/{item_id}/test": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Sources Test",
+        "description": "Search now with this source's own config and rate limit; nothing is stored.",
+        "operationId": "sources_test",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTestOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watched-employers/from-url": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Watched Employers From Url",
+        "description": "Paste a careers URL: detect the board type and slug, then add the employer to the watched list.",
+        "operationId": "watched_employers_from_url",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchedEmployerFromUrl"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchedEmployerOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The URL is not a recognised careers board"
+          },
+          "409": {
+            "description": "That board is already watched"
+          }
+        }
+      }
+    },
     "/api/jobs": {
       "get": {
         "tags": [
           "jobs"
         ],
         "summary": "Jobs List",
+        "description": "Matches. ``conditions`` (JSON ``ConditionSet``) carries the facet grammar; ``view_id`` adds a\nsaved view's conditions (and its group and sort unless given); ``q`` is free text.",
         "operationId": "jobs_list",
         "parameters": [
           {
@@ -6411,6 +7021,7 @@
           "jobs"
         ],
         "summary": "Jobs Patch",
+        "description": "Triage, pin, snooze, notes and manual tags. Skipping a conflict winner promotes the next role.",
         "operationId": "jobs_patch",
         "parameters": [
           {
@@ -6570,6 +7181,7 @@
           "jobs"
         ],
         "summary": "Jobs Why",
+        "description": "The \"Why?\" panel: the decision table's gates for each campaign that assessed the role (or the\none asked for), with each rule's effective value, source and version, and what would change it.",
         "operationId": "jobs_why",
         "parameters": [
           {
@@ -6687,258 +7299,6 @@
         }
       }
     },
-    "/api/jobs/{job_id}/applied-myself": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Applied Myself",
-        "operationId": "jobs_applied_myself",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AppliedMyselfIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Ok"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/merge": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Merge",
-        "operationId": "jobs_merge",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MergeIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/split": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Split",
-        "operationId": "jobs_split",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SplitIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/employer": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Fix Employer",
-        "operationId": "jobs_fix_employer",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmployerFixIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/jobs/{job_id}/release": {
       "post": {
         "tags": [
@@ -7009,6 +7369,7 @@
           "jobs"
         ],
         "summary": "Jobs Recheck",
+        "description": "Re-read the posting through its source. A failed check is ``unknown``, never ``closed``. A\nmaterial change (text, title, pay, deadline, apply link, place) is re-extracted and reassessed.",
         "operationId": "jobs_recheck",
         "parameters": [
           {
@@ -7028,7 +7389,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
+                  "$ref": "#/components/schemas/RecheckOut"
                 }
               }
             }
@@ -8115,7 +8476,7 @@
           "jobs"
         ],
         "summary": "Custom Facets Backfill",
-        "description": "Without ``confirm`` returns the cost estimate only; with it, queues the backfill under the budget cap.",
+        "description": "Without ``confirm`` returns the cost estimate only; with it, answers the jobs now, each call budgeted.",
         "operationId": "custom_facets_backfill",
         "parameters": [
           {
@@ -8146,6 +8507,264 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BackfillEstimate"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/applied-myself": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Applied Myself",
+        "operationId": "jobs_applied_myself",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppliedMyselfIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already applied to this job"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/merge": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Merge",
+        "description": "Merge duplicates into this job. Sightings, tags, contacts and application history are kept.",
+        "operationId": "jobs_merge",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/split": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Split",
+        "description": "Move wrongly merged sightings into their own job (or back to the job they were merged away from).\nAnswers with the new job.",
+        "operationId": "jobs_split",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/employer": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Fix Employer",
+        "description": "Set the right canonical employer (for every job posted under the same name), optionally remembering\nit as an alias, then re-evaluate the conflict groups involved.",
+        "operationId": "jobs_fix_employer",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployerFixIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
                 }
               }
             }
@@ -8335,6 +8954,7 @@
           "assessments"
         ],
         "summary": "Assessments Override",
+        "description": "Record who and why. A score override replaces the rubric score at the score layer only:\nexclusions, eligibility and automation gates still apply.",
         "operationId": "assessments_override",
         "parameters": [
           {
@@ -8398,6 +9018,7 @@
           "assessments"
         ],
         "summary": "Assessments Rescore",
+        "description": "Queue a rescore run. One assessment per job and campaign is updated in place, so a rescore\nnever duplicates assessments or applications.",
         "operationId": "assessments_rescore",
         "requestBody": {
           "content": {
@@ -8501,6 +9122,27 @@
             }
           },
           {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "email",
+                    "browser",
+                    "manual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -8514,6 +9156,32 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "name": "pinned",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pinned"
+            }
+          },
+          {
+            "name": "hide_snoozed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Hide Snoozed"
             }
           },
           {
@@ -8538,6 +9206,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 100,
               "title": "Limit"
             }
@@ -8612,6 +9282,291 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The job already has an application"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/board": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Board",
+        "description": "Applications grouped by stage, every stage present (empty columns included).",
+        "operationId": "applications_board",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "email",
+                    "browser",
+                    "manual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "hide_snoozed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Hide Snoozed"
+            }
+          },
+          {
+            "name": "per_column",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Per Column"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/applied-myself": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Applied Myself",
+        "description": "'I applied myself': counts at once for duplicates, employer limits and follow-ups. Creates no\nevidence; the application is marked owner-attested.",
+        "operationId": "applications_applied_myself",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppliedMyselfCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already applied to this job"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/import/preview": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Import Preview",
+        "description": "Upload an application-history CSV and see what it would change. Writes nothing.",
+        "operationId": "applications_import_preview",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_applications_import_preview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__api__routers__applications__ImportPreviewOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/import/confirm": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Import Confirm",
+        "description": "Apply the previewed file in one transaction. Importing the same file again changes nothing.",
+        "operationId": "applications_import_confirm",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_applications_import_confirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The file differs from the one previewed"
           },
           "422": {
             "description": "Validation Error",
@@ -8776,6 +9731,132 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That move is not allowed"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/files": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Attach Files",
+        "description": "Keep the files the owner sent (use after 'I applied myself'). Stored under FILES_DIR and shown on the\ntimeline; they are the owner's own record, not submission evidence.",
+        "operationId": "applications_attach_files",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_applications_attach_files"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttachedFile"
+                  },
+                  "title": "Response Applications Attach Files"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Files",
+        "operationId": "applications_files",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttachedFile"
+                  },
+                  "title": "Response Applications Files"
                 }
               }
             }
@@ -9594,6 +10675,23 @@
         "operationId": "contacts_list",
         "parameters": [
           {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,
@@ -9615,6 +10713,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -10315,6 +11415,7 @@
           "pending_actions"
         ],
         "summary": "Pending Actions List",
+        "description": "Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back.",
         "operationId": "pending_actions_list",
         "parameters": [
           {
@@ -10351,7 +11452,8 @@
                     "confirm_submission",
                     "review_import",
                     "conflict_choice",
-                    "answer_review_due"
+                    "answer_review_due",
+                    "follow_up"
                   ],
                   "type": "string"
                 },
@@ -10360,6 +11462,16 @@
                 }
               ],
               "title": "Type"
+            }
+          },
+          {
+            "name": "include_snoozed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Snoozed"
             }
           },
           {
@@ -10376,6 +11488,18 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
             }
           }
         ],
@@ -10501,13 +11625,208 @@
         }
       }
     },
+    "/api/pending-actions/{action_id}/dismiss": {
+      "post": {
+        "tags": [
+          "pending_actions"
+        ],
+        "summary": "Pending Actions Dismiss",
+        "operationId": "pending_actions_dismiss",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingActionOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pending-actions/{action_id}/snooze": {
+      "post": {
+        "tags": [
+          "pending_actions"
+        ],
+        "summary": "Pending Actions Snooze",
+        "description": "Hide until ``until``; it returns on schedule, and sooner if its deadline becomes imminent.",
+        "operationId": "pending_actions_snooze",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnoozeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingActionOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pending-actions/{action_id}/answer": {
+      "post": {
+        "tags": [
+          "pending_actions"
+        ],
+        "summary": "Pending Actions Answer",
+        "description": "Answer an unknown form question: saves it to the answer bank with the chosen scope and settles every\nother open question in the group that the scope covers. Returns the actions that closed.",
+        "operationId": "pending_actions_answer",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__routers__pending_actions__AnswerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PendingActionOut"
+                  },
+                  "title": "Response Pending Actions Answer"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pending-actions/{action_id}/resolve": {
       "post": {
         "tags": [
           "pending_actions"
         ],
         "summary": "Pending Actions Resolve",
-        "description": "'I've signed in, continue' returns the task to the same runner (8.4).",
+        "description": "'I've signed in, continue' returns the task to the same runner (8.4). Wave 2 (apply) handles the\ntypes that need a runner; dismissing and answering an unknown question work now.",
         "operationId": "pending_actions_resolve",
         "parameters": [
           {
@@ -10679,6 +11998,7 @@
           "runs"
         ],
         "summary": "Runs Create",
+        "description": "Start a manual run (or a dry run: counts what a sweep would do, writes nothing).",
         "operationId": "runs_create",
         "requestBody": {
           "required": true,
@@ -10711,15 +12031,11 @@
               }
             }
           },
+          "409": {
+            "description": "A run for this campaign is already queued or running"
+          },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "A sweep needs an existing campaign"
           }
         }
       }
@@ -10783,6 +12099,7 @@
           "runs"
         ],
         "summary": "Runs Cancel",
+        "description": "Cancel a queued run at once; a running sweep stops at its next checkpoint and keeps what it saved.",
         "operationId": "runs_cancel",
         "parameters": [
           {
@@ -10816,6 +12133,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The run already finished"
           },
           "422": {
             "description": "Validation Error",
@@ -11145,6 +12465,7 @@
           "connections"
         ],
         "summary": "Connections Create",
+        "description": "LLM providers (wave 1). Keys are encrypted at rest and only ever returned masked.",
         "operationId": "connections_create",
         "requestBody": {
           "content": {
@@ -11196,6 +12517,7 @@
           "connections"
         ],
         "summary": "Connections Update",
+        "description": "Omitted fields stay; a blank secret value keeps the stored one.",
         "operationId": "connections_update",
         "parameters": [
           {
@@ -11303,6 +12625,7 @@
           "connections"
         ],
         "summary": "Connections Test",
+        "description": "One tiny budgeted request with this provider record (model: config ``test_model`` or the extract model).",
         "operationId": "connections_test",
         "parameters": [
           {
@@ -11717,7 +13040,34 @@
           "insights"
         ],
         "summary": "Today Summary",
+        "description": "Decisions first (shared blockers grouped), then the last sweep, best new matches, what is coming\nup, the funnel, source health and spend.",
         "operationId": "today_summary",
+        "parameters": [
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 5,
+              "title": "Top"
+            }
+          },
+          {
+            "name": "horizon_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 14,
+              "title": "Horizon Days"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -11735,6 +13085,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -11945,7 +13305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportPreviewOut"
+                  "$ref": "#/components/schemas/app__api__routers__data__ImportPreviewOut"
                 }
               }
             }
@@ -12274,6 +13634,283 @@
           }
         }
       }
+    },
+    "/api/ai/routing": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Routing List",
+        "operationId": "ai_routing_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RouteOut"
+                  },
+                  "type": "array",
+                  "title": "Response Ai Routing List"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/routing/test": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Routing Test",
+        "description": "One tiny budgeted request on the route (costs well under one cent on the defaults).",
+        "operationId": "ai_routing_test",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteTestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteTestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/routing/activate": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Routing Activate",
+        "description": "Switch a stage to a model. The route must have passed a test recently (DESIGN.md 18.5).",
+        "operationId": "ai_routing_activate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteActivateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/prices": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Prices List",
+        "operationId": "ai_prices_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceOut"
+                  },
+                  "type": "array",
+                  "title": "Response Ai Prices List"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Prices Replace",
+        "description": "Replace the whole price table (the screen edits it as one table).",
+        "operationId": "ai_prices_replace",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceTableIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceOut"
+                  },
+                  "type": "array",
+                  "title": "Response Ai Prices Replace"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/prices/reset": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Prices Reset",
+        "description": "Restore the dated default table.",
+        "operationId": "ai_prices_reset",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceOut"
+                  },
+                  "type": "array",
+                  "title": "Response Ai Prices Reset"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/spend": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Spend Summary",
+        "description": "Month to date (owner's time zone), by stage, model and run; billed and estimated-unbilled apart.",
+        "operationId": "ai_spend_summary",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/spend/meter": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Spend Meter",
+        "description": "The top-bar meter. Refetch on the ``spend.updated`` event.",
+        "operationId": "ai_spend_meter",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendMeter"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -12384,111 +14021,6 @@
           "canonical"
         ],
         "title": "AliasOut"
-      },
-      "AnswerIn": {
-        "properties": {
-          "patterns": {
-            "$ref": "#/components/schemas/AnswerPatterns"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          },
-          "value_type": {
-            "type": "string",
-            "enum": [
-              "text",
-              "number",
-              "boolean",
-              "choice",
-              "date",
-              "money"
-            ],
-            "title": "Value Type",
-            "default": "text"
-          },
-          "conditions": {
-            "$ref": "#/components/schemas/ConditionSet-Input"
-          },
-          "answer_class": {
-            "type": "string",
-            "enum": [
-              "auto",
-              "ask_first",
-              "never",
-              "owner_only"
-            ],
-            "title": "Answer Class",
-            "default": "ask_first"
-          },
-          "material": {
-            "type": "boolean",
-            "title": "Material",
-            "default": false
-          },
-          "settled": {
-            "type": "boolean",
-            "title": "Settled",
-            "default": false
-          },
-          "scope": {
-            "type": "string",
-            "enum": [
-              "this_application",
-              "this_employer",
-              "this_country",
-              "all_matching"
-            ],
-            "title": "Scope",
-            "default": "all_matching"
-          },
-          "scope_ref": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Scope Ref"
-          },
-          "forced_choice": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Forced Choice"
-          },
-          "review_after": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Review After"
-          }
-        },
-        "type": "object",
-        "required": [
-          "patterns"
-        ],
-        "title": "AnswerIn"
       },
       "AnswerMatchIn": {
         "properties": {
@@ -12770,6 +14302,50 @@
         ],
         "title": "AnswerPatterns"
       },
+      "AnswerUseOut": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "job_title": {
+            "type": "string",
+            "title": "Job Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "packet",
+              "pending_action"
+            ],
+            "title": "Via"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "job_id",
+          "job_title",
+          "employer",
+          "stage",
+          "via"
+        ],
+        "title": "AnswerUseOut"
+      },
       "Appearance": {
         "properties": {
           "theme_id": {
@@ -13000,8 +14576,69 @@
             ],
             "title": "Applied At"
           },
+          "snoozed_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snoozed Until"
+          },
+          "snoozed": {
+            "type": "boolean",
+            "title": "Snoozed",
+            "description": "Snoozed right now (an imminent deadline overrides a snooze)",
+            "default": false
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline",
+            "description": "The job's closing date, when dated"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "system",
+              "owner",
+              "import"
+            ],
+            "title": "Origin",
+            "default": "system"
+          },
+          "owner_attested": {
+            "type": "boolean",
+            "title": "Owner Attested",
+            "description": "Applied outside Nchito, on the owner's word",
+            "default": false
+          },
+          "legacy_fit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Fit",
+            "description": "Imported 1-5 fit; not a rubric score"
+          },
           "spec": {
-            "$ref": "#/components/schemas/ApplicationSpec"
+            "$ref": "#/components/schemas/ApplicationSpec-Output"
           },
           "check_results": {
             "items": {
@@ -13042,6 +14679,75 @@
           "applied_outside": {
             "type": "boolean",
             "title": "Applied Outside"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "apply_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apply Url"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "allowed_next": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "shortlisted",
+                "tailoring",
+                "ready",
+                "applying",
+                "submitted_unconfirmed",
+                "submitted",
+                "screening",
+                "interview",
+                "offer",
+                "accepted",
+                "rejected",
+                "withdrawn",
+                "closed",
+                "skipped"
+              ]
+            },
+            "type": "array",
+            "title": "Allowed Next",
+            "description": "Stages the owner can move it to now"
           }
         },
         "type": "object",
@@ -13075,7 +14781,8 @@
           "next_step": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 300
               },
               {
                 "type": "null"
@@ -13133,12 +14840,86 @@
               }
             ],
             "title": "Channel"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           }
         },
         "type": "object",
-        "title": "ApplicationPatch"
+        "title": "ApplicationPatch",
+        "description": "Only the fields sent change; send null to clear a date or the snooze."
       },
-      "ApplicationSpec": {
+      "ApplicationSpec-Input": {
+        "properties": {
+          "headline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SpecItem"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "competencies": {
+            "items": {
+              "$ref": "#/components/schemas/SpecItem"
+            },
+            "type": "array",
+            "title": "Competencies"
+          },
+          "experience": {
+            "items": {
+              "$ref": "#/components/schemas/SpecExperience"
+            },
+            "type": "array",
+            "title": "Experience"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skills"
+          },
+          "letter": {
+            "items": {
+              "$ref": "#/components/schemas/SpecItem"
+            },
+            "type": "array",
+            "title": "Letter"
+          },
+          "requirement_match": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementMatch"
+            },
+            "type": "array",
+            "title": "Requirement Match"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ApplicationSpec"
+      },
+      "ApplicationSpec-Output": {
         "properties": {
           "headline": {
             "anyOf": [
@@ -13331,6 +15112,67 @@
               }
             ],
             "title": "Applied At"
+          },
+          "snoozed_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snoozed Until"
+          },
+          "snoozed": {
+            "type": "boolean",
+            "title": "Snoozed",
+            "description": "Snoozed right now (an imminent deadline overrides a snooze)",
+            "default": false
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline",
+            "description": "The job's closing date, when dated"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "system",
+              "owner",
+              "import"
+            ],
+            "title": "Origin",
+            "default": "system"
+          },
+          "owner_attested": {
+            "type": "boolean",
+            "title": "Owner Attested",
+            "description": "Applied outside Nchito, on the owner's word",
+            "default": false
+          },
+          "legacy_fit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Fit",
+            "description": "Imported 1-5 fit; not a rubric score"
           }
         },
         "type": "object",
@@ -13353,12 +15195,68 @@
         ],
         "title": "ApplicationSummary"
       },
-      "AppliedMyselfIn": {
+      "AppliedMyselfCreate": {
         "properties": {
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "employer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer"
+          },
           "applied_on": {
-            "type": "string",
-            "format": "date",
-            "title": "Applied On"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied On",
+            "description": "Defaults to today"
           },
           "channel": {
             "type": "string",
@@ -13373,7 +15271,8 @@
           "reference": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200
               },
               {
                 "type": "null"
@@ -13391,14 +15290,92 @@
               }
             ],
             "title": "Note"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Names of the files sent, for the record"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
           }
         },
         "type": "object",
-        "required": [
-          "applied_on"
-        ],
+        "title": "AppliedMyselfCreate",
+        "description": "Log an application made outside Nchito, for an existing job or one created from what is known."
+      },
+      "AppliedMyselfIn": {
+        "properties": {
+          "applied_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied On",
+            "description": "Defaults to today"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "browser",
+              "manual"
+            ],
+            "title": "Channel",
+            "default": "manual"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Names of the files sent, for the record"
+          }
+        },
+        "type": "object",
         "title": "AppliedMyselfIn",
-        "description": "\"I applied myself\": counts at once for duplicates, employer limits and follow-ups."
+        "description": "\"I applied myself\": counts at once for duplicates, employer limits and follow-ups. No evidence is\ncreated; the application is marked owner-attested."
       },
       "ApproveIn": {
         "properties": {
@@ -13546,6 +15523,11 @@
             "type": "integer",
             "title": "Cost Minor"
           },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
+            "default": 0
+          },
           "cost_currency": {
             "anyOf": [
               {
@@ -13570,6 +15552,29 @@
           "is_conflict_winner": {
             "type": "boolean",
             "title": "Is Conflict Winner"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "filtered_out",
+              "scored",
+              "parked"
+            ],
+            "title": "State",
+            "default": "pending"
+          },
+          "base_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Score",
+            "description": "Rubric score before campaign rules and overrides"
           }
         },
         "type": "object",
@@ -13622,6 +15627,46 @@
           "when"
         ],
         "title": "AttachPolicy"
+      },
+      "AttachedFile": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "name",
+          "sha256",
+          "size_bytes"
+        ],
+        "title": "AttachedFile"
       },
       "AuditEventOut": {
         "properties": {
@@ -13812,9 +15857,31 @@
             "type": "integer",
             "title": "Estimated Cost Minor"
           },
+          "estimated_cost_micros": {
+            "type": "integer",
+            "title": "Estimated Cost Micros",
+            "default": 0
+          },
           "currency": {
             "type": "string",
             "title": "Currency"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining",
+            "default": 0
+          },
+          "paused_for_budget": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused For Budget",
+            "description": "Budget scope that stopped the backfill"
           }
         },
         "type": "object",
@@ -13823,7 +15890,43 @@
           "estimated_cost_minor",
           "currency"
         ],
-        "title": "BackfillEstimate"
+        "title": "BackfillEstimate",
+        "description": "Without ``confirm``: jobs to answer and the estimate. With it: jobs answered and the spend."
+      },
+      "BacktestEstimateOut": {
+        "properties": {
+          "jobs": {
+            "type": "integer",
+            "title": "Jobs",
+            "description": "Roles in the backtest"
+          },
+          "to_score": {
+            "type": "integer",
+            "title": "To Score",
+            "description": "Roles that need a model call (not filtered out, not cached)"
+          },
+          "estimated_cost_minor": {
+            "type": "integer",
+            "title": "Estimated Cost Minor"
+          },
+          "estimated_cost_micros": {
+            "type": "integer",
+            "title": "Estimated Cost Micros",
+            "default": 0
+          },
+          "cost_currency": {
+            "type": "string",
+            "title": "Cost Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs",
+          "to_score",
+          "estimated_cost_minor",
+          "cost_currency"
+        ],
+        "title": "BacktestEstimateOut"
       },
       "BacktestIn": {
         "properties": {
@@ -13874,6 +15977,11 @@
           "estimated_cost_minor": {
             "type": "integer",
             "title": "Estimated Cost Minor"
+          },
+          "estimated_cost_micros": {
+            "type": "integer",
+            "title": "Estimated Cost Micros",
+            "default": 0
           },
           "cost_currency": {
             "type": "string",
@@ -14015,11 +16123,119 @@
         ],
         "title": "BackupOut"
       },
+      "BoardColumn": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "shortlisted",
+              "tailoring",
+              "ready",
+              "applying",
+              "submitted_unconfirmed",
+              "submitted",
+              "screening",
+              "interview",
+              "offer",
+              "accepted",
+              "rejected",
+              "withdrawn",
+              "closed",
+              "skipped"
+            ],
+            "title": "Stage"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApplicationSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "count",
+          "items"
+        ],
+        "title": "BoardColumn"
+      },
+      "BoardOut": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/BoardColumn"
+            },
+            "type": "array",
+            "title": "Columns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns"
+        ],
+        "title": "BoardOut"
+      },
+      "Body_applications_attach_files": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_applications_attach_files"
+      },
+      "Body_applications_import_confirm": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "content_hash"
+        ],
+        "title": "Body_applications_import_confirm"
+      },
+      "Body_applications_import_preview": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "format": "binary",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_applications_import_preview"
+      },
       "Body_data_import_preview": {
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "source": {
@@ -14044,7 +16260,7 @@
         "properties": {
           "file": {
             "type": "string",
-            "contentMediaType": "application/octet-stream",
+            "format": "binary",
             "title": "File"
           },
           "title": {
@@ -14425,6 +16641,27 @@
         ],
         "title": "CampaignIn"
       },
+      "CampaignMatchCounts": {
+        "properties": {
+          "new": {
+            "type": "integer",
+            "title": "New",
+            "default": 0
+          },
+          "shortlisted": {
+            "type": "integer",
+            "title": "Shortlisted",
+            "default": 0
+          },
+          "held": {
+            "type": "integer",
+            "title": "Held",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "CampaignMatchCounts"
+      },
       "CampaignOut": {
         "properties": {
           "id": {
@@ -14584,6 +16821,41 @@
             ],
             "title": "Mode Ceiling",
             "description": "Highest mode allowed now: 'prepare' until criteria and answers are confirmed"
+          },
+          "unconfirmed": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "titles",
+                "keywords",
+                "rules",
+                "locations",
+                "work_models",
+                "seniority",
+                "pay_floors",
+                "deprioritise_themes",
+                "unknown_data_policy"
+              ]
+            },
+            "type": "array",
+            "title": "Unconfirmed",
+            "description": "Criteria items still to confirm; the campaign is confirmed when empty"
+          },
+          "match_counts": {
+            "$ref": "#/components/schemas/CampaignMatchCounts",
+            "description": "Assessed jobs by triage, and held by a conflict group"
+          },
+          "last_run_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run At"
           }
         },
         "type": "object",
@@ -15064,6 +17336,98 @@
         ],
         "title": "ConfigRevisionOut"
       },
+      "ConflictOut": {
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "winner",
+              "held",
+              "released"
+            ],
+            "title": "State"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "outranked_by_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outranked By Job Id"
+          },
+          "outranked_by_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outranked By Title"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "outranked_by_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outranked By Score"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "outranked",
+                  "applied"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "outranked: a higher role won; applied: the employer is locked after applying"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "ConflictOut",
+        "description": "The role's employer-group state; for a held role, the role that outranks it and both scores."
+      },
       "ConnectionCreate": {
         "properties": {
           "provider": {
@@ -15240,6 +17604,11 @@
           "cost_minor": {
             "type": "integer",
             "title": "Cost Minor",
+            "default": 0
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
             "default": 0
           }
         },
@@ -15771,6 +18140,23 @@
         ],
         "title": "DetectOut"
       },
+      "DismissIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "DismissIn"
+      },
       "DispatchOut": {
         "properties": {
           "id": {
@@ -15932,6 +18318,8 @@
         "properties": {
           "canonical_employer": {
             "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
             "title": "Canonical Employer"
           },
           "remember_alias": {
@@ -17115,6 +19503,19 @@
             },
             "type": "array",
             "title": "File Names"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id",
+            "description": "Take this application's waivers of 'block, waivable once' guardrails into account"
           }
         },
         "type": "object",
@@ -17541,47 +19942,203 @@
         ],
         "title": "ImportDiffItem"
       },
-      "ImportPreviewOut": {
+      "ImportErrorOut": {
         "properties": {
-          "import_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Import Id"
+          "line": {
+            "type": "integer",
+            "title": "Line"
           },
-          "source": {
-            "type": "string",
-            "enum": [
-              "kit_file",
-              "old_kit_zip",
-              "history_csv",
-              "free_form"
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Source"
+            "title": "Id"
           },
-          "diff": {
-            "items": {
-              "$ref": "#/components/schemas/ImportDiffItem"
-            },
-            "type": "array",
-            "title": "Diff"
-          },
-          "notices": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Notices",
-            "description": "e.g. 'free-form text will be sent to <provider>'"
+          "message": {
+            "type": "string",
+            "title": "Message"
           }
         },
         "type": "object",
         "required": [
-          "import_id",
-          "source",
-          "diff",
-          "notices"
+          "line",
+          "id",
+          "message"
         ],
-        "title": "ImportPreviewOut"
+        "title": "ImportErrorOut"
+      },
+      "ImportFieldChange": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "before": {
+            "title": "Before"
+          },
+          "after": {
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "before",
+          "after"
+        ],
+        "title": "ImportFieldChange"
+      },
+      "ImportResultOut": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "application_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Application Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "updated",
+          "unchanged",
+          "skipped",
+          "errors",
+          "application_ids"
+        ],
+        "title": "ImportResultOut"
+      },
+      "ImportRowOut": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "shortlisted",
+              "tailoring",
+              "ready",
+              "applying",
+              "submitted_unconfirmed",
+              "submitted",
+              "screening",
+              "interview",
+              "offer",
+              "accepted",
+              "rejected",
+              "withdrawn",
+              "closed",
+              "skipped"
+            ],
+            "title": "Stage"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "update",
+              "unchanged",
+              "skip",
+              "error"
+            ],
+            "title": "Action"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "new",
+                  "existing"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ImportFieldChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "messages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "key",
+          "company",
+          "role",
+          "stage",
+          "action",
+          "job",
+          "changes",
+          "messages"
+        ],
+        "title": "ImportRowOut"
       },
       "InsightsOut": {
         "properties": {
@@ -17967,6 +20524,26 @@
             ],
             "title": "Conflict Note"
           },
+          "conflict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConflictOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pay_state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "estimated",
+              "not_stated"
+            ],
+            "title": "Pay State",
+            "default": "not_stated"
+          },
           "pay": {
             "$ref": "#/components/schemas/PayOut"
           },
@@ -18004,6 +20581,40 @@
               }
             ],
             "title": "Posted At"
+          },
+          "work_model": {
+            "type": "string",
+            "enum": [
+              "on_site",
+              "hybrid",
+              "remote",
+              "not_stated"
+            ],
+            "title": "Work Model",
+            "default": "not_stated"
+          },
+          "remote_scope": {
+            "type": "string",
+            "enum": [
+              "worldwide",
+              "regions",
+              "country_only",
+              "not_stated"
+            ],
+            "title": "Remote Scope",
+            "default": "not_stated"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Name of the first sighting's source"
           },
           "recruiter": {
             "anyOf": [
@@ -18554,6 +21165,26 @@
             ],
             "title": "Conflict Note"
           },
+          "conflict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConflictOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pay_state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "estimated",
+              "not_stated"
+            ],
+            "title": "Pay State",
+            "default": "not_stated"
+          },
           "pay": {
             "$ref": "#/components/schemas/PayOut"
           },
@@ -18591,6 +21222,40 @@
               }
             ],
             "title": "Posted At"
+          },
+          "work_model": {
+            "type": "string",
+            "enum": [
+              "on_site",
+              "hybrid",
+              "remote",
+              "not_stated"
+            ],
+            "title": "Work Model",
+            "default": "not_stated"
+          },
+          "remote_scope": {
+            "type": "string",
+            "enum": [
+              "worldwide",
+              "regions",
+              "country_only",
+              "not_stated"
+            ],
+            "title": "Remote Scope",
+            "default": "not_stated"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source",
+            "description": "Name of the first sighting's source"
           }
         },
         "type": "object",
@@ -18611,6 +21276,99 @@
           "pinned"
         ],
         "title": "JobSummary"
+      },
+      "LastSweep": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "cost_minor": {
+            "type": "integer",
+            "title": "Cost Minor"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "started_at",
+          "finished_at",
+          "counts",
+          "cost_minor"
+        ],
+        "title": "LastSweep"
+      },
+      "LastTest": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "at"
+        ],
+        "title": "LastTest"
       },
       "LimitRule": {
         "properties": {
@@ -20832,7 +23590,8 @@
               "confirm_submission",
               "review_import",
               "conflict_choice",
-              "answer_review_due"
+              "answer_review_due",
+              "follow_up"
             ],
             "title": "Type"
           },
@@ -20911,6 +23670,58 @@
               "expired"
             ],
             "title": "Status"
+          },
+          "snoozed_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snoozed Until"
+          },
+          "snoozed": {
+            "type": "boolean",
+            "title": "Snoozed",
+            "description": "Hidden until snoozed_until, unless its deadline is imminent",
+            "default": false
+          },
+          "employer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
           }
         },
         "type": "object",
@@ -21225,6 +24036,300 @@
         ],
         "title": "Positioning"
       },
+      "PriceIn": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency"
+          },
+          "input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Input Per Mtok"
+          },
+          "output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Output Per Mtok"
+          },
+          "cache_write_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Per Mtok"
+          },
+          "cache_read_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Per Mtok"
+          },
+          "long_context_threshold": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Context Threshold"
+          },
+          "long_input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Input Per Mtok"
+          },
+          "long_output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Output Per Mtok"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "currency",
+          "input_per_mtok",
+          "output_per_mtok",
+          "as_of"
+        ],
+        "title": "PriceIn"
+      },
+      "PriceOut": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency"
+          },
+          "input_per_mtok": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Input Per Mtok"
+          },
+          "output_per_mtok": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Output Per Mtok"
+          },
+          "cache_write_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Per Mtok"
+          },
+          "cache_read_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Per Mtok"
+          },
+          "long_context_threshold": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Context Threshold"
+          },
+          "long_input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Input Per Mtok"
+          },
+          "long_output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Output Per Mtok"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "currency",
+          "input_per_mtok",
+          "output_per_mtok",
+          "as_of",
+          "id",
+          "updated_at"
+        ],
+        "title": "PriceOut"
+      },
+      "PriceTableIn": {
+        "properties": {
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/PriceIn"
+            },
+            "type": "array",
+            "title": "Prices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prices"
+        ],
+        "title": "PriceTableIn"
+      },
       "PromptIn": {
         "properties": {
           "stage": {
@@ -21310,6 +24415,60 @@
           "active"
         ],
         "title": "PromptOut"
+      },
+      "ProposedAction": {
+        "properties": {
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id",
+            "description": "None when the posting is new and has no job yet"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "description": "apply, ask_owner, prepare, add_to_matches, review, skip or parked"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "title",
+          "employer",
+          "action",
+          "reason"
+        ],
+        "title": "ProposedAction"
       },
       "RangeFilter": {
         "properties": {
@@ -21470,6 +24629,67 @@
         ],
         "title": "ReceiptOut",
         "description": "The approval receipt (18.2): the one screen the owner approves from."
+      },
+      "RecheckOut": {
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/JobDetail"
+          },
+          "availability_before": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "unknown"
+            ],
+            "title": "Availability Before"
+          },
+          "availability_after": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "unknown"
+            ],
+            "title": "Availability After"
+          },
+          "content_changed": {
+            "type": "boolean",
+            "title": "Content Changed"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          },
+          "reassessed": {
+            "type": "boolean",
+            "title": "Reassessed",
+            "default": false
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why nothing was re-read, when that is so"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job",
+          "availability_before",
+          "availability_after",
+          "content_changed"
+        ],
+        "title": "RecheckOut"
       },
       "ReferenceIn": {
         "properties": {
@@ -22047,6 +25267,188 @@
         "type": "object",
         "title": "RollbackIn"
       },
+      "RouteActivateIn": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "model"
+        ],
+        "title": "RouteActivateIn"
+      },
+      "RouteOut": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "setting_key": {
+            "type": "string",
+            "title": "Setting Key"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "billed": {
+            "type": "boolean",
+            "title": "Billed"
+          },
+          "last_test": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastTest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "setting_key",
+          "provider",
+          "model",
+          "billed"
+        ],
+        "title": "RouteOut"
+      },
+      "RouteTestIn": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Defaults to the stage's current model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage"
+        ],
+        "title": "RouteTestIn"
+      },
+      "RouteTestOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
+            "default": 0
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "billed": {
+            "type": "boolean",
+            "title": "Billed",
+            "default": true
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "stage"
+        ],
+        "title": "RouteTestOut"
+      },
       "RubricBody-Input": {
         "properties": {
           "criteria": {
@@ -22308,6 +25710,56 @@
         "type": "object",
         "title": "RubricThresholds"
       },
+      "RuleFromViewIn": {
+        "properties": {
+          "view_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "View Id"
+          },
+          "effect": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "include",
+              "penalty",
+              "bonus"
+            ],
+            "title": "Effect"
+          },
+          "points": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "view_id",
+          "effect"
+        ],
+        "title": "RuleFromViewIn",
+        "description": "\"Use as campaign rule\": copy a saved view's conditions into the campaign."
+      },
       "RulePreviewIn": {
         "properties": {
           "conditions": {
@@ -22470,7 +25922,16 @@
               "type": "integer"
             },
             "type": "object",
-            "title": "Counts"
+            "title": "Counts",
+            "description": "Per-stage counts: found, new, passed_filters, above_threshold, tailored, applied (later stages stay 0 until their stream lands), plus intake detail (seen, suppressed, reposted, extracted, ...)"
+          },
+          "proposed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedAction"
+            },
+            "type": "array",
+            "title": "Proposed Actions",
+            "description": "Dry runs only: what a real run would do"
           },
           "source_results": {
             "items": {
@@ -22482,6 +25943,11 @@
           "cost_minor": {
             "type": "integer",
             "title": "Cost Minor"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
+            "default": 0
           },
           "config_versions": {
             "additionalProperties": true,
@@ -22497,7 +25963,8 @@
               "failed",
               "partial",
               "cancelled",
-              "skipped"
+              "skipped",
+              "paused"
             ],
             "title": "Status"
           },
@@ -23020,6 +26487,59 @@
         ],
         "title": "Series"
       },
+      "SessionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "last_seen_at"
+        ],
+        "title": "SessionOut"
+      },
       "SettingGroupOut": {
         "properties": {
           "key": {
@@ -23522,6 +27042,21 @@
         ],
         "title": "SkillOut"
       },
+      "SnoozeIn": {
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until",
+            "description": "The action comes back at this time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "until"
+        ],
+        "title": "SnoozeIn"
+      },
       "SortSpec": {
         "properties": {
           "field": {
@@ -23934,7 +27469,7 @@
       "SpecUpdate": {
         "properties": {
           "spec": {
-            "$ref": "#/components/schemas/ApplicationSpec"
+            "$ref": "#/components/schemas/ApplicationSpec-Input"
           }
         },
         "type": "object",
@@ -23942,6 +27477,78 @@
           "spec"
         ],
         "title": "SpecUpdate"
+      },
+      "SpendBucket": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "billed_minor": {
+            "type": "integer",
+            "title": "Billed Minor",
+            "default": 0
+          },
+          "unbilled_minor": {
+            "type": "integer",
+            "title": "Unbilled Minor",
+            "default": 0
+          },
+          "billed_micros": {
+            "type": "integer",
+            "title": "Billed Micros",
+            "default": 0
+          },
+          "unbilled_micros": {
+            "type": "integer",
+            "title": "Unbilled Micros",
+            "default": 0
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "SpendBucket"
+      },
+      "SpendDay": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "billed_minor": {
+            "type": "integer",
+            "title": "Billed Minor",
+            "default": 0
+          },
+          "unbilled_minor": {
+            "type": "integer",
+            "title": "Unbilled Minor",
+            "default": 0
+          },
+          "billed_micros": {
+            "type": "integer",
+            "title": "Billed Micros",
+            "default": 0
+          },
+          "unbilled_micros": {
+            "type": "integer",
+            "title": "Unbilled Micros",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "day"
+        ],
+        "title": "SpendDay"
       },
       "SpendMeter": {
         "properties": {
@@ -23971,6 +27578,32 @@
           "estimated_unbilled_minor": {
             "type": "integer",
             "title": "Estimated Unbilled Minor"
+          },
+          "month_to_date_micros": {
+            "type": "integer",
+            "title": "Month To Date Micros",
+            "default": 0
+          },
+          "reserved_micros": {
+            "type": "integer",
+            "title": "Reserved Micros",
+            "default": 0
+          },
+          "cap_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Micros"
+          },
+          "estimated_unbilled_micros": {
+            "type": "integer",
+            "title": "Estimated Unbilled Micros",
+            "default": 0
           }
         },
         "type": "object",
@@ -23982,6 +27615,170 @@
           "estimated_unbilled_minor"
         ],
         "title": "SpendMeter"
+      },
+      "SpendSummary": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "cap_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Minor"
+          },
+          "per_run_cap_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Run Cap Minor"
+          },
+          "warning_percent": {
+            "type": "integer",
+            "title": "Warning Percent"
+          },
+          "month_to_date_minor": {
+            "type": "integer",
+            "title": "Month To Date Minor"
+          },
+          "reserved_minor": {
+            "type": "integer",
+            "title": "Reserved Minor"
+          },
+          "estimated_unbilled_minor": {
+            "type": "integer",
+            "title": "Estimated Unbilled Minor"
+          },
+          "remaining_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Minor"
+          },
+          "cap_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Micros"
+          },
+          "per_run_cap_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Run Cap Micros"
+          },
+          "month_to_date_micros": {
+            "type": "integer",
+            "title": "Month To Date Micros",
+            "default": 0
+          },
+          "reserved_micros": {
+            "type": "integer",
+            "title": "Reserved Micros",
+            "default": 0
+          },
+          "estimated_unbilled_micros": {
+            "type": "integer",
+            "title": "Estimated Unbilled Micros",
+            "default": 0
+          },
+          "remaining_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Micros"
+          },
+          "warning_reached": {
+            "type": "boolean",
+            "title": "Warning Reached"
+          },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/SpendBucket"
+            },
+            "type": "array",
+            "title": "By Stage"
+          },
+          "by_model": {
+            "items": {
+              "$ref": "#/components/schemas/SpendBucket"
+            },
+            "type": "array",
+            "title": "By Model"
+          },
+          "by_run": {
+            "items": {
+              "$ref": "#/components/schemas/SpendBucket"
+            },
+            "type": "array",
+            "title": "By Run"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/SpendDay"
+            },
+            "type": "array",
+            "title": "Daily"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "timezone",
+          "currency",
+          "cap_minor",
+          "per_run_cap_minor",
+          "warning_percent",
+          "month_to_date_minor",
+          "reserved_minor",
+          "estimated_unbilled_minor",
+          "remaining_minor",
+          "warning_reached",
+          "by_stage",
+          "by_model",
+          "by_run",
+          "daily"
+        ],
+        "title": "SpendSummary"
       },
       "SplitIn": {
         "properties": {
@@ -24801,7 +28598,16 @@
         "properties": {
           "needs_you": {
             "type": "integer",
-            "title": "Needs You"
+            "title": "Needs You",
+            "description": "Decisions waiting on the owner (a shared blocker counts once)"
+          },
+          "needs_you_groups": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionGroup"
+            },
+            "type": "array",
+            "title": "Needs You Groups",
+            "description": "Soonest deadline and biggest consequence first"
           },
           "last_sweep_run_id": {
             "anyOf": [
@@ -24814,6 +28620,16 @@
               }
             ],
             "title": "Last Sweep Run Id"
+          },
+          "last_sweep": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastSweep"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "funnel": {
             "items": {
@@ -24836,6 +28652,13 @@
             },
             "type": "array",
             "title": "Top Match Ids"
+          },
+          "top_matches": {
+            "items": {
+              "$ref": "#/components/schemas/TopMatch"
+            },
+            "type": "array",
+            "title": "Top Matches"
           },
           "upcoming": {
             "items": {
@@ -25110,6 +28933,42 @@
           "suspended_reason"
         ],
         "title": "TokenOut"
+      },
+      "TopMatch": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "title",
+          "employer",
+          "score"
+        ],
+        "title": "TopMatch"
       },
       "TotpCode": {
         "properties": {
@@ -25573,13 +29432,6 @@
           "type": {
             "type": "string",
             "title": "Error Type"
-          },
-          "input": {
-            "title": "Input"
-          },
-          "ctx": {
-            "type": "object",
-            "title": "Context"
           }
         },
         "type": "object",
@@ -25794,6 +29646,125 @@
           "sensitivity"
         ],
         "title": "VaultDocumentUpdate"
+      },
+      "WaiverIn": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Why this application may break the rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "reason"
+        ],
+        "title": "WaiverIn"
+      },
+      "WaiverOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "guardrail_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Guardrail Id"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "waived_by": {
+            "type": "string",
+            "title": "Waived By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "guardrail_id",
+          "application_id",
+          "reason",
+          "waived_by"
+        ],
+        "title": "WaiverOut"
+      },
+      "WatchedEmployerFromUrl": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "A careers page or posting URL; the board type and slug are detected"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Employer name; guessed from the board when omitted"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 0
+          },
+          "cooldown_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Days"
+          },
+          "always_ask_first": {
+            "type": "boolean",
+            "title": "Always Ask First",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "WatchedEmployerFromUrl"
       },
       "WatchedEmployerIn": {
         "properties": {
@@ -26060,6 +30031,247 @@
           "ok"
         ],
         "title": "WorkerHealth"
+      },
+      "app__api__routers__applications__ImportPreviewOut": {
+        "properties": {
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash",
+            "description": "Pass back when confirming, to be sure the same file is applied"
+          },
+          "create": {
+            "type": "integer",
+            "title": "Create"
+          },
+          "update": {
+            "type": "integer",
+            "title": "Update"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ImportErrorOut"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content_hash",
+          "create",
+          "update",
+          "unchanged",
+          "skip",
+          "errors",
+          "rows"
+        ],
+        "title": "ImportPreviewOut",
+        "description": "What importing this file would change. Nothing is written until it is confirmed."
+      },
+      "app__api__routers__data__ImportPreviewOut": {
+        "properties": {
+          "import_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Import Id"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "kit_file",
+              "old_kit_zip",
+              "history_csv",
+              "free_form"
+            ],
+            "title": "Source"
+          },
+          "diff": {
+            "items": {
+              "$ref": "#/components/schemas/ImportDiffItem"
+            },
+            "type": "array",
+            "title": "Diff"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notices",
+            "description": "e.g. 'free-form text will be sent to <provider>'"
+          }
+        },
+        "type": "object",
+        "required": [
+          "import_id",
+          "source",
+          "diff",
+          "notices"
+        ],
+        "title": "ImportPreviewOut"
+      },
+      "app__api__routers__kit__AnswerIn": {
+        "properties": {
+          "patterns": {
+            "$ref": "#/components/schemas/AnswerPatterns"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "boolean",
+              "choice",
+              "date",
+              "money"
+            ],
+            "title": "Value Type",
+            "default": "text"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Input"
+          },
+          "answer_class": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ask_first",
+              "never",
+              "owner_only"
+            ],
+            "title": "Answer Class",
+            "default": "ask_first"
+          },
+          "material": {
+            "type": "boolean",
+            "title": "Material",
+            "default": false
+          },
+          "settled": {
+            "type": "boolean",
+            "title": "Settled",
+            "default": false
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "this_application",
+              "this_employer",
+              "this_country",
+              "all_matching"
+            ],
+            "title": "Scope",
+            "default": "all_matching"
+          },
+          "scope_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Ref"
+          },
+          "forced_choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forced Choice"
+          },
+          "review_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patterns"
+        ],
+        "title": "AnswerIn"
+      },
+      "app__api__routers__pending_actions__AnswerIn": {
+        "properties": {
+          "answer_value": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Answer Value"
+          },
+          "answer_scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "this_application",
+                  "this_employer",
+                  "this_country",
+                  "all_matching"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Scope",
+            "description": "Default from answers.routine_default_scope / material_default_scope"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer_value"
+        ],
+        "title": "AnswerIn"
       }
     }
   }

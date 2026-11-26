@@ -5,10 +5,24 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -130,11 +144,17 @@ class LedgerEntry(Base, Entity):
     """Spend ledger. Rows are never updated; a reservation is closed by a reconciliation or release row."""
 
     __tablename__ = "ledger_entry"
-    __table_args__ = (Index("ix_ledger_entry_created", "created_at"),)
+    __table_args__ = (
+        Index("ix_ledger_entry_created", "created_at"),
+        # A reservation is closed exactly once (reconciliation or release).
+        Index("ix_ledger_entry_closes_once", "reservation_id", unique=True,
+              postgresql_where=text("reservation_id IS NOT NULL")),
+        Index("ix_ledger_entry_run", "run_id"),
+    )
 
     kind: Mapped[LedgerKind] = mapped_column(str_enum(LedgerKind), nullable=False)
     reservation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ledger_entry.id"))
-    amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    amount_micros: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     billed: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     stage: Mapped[str] = mapped_column(String(60), nullable=False)
@@ -145,6 +165,30 @@ class LedgerEntry(Base, Entity):
     input_tokens: Mapped[int | None] = mapped_column(Integer)
     output_tokens: Mapped[int | None] = mapped_column(Integer)
     note: Mapped[str | None] = mapped_column(Text)
+
+
+class LlmPrice(Base, Entity):
+    """Price table for the ledger's estimates and reconciliation (editable data, seeded with a dated default).
+
+    Prices are minor currency units per million tokens. Above ``long_context_threshold`` input tokens
+    the ``long_*`` prices apply when set.
+    """
+
+    __tablename__ = "llm_price"
+    __table_args__ = (Index("ix_llm_price_provider_model", "provider", "model", unique=True),)
+
+    provider: Mapped[str] = mapped_column(String(60), nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    input_per_mtok: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    output_per_mtok: Mapped[Decimal] = mapped_column(Numeric(14, 4), nullable=False)
+    cache_write_per_mtok: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
+    cache_read_per_mtok: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
+    long_context_threshold: Mapped[int | None] = mapped_column(Integer)
+    long_input_per_mtok: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
+    long_output_per_mtok: Mapped[Decimal | None] = mapped_column(Numeric(14, 4))
+    as_of: Mapped[date] = mapped_column(Date, nullable=False)
+    source: Mapped[str | None] = mapped_column(Text)
 
 
 class ConnectionProvider(enum.StrEnum):

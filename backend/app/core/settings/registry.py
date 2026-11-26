@@ -42,6 +42,7 @@ GROUPS: dict[str, str] = {
     "scoring": "Scoring",
     "matching": "Matching",
     "automation": "Automation",
+    "tracking": "Tracking",
     "answers": "Answer bank",
     "reconcile": "Reconciliation",
     "ai": "AI",
@@ -178,6 +179,9 @@ _int("schedule.overlap_days", "Sweep overlap",
      "Each incremental sweep searches from the last successful sweep minus this many days.", 2, 3, 0, 14, "days")
 _cron("schedule.expiry_check_cron", "Expiry check schedule",
       "When open roles are rechecked for closure.", "0 12 * * *", "0 */6 * * *")
+_int("schedule.expiry_check_batch", "Expiry check batch",
+     "At most this many open or unconfirmed roles are rechecked in one expiry run (oldest check first).",
+     200, 50, 1, 2000, "roles")
 
 # Scoring
 _int("scoring.threshold_shortlist", "Shortlist threshold", "Minimum score to shortlist.", 60, 55, 0, 100, "points")
@@ -189,6 +193,11 @@ _enum("scoring.unknown_pay", "Unknown pay",
       "pass_blocks_auto", "review", UNKNOWN_POLICIES)
 _enum("scoring.unknown_eligibility", "Unknown eligibility",
       "What an unknown work-rights or location eligibility does.", "review", "fail", UNKNOWN_POLICIES)
+_enum("scoring.unknown_deadline", "Unknown deadline",
+      "What a posting with no stated deadline does (only a passed date excludes a role).",
+      "pass_blocks_auto", "review", UNKNOWN_POLICIES)
+_int("scoring.backtest_default_jobs", "Backtest sample",
+     "How many recent saved roles a backtest scores when you do not pick them.", 50, 100, 1, 500, "roles")
 _int("scoring.escalation_margin", "Escalation margin",
      "Re-score with the stronger model when within this many points of a threshold.", 5, 3, 0, 20, "points")
 _int("scoring.unknown_penalty", "Unknown-data penalty",
@@ -239,6 +248,13 @@ _int("automation.open_check_max_age_hours", "Open-check freshness",
      24, 12, 1, 168, "hours")
 _int("automation.agent_max_steps", "Agent step limit", "Maximum steps an agent task may take.", 80, 120, 5, 500)
 
+# Tracking (4, 18.4)
+_int("tracking.imminent_deadline_days", "Imminent deadline",
+     "A snooze is ignored when a role's deadline or a pending action's deadline is this close.", 3, 5, 0, 30,
+     "days")
+_int("tracking.stale_pending_days", "Stale pending action",
+     "Remind the owner when an open pending action has waited this long.", 3, 7, 1, 90, "days")
+
 # Answer bank (5.4)
 _enum("answers.routine_default_scope", "Default scope: routine answers",
       "Scope pre-selected when the owner answers a routine new question.",
@@ -274,8 +290,17 @@ _model("ai.model_claim_check", "Model: unsupported-claim check", "Second-pass tr
        "claude-sonnet-5-5", "claude-opus-5-5")
 _model("ai.model_browser_agent", "Model: server browser agent", "Drives the optional server runner.",
        "claude-sonnet-5-5", "claude-opus-5-5")
+_int("ai.max_output_tokens", "Output token limit",
+     "Most tokens a model may write in one call (bounds each call's reserved cost).",
+     8192, 4096, 256, 128_000, "tokens")
+_int("ai.request_timeout_seconds", "Request timeout", "Give up on one model call after this long.",
+     120, 60, 5, 1800, "seconds")
+_int("ai.max_retries", "Retries", "Retries after a failed or invalid model reply. Each attempt is budgeted.",
+     2, 3, 0, 6)
+_int("ai.route_test_valid_minutes", "Route test validity",
+     "A model route can be activated only after a successful test within this window.", 60, 240, 1, 10_080, "minutes")
 
-# Budget (11)
+# Budget (13)
 _add("budget.currency", "currency", "Budget currency", "Currency of the spend ledger.",
      "USD", "EUR", str, validators=(currency_code,), invalid_example="dollars", has_invalid_example=True)
 _int("budget.monthly_cap_minor", "Monthly cap",
@@ -283,13 +308,23 @@ _int("budget.monthly_cap_minor", "Monthly cap",
      "minor units", nullable=True)
 _int("budget.per_run_cap_minor", "Per-run cap", "Spend cap per run in minor units. Unset means no per-run cap.",
      None, 200, 0, 10_000_000, "minor units", nullable=True)
+_int("budget.monthly_cap_micros", "Monthly cap (micro-units)",
+     "Monthly cap in millionths of the major unit; when set it wins over the minor-unit cap, which is kept in "
+     "step (rounded).", None, 20_000_000, 0, 100_000_000_000, "micros", nullable=True)
+_int("budget.per_run_cap_micros", "Per-run cap (micro-units)",
+     "Per-run cap in millionths of the major unit; when set it wins over the minor-unit cap.",
+     None, 2_000_000, 0, 100_000_000_000, "micros", nullable=True)
 _int("budget.warning_percent", "Warning", "Warn when month-to-date spend passes this share of the cap.",
      80, 90, 1, 100, "%")
 _int("budget.agent_task_ceiling_minor", "Agent task ceiling", "Maximum spend for one agent task, in minor units.",
      100, 250, 1, 100_000, "minor units")
+_int("budget.reservation_stale_minutes", "Reservation expiry",
+     "An unreconciled reservation older than this is closed and charged at its estimate.", 30, 60, 1, 1440, "minutes")
 
 # Documents (9)
 _int("documents.cv_pages", "CV pages", "Maximum CV length.", 2, 3, 1, 6, "pages")
+_int("documents.vault_max_upload_mb", "Vault upload limit", "Largest file the vault accepts.", 25, 10, 1, 200,
+     "MB")
 _int("documents.letter_pages", "Letter pages", "Maximum cover letter length.", 1, 2, 1, 3, "pages")
 _int("documents.letter_paragraphs", "Letter paragraphs", "Maximum cover letter paragraphs.", 4, 5, 1, 10)
 _add("documents.cv_template", "string", "CV template", "Default CV template (by template key).",

@@ -11,6 +11,7 @@ import type {
   LoginRequest,
   Me,
   OwnerCreate,
+  Schemas,
   Theme,
   ThemeInput,
 } from "./types"
@@ -52,14 +53,39 @@ export const meQuery = () =>
   queryOptions({ queryKey: keys.me, queryFn: getMe, staleTime: 5 * 60_000 })
 
 // ---- themes and appearance ----
-export const listThemes = () => unwrap(api.GET("/api/themes"))
-export const createTheme = (body: ThemeInput) =>
-  unwrap(api.POST("/api/themes", { body }))
-export const updateTheme = (id: string, body: ThemeInput) =>
-  unwrap(api.PUT("/api/themes/{id}", { params: { path: { id } }, body }))
+type ThemeOut = Schemas["ThemeOut"]
+type AppearanceOut = Schemas["Appearance"]
+/** The contract sends `description: null`; the theme engine's schema leaves it out. */
+const toTheme = ({ description, ...t }: ThemeOut): Theme => ({
+  ...t,
+  ...(description ? { description } : {}),
+})
+/** Appearance is a request shape too, so the contract marks its nullable fields optional. */
+const toAppearance = (a: AppearanceOut): Appearance => ({
+  ...a,
+  radius: a.radius ?? null,
+  accent_override: a.accent_override ?? null,
+})
+
+export const listThemes = async () =>
+  (await unwrap(api.GET("/api/themes"))).map(toTheme)
+export const createTheme = async (body: ThemeInput) =>
+  toTheme(await unwrap(api.POST("/api/themes", { body })))
+export const updateTheme = async (id: string, body: ThemeInput) =>
+  toTheme(
+    await unwrap(
+      api.PUT("/api/themes/{theme_id}", {
+        params: { path: { theme_id: id } },
+        body,
+      })
+    )
+  )
 export const deleteTheme = (id: string) =>
-  unwrap(api.DELETE("/api/themes/{id}", { params: { path: { id } } }))
-export const getAppearance = () => unwrap(api.GET("/api/settings/appearance"))
+  unwrap(
+    api.DELETE("/api/themes/{theme_id}", { params: { path: { theme_id: id } } })
+  )
+export const getAppearance = async () =>
+  toAppearance(await unwrap(api.GET("/api/settings/appearance")))
 export const putAppearance = (body: Appearance) =>
   unwrap(api.PUT("/api/settings/appearance", { body }))
 
@@ -82,7 +108,7 @@ export const appearanceQuery = (enabled = true) =>
 // ---- health ----
 export const getHealth = () => unwrap(api.GET("/api/health"))
 
-// ---- PENDING CONTRACT (mocked in MSW; see schema.ts) ----
+// ---- capture and Autopilot ----
 export const captureJob = (body: JobCaptureRequest) =>
   unwrap(api.POST("/api/jobs/capture", { body }))
 export const getAutopilot = () => unwrap(api.GET("/api/autopilot"))

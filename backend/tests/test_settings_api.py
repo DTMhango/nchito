@@ -84,3 +84,23 @@ async def test_setting_revisions_are_append_only(owner_client, session):
     await session.rollback()
     with pytest.raises(DBAPIError):
         await session.execute(text("DELETE FROM audit_event"))
+
+
+async def test_caps_accept_micros_or_minor(owner_client):
+    put = owner_client.put
+    r = await put("/api/settings/budget.monthly_cap_micros", json={"value": 12_345})
+    assert r.status_code == 200
+    # micros wins; the minor form follows, rounded
+    assert (await owner_client.get("/api/settings/budget.monthly_cap_minor")).json()["value"] == 1
+    summary = (await owner_client.get("/api/ai/spend")).json()
+    assert summary["cap_micros"] == 12_345 and summary["cap_minor"] == 1
+    meter = (await owner_client.get("/api/ai/spend/meter")).json()
+    assert meter["cap_micros"] == 12_345
+
+    await put("/api/settings/budget.monthly_cap_minor", json={"value": 500})
+    assert (await owner_client.get("/api/settings/budget.monthly_cap_micros")).json()["value"] is None
+    assert (await owner_client.get("/api/ai/spend")).json()["cap_micros"] == 5_000_000
+
+    await put("/api/settings/budget.monthly_cap_micros", json={"value": None})
+    assert (await owner_client.get("/api/settings/budget.monthly_cap_minor")).json()["value"] is None
+    assert (await owner_client.get("/api/ai/spend")).json()["cap_micros"] is None
