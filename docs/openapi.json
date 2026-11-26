@@ -6035,59 +6035,6 @@
         }
       }
     },
-    "/api/sources/{item_id}/test": {
-      "post": {
-        "tags": [
-          "sources"
-        ],
-        "summary": "Sources Test",
-        "operationId": "sources_test",
-        "parameters": [
-          {
-            "name": "item_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Item Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SourceTestOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/sources/detect": {
       "post": {
         "tags": [
@@ -6135,6 +6082,108 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/sources/{item_id}/test": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Sources Test",
+        "description": "Search now with this source's own config and rate limit; nothing is stored.",
+        "operationId": "sources_test",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceTestOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watched-employers/from-url": {
+      "post": {
+        "tags": [
+          "sources"
+        ],
+        "summary": "Watched Employers From Url",
+        "description": "Paste a careers URL: detect the board type and slug, then add the employer to the watched list.",
+        "operationId": "watched_employers_from_url",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchedEmployerFromUrl"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchedEmployerOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The URL is not a recognised careers board"
+          },
+          "409": {
+            "description": "That board is already watched"
           }
         }
       }
@@ -10679,6 +10728,7 @@
           "runs"
         ],
         "summary": "Runs Create",
+        "description": "Start a manual run (or a dry run: counts what a sweep would do, writes nothing).",
         "operationId": "runs_create",
         "requestBody": {
           "required": true,
@@ -10711,15 +10761,11 @@
               }
             }
           },
+          "409": {
+            "description": "A run for this campaign is already queued or running"
+          },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "A sweep needs an existing campaign"
           }
         }
       }
@@ -10783,6 +10829,7 @@
           "runs"
         ],
         "summary": "Runs Cancel",
+        "description": "Cancel a queued run at once; a running sweep stops at its next checkpoint and keeps what it saved.",
         "operationId": "runs_cancel",
         "parameters": [
           {
@@ -10816,6 +10863,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The run already finished"
           },
           "422": {
             "description": "Validation Error",
@@ -21311,6 +21361,48 @@
         ],
         "title": "PromptOut"
       },
+      "ProposedAction": {
+        "properties": {
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id",
+            "description": "None when the posting is new and has no job yet"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "title",
+          "employer",
+          "action",
+          "reason"
+        ],
+        "title": "ProposedAction"
+      },
       "RangeFilter": {
         "properties": {
           "type": {
@@ -22470,7 +22562,16 @@
               "type": "integer"
             },
             "type": "object",
-            "title": "Counts"
+            "title": "Counts",
+            "description": "Per-stage counts: found, new, passed_filters, above_threshold, tailored, applied (later stages stay 0 until their stream lands), plus intake detail (seen, suppressed, reposted, extracted, ...)"
+          },
+          "proposed_actions": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedAction"
+            },
+            "type": "array",
+            "title": "Proposed Actions",
+            "description": "Dry runs only: what a real run would do"
           },
           "source_results": {
             "items": {
@@ -25794,6 +25895,55 @@
           "sensitivity"
         ],
         "title": "VaultDocumentUpdate"
+      },
+      "WatchedEmployerFromUrl": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "A careers page or posting URL; the board type and slug are detected"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Employer name; guessed from the board when omitted"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority",
+            "default": 0
+          },
+          "cooldown_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown Days"
+          },
+          "always_ask_first": {
+            "type": "boolean",
+            "title": "Always Ask First",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "title": "WatchedEmployerFromUrl"
       },
       "WatchedEmployerIn": {
         "properties": {

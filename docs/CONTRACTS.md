@@ -126,6 +126,7 @@ data)` inside their transaction; the event is delivered only after commit (Postg
 |---|---|---|
 | `settings.changed` | `{key, version}` | settings service |
 | `run.started` / `run.finished` | `{run_id[, status]}` | worker |
+| `run.progress` | `{run_id, stage, counts}` (stage: `search`, `source:<name>`, `done`) | sweep orchestrator |
 | (wave 1+) `job.created`, `job.updated`, `assessment.updated`, `pending_action.created`, `pending_action.resolved`, `application.updated`, `dispatch.updated`, `notification.created` | `{<entity>_id, ...}` | owning stream |
 
 New event names follow `<entity>.<past tense verb>` and are added to this table.
@@ -133,7 +134,7 @@ New event names follow `<entity>.<past tense verb>` and are added to this table.
 ## 4. Settings registry
 
 `backend/app/core/settings/registry.py` is the **only** place a business setting and its
-default exist. 72 settings in groups `general, appearance, schedule, scoring, matching,
+default exist. 73 settings in groups `general, appearance, schedule, scoring, matching,
 automation, answers, reconcile, ai, budget, documents, retention, backups, notifications,
 runners`. Read them with `await settings_service.values(session)` (one query) or
 `get_value(session, key)`; write with `set_value(session, key, value, actor=..., reason=...)`,
