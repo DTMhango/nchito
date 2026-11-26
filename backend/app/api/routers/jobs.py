@@ -38,7 +38,7 @@ from app.models.search import (
     SkillAlias,
     TagRule,
 )
-from app.pipeline import conflicts, custom_facets, filters, scoring
+from app.pipeline import conflicts, custom_facets, filters, normalise, scoring
 from app.pipeline.capture import CaptureError, capture
 from app.pipeline.decisions import decide
 from app.schemas.json_types import CustomFacetValue, JobFacets, Requirement, SavedViewBody, StructuredLocation
@@ -612,7 +612,8 @@ async def _apply_tag_rule(session: SessionDep, rule: TagRule) -> int:
 def _simple_crud(path: str, name: str, model: type[Any], model_in: type[BaseModel], model_out: type[BaseModel], *,
                  ops: tuple[str, ...] = ("list", "get", "create", "update", "delete"), order: Any = None,
                  after_write: Callable[[SessionDep, Any], Awaitable[Any]] | None = None,
-                 out_many: Callable[[SessionDep, list[Any]], Awaitable[list[Any]]] | None = None) -> None:
+                 out_many: Callable[[SessionDep, list[Any]], Awaitable[list[Any]]] | None = None,
+                 after_delete: Callable[[SessionDep, Any], Awaitable[Any]] | None = None) -> None:
     """Typed CRUD for a simple table (annotations set explicitly: this module uses postponed annotations)."""
 
     async def render(session: Any, rows: list[Any]) -> list[Any]:
@@ -665,6 +666,9 @@ def _simple_crud(path: str, name: str, model: type[Any], model_in: type[BaseMode
         await audit.record(session, actor=principal.actor, action=f"{name}.deleted", subject_type=name,
                            subject_id=row.id)
         await session.delete(row)
+        if after_delete is not None:
+            await session.flush()
+            await after_delete(session, row)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     list_items.__annotations__ = {"session": SessionDep, "cursor": str | None, "limit": int}
@@ -696,8 +700,18 @@ _simple_crud("/views", "views", SavedView, SavedViewIn, SavedViewOut, order=Save
              out_many=_views_out)
 _simple_crud("/tag-rules", "tag_rules", TagRule, TagRuleIn, TagRuleOut, after_write=_after_tag_rule)
 _simple_crud("/custom-facets", "custom_facets", CustomFacet, CustomFacetIn, CustomFacetOut)
+
+
+async def _after_skill_alias(session: SessionDep, alias: SkillAlias) -> None:
+    """A changed alias re-canonicalises stored job skills from the extraction cache (no fetch, no model)."""
+    changed = await normalise.recanonicalise_jobs(session)
+    await audit.record(session, actor="owner", action="skill_alias.recanonicalised", subject_type="skill_alias",
+                       subject_id=alias.id, detail={"jobs_changed": changed})
+
+
 _simple_crud("/skill-aliases", "skill_aliases", SkillAlias, SkillAliasIn, SkillAliasOut,
-             ops=("list", "create", "update", "delete"))
+             ops=("list", "create", "update", "delete"), after_write=_after_skill_alias,
+             after_delete=_after_skill_alias)
 
 
 @router.post("/custom-facets/{item_id}/backfill", response_model=BackfillEstimate, name="custom_facets_backfill",
