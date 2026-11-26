@@ -630,3 +630,55 @@ async def test_runner_task_history_and_current_task_title(owner_client):
     assert [t["task_id"] for t in r.json()["items"]] == [blocked] and r.json()["next_cursor"] is None
     assert (await owner_client.get(f"/api/tokens/{w.runner_b}/tasks")).json()["items"] == []
     assert (await owner_client.get(f"/api/tokens/{uuid.uuid4()}/tasks")).status_code == 404
+
+
+# ----- personal packet fields compared at the permit ------------------------------------------------------
+
+
+async def _permit_with_fields(runner: uuid.UUID, task_id: str, fields: list[dict[str, str]] | None) -> dict:
+    args = {"task_id": task_id, "summary": "ready to submit", "entered_answers": [
+        {"question": "Notice period", "value": "One month"}], "attached_files_sha256": [], "current_url": URL}
+    if fields is not None:
+        args["entered_fields"] = fields
+    return await call(runner, "request_submit_permit", **args)
+
+
+async def test_entered_fields_matching_the_packet_are_granted():
+    w = await world()
+    task_id = await claim(w.runner_a)
+    packet = await call(w.runner_a, "get_packet", task_id=task_id)
+    fields = [{"key": f["key"], "value": f" {f['value'].upper()} "} for f in packet["fields"]]  # case and spacing
+    out = await _permit_with_fields(w.runner_a, task_id, fields)
+    assert out["decision"] == "granted", out
+
+
+async def test_entered_fields_that_differ_ask_the_owner_with_the_differing_keys(owner_client):
+    w = await world()
+    task_id = await claim(w.runner_a)
+    await call(w.runner_a, "get_packet", task_id=task_id)
+    out = await _permit_with_fields(w.runner_a, task_id, [
+        {"key": "sending_identity", "value": "someone.else@example.com"},
+        {"key": "extra.passport", "value": "X1"},  # not in the packet at all
+        {"key": "file.cv.pdf", "value": "0" * 64}])
+    assert out["decision"] == "wait_for_owner" and "permit_id" not in {k for k, v in out.items() if v}
+    assert out["changes"] == ["field 'sending_identity' differs from the packet",
+                              "field 'extra.passport' differs from the packet",
+                              "field 'file.cv.pdf' differs from the packet"]
+    assert "someone.else@example.com" not in str(out)  # values are never echoed back
+    assert (await load(AgentTask, uuid.UUID(task_id))).status == AgentTaskStatus.blocked
+    async with maker()() as s:
+        assert await s.scalar(select(SubmitPermit).where(SubmitPermit.application_id == w.app_id)) is None
+    r = await owner_client.get("/api/pending-actions", params={"kind": "field_mismatch"})
+    (action,) = r.json()["items"]
+    assert action["detail"]["keys"] == ["sending_identity", "extra.passport", "file.cv.pdf"]
+    assert action["choices"] == ["continue", "manual_handoff", "skipped"]
+    r = await owner_client.post(f"/api/pending-actions/{action['id']}/resolve", json={"resolution": "continue"})
+    assert r.status_code == 200
+    assert (await call(w.runner_a, "next_task"))["task_id"] == task_id  # back to the same runner to correct it
+
+
+async def test_omitted_entered_fields_are_not_compared():
+    w = await world()
+    task_id = await claim(w.runner_a)
+    await call(w.runner_a, "get_packet", task_id=task_id)
+    assert (await _permit_with_fields(w.runner_a, task_id, None))["decision"] == "granted"

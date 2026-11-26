@@ -43,6 +43,7 @@ from app.models.applications import AgentTask, AgentTaskType, Application, Stage
 from app.models.kit import Person, Sensitivity, VaultDocument
 from app.models.platform import ApiToken
 from app.models.search import Job, JobSighting
+from app.schemas.json_types import PacketContents
 
 AFTER_OFFER = frozenset({Stage.offer, Stage.accepted})
 
@@ -91,6 +92,15 @@ async def _attach_rule(session: AsyncSession, app: Application, kind: str, docum
     return "when_asked" if doc.sensitivity == Sensitivity.on_request else "always"
 
 
+async def packet_fields(session: AsyncSession, contents: PacketContents) -> list[PacketField]:
+    """The person and contact fields a packet releases (``get_packet`` ``fields[]``), by key."""
+    person = await session.scalar(select(Person).limit(1))
+    fields = [PacketField(key="sending_identity", label="Email to apply with", value=contents.sending_identity)]
+    if contents.requisition:
+        fields.append(PacketField(key="requisition", label="Requisition", value=contents.requisition))
+    return fields + [f for f in _person_fields(person) if f.key != "email"]
+
+
 async def get_packet(session: AsyncSession, token: ApiToken, body: GetPacketIn, *, at: datetime) -> GetPacketOut:
     require_active(token)
     require_scope(token, "gateway:packets")
@@ -101,11 +111,7 @@ async def get_packet(session: AsyncSession, token: ApiToken, body: GetPacketIn, 
         raise GatewayError("not_approved", "this application has no approved browser packet")
     contents = packet.contents
     domain = await check_destination(session, job, contents.destination.url, packet.approved_by)
-    person = await session.scalar(select(Person).limit(1))
-    fields = [PacketField(key="sending_identity", label="Email to apply with", value=contents.sending_identity)]
-    if contents.requisition:
-        fields.append(PacketField(key="requisition", label="Requisition", value=contents.requisition))
-    fields += [f for f in _person_fields(person) if f.key != "email"]
+    fields = await packet_fields(session, contents)
     answers = [PacketField(key=f"answer.{i}", label=a.question, value=a.value) for i, a in enumerate(contents.answers)]
     expires = await files.lifetime(session, at)
     released_files: list[PacketFileOut] = []

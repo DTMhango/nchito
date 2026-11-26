@@ -143,12 +143,22 @@ class EnteredAnswer(_M):
     value: str
 
 
+class EnteredField(_M):
+    key: str = Field(description="The packet field key from get_packet fields[] (e.g. full_name, phone, "
+                                 "sending_identity, link.<name>), or file.<name> for an attached packet file")
+    value: str = Field(description="What was typed; for file.<name>, the attached file's sha256")
+
+
 class RequestPermitIn(_M):
     task_id: str
     summary: str
     entered_answers: list[EnteredAnswer]
     attached_files_sha256: list[str]
     current_url: str
+    entered_fields: list[EnteredField] | None = Field(
+        default=None, description="The person, contact and document fields typed or attached, by packet field key. "
+                                  "Compared with the packet: a difference asks the owner (wait_for_owner, the "
+                                  "differing keys in changes). Omitted: not compared (older runners).")
 
 
 class RequestPermitOut(_M):

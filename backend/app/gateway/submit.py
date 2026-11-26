@@ -7,6 +7,10 @@ Invariants, never settings:
   attached file one of its files. A new question or a changed value is a packet change: a new packet version
   holding what was entered is built and the owner is asked (``wait_for_owner``). An entered answer to a
   ``never`` or ``owner_only`` question, an unknown file, or a page off the destination is ``denied``.
+- **Personal fields too.** ``entered_fields`` (the person, contact and document fields typed or attached, by
+  packet field key) must match the packet: a different value or a key the packet does not hold stops the task
+  (``wait_for_owner``, the differing keys in ``changes``) and raises a ``field_mismatch`` blocker for the owner.
+  Values are never echoed back. Omitted ``entered_fields`` (an older runner) is not compared.
 - **Consumed at clearance.** Then ``dispatch.queue(app, runner_token_id=, agent_task_id=)`` requests the permit
   (every gate, under the permit and employer locks) and consumes it with the ``DispatchAttempt`` in one
   transaction, and ``dispatch.run`` rechecks every gate and asks ``BrowserChannel.dispatch`` to clear the
@@ -110,6 +114,24 @@ async def _compare(session: AsyncSession, app: Application, job: Job, packet: Ap
     return refusals, changes, merged
 
 
+async def _field_mismatches(session: AsyncSession, packet: ApplicationPacket, body: RequestPermitIn) -> list[str]:
+    """Keys of entered personal fields that differ from the packet (or that it does not hold)."""
+    if body.entered_fields is None:
+        return []
+    from app.gateway.release import packet_fields
+
+    expected = {f.key: f.value for f in await packet_fields(session, packet.contents)}
+    expected |= {f"file.{f.name}": f.sha256 for f in packet.contents.files}
+    keys: list[str] = []
+    for entered in body.entered_fields:
+        key = clip(entered.key, 200) or ""
+        want = expected.get(key)
+        differs = want is None or not _same_value(want, clip(entered.value, 2000) or "")
+        if differs and key not in keys:
+            keys.append(key)
+    return keys
+
+
 def _draft(packet: ApplicationPacket, answers: list[packets.DraftAnswer]) -> packets.PacketDraft:
     c = packet.contents
     return packets.PacketDraft(channel="browser", destination_url=c.destination.url,
@@ -121,7 +143,8 @@ def _entered(body: RequestPermitIn, at: datetime) -> dict[str, Any]:
     return {"at": at.isoformat(), "summary": clip(body.summary, 1000), "current_url": clip(body.current_url, 2000),
             "answers": [{"question": clip(a.question, 500), "value": clip(a.value, 2000)}
                         for a in body.entered_answers],
-            "files": [s[:64] for s in body.attached_files_sha256]}
+            "files": [s[:64] for s in body.attached_files_sha256],
+            "fields": None if body.entered_fields is None else [clip(f.key, 200) for f in body.entered_fields]}
 
 
 async def _wait(session: AsyncSession, task: AgentTask, app: Application, packet: ApplicationPacket,
@@ -165,6 +188,9 @@ async def request_submit_permit(session: AsyncSession, token: ApiToken, body: Re
     refusals, changes, merged = await _compare(session, app, job, packet, body, at)
     if refusals:
         return await refuse("; ".join(refusals), changes)
+    mismatched = await _field_mismatches(session, packet, body)
+    if mismatched:
+        return await _fields_differ(session, token, task, job, mismatched, body, actor, at, entered)
     if changes:
         try:
             built = await packets.build(session, app, _draft(packet, merged), actor=actor, now=at)
@@ -212,6 +238,28 @@ async def request_submit_permit(session: AsyncSession, token: ApiToken, body: Re
     return RequestPermitOut(decision="granted", permit_id=str(permit_id),
                             expires_at=permit.expires_at.isoformat() if permit else None,
                             reason="cleared: submit now, then report the result")
+
+
+async def _fields_differ(session: AsyncSession, token: ApiToken, task: AgentTask, job: Job, keys: list[str],
+                         body: RequestPermitIn, actor: str, at: datetime, entered: dict[str, Any]) -> RequestPermitOut:
+    """Personal fields typed differently from the packet: the owner checks them (a ``field_mismatch`` blocker:
+    continue once corrected, apply by hand, or skip). Only the keys are recorded, never the typed values."""
+    from app.apply import accounts
+
+    changes = [f"field {key!r} differs from the packet" for key in keys]
+    action = await accounts.register_blocker(session, kind="field_mismatch", job=job, task_id=task.id,
+                                             runner_id=token.id, detail={
+                                                 "keys": keys, "url": clip(body.current_url, 2000),
+                                                 "runner_kind": token.runner_kind,
+                                                 "released": task.released.get("given") or []})
+    task.status = AgentTaskStatus.blocked
+    task.result = {"outcome": "blocked", "blocker": "field_mismatch"}
+    await audit.record(session, actor=actor, action="gateway.permit_wait_for_owner", subject_type="agent_task",
+                       subject_id=task.id, detail={"reason": "entered fields differ from the packet",
+                                                   "changes": changes, "pending_action_id": str(action.id),
+                                                   **entered})
+    return RequestPermitOut(decision="wait_for_owner", changes=changes,
+                            reason="the entered details differ from the approved packet; the owner is asked")
 
 
 # ----- results -----------------------------------------------------------------------------------

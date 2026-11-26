@@ -35,6 +35,7 @@ from app.pipeline import conflicts
 # Types that can carry a continuable blocker; which kinds may actually continue is ``accounts.choices_for``.
 CONTINUABLE = frozenset({PendingActionType.sign_in, PendingActionType.create_account, PendingActionType.captcha,
                          PendingActionType.assessment, PendingActionType.declaration,
+                         PendingActionType.unsupported_form,
                          PendingActionType.redirect_off_domain, PendingActionType.page_instruction})
 
 

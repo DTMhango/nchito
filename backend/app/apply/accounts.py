@@ -61,7 +61,8 @@ log = logging.getLogger(__name__)
 
 TENANT_KINDS = ("sign_in", "create_account")
 SUSPICIOUS_KINDS = ("redirect_off_domain", "page_instruction")
-TASK_KINDS = ("verification_code", "captcha", "assessment", "declaration", "unsupported_form", *SUSPICIOUS_KINDS)
+TASK_KINDS = ("verification_code", "captcha", "assessment", "declaration", "unsupported_form", "field_mismatch",
+              *SUSPICIOUS_KINDS)
 BLOCKER_KINDS = TENANT_KINDS + TASK_KINDS
 # The pending action type each blocker kind is raised as (the type enum is shared; ``detail.kind`` is exact).
 TYPE_FOR_KIND: dict[str, PendingActionType] = {
@@ -69,6 +70,8 @@ TYPE_FOR_KIND: dict[str, PendingActionType] = {
     "verification_code": PendingActionType.sign_in, "captcha": PendingActionType.captcha,
     "assessment": PendingActionType.assessment, "declaration": PendingActionType.declaration,
     "unsupported_form": PendingActionType.unsupported_form,
+    # Personal details typed differently from the packet (raised by the permit check, not by the runner).
+    "field_mismatch": PendingActionType.unsupported_form,
     "redirect_off_domain": PendingActionType.redirect_off_domain,
     "page_instruction": PendingActionType.page_instruction,
 }
@@ -79,7 +82,8 @@ ACCOUNT_TYPES = tuple(dict.fromkeys(TYPE_FOR_KIND.values()))
 # acknowledgement, which is audited. ``manual_handoff`` / ``skipped``: ``give_up``.
 CHOICES: dict[str, tuple[str, ...]] = {
     **{k: ("continue", "manual_handoff", "skipped") for k in (
-        "sign_in", "create_account", "verification_code", "captcha", "assessment", "declaration")},
+        "sign_in", "create_account", "verification_code", "captcha", "assessment", "declaration",
+        "field_mismatch")},
     "unsupported_form": ("manual_handoff", "skipped"),
     **{k: ("manual_handoff", "skipped", "continue_acknowledged") for k in SUSPICIOUS_KINDS},
 }
@@ -261,6 +265,7 @@ async def _title(session: AsyncSession, kind: str, entries: list[dict[str, Any]]
     label = {"verification_code": "Enter the verification code", "captcha": "Solve the CAPTCHA",
              "assessment": "Complete the assessment", "declaration": "Make the declaration",
              "unsupported_form": "Fill in the form by hand",
+             "field_mismatch": "Check the details entered",
              "redirect_off_domain": "Check where the form went",
              "page_instruction": "Check what the page asked"}[kind]
     return f"{label} for {entries[0]['title']} at {employer}"[:300] if entries else label

@@ -86,6 +86,11 @@ async def test_greenhouse_happy_path_submits_once_with_evidence(fake, gw_url, tm
     assert qs == {"How did you hear": "Job board"}, "packet field values (name, email) are not answers"
     assert fake.checkpoints["t1"]["data"]["entered"]["Email"] == "test.applicant@example.com"
     assert len(permit_req["attached_files_sha256"]) == 1
+    assert permit_req["entered_fields"] == [
+        {"key": "first_name", "value": "Test"}, {"key": "last_name", "value": "Applicant"},
+        {"key": "email", "value": "test.applicant@example.com"},
+        {"key": "file.cv.pdf", "value": permit_req["attached_files_sha256"][0]}], "packet fields typed, by packet key"
+    assert fake.packets["t1"]["files"][0]["sha256"] == permit_req["attached_files_sha256"][0]
     assert fake.downloads == ["f-cv"], "the CV came from the gateway, not from the public host in the link"
     assert permit_req["current_url"].startswith(web.base)
     assert not fake.suspended and not fake.blockers
@@ -217,6 +222,33 @@ async def test_wait_for_owner_ends_the_task_without_a_submit(fake, gw_url, tmp_p
 
     fake.permit_decision = "wait_for_owner"
     await run_task(fake, gw_url, tmp_path, web, script)
+    assert web.submissions == [] and fake.results == [] and fake.blockers == [] and fake.released == []
+
+
+async def test_a_packet_field_typed_differently_waits_for_the_owner(fake, gw_url, tmp_path, web):
+    async def script(box, task):
+        await box.call("get_packet", {})
+        await box.call("open_url", {"url": task["posting_url"]})
+        snap = await box.call("snapshot", {})
+        bad = await box.call("fill_field", {"ref": ref(snap, name="first_name"), "value": "Test",
+                                            "question": "First Name", "packet_key": "answer.1"})
+        assert bad.startswith("REFUSED [unknown_packet_key]"), bad
+        await box.call("fill_field", {"ref": ref(snap, name="first_name"), "value": "Test", "question": "First Name"})
+        await box.call("fill_field", {"ref": ref(snap, name="last_name"), "value": "Applicant", "question": "Last Name"})
+        await box.call("fill_field", {"ref": ref(snap, name="email"), "value": "other.person@example.com",
+                                      "question": "Email", "packet_key": "email"})
+        await box.call("select_option", {"ref": ref(snap, name="source"), "value": "Job board",
+                                         "question": "How did you hear"})
+        out = await box.call("request_submit_permit", {"summary": "x"})
+        assert '"wait_for_owner"' in out and '"email"' in out and "this task is over" in out, out
+        again = await box.call("click", {"ref": ref(snap, type="submit")})
+        assert again.startswith("STOP"), again
+
+    await run_task(fake, gw_url, tmp_path, web, script)
+    [permit_req] = fake.called("request_submit_permit")
+    assert {"key": "email", "value": "other.person@example.com"} in permit_req["entered_fields"]
+    assert [a["question"] for a in permit_req["entered_answers"]] == ["How did you hear"], \
+        "a packet field is not an answer, even when it was typed differently"
     assert web.submissions == [] and fake.results == [] and fake.blockers == [] and fake.released == []
 
 

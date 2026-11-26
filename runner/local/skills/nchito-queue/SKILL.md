@@ -154,8 +154,9 @@ Read the form (`read_page`, `find`). For each field, in page order:
 4. File inputs: `file_upload` with the downloaded path, under the attach rule. Never click a
    file input (it opens a native picker you cannot use).
 
-Keep a running list of every question and the exact value you entered (or selected), and
-the SHA-256 of every file attached. This list is what you send for the permit; it must be
+Keep a running list of every question and the exact value you entered (or selected), noting
+the packet field `key` when the value came from `fields`, and the name and SHA-256 of every
+file attached. This list is what you send for the permit; it must be
 the truth of what is on the form.
 
 After each page or section, `save_checkpoint` with `state`: `step` (short name of where you
@@ -177,8 +178,16 @@ When everything is filled and the only thing left is the final Submit:
 1. Re-read the whole form once (`read_page`) and correct your list to what is actually there.
 2. Call `request_submit_permit` with `task_id`, a one-line `summary` ("Applying to <role> at
    <employer> on <system>; N answers, M files"), `entered_answers` (every question and value
-   actually entered, including selections from `do_not_answer`), `attached_files_sha256`, and
-   `current_url`.
+   actually entered, including selections from `do_not_answer`), `attached_files_sha256`,
+   `entered_fields`, and `current_url`.
+
+   `entered_fields` is a list of `{key, value}`: one entry for every packet `fields` value you
+   typed or selected, keyed by that field's `key` from `get_packet` (`full_name`, `phone`,
+   `link.<name>`, `extra.<name>`, ...), with the value exactly as it now stands on the form
+   (not as the packet has it). Add one entry per attached file: key `file.<name>` (the file's
+   `name` in `get_packet` `files`), value its SHA-256. Answers to questions go in
+   `entered_answers` only; never add `answer.N` keys here. A difference from the packet comes
+   back as `wait_for_owner` with the differing keys in `changes`.
 3. Act on `decision`:
    - `granted`: go to step 6 at once (the permit lasts 10 minutes and is already consumed:
      Nchito treats this send as under way).

@@ -247,7 +247,7 @@ Schemas: `backend/app/gateway/tools.py`; JSON Schemas for every input and output
 | `find_answer` | `{task_id, question, options?}` | `{outcome: value \| ask_owner \| do_not_answer, value?, select?}` |
 | `save_checkpoint` | `{task_id, state: {step, fields_filled, screenshot_ref, url, data}}` | `{ok, steps_used, steps_left}` |
 | `raise_blocker` | `{task_id, type, detail, url?}` | `{pending_action_id, next: move_on \| wait}` |
-| `request_submit_permit` | `{task_id, summary, entered_answers[], attached_files_sha256[], current_url}` | `{decision: granted \| wait_for_owner \| denied, permit_id?, expires_at?, reason?, changes[]}` |
+| `request_submit_permit` | `{task_id, summary, entered_answers[], attached_files_sha256[], current_url, entered_fields[{key, value}]?}` | `{decision: granted \| wait_for_owner \| denied, permit_id?, expires_at?, reason?, changes[]}` |
 | `report_result` | `{task_id, outcome: submitted \| uncertain \| failed, permit_id?, confirmation_text?, reference?, screenshot_ref?, detail?}` | `{recorded, application_stage}` |
 | `report_jobs` | `{task_id, jobs[{url_visited, title, employer, location?, snippet?}]}` | `{accepted, duplicates}` |
 | `report_check` (wave 3) | `{task_id, status: open \| closed \| unknown, evidence?, screenshot_ref?}` | `{recorded, availability}` |
@@ -270,6 +270,12 @@ Semantics (DESIGN.md 8.3, 18.1 to 18.3), enforced server-side:
   Editing a material item (answer, file, recipient, body) invalidates the approval. A new
   question met on the form, or an entered answer that differs from the packet, is a packet
   change: `request_submit_permit` returns `wait_for_owner` with `changes`.
+- **Personal fields.** `entered_fields` lists the person, contact and document fields the runner typed or attached,
+  by packet field key (`get_packet` `fields[].key`, e.g. `sending_identity`, `full_name`, `phone`, `link.<name>`,
+  `extra.<name>`; an attached file is `file.<name>` with its sha256). Compared with the packet (ignoring case and
+  spacing): a different value or a key the packet does not hold returns `wait_for_owner` with
+  `changes = ["field '<key>' differs from the packet", ...]` (values never echoed), blocks the task and raises a
+  `field_mismatch` blocker (choices continue, manual handoff, skip). Omitted (older runners): not compared.
 - **Permit.** Issued only after every gate passes again (`pipeline.decisions`, purpose
   `permit`) under a per-employer lock: mode, score, caps, duplicates, conflict group, expiry
   (open within `automation.open_check_max_age_hours`), quiet hours, budget, global pause.
@@ -990,3 +996,8 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   `results_per_query`, `max_leads`); provider keys (`endpoint`, `query_param`, `limit_param`, `key_header`,
   `key_param`, `result_path`, `url_field`, `title_field`) are dropped by `validate_config` and ignored if stored.
   `POST /api/sources/{id}/test` now builds the connector with the same extras as a run.
+- **Entered personal fields** (section 8): `request_submit_permit.entered_fields` (`tools.EnteredField {key, value}`),
+  checked after the answer comparison by `submit._field_mismatches` against `release.packet_fields` and the packet's
+  files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
+  The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
+  skill asks for it.

@@ -138,12 +138,23 @@ def build_server(fake: FakeNchito) -> FastMCP:
 
     @srv.tool()
     def request_submit_permit(task_id: str, summary: str, entered_answers: list[dict[str, Any]],
-                              attached_files_sha256: list[str], current_url: str) -> dict[str, Any]:
+                              attached_files_sha256: list[str], current_url: str,
+                              entered_fields: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         rec("request_submit_permit", {"task_id": task_id, "summary": summary, "entered_answers": entered_answers,
-                                      "attached_files_sha256": attached_files_sha256, "current_url": current_url})
+                                      "attached_files_sha256": attached_files_sha256, "current_url": current_url,
+                                      "entered_fields": entered_fields})
         task = fake.own(task_id)
         if task.get("dry_run"):
             return {"decision": "denied", "reason": "dry run: no permit is ever granted", "changes": []}
+        if entered_fields is not None:  # omitted by older runners: accepted
+            pk = fake.packets.get(task_id, {})
+            expected = {f["key"]: f["value"] for f in pk.get("fields", [])}
+            expected.update({f"file.{f['name']}": f["sha256"] for f in pk.get("files", [])})
+            changed = sorted({e["key"] for e in entered_fields if expected.get(e["key"]) != e["value"]})
+            if changed:
+                fake.claimed.pop(task_id, None)  # held for the owner
+                return {"decision": "wait_for_owner", "reason": "entered fields differ from the packet",
+                        "changes": changed}
         if fake.permit_decision != "granted":
             if fake.permit_decision == "wait_for_owner":
                 fake.claimed.pop(task_id, None)  # blocked for the owner
