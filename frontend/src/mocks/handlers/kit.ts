@@ -2,14 +2,21 @@
 import { http, HttpResponse } from "msw"
 import type { Resource } from "@/features/kit/api"
 import { db } from "../db"
-import { kitSeed } from "./kit-fixtures"
+import { kitSeed } from "@/mocks/data/kit"
+import { FACTS } from "@/mocks/data/jobs"
 
 type Row = Record<string, unknown> & { id: string }
 
-let store = kitSeed()
+/** The Kit seed plus the facts the shared job assessments cite as evidence (data/jobs). */
+function seed() {
+  const s = kitSeed()
+  s.facts.push(...(structuredClone(FACTS) as unknown as typeof s.facts))
+  return s
+}
+let store = seed()
 /** Reset the mock Kit to its seed (tests call this; the browser mock resets on reload). */
 export const resetKitMock = () => {
-  store = kitSeed()
+  store = seed()
 }
 export const kitStore = () => store
 

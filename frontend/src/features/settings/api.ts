@@ -2,12 +2,11 @@
  * Typed calls for the settings screens, against the generated contract (`schema.d.ts`).
  * The shared client is cast to the generated `paths` so nothing else has to change.
  */
-import type { Client } from "openapi-fetch"
 import { queryOptions } from "@tanstack/react-query"
 import { api, unwrap } from "@/lib/api/client"
-import type { components, paths } from "@/lib/api/schema.d"
+import type { components } from "@/lib/api/types"
 
-const gen = api as unknown as Client<paths>
+const gen = api
 
 export type SettingOut = components["schemas"]["SettingOut"]
 export type SettingGroupOut = components["schemas"]["SettingGroupOut"]
@@ -22,7 +21,11 @@ export const settingsKeys = {
   config: (kind: string) => ["config-history", kind] as const,
 }
 
-export type AuditFilters = { action?: string; actor?: string; subject_type?: string }
+export type AuditFilters = {
+  action?: string
+  actor?: string
+  subject_type?: string
+}
 
 export const settingsQuery = () =>
   queryOptions({
@@ -59,7 +62,9 @@ export const listAudit = (f: AuditFilters, before?: string) =>
 export const listConfigHistory = (kind: string, cursor?: string) =>
   unwrap(
     gen.GET("/api/data/config-history", {
-      params: { query: { kind: kind || undefined, cursor: cursor ?? undefined } },
+      params: {
+        query: { kind: kind || undefined, cursor: cursor ?? undefined },
+      },
     })
   )
 
@@ -71,10 +76,27 @@ export const rollbackRevision = (id: string, note: string) =>
     })
   )
 
-export const changePassword = (current_password: string, new_password: string) =>
-  unwrap(gen.POST("/api/auth/password", { body: { current_password, new_password } }))
+export const changePassword = (
+  current_password: string,
+  new_password: string
+) =>
+  unwrap(
+    gen.POST("/api/auth/password", { body: { current_password, new_password } })
+  )
 export const totpSetup = () => unwrap(gen.POST("/api/auth/totp/setup"))
 export const totpEnable = (code: string) =>
   unwrap(gen.POST("/api/auth/totp/enable", { body: { code } }))
 export const totpDisable = (password: string, code: string) =>
   unwrap(gen.POST("/api/auth/totp/disable", { body: { password, code } }))
+
+// ---- sessions (Security) ----
+export const sessionsKey = ["auth", "sessions"] as const
+export const listSessions = () => unwrap(gen.GET("/api/auth/sessions"))
+export const revokeSession = (id: string) =>
+  unwrap(
+    gen.DELETE("/api/auth/sessions/{session_id}", {
+      params: { path: { session_id: id } },
+    })
+  )
+export const revokeOtherSessions = () =>
+  unwrap(gen.POST("/api/auth/sessions/revoke-others"))

@@ -31,6 +31,10 @@ export const JobRow = memo(function JobRow({
 }: JobRowProps) {
   const band = payBand(job.pay)
   const model = workModelLabel(job.work_model)
+  const scope =
+    job.work_model === "remote" && job.remote_scope !== "not_stated"
+      ? REMOTE_SCOPE[job.remote_scope]
+      : null
   return (
     <div
       data-job-id={job.id}
@@ -99,11 +103,12 @@ export const JobRow = memo(function JobRow({
         </div>
         <div className="mt-1.5 flex flex-wrap gap-[5px]">
           <Chip tone="line">{placeLabel(job.location)}</Chip>
-          {model && <Chip tone="line">{model}</Chip>}
+          {model && (
+            <Chip tone="line">{scope ? `${model} · ${scope}` : model}</Chip>
+          )}
           {job.conflict_state === "held" && (
             <Chip tone="warn" icon={Scale} className="whitespace-normal">
-              Held ·{" "}
-              {lowerFirst(job.conflict_note) ?? "outranked at this employer"}
+              Held · {heldWords(job)}
             </Chip>
           )}
           {job.conflict_state === "released" && (
@@ -130,10 +135,29 @@ export const JobRow = memo(function JobRow({
 const lowerFirst = (s: string | null | undefined) =>
   s ? s.charAt(0).toLowerCase() + s.slice(1) : null
 
+const REMOTE_SCOPE: Record<ListJob["remote_scope"], string> = {
+  worldwide: "worldwide",
+  regions: "some regions",
+  country_only: "in-country",
+  not_stated: "",
+}
+
+/** Why a role is held: who outranked it and by how much, from the conflict record. */
+function heldWords(job: ListJob): string {
+  const c = job.conflict
+  if (c?.outranked_by_title)
+    return c.outranked_by_score != null && c.score != null
+      ? `outranked by ${c.outranked_by_title} (${c.outranked_by_score} vs ${c.score})`
+      : `outranked by ${c.outranked_by_title}`
+  return (
+    lowerFirst(c?.note ?? job.conflict_note) ?? "outranked at this employer"
+  )
+}
+
 function Pay({ job, band }: { job: ListJob; band: string | null }) {
-  if (job.pay.state === "stated" && band)
+  if (job.pay_state === "stated" && band)
     return <span className="num text-[0.86rem] text-foreground">{band}</span>
-  if (job.pay.state === "estimated" && band)
+  if (job.pay_state === "estimated" && band)
     return (
       <span className="num text-[0.86rem] text-muted-foreground italic">
         ~{band}

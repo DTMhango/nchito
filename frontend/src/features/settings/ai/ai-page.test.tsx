@@ -26,7 +26,7 @@ describe("Settings > AI", () => {
   it("only activates a model after a passing route test", async () => {
     const user = userEvent.setup()
     const s = aiMockState()
-    s.settings["budget.monthly_cap_minor"] = 2000
+    s.settings["budget.monthly_cap_micros"] = 20_000_000
     s.connections.push({
       id: "c1",
       created_at: "",
@@ -67,7 +67,9 @@ describe("Settings > AI", () => {
       })
     )
     await waitFor(() =>
-      expect(aiMockState().settings["budget.monthly_cap_minor"]).toBe(2500)
+      expect(aiMockState().settings["budget.monthly_cap_micros"]).toBe(
+        25_000_000
+      )
     )
     expect(
       await screen.findByText("Subscription (not billed)")
@@ -96,7 +98,7 @@ describe("Settings > AI", () => {
   })
 
   it("feeds the shell spend meter from the summary endpoint", async () => {
-    aiMockState().settings["budget.monthly_cap_minor"] = 2500
+    aiMockState().settings["budget.monthly_cap_micros"] = 25_000_000
     localStorage.setItem("nchito.sidebar.collapsed", "0") // expanded sidebar shows the meter
     const { queryClient } = renderApp("/settings/ai")
     await waitFor(() =>

@@ -5,7 +5,13 @@ import { Chip, type ChipTone } from "@/components/chip"
 import { DataTable, type Column } from "@/components/data-table"
 import { Segmented } from "@/components/segmented"
 import { cn } from "@/lib/utils"
-import type { BacktestResult, BacktestRow, JobSummary } from "./types"
+import { costOf } from "@/lib/cost"
+import type {
+  BacktestEstimate,
+  BacktestResult,
+  BacktestRow,
+  JobSummary,
+} from "./types"
 
 const CROSSING: Record<
   BacktestRow["crossed"][number],
@@ -136,6 +142,11 @@ function RankChange({ row }: { row: BacktestRow }) {
 type Props = {
   jobs: JobSummary[]
   disabledReason: string | null
+  /** Step one: how many roles and what it would cost. */
+  estimating: boolean
+  estimate: BacktestEstimate | null
+  onEstimate: (jobIds: string[] | null) => void
+  /** Step two: score them. */
   running: boolean
   result: BacktestResult | null
   error: string | null
@@ -149,6 +160,9 @@ type Props = {
 export function BacktestPanel({
   jobs,
   disabledReason,
+  estimating,
+  estimate,
+  onEstimate,
   running,
   result,
   error,
@@ -160,6 +174,7 @@ export function BacktestPanel({
   const [source, setSource] = useState<"recent" | "pick">("recent")
   const [picked, setPicked] = useState<string[]>([])
   const count = source === "recent" ? jobs.length : picked.length
+  const jobIds = source === "recent" ? null : picked
   const blocked =
     disabledReason ?? (count === 0 ? "Pick at least one saved job." : null)
 
@@ -222,21 +237,42 @@ export function BacktestPanel({
         {source === "recent"
           ? "Scores every role saved in the last 30 days."
           : `${picked.length} saved ${picked.length === 1 ? "job" : "jobs"} picked.`}{" "}
-        The cost estimate appears with the results and counts against this
+        You see the cost before anything is scored; it counts against this
         campaign's budget.
       </p>
       <div className="flex flex-wrap items-center gap-3">
         <Button
           type="button"
-          disabled={!!blocked || running}
-          onClick={() => onRun(source === "recent" ? null : picked)}
+          variant={estimate ? "outline" : "default"}
+          disabled={!!blocked || estimating || running}
+          onClick={() => onEstimate(jobIds)}
         >
-          {running ? "Scoring..." : "Run backtest"}
+          {estimating ? "Estimating..." : "Estimate the backtest"}
         </Button>
         {blocked && (
           <span className="text-sm text-muted-foreground">{blocked}</span>
         )}
       </div>
+      {estimate && (
+        <div
+          className="flex flex-wrap items-center gap-3 rounded-md bg-surface p-3 text-sm"
+          aria-live="polite"
+        >
+          <span>
+            {estimate.jobs} {estimate.jobs === 1 ? "role" : "roles"},{" "}
+            {estimate.to_score} to score. Estimated cost{" "}
+            <b className="num">{costOf(estimate, "estimated_cost")}</b>.
+          </span>
+          <Button
+            type="button"
+            size="sm"
+            disabled={!!blocked || running || estimate.jobs === 0}
+            onClick={() => onRun(jobIds)}
+          >
+            {running ? "Scoring..." : "Run backtest"}
+          </Button>
+        </div>
+      )}
       {error && (
         <p className="text-sm text-danger" role="alert">
           {error}
@@ -253,7 +289,7 @@ export function BacktestPanel({
             <span className="text-muted-foreground">
               Estimated cost{" "}
               <b className="num text-foreground">
-                {formatMinor(result.estimated_cost_minor, result.cost_currency)}
+                {costOf(result, "estimated_cost")}
               </b>
             </span>
           </div>

@@ -3,6 +3,7 @@ import { cleanup } from "@testing-library/react"
 import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest"
 import { server } from "./server"
 import { db } from "@/mocks/db"
+import { resetAllMocks } from "@/mocks/reset"
 import { resetSystemDark } from "./media"
 
 // ---- browser APIs jsdom lacks ----
@@ -26,6 +27,7 @@ if (!("CSS" in globalThis) || !CSS.escape) {
 beforeAll(() => server.listen({ onUnhandledFrame: "error" }))
 beforeEach(() => {
   db.reset("signed-in")
+  resetAllMocks()
   localStorage.clear()
   resetSystemDark()
 })

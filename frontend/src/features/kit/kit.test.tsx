@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { kitStore, resetKitMock } from "@/mocks/handlers/kit"
+import { api } from "@/lib/api/client"
 import { renderApp } from "@/test/render"
 import { summarise } from "./labels"
 import type { GuardrailOut } from "./api"
@@ -213,20 +214,24 @@ describe("Kit answer bank", () => {
 describe("Kit documents", () => {
   it("uploads a document with its type and sensitivity", async () => {
     const user = userEvent.setup()
-    // jsdom's File cannot cross Node's fetch, so catch the multipart POST here.
-    const real = globalThis.fetch
+    // jsdom's File cannot cross Node's fetch, so catch the multipart POST at the client and
+    // check the form it would send.
     let sent: FormData | null = null
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      const url = input instanceof Request ? input.url : String(input)
-      if (url.endsWith("/api/kit/vault") && init?.method === "POST") {
-        sent = init.body as FormData
-        return Response.json(
-          { id: "va-9", title: "reference-letter" },
-          { status: 201 }
-        )
+    const post = api.POST.bind(api)
+    vi.spyOn(api, "POST").mockImplementation(((path: string, opts: never) => {
+      if (path === "/api/kit/vault") {
+        const o = opts as {
+          body: object
+          bodySerializer: (b: object) => FormData
+        }
+        sent = o.bodySerializer(o.body)
+        return Promise.resolve({
+          data: { id: "va-9", title: "reference-letter" },
+          response: new Response(null, { status: 201 }),
+        })
       }
-      return real(input, init)
-    })
+      return post(path as never, opts)
+    }) as never)
     renderApp("/kit/documents")
     const form = await screen.findByRole("form", { name: "Upload a document" })
     await user.upload(

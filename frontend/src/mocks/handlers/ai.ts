@@ -2,8 +2,9 @@
  * MSW handlers for Settings > AI: provider records, routing, price table, spend, prompts and
  * the budget settings. In-memory, fictional, reset with `resetAiMock()` (tests).
  */
+import { settingValues } from "../data/settings"
 import { http, HttpResponse } from "msw"
-import type { components } from "@/lib/api/schema.d"
+import type { components } from "@/lib/api/types"
 
 type S = components["schemas"]
 
@@ -70,20 +71,8 @@ function seed(): AiState {
   }
   return {
     connections: [],
-    settings: {
-      "ai.provider": "anthropic",
-      "ai.model_extract": "claude-haiku-5-5",
-      "ai.model_classify_email": "claude-haiku-5-5",
-      "ai.model_score": "claude-haiku-5-5",
-      "ai.model_custom_facet": "claude-haiku-5-5",
-      "ai.model_tailor": "claude-sonnet-5-5",
-      "ai.model_claim_check": "claude-sonnet-5-5",
-      "ai.model_browser_agent": "claude-sonnet-5-5",
-      "budget.monthly_cap_minor": null,
-      "budget.per_run_cap_minor": null,
-      "budget.warning_percent": 80,
-      "budget.currency": "USD",
-    },
+    // The one settings store (Settings pages own /api/settings); read and written in place.
+    settings: settingValues,
     prices: [
       price("claude-haiku-5-5", "10.0000", "50.0000"),
       price("claude-sonnet-5-5", "200.0000", "1000.0000"),
@@ -153,28 +142,6 @@ export const resetAiMock = () => {
 }
 export const aiMockState = () => state
 
-function setting(key: string): S["SettingOut"] {
-  const isCap = key.startsWith("budget.") && key.endsWith("_minor")
-  return {
-    key,
-    group: key.split(".")[0],
-    label: key,
-    description: "",
-    kind: isCap || key === "budget.warning_percent" ? "int" : "string",
-    value: state.settings[key] ?? null,
-    default: null,
-    is_default: false,
-    nullable: isCap,
-    choices: null,
-    minimum: key === "budget.warning_percent" ? 1 : 0,
-    maximum: key === "budget.warning_percent" ? 100 : 10_000_000,
-    unit: isCap ? "minor units" : null,
-    version: 1,
-    updated_by: "owner",
-    updated_at: now(),
-  }
-}
-
 function routes(): S["RouteOut"][] {
   const provider = String(state.settings["ai.provider"])
   return STAGES.map(([stage, key]) => {
@@ -192,10 +159,14 @@ function routes(): S["RouteOut"][] {
 }
 
 function syncSpend() {
-  const cap = state.settings["budget.monthly_cap_minor"] as number | null
+  // Caps are stored in micros; the summary carries them rounded to cents.
+  const toMinor = (v: unknown) =>
+    v == null ? null : Math.round((v as number) / 10_000)
+  const cap = toMinor(state.settings["budget.monthly_cap_micros"])
   state.spend.cap_minor = cap
-  state.spend.per_run_cap_minor = state.settings["budget.per_run_cap_minor"] as
-    number | null
+  state.spend.per_run_cap_minor = toMinor(
+    state.settings["budget.per_run_cap_micros"]
+  )
   state.spend.warning_percent = state.settings[
     "budget.warning_percent"
   ] as number
@@ -267,7 +238,7 @@ export const aiHandlers = [
         { status: 404 }
       )
     conn.last_checked_at = now()
-    if (state.settings["budget.monthly_cap_minor"] === null) {
+    if (state.settings["budget.monthly_cap_micros"] === null) {
       conn.health = "unknown"
       return HttpResponse.json({
         ok: false,
@@ -290,7 +261,7 @@ export const aiHandlers = [
     const model = body.model || route?.model || ""
     const provider = String(state.settings["ai.provider"])
     const ok =
-      state.settings["budget.monthly_cap_minor"] !== null &&
+      state.settings["budget.monthly_cap_micros"] !== null &&
       state.connections.length > 0
     state.tested[`${provider}/${model}`] = { ok, at: now() }
     return HttpResponse.json({
@@ -404,26 +375,5 @@ export const aiHandlers = [
       if (p.stage === prompt.stage) p.active = false
     prompt.active = true
     return HttpResponse.json(prompt)
-  }),
-
-  http.get("*/api/settings/:key", ({ params }) => {
-    const key = String(params.key)
-    if (!(key in state.settings)) return undefined
-    return HttpResponse.json(setting(key))
-  }),
-  http.put("*/api/settings/:key", async ({ params, request }) => {
-    const key = String(params.key)
-    if (!(key in state.settings)) return undefined
-    const { value } = (await request.json()) as { value: unknown }
-    if (
-      key === "budget.warning_percent" &&
-      (typeof value !== "number" || value < 1 || value > 100)
-    )
-      return HttpResponse.json(
-        { detail: "must be between 1 and 100" },
-        { status: 422 }
-      )
-    state.settings[key] = value
-    return HttpResponse.json(setting(key))
   }),
 ]

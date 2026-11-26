@@ -53,24 +53,35 @@ const CLASS_TONE: Record<Cls, ChipTone> = {
   owner_only: "info",
 }
 
-/** The three condition facets the owner edits in plain fields. Anything else is preserved. */
+/**
+ * The three condition facets the owner edits in plain fields, by the record paths the answer
+ * matcher evaluates (CONTRACTS 5). `legacy` names written by earlier builds are read and
+ * rewritten on save. Anything else is preserved.
+ */
 const COND_FACETS = [
   {
-    facet: "country",
+    facet: "location.country",
+    legacy: "country",
     label: "Country",
     hint: "Country codes, like ZM, separated with commas.",
   },
   {
-    facet: "employment_type",
+    facet: "facets.employment_type",
+    legacy: "employment_type",
     label: "Employment type",
-    hint: "Like permanent, contract.",
+    hint: "Like permanent, fixed_term, contract.",
   },
   {
     facet: "employer",
+    legacy: "employer",
     label: "Employer",
     hint: "Employer names, separated with commas.",
   },
 ] as const
+
+type CondFacet = (typeof COND_FACETS)[number]
+const isFacet = (c: Cond, f: CondFacet) =>
+  c.type === "values" && (c.facet === f.facet || c.facet === f.legacy)
 
 const groupOf = (a: AnswerOut | AnswerIn): Group =>
   ((a.conditions as { root?: Group } | undefined)?.root ?? {
@@ -81,10 +92,9 @@ const groupOf = (a: AnswerOut | AnswerIn): Group =>
   }) as Group
 
 const condText = (a: AnswerOut) =>
-  COND_FACETS.flatMap(({ facet, label }) => {
-    const c = groupOf(a).conditions.find(
-      (x) => x.type === "values" && x.facet === facet
-    )
+  COND_FACETS.flatMap((f) => {
+    const { label } = f
+    const c = groupOf(a).conditions.find((x) => isFacet(x, f))
     return c?.include?.length ? [`${label}: ${c.include.join(", ")}`] : []
   })
 
@@ -210,13 +220,9 @@ function AnswerDialog({
     : { type: "group", op: "and", negate: false, conditions: [] as Cond[] }
   const [conds, setConds] = useState<Record<string, string>>(() =>
     Object.fromEntries(
-      COND_FACETS.map(({ facet }) => [
-        facet,
-        csv(
-          existing.conditions.find(
-            (c) => c.type === "values" && c.facet === facet
-          )?.include
-        ),
+      COND_FACETS.map((f) => [
+        f.facet,
+        csv(existing.conditions.find((c) => isFacet(c, f))?.include),
       ])
     )
   )
@@ -233,11 +239,7 @@ function AnswerDialog({
       onSubmit={() => {
         if (!canonical.trim()) return
         const kept = existing.conditions.filter(
-          (c) =>
-            !(
-              c.type === "values" &&
-              COND_FACETS.some((f) => f.facet === c.facet)
-            )
+          (c) => !COND_FACETS.some((f) => isFacet(c, f))
         )
         const mine: Cond[] = COND_FACETS.flatMap(({ facet }) => {
           const include = parseCsv(conds[facet] ?? "")

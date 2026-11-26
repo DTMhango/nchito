@@ -1,11 +1,11 @@
 /**
  * Generate src/lib/api/schema.d.ts from ../docs/openapi.json (`npm run gen:api`).
  *
- * A field with a default is optional when we send it and always present when the server
- * returns it. openapi-typescript has one switch for both, so before generating we mark
- * defaulted properties as required in schemas that are only ever read (reachable from a
- * response and never from a request body), and generate with defaults left optional.
- * Schemas used both ways keep defaults optional.
+ * A field with a default is optional when we send it, and FastAPI always serialises every
+ * field of a response model. openapi-typescript has one switch for both, so before
+ * generating we mark every property required in schemas that are only ever read (reachable
+ * from a response and never from a request body or parameter), and generate with defaults
+ * left optional. Schemas used both ways keep defaulted fields optional.
  */
 import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
@@ -58,10 +58,7 @@ const readOnly = [...closure(responseRoots)].filter((n) => !written.has(n))
 for (const name of readOnly) {
   const s = schemas[name]
   if (!s?.properties) continue
-  const required = new Set(s.required ?? [])
-  for (const [prop, def] of Object.entries(s.properties))
-    if (def && typeof def === "object" && "default" in def) required.add(prop)
-  s.required = [...required]
+  s.required = Object.keys(s.properties)
 }
 
 const ast = await openapiTS(doc, { defaultNonNullable: false })

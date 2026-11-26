@@ -21,19 +21,19 @@ type Field = {
   key: string
   label: string
   hint: string
-  /** Shown in major units (dollars), stored in minor units (cents). */
+  /** Shown in dollars, stored in integer micros (1 USD = 1,000,000). */
   money?: boolean
 }
 
 const FIELDS: Field[] = [
   {
-    key: "budget.monthly_cap_minor",
+    key: "budget.monthly_cap_micros",
     label: "Monthly cap",
     hint: "Empty means paid AI work stays off.",
     money: true,
   },
   {
-    key: "budget.per_run_cap_minor",
+    key: "budget.per_run_cap_micros",
     label: "Per-run cap",
     hint: "Empty means no per-run cap.",
     money: true,
@@ -67,7 +67,7 @@ function BudgetField({ field }: { field: Field }) {
   const { data } = useQuery(settingQuery(field.key))
   const stored = data?.value as number | null | undefined
   const shown = (v: number | null | undefined) =>
-    v == null ? "" : field.money ? String(v / 100) : String(v)
+    v == null ? "" : field.money ? String(v / 1_000_000) : String(v)
   // Local edit state, reset whenever the stored value changes (React's "adjust state on prop change").
   const [value, setValue] = useState("")
   const [seen, setSeen] = useState<number | null | undefined>(undefined)
@@ -82,7 +82,7 @@ function BudgetField({ field }: { field: Field }) {
         throw new Error("Enter a positive number.")
       return putSetting(
         field.key,
-        n === null ? null : field.money ? Math.round(n * 100) : n
+        n === null ? null : field.money ? Math.round(n * 1_000_000) : n
       )
     },
     onSuccess: () => {

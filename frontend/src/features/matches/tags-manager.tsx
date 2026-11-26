@@ -1,3 +1,4 @@
+import { costOf } from "@/lib/cost"
 import { useId, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Plus, Trash2 } from "lucide-react"
@@ -217,10 +218,7 @@ const slug = (q: string) =>
     .slice(0, 48)
 
 function money(e: BackfillEstimate) {
-  return new Intl.NumberFormat("en", {
-    style: "currency",
-    currency: e.currency,
-  }).format(e.estimated_cost_minor / 100)
+  return costOf(e, "estimated_cost", { currency: e.currency })
 }
 
 function Questions() {

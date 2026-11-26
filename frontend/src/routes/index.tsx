@@ -273,8 +273,10 @@ const groupRoutes = [
   groupRoute("reconcile"),
   groupRoute("notifications"),
 ] as const
-const ownRoute = (path: "security" | "activity" | "history", C: () => React.ReactNode) =>
-  createRoute({ getParentRoute: () => settingsRoute, path, component: C })
+const ownRoute = (
+  path: "security" | "activity" | "history",
+  C: () => React.ReactNode
+) => createRoute({ getParentRoute: () => settingsRoute, path, component: C })
 const ownRoutes = [
   ownRoute("security", SecurityPage),
   ownRoute("activity", ActivityPage),

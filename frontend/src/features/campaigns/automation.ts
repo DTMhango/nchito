@@ -122,22 +122,78 @@ export function toInput(c: Campaign): CampaignDraft {
   }
 }
 
+/** A criteria item the server still wants confirmed (`CampaignOut.unconfirmed`). */
+export type ConfirmItemId = Campaign["unconfirmed"][number]
+
 export type PendingItem = {
-  id: "pay_floors" | "countries" | "seniority"
+  id: ConfirmItemId
   label: string
   value: string
   section: string
+  /** Pay floors, countries and seniority have no defaults: set a value before confirming. */
+  needsValue: boolean
 }
 
-/** The items an imported campaign needs the owner to confirm (they have no defaults). */
-export function pendingItems(c: CampaignDraft): PendingItem[] {
+const NOT_SET = "Not set"
+const list = (xs: readonly string[] | undefined) =>
+  xs?.length ? xs.join(", ") : NOT_SET
+
+/**
+ * The items an imported campaign still needs the owner to confirm, in the order the server
+ * lists them (`unconfirmed`); with no list, the three that have no defaults.
+ */
+export function pendingItems(
+  c: CampaignDraft,
+  unconfirmed: readonly ConfirmItemId[] = [
+    "pay_floors",
+    "locations",
+    "seniority",
+  ]
+): PendingItem[] {
   const crit = c.criteria ?? {}
   const floors = crit.pay_floors ?? []
   const places = (crit.locations ?? []).filter((l) => l.kind !== "deny")
   const seniority = crit.seniority ?? []
-  return [
-    {
-      id: "pay_floors",
+  const all: Record<ConfirmItemId, Omit<PendingItem, "id">> = {
+    titles: {
+      label: "Job titles",
+      value: list(crit.titles),
+      section: "target",
+      needsValue: false,
+    },
+    keywords: {
+      label: "Keywords",
+      value: list(crit.keywords),
+      section: "target",
+      needsValue: false,
+    },
+    rules: {
+      label: "Rules",
+      value: crit.rules?.length
+        ? `${crit.rules.length} rule${crit.rules.length === 1 ? "" : "s"}`
+        : "None",
+      section: "rules",
+      needsValue: false,
+    },
+    locations: {
+      label: "Countries",
+      value: places.length ? places.map((l) => l.place).join(", ") : NOT_SET,
+      section: "rules",
+      needsValue: true,
+    },
+    work_models: {
+      label: "Work models",
+      value: list(crit.work_models?.map((w) => w.replace(/_/g, " "))),
+      section: "rules",
+      needsValue: false,
+    },
+    seniority: {
+      label: "Seniority",
+      value: seniority.length ? seniority.join(", ") : NOT_SET,
+      section: "rules",
+      needsValue: true,
+    },
+    pay_floors: {
       label: "Pay floors",
       value: floors.length
         ? floors
@@ -146,20 +202,22 @@ export function pendingItems(c: CampaignDraft): PendingItem[] {
                 `${f.currency} ${(f.amount_minor / 100).toLocaleString()} a ${f.period ?? "year"} (${f.employment_type.replace("_", " ")})`
             )
             .join(", ")
-        : "Not set",
+        : NOT_SET,
       section: "rules",
+      needsValue: true,
     },
-    {
-      id: "countries",
-      label: "Countries",
-      value: places.length ? places.map((l) => l.place).join(", ") : "Not set",
+    deprioritise_themes: {
+      label: "Themes to rank lower",
+      value: list(crit.deprioritise_themes),
       section: "rules",
+      needsValue: false,
     },
-    {
-      id: "seniority",
-      label: "Seniority",
-      value: seniority.length ? seniority.join(", ") : "Not set",
-      section: "rules",
+    unknown_data_policy: {
+      label: "When information is missing",
+      value: "As set below",
+      section: "missing",
+      needsValue: false,
     },
-  ]
+  }
+  return unconfirmed.map((id) => ({ id, ...all[id] }))
 }

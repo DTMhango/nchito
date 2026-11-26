@@ -3,10 +3,20 @@ import { Activity } from "lucide-react"
 import { EmptyState } from "@/components/empty-state"
 import { jobAuditQuery, timelineQuery, type JobDetail } from "../api"
 
-type Entry = { id: string; at: string; actor: string; what: string; reason?: string }
+type Entry = {
+  id: string
+  at: string
+  actor: string
+  what: string
+  reason?: string
+}
 
 const reasonOf = (d: Record<string, unknown>) =>
-  typeof d.reason === "string" ? d.reason : typeof d.note === "string" ? d.note : undefined
+  typeof d.reason === "string"
+    ? d.reason
+    : typeof d.note === "string"
+      ? d.note
+      : undefined
 
 /** Timeline plus audit trail for this role, newest first, each with who did it and why. */
 export function ActivityTab({ job }: { job: JobDetail }) {
@@ -42,15 +52,20 @@ export function ActivityTab({ job }: { job: JobDetail }) {
   return (
     <ol aria-label="Timeline" className="panel p-4">
       {entries.map((e) => (
-        <li key={e.id} className="grid gap-0.5 border-t border-border row-pad first:border-t-0">
+        <li
+          key={e.id}
+          className="grid gap-0.5 border-t border-border row-pad first:border-t-0"
+        >
           <div className="flex flex-wrap items-baseline gap-x-2">
             <b className="capitalize">{e.what}</b>
             <span className="text-sm text-muted-foreground">by {e.actor}</span>
-            <span className="num ml-auto text-xs text-faint">
+            <span className="ml-auto num text-xs text-faint">
               {new Date(e.at).toLocaleString()}
             </span>
           </div>
-          {e.reason && <p className="text-sm text-muted-foreground">Reason: {e.reason}</p>}
+          {e.reason && (
+            <p className="text-sm text-muted-foreground">Reason: {e.reason}</p>
+          )}
         </li>
       ))}
     </ol>

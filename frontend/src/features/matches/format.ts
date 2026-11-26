@@ -1,11 +1,8 @@
 import type { JobSummary, PayOut } from "./types"
 import { valueLabel } from "./filters"
 
-/** Fields the list reads when the backend includes them (they are not in JobSummary yet). */
-export type ListJob = JobSummary & {
-  work_model?: string | null
-  source?: string | null
-}
+/** A Matches list row: the contract's JobSummary (work_model, remote_scope, source, pay_state, conflict). */
+export type ListJob = JobSummary
 
 const compact = (n: number) =>
   new Intl.NumberFormat("en", {

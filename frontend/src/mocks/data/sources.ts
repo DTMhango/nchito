@@ -202,6 +202,7 @@ function runs(): Run[] {
     schedule_id: "sch-1",
     scheduled_for: ago(minutesAgo),
     dry_run: false,
+    proposed_actions: [],
     counts: funnel(212, 38, 21, 9, 5, 2),
     source_results: [
       { source_id: "src-gh", status: "ok", found: 84, new: 15, error: null },
@@ -323,6 +324,15 @@ export const PROPOSED: ProposedAction[] = [
   },
   {
     job_id: null,
+    title: "Risk Modelling Lead",
+    employer: "Mukuba Capital",
+    action: "ask_owner",
+    reason:
+      "tie with Head of Catastrophe Modelling at the same employer: you choose which one goes ahead",
+    score: 88,
+  },
+  {
+    job_id: null,
     title: "Junior Data Clerk",
     employer: "Zambezi Digital",
     action: "skip",
@@ -338,7 +348,6 @@ type Store = {
   runs: Run[]
   /** run id -> epoch ms the mock run started, for simulated progress. */
   live: Map<string, number>
-  missedRun: "catch_up_once" | "skip"
 }
 
 export const LIVE_RUN_MS = 9000
@@ -350,7 +359,6 @@ function fresh(): Store {
     schedules: schedules().map(withNext),
     runs: runs(),
     live: new Map(),
-    missedRun: "catch_up_once",
   }
 }
 

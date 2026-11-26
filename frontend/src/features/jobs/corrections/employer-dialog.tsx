@@ -14,7 +14,11 @@ import {
 import { fixEmployer, searchJobsQuery, type JobDetail } from "../api"
 import { errorText, useCorrection } from "./use-correction"
 
-type Props = { job: JobDetail; open: boolean; onOpenChange: (v: boolean) => void }
+type Props = {
+  job: JobDetail
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}
 
 /** "Wrong employer": pick an employer already in your list, or type the right one. */
 export function EmployerDialog({ job, open, onOpenChange }: Props) {

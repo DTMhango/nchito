@@ -8,17 +8,11 @@ import type {
   Rubric,
   RubricBody,
 } from "@/features/campaigns/types"
-import {
-  employers,
-  facets,
-  IDS,
-  jobs,
-  rubrics as seedRubrics,
-  seedCampaigns,
-  settings as seedSettings,
-  sources,
-  tracks,
-} from "./campaigns-fixtures"
+import type { CampaignRuleIn } from "@/features/matches/types"
+import { rubrics as seedRubrics, seedCampaigns } from "@/mocks/data/campaigns"
+import { RUBRIC } from "@/mocks/data/jobs"
+import { matchesMock } from "./matches"
+import { matches as evaluate } from "./matches-evaluator"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(100)
@@ -33,72 +27,46 @@ const page = <T>(items: T[]) => ({
 })
 
 // ---- in-memory state (reset between tests) ----
+// The rubric the shared jobs were scored with (data/jobs) is one of the rubrics here too.
+const allRubrics = () => [
+  ...structuredClone(seedRubrics),
+  structuredClone(RUBRIC) as unknown as Rubric,
+]
 let campaigns: Campaign[] = seedCampaigns()
-let rubrics: Rubric[] = structuredClone(seedRubrics)
-let settings = structuredClone(seedSettings)
-let employerList = structuredClone(employers)
+let rubrics: Rubric[] = allRubrics()
 
 export function resetCampaignMocks() {
   campaigns = seedCampaigns()
-  rubrics = structuredClone(seedRubrics)
-  settings = structuredClone(seedSettings)
-  employerList = structuredClone(employers)
+  rubrics = allRubrics()
 }
 
-// ---- a small condition evaluator so "Preview matches" gives believable counts ----
-type Group = NonNullable<ConditionSet["root"]>
-type Cond = NonNullable<Group["conditions"]>[number]
+/** The shared jobs (Matches owns them): preview, backtest and counts read the same roles. */
+const jobs = () => matchesMock.get().jobs
 
-function evalCondition(
-  c: Cond,
-  mock: Record<string, string | number | string[]>,
-  title: string
-): boolean {
-  if (c.type === "group") {
-    const parts = (c.conditions ?? []).map((x) => evalCondition(x, mock, title))
-    const r =
-      parts.length === 0
-        ? true
-        : c.op === "or"
-          ? parts.some(Boolean)
-          : parts.every(Boolean)
-    return c.negate ? !r : r
-  }
-  if (c.type === "text")
-    return c.query
-      .toLowerCase()
-      .split(/\s+/)
-      .every((w) => title.toLowerCase().includes(w))
-  if (c.type === "range") {
-    const v = mock[c.facet]
-    if (typeof v !== "number") return c.not_stated === "include"
-    return (c.min == null || v >= c.min) && (c.max == null || v <= c.max)
-  }
-  const raw = mock[c.facet]
-  const have = Array.isArray(raw)
-    ? raw
-    : raw === undefined
-      ? ["not_stated"]
-      : [String(raw)]
-  const inc = (c.include ?? []).map(String)
-  const exc = (c.exclude ?? []).map(String)
-  const incOk =
-    inc.length === 0 ||
-    (c.match === "all"
-      ? inc.every((v) => have.includes(v))
-      : inc.some((v) => have.includes(v)))
-  const excOk = !exc.some((v) => have.includes(v))
-  return incOk && excOk
-}
-
-function previewCount(set: ConditionSet) {
-  const matched = jobs.filter((j) =>
-    evalCondition((set.root ?? { type: "group" }) as Cond, j.mock, j.title)
+/** Assessed roles by triage for a campaign, and held by a conflict group. */
+function withCounts(c: Campaign): Campaign {
+  const mine = jobs().filter((j) =>
+    (matchesMock.get().assessments.get(j.id) ?? []).some(
+      (a) => a.campaign_id === c.id
+    )
   )
   return {
+    ...c,
+    match_counts: {
+      new: mine.filter((j) => j.triage === "new").length,
+      shortlisted: mine.filter((j) => j.triage === "shortlisted").length,
+      held: mine.filter((j) => j.conflict_state === "held").length,
+    },
+  }
+}
+
+function previewCount(set: ConditionSet, limit = 5) {
+  const all = jobs()
+  const matched = all.filter((j) => evaluate(j, set as never))
+  return {
     matched: matched.length,
-    total: jobs.length,
-    sample_job_ids: matched.slice(0, 5).map((j) => j.id),
+    total: all.length,
+    sample_job_ids: matched.slice(0, limit).map((j) => j.id),
   }
 }
 
@@ -109,7 +77,8 @@ function hash(s: string) {
 }
 
 function backtest(rubric: Rubric, jobIds: string[] | null) {
-  const chosen = jobIds ? jobs.filter((j) => jobIds.includes(j.id)) : jobs
+  const all = jobs()
+  const chosen = jobIds ? all.filter((j) => jobIds.includes(j.id)) : all
   const t = {
     shortlist: 60,
     tailor: 70,
@@ -154,6 +123,19 @@ function backtest(rubric: Rubric, jobIds: string[] | null) {
   return { rows, estimated_cost_minor: rows.length * 3, cost_currency: "USD" }
 }
 
+function estimate(jobIds: string[] | null) {
+  const all = jobs()
+  const n = jobIds
+    ? all.filter((j) => jobIds.includes(j.id)).length
+    : all.length
+  return {
+    jobs: n,
+    to_score: n,
+    estimated_cost_minor: n * 3,
+    cost_currency: "USD",
+  }
+}
+
 function applyInput(c: Campaign, body: CampaignInput): Campaign {
   return {
     ...c,
@@ -184,7 +166,7 @@ export const campaignHandlers = [
     const g = guard()
     if (g) return g
     await latency()
-    return HttpResponse.json(page(campaigns))
+    return HttpResponse.json(page(campaigns.map(withCounts)))
   }),
   http.post("*/api/campaigns", async ({ request }) => {
     const g = guard()
@@ -214,7 +196,7 @@ export const campaignHandlers = [
     if (g) return g
     await latency()
     const c = campaigns.find((x) => x.id === params.id)
-    return c ? HttpResponse.json(c) : notFound("Campaign")
+    return c ? HttpResponse.json(withCounts(c)) : notFound("Campaign")
   }),
   http.put("*/api/campaigns/:id", async ({ params, request }) => {
     const g = guard()
@@ -256,8 +238,47 @@ export const campaignHandlers = [
       review_state: "confirmed",
       confirmed_at: new Date().toISOString(),
       mode_ceiling: ceilingFor("confirmed"),
+      unconfirmed: [],
     }
     return HttpResponse.json(campaigns[idx])
+  }),
+  http.post("*/api/campaigns/:id/confirm/:item", ({ params }) => {
+    const g = guard()
+    if (g) return g
+    const idx = campaigns.findIndex((x) => x.id === params.id)
+    if (idx < 0) return notFound("Campaign")
+    const c = campaigns[idx]
+    const unconfirmed = c.unconfirmed.filter((i) => i !== params.item)
+    const done = unconfirmed.length === 0
+    campaigns[idx] = {
+      ...c,
+      unconfirmed,
+      review_state: done ? "confirmed" : c.review_state,
+      confirmed_at: done ? new Date().toISOString() : c.confirmed_at,
+      mode_ceiling: ceilingFor(done ? "confirmed" : c.review_state),
+    }
+    return HttpResponse.json(withCounts(campaigns[idx]))
+  }),
+  http.post("*/api/campaigns/:id/rules", async ({ params, request }) => {
+    const g = guard()
+    if (g) return g
+    const idx = campaigns.findIndex((x) => x.id === params.id)
+    if (idx < 0) return notFound("Campaign")
+    const rule = (await request.json()) as CampaignRuleIn
+    if ((rule.effect === "penalty" || rule.effect === "bonus") && !rule.points)
+      return HttpResponse.json(
+        { detail: "Say how many points." },
+        { status: 422 }
+      )
+    const c = campaigns[idx]
+    campaigns[idx] = {
+      ...c,
+      criteria: {
+        ...c.criteria,
+        rules: [...(c.criteria?.rules ?? []), rule],
+      } as Campaign["criteria"],
+    }
+    return HttpResponse.json(withCounts(campaigns[idx]))
   }),
   http.post("*/api/campaigns/:id/clone", ({ params }) => {
     const g = guard()
@@ -282,8 +303,11 @@ export const campaignHandlers = [
     const g = guard()
     if (g) return g
     await latency()
-    const body = (await request.json()) as { conditions: ConditionSet }
-    return HttpResponse.json(previewCount(body.conditions))
+    const body = (await request.json()) as {
+      conditions: ConditionSet
+      limit?: number
+    }
+    return HttpResponse.json(previewCount(body.conditions, body.limit ?? 50))
   }),
 
   // ---- rubrics ----
@@ -356,6 +380,12 @@ export const campaignHandlers = [
     target.status = "active"
     return HttpResponse.json(target)
   }),
+  http.post("*/api/rubrics/backtest/estimate", async ({ request }) => {
+    const g = guard()
+    if (g) return g
+    const b = (await request.json()) as { job_ids: string[] | null }
+    return HttpResponse.json(estimate(b.job_ids))
+  }),
   http.post("*/api/rubrics/backtest", async ({ request }) => {
     const g = guard()
     if (g) return g
@@ -368,56 +398,7 @@ export const campaignHandlers = [
     if (!r) return notFound("Rubric")
     return HttpResponse.json(backtest(r, b.job_ids))
   }),
-
-  // ---- catalogues the editor reads ----
-  http.get("*/api/jobs/facets", () => HttpResponse.json(facets)),
-  http.get("*/api/jobs", () => {
-    const g = guard()
-    if (g) return g
-    return HttpResponse.json({
-      items: jobs.map((j) => {
-        const { mock, ...rest } = j
-        void mock
-        return rest
-      }),
-      total: jobs.length,
-      next_cursor: null,
-      groups: null,
-    })
-  }),
-  http.get("*/api/sources", () => HttpResponse.json(page(sources))),
-  http.get("*/api/watched-employers", () =>
-    HttpResponse.json(page(employerList))
-  ),
-  http.put("*/api/watched-employers/:id", async ({ params, request }) => {
-    const idx = employerList.findIndex((x) => x.id === params.id)
-    if (idx < 0) return notFound("Employer")
-    const b = (await request.json()) as { always_ask_first: boolean }
-    employerList[idx] = {
-      ...employerList[idx],
-      always_ask_first: b.always_ask_first,
-    }
-    return HttpResponse.json(employerList[idx])
-  }),
-  http.get("*/api/kit/tracks", () => HttpResponse.json(page(tracks))),
-  http.get("*/api/settings", () =>
-    HttpResponse.json({
-      groups: [...new Set(settings.map((s) => s.group))].map((g) => ({
-        key: g,
-        label: g,
-        settings: settings.filter((s) => s.group === g),
-      })),
-    })
-  ),
-  http.put("*/api/settings/:key", async ({ params, request }) => {
-    const s = settings.find((x) => x.key === params.key)
-    if (!s) return notFound("Setting")
-    const b = (await request.json()) as { value: unknown }
-    s.value = b.value
-    s.is_default = b.value === s.default
-    s.version += 1
-    return HttpResponse.json(s)
-  }),
 ]
 
-export { IDS as campaignIds }
+/** Read access for tests. */
+export const campaignsMock = { get: () => campaigns }

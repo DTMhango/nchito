@@ -22,6 +22,7 @@ import {
   pendingItems,
   toInput,
   type CampaignDraft,
+  type PendingItem,
 } from "./automation"
 import { AutomationSection } from "./automation-section"
 import {
@@ -78,23 +79,6 @@ export function sanitise(d: CampaignDraft): CampaignDraft {
   }
 }
 
-const confirmedKey = (id: string) => `nchito.campaign.${id}.confirmed-items`
-function loadConfirmed(id: string): string[] {
-  try {
-    const raw = localStorage.getItem(confirmedKey(id))
-    return raw ? (JSON.parse(raw) as string[]) : []
-  } catch {
-    return []
-  }
-}
-function storeConfirmed(id: string, items: string[]) {
-  try {
-    localStorage.setItem(confirmedKey(id), JSON.stringify(items))
-  } catch {
-    /* private mode: the choice lasts until the page closes */
-  }
-}
-
 export function CampaignEditorPage({ id }: { id: string }) {
   const q = useQuery(campaignQuery(id))
   if (q.isLoading)
@@ -133,9 +117,6 @@ function Editor({ initial }: { initial: Campaign }) {
     initialData: initial,
   }).data
   const [draft, setDraft] = useState<CampaignDraft>(() => toInput(initial))
-  const [confirmed, setConfirmed] = useState<string[]>(() =>
-    loadConfirmed(initial.id)
-  )
   const m = useCampaignMutations()
   const catalogue = useQuery(facetsQuery()).data ?? []
   const tracks = useQuery(tracksQuery()).data ?? []
@@ -168,26 +149,22 @@ function Editor({ initial }: { initial: Campaign }) {
     touch(next)
   }
 
-  const items = useMemo(() => pendingItems(draft), [draft])
-  // An item cannot stay confirmed after it has been emptied.
-  const effectiveConfirmed = confirmed.filter((c) =>
-    items.some((i) => i.id === c && i.value !== "Not set")
+  const items = useMemo(
+    () => pendingItems(draft, live.unconfirmed),
+    [draft, live.unconfirmed]
   )
 
-  const confirmItem = async (itemId: string) => {
-    const next = [...new Set([...effectiveConfirmed, itemId])]
-    setConfirmed(next)
-    storeConfirmed(initial.id, next)
-    if (items.every((i) => next.includes(i.id))) {
-      await auto.flush()
-      try {
-        await m.confirm.mutateAsync(initial.id)
+  // Each item is confirmed on the server; the campaign is confirmed when none remain.
+  const confirmItem = async (item: PendingItem["id"]) => {
+    await auto.flush()
+    try {
+      const saved = await m.confirmItem.mutateAsync({ id: initial.id, item })
+      if (saved.review_state === "confirmed")
         toast.success(
           "Campaign confirmed. Higher automation modes are unlocked."
         )
-      } catch (e) {
-        toast.error(e instanceof Error ? e.message : "Could not confirm.")
-      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not confirm.")
     }
   }
   const editItem = (section: string) => {
@@ -197,9 +174,7 @@ function Editor({ initial }: { initial: Campaign }) {
   }
 
   const criteria = draft.criteria ?? {}
-  const unconfirmedIds = needsReview
-    ? items.filter((i) => !effectiveConfirmed.includes(i.id)).map((i) => i.id)
-    : []
+  const unconfirmedIds: string[] = needsReview ? live.unconfirmed : []
   const mode = effectiveMode(draft.automation?.mode, ceiling)
 
   return (
@@ -250,7 +225,7 @@ function Editor({ initial }: { initial: Campaign }) {
         <div className="max-w-[860px]">
           <ConfirmationBanner
             items={items}
-            confirmed={effectiveConfirmed}
+            busy={m.confirmItem.isPending}
             onConfirm={(i) => void confirmItem(i)}
             onEdit={(i) => editItem(i.section)}
           />

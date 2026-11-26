@@ -9,7 +9,6 @@ import type {
   AppliedMyselfIn,
   AssessmentOut,
   BulkActionIn,
-  CampaignRuleIn,
   ConditionSet,
   CustomFacetIn,
   CustomFacetOut,
@@ -24,14 +23,12 @@ import type {
 import {
   assessmentFor,
   CAMPAIGNS,
-  FACTS,
   makeJobs,
-  RUBRIC,
   seedCustomFacets,
   seedTagRules,
   seedViews,
   type MockJob,
-} from "./matches-fixtures"
+} from "@/mocks/data/jobs"
 import { groupCounts, matches, NOT_STATED } from "./matches-evaluator"
 
 type State = {
@@ -40,7 +37,6 @@ type State = {
   views: SavedViewOut[]
   tagRules: TagRuleOut[]
   customFacets: CustomFacetOut[]
-  campaignRules: Record<string, CampaignRuleIn[]>
 }
 
 function seed(): State {
@@ -53,7 +49,6 @@ function seed(): State {
     views: seedViews(),
     tagRules: seedTagRules(),
     customFacets: seedCustomFacets(),
-    campaignRules: {},
   }
 }
 
@@ -219,7 +214,7 @@ function catalog(): FacetCatalogEntry[] {
   const jobs = state.jobs
   const entries: FacetCatalogEntry[] = FACETS.map((f) => {
     if (f.kind === "range")
-      return { facet: f.facet, label: f.label, kind: "range" }
+      return { facet: f.facet, label: f.label, kind: "range", values: [] }
     const counts = groupCounts(jobs, f.facet).filter(
       (c) => f.facet !== "tags" || c.value !== NOT_STATED
     )
@@ -538,14 +533,6 @@ export const matchesHandlers = [
       )
     return HttpResponse.json({ run_id: crypto.randomUUID() }, { status: 202 })
   }),
-  http.get("*/api/rubrics/:id", ({ params }) =>
-    String(params.id) === RUBRIC.id
-      ? HttpResponse.json(RUBRIC)
-      : notFound("Rubric")
-  ),
-  http.get("*/api/kit/facts", () =>
-    HttpResponse.json({ items: FACTS, total: FACTS.length, next_cursor: null })
-  ),
 
   // ---- saved views ----
   http.get("*/api/views", async () => {
@@ -700,46 +687,5 @@ export const matchesHandlers = [
       },
       { status: 202 }
     )
-  }),
-
-  // ---- campaigns (only what Matches needs) ----
-  http.get("*/api/campaigns", () => {
-    if (!signedIn()) return unauthorized()
-    return HttpResponse.json({
-      items: CAMPAIGNS,
-      total: CAMPAIGNS.length,
-      next_cursor: null,
-    })
-  }),
-  http.post("*/api/campaigns/:id/preview", async ({ params, request }) => {
-    if (!signedIn()) return unauthorized()
-    if (!CAMPAIGNS.some((c) => c.id === String(params.id)))
-      return notFound("Campaign")
-    const body = (await request.json()) as {
-      conditions: ConditionSet
-      limit?: number
-    }
-    const hit = state.jobs.filter((j) => matches(j, body.conditions))
-    return HttpResponse.json({
-      matched: hit.length,
-      total: state.jobs.length,
-      sample_job_ids: hit.slice(0, body.limit ?? 50).map((j) => j.id),
-    })
-  }),
-  http.post("*/api/campaigns/:id/rules", async ({ params, request }) => {
-    if (!signedIn()) return unauthorized()
-    const c = CAMPAIGNS.find((x) => x.id === String(params.id))
-    if (!c) return notFound("Campaign")
-    const rule = (await request.json()) as CampaignRuleIn
-    if ((rule.effect === "penalty" || rule.effect === "bonus") && !rule.points)
-      return HttpResponse.json(
-        { detail: "Say how many points." },
-        { status: 422 }
-      )
-    state.campaignRules[c.id] = [...(state.campaignRules[c.id] ?? []), rule]
-    return HttpResponse.json({
-      ...c,
-      criteria: { ...c.criteria, rules: state.campaignRules[c.id] },
-    })
   }),
 ]

@@ -2,30 +2,21 @@
  * Campaign endpoints, typed from the generated OpenAPI types (schema.d.ts).
  * Kept inside the feature; the shared client only knows the wave 0 contract.
  */
-import createClient from "openapi-fetch"
 import {
   queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import { unwrap } from "@/lib/api/client"
+import { api, unwrap } from "@/lib/api/client"
 import type {
+  BacktestEstimate,
   BacktestResult,
   Campaign,
   CampaignInput,
   ConditionSet,
-  GenPaths,
   RubricBody,
 } from "./types"
-
-const origin =
-  typeof window !== "undefined" ? window.location.origin : "http://localhost"
-const api = createClient<GenPaths>({
-  baseUrl: origin,
-  credentials: "include",
-  fetch: (request: Request) => globalThis.fetch(request),
-})
 
 export const ck = {
   campaigns: ["campaigns"] as const,
@@ -154,6 +145,12 @@ export const backtestRubric = (body: {
   campaign_id: string
   job_ids: string[] | null
 }) => unwrap(api.POST("/api/rubrics/backtest", { body }))
+/** Step one of a backtest: how many roles and the estimated cost, nothing scored. */
+export const estimateBacktest = (body: {
+  rubric_id: string
+  campaign_id: string
+  job_ids: string[] | null
+}) => unwrap(api.POST("/api/rubrics/backtest/estimate", { body }))
 
 export function useCampaigns() {
   return useQuery(campaignsQuery())
@@ -203,6 +200,16 @@ export function useCampaignMutations() {
         ),
       onSuccess: refresh,
     }),
+    /** Confirm one criteria item (`unconfirmed`); returns the campaign. */
+    confirmItem: useMutation({
+      mutationFn: (v: { id: string; item: Campaign["unconfirmed"][number] }) =>
+        unwrap(
+          api.POST("/api/campaigns/{item_id}/confirm/{item}", {
+            params: { path: { item_id: v.id, item: v.item } },
+          })
+        ),
+      onSuccess: refresh,
+    }),
   }
 }
 
@@ -236,6 +243,11 @@ export function useRubricMutations() {
         ),
       onSuccess: refresh,
     }),
+    estimate: useMutation<
+      BacktestEstimate,
+      Error,
+      { rubric_id: string; campaign_id: string; job_ids: string[] | null }
+    >({ mutationFn: estimateBacktest }),
     backtest: useMutation<
       BacktestResult,
       Error,

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { resetSourcesMock, store } from "@/mocks/handlers/sources-data"
+import { resetSourcesMock, store } from "@/mocks/data/sources"
+import { settingValues } from "@/mocks/data/settings"
 import { renderApp } from "@/test/render"
 import { plainError } from "./words"
 
@@ -157,7 +158,9 @@ describe("Schedules", () => {
     await user.click(
       await screen.findByRole("radio", { name: "Skip until the next time" })
     )
-    await waitFor(() => expect(store.missedRun).toBe("skip"))
+    await waitFor(() =>
+      expect(settingValues["schedule.missed_run"]).toBe("skip")
+    )
   })
 })
 

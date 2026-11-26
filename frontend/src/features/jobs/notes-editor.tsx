@@ -19,7 +19,9 @@ export function NotesEditor({
   const qc = useQueryClient()
   const [text, setText] = useState(initial ?? "")
   const saved = useRef(initial ?? "")
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle")
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
+    "idle"
+  )
   const save = useMutation({
     mutationFn: (notes: string) => patchJob(jobId, { notes }),
     onSuccess: (job, notes) => {
@@ -55,7 +57,8 @@ export function NotesEditor({
       <p className="text-xs text-faint" role="status" aria-live="polite">
         {status === "saving" && "Saving..."}
         {status === "saved" && "Saved"}
-        {status === "error" && "Could not save. It will try again when you type."}
+        {status === "error" &&
+          "Could not save. It will try again when you type."}
         {status === "idle" && "Saves by itself when you pause."}
       </p>
     </div>

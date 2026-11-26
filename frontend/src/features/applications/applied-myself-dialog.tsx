@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select"
 import {
   appKeys,
+  attachFiles,
   markSubmitted,
   patchApplication,
   type ApplicationSummary,
@@ -72,7 +73,7 @@ function AppliedForm({
   const [date, setDate] = useState(todayIn(timeZone))
   const [channel, setChannel] = useState<Channel>(app.channel ?? "manual")
   const [reference, setReference] = useState("")
-  const [files, setFiles] = useState<string[]>([])
+  const [files, setFiles] = useState<File[]>([])
 
   const save = useMutation({
     mutationFn: async () => {
@@ -80,11 +81,12 @@ function AppliedForm({
       const parts = [
         `Applied myself on ${date} via ${CHANNEL_META[channel].label.toLowerCase()}.`,
       ]
-      if (files.length) parts.push(`Files: ${files.join(", ")}.`)
-      return markSubmitted(app.id, {
+      const saved = await markSubmitted(app.id, {
         reference: reference.trim() || null,
         note: parts.join(" "),
       })
+      if (files.length) await attachFiles(app.id, files)
+      return saved
     },
     onSuccess: () => {
       toast.success(`Recorded: you applied to ${app.employer}.`)
@@ -151,12 +153,11 @@ function AppliedForm({
           id="am-files"
           type="file"
           multiple
-          onChange={(e) =>
-            setFiles(Array.from(e.target.files ?? [], (f) => f.name))
-          }
+          onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
         />
         <p className="text-xs text-faint">
-          File names are noted on the timeline. You can apply without any.
+          Kept with the application and shown on its timeline. You can save
+          without any.
         </p>
       </div>
       <DialogFooter>

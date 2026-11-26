@@ -24,7 +24,15 @@ import { ScoreRing } from "@/components/score-ring"
 import { StagePill } from "@/components/stage-pill"
 import { SubNav, SubNavLink } from "@/components/sub-nav"
 import { View } from "@/components/view"
-import { applicationQuery, jobKeys, jobQuery, patchJob, recheckJob, type JobDetail } from "./api"
+import { recheckSummary } from "./recheck"
+import {
+  applicationQuery,
+  jobKeys,
+  jobQuery,
+  patchJob,
+  recheckJob,
+  type JobDetail,
+} from "./api"
 import { deadlineText } from "./format"
 import { CorrectionsMenu } from "./corrections/corrections-menu"
 import { WhyButton } from "./why-sheet"
@@ -76,7 +84,10 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
   if (job.isPending)
     return (
       <View>
-        <Skeleton className="h-8 w-[min(360px,70vw)] bg-sunken" aria-label="Loading the role" />
+        <Skeleton
+          className="h-8 w-[min(360px,70vw)] bg-sunken"
+          aria-label="Loading the role"
+        />
       </View>
     )
   if (job.isError || !job.data)
@@ -108,7 +119,11 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
               search={{ tab: t }}
               activeOptions={{ includeSearch: true }}
             >
-              <Icon className="size-[15px]" strokeWidth={1.5} aria-hidden="true" />
+              <Icon
+                className="size-[15px]"
+                strokeWidth={1.5}
+                aria-hidden="true"
+              />
               {TAB_META[t].label}
             </SubNavLink>
           )
@@ -135,7 +150,8 @@ function JobHeader({ job }: { job: JobDetail }) {
   const qc = useQueryClient()
   const app = useQuery(applicationQuery(job.application_id))
   const patch = useMutation({
-    mutationFn: (body: Parameters<typeof patchJob>[1]) => patchJob(job.id, body),
+    mutationFn: (body: Parameters<typeof patchJob>[1]) =>
+      patchJob(job.id, body),
     onSuccess: (next) => {
       qc.setQueryData(jobKeys.job(job.id), next)
       void qc.invalidateQueries({ queryKey: ["jobs"] })
@@ -143,9 +159,9 @@ function JobHeader({ job }: { job: JobDetail }) {
   })
   const recheck = useMutation({
     mutationFn: () => recheckJob(job.id),
-    onSuccess: (next) => {
-      qc.setQueryData(jobKeys.job(job.id), next)
-      toast.success("Posting checked again")
+    onSuccess: (r) => {
+      qc.setQueryData(jobKeys.job(job.id), r.job)
+      toast.success(recheckSummary(r))
     },
   })
   const application = app.data
@@ -154,7 +170,9 @@ function JobHeader({ job }: { job: JobDetail }) {
   return (
     <header className="grid gap-3 border-b border-border pb-4.5">
       <div className="flex flex-wrap items-start gap-4">
-        {job.best_score != null && <ScoreRing score={job.best_score} size={64} />}
+        {job.best_score != null && (
+          <ScoreRing score={job.best_score} size={64} />
+        )}
         <div className="grid min-w-0 flex-1 gap-1.5">
           <span className="eyebrow">{job.canonical_employer}</span>
           <h2 className="text-2xl">{job.title}</h2>
@@ -166,12 +184,16 @@ function JobHeader({ job }: { job: JobDetail }) {
             )}
             {job.conflict_state === "held" && <Chip tone="warn">Held</Chip>}
             <span>
-              Deadline: <b className="text-foreground">{deadlineText(job.deadline)}</b>
+              Deadline:{" "}
+              <b className="text-foreground">{deadlineText(job.deadline)}</b>
             </span>
             <span>
               Next step:{" "}
               <b className="text-foreground">
-                {application?.next_step ?? (job.triage === "new" ? "Decide whether to shortlist it" : "None yet")}
+                {application?.next_step ??
+                  (job.triage === "new"
+                    ? "Decide whether to shortlist it"
+                    : "None yet")}
               </b>
             </span>
           </div>
@@ -183,12 +205,19 @@ function JobHeader({ job }: { job: JobDetail }) {
       </div>
       <div className="flex flex-wrap gap-1.5" aria-label="Actions">
         {(job.triage === "new" || job.triage === "below_threshold") && (
-          <Button size="sm" onClick={() => patch.mutate({ triage: "shortlisted" })}>
+          <Button
+            size="sm"
+            onClick={() => patch.mutate({ triage: "shortlisted" })}
+          >
             Shortlist
           </Button>
         )}
         {job.triage !== "skipped" && !application && (
-          <Button size="sm" variant="outline" onClick={() => patch.mutate({ triage: "skipped" })}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => patch.mutate({ triage: "skipped" })}
+          >
             Skip
           </Button>
         )}
@@ -197,11 +226,24 @@ function JobHeader({ job }: { job: JobDetail }) {
             <Link to="/studio">Open in Studio</Link>
           </Button>
         )}
-        <Button size="sm" variant="ghost" onClick={() => patch.mutate({ pinned: !job.pinned })}>
-          {job.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => patch.mutate({ pinned: !job.pinned })}
+        >
+          {job.pinned ? (
+            <PinOff aria-hidden="true" />
+          ) : (
+            <Pin aria-hidden="true" />
+          )}
           {job.pinned ? "Unpin" : "Pin"}
         </Button>
-        <Button size="sm" variant="ghost" disabled={recheck.isPending} onClick={() => recheck.mutate()}>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={recheck.isPending}
+          onClick={() => recheck.mutate()}
+        >
           Check the posting again
         </Button>
         {applyUrl && (

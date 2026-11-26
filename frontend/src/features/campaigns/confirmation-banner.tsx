@@ -1,8 +1,6 @@
-import { Check, ShieldAlert } from "lucide-react"
+import { ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { PendingItem } from "./automation"
-
-const NOT_SET = "Not set"
 
 /**
  * "Needs your confirmation" (imported campaigns): each item with Confirm and Edit.
@@ -11,16 +9,17 @@ const NOT_SET = "Not set"
  */
 export function ConfirmationBanner({
   items,
-  confirmed,
+  busy,
   onConfirm,
   onEdit,
 }: {
+  /** The items still to confirm (the server's `unconfirmed` list). */
   items: PendingItem[]
-  confirmed: string[]
+  busy?: boolean
   onConfirm: (id: PendingItem["id"]) => void
   onEdit: (item: PendingItem) => void
 }) {
-  const waiting = items.filter((i) => !confirmed.includes(i.id))
+  const waiting = items
   return (
     <section
       aria-labelledby="needs-confirmation"
@@ -40,8 +39,7 @@ export function ConfirmationBanner({
       </p>
       <ul className="grid gap-2">
         {items.map((i) => {
-          const done = confirmed.includes(i.id)
-          const empty = i.value === NOT_SET
+          const empty = i.needsValue && i.value === "Not set"
           return (
             <li
               key={i.id}
@@ -53,16 +51,12 @@ export function ConfirmationBanner({
                   {empty ? "Not set yet: choose a value first." : i.value}
                 </div>
               </div>
-              {done ? (
-                <span className="inline-flex items-center gap-1 text-sm text-good">
-                  <Check className="size-4" aria-hidden="true" /> Confirmed
-                </span>
-              ) : (
+              {
                 <div className="flex gap-2">
                   <Button
                     type="button"
                     size="sm"
-                    disabled={empty}
+                    disabled={empty || busy}
                     aria-label={`Confirm ${i.label.toLowerCase()}`}
                     onClick={() => onConfirm(i.id)}
                   >
@@ -78,7 +72,7 @@ export function ConfirmationBanner({
                     Edit
                   </Button>
                 </div>
-              )}
+              }
             </li>
           )
         })}

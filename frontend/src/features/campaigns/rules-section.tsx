@@ -131,11 +131,11 @@ export function RulesSection({
 
       <div
         className="grid gap-2"
-        data-unconfirmed={unconfirmed.includes("countries") || undefined}
+        data-unconfirmed={unconfirmed.includes("locations") || undefined}
       >
         <h4 className="text-md">
           Countries and cities{" "}
-          {unconfirmed.includes("countries") && (
+          {unconfirmed.includes("locations") && (
             <Chip tone="warn">Confirm</Chip>
           )}
         </h4>

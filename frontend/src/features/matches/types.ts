@@ -1,5 +1,5 @@
 /** Matches API types, taken from the generated contract (`src/lib/api/schema.d.ts`). */
-import type { components, paths } from "@/lib/api/schema.d"
+import type { components, paths } from "@/lib/api/types"
 
 type S = components["schemas"]
 

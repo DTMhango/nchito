@@ -15,7 +15,10 @@ export function PostingTab({ job }: { job: JobDetail }) {
   const live = LIVE[job.availability]
   return (
     <div className="grid gap-7">
-      <section aria-label="Live status" className="flex flex-wrap items-center gap-2">
+      <section
+        aria-label="Live status"
+        className="flex flex-wrap items-center gap-2"
+      >
         <Chip tone={live.tone}>{live.label}</Chip>
         <span className="text-sm text-muted-foreground">
           {job.last_checked_at
@@ -33,17 +36,23 @@ export function PostingTab({ job }: { job: JobDetail }) {
           </pre>
         ) : (
           <p className="text-sm text-muted-foreground">
-            The full text has been dropped under your retention setting. A minimal
-            record is kept.
+            The full text has been dropped under your retention setting. A
+            minimal record is kept.
           </p>
         )}
       </section>
 
       <section aria-label="Sightings" className="grid gap-2">
-        <SectionHeader title="Where it was seen" aside={`${job.sightings.length} link${job.sightings.length === 1 ? "" : "s"}`} />
+        <SectionHeader
+          title="Where it was seen"
+          aside={`${job.sightings.length} link${job.sightings.length === 1 ? "" : "s"}`}
+        />
         <ul className="panel p-4">
           {job.sightings.map((s) => (
-            <li key={s.url} className="grid gap-0.5 border-t border-border row-pad first:border-t-0">
+            <li
+              key={s.url}
+              className="grid gap-0.5 border-t border-border row-pad first:border-t-0"
+            >
               <a
                 href={s.url}
                 target="_blank"
@@ -51,10 +60,14 @@ export function PostingTab({ job }: { job: JobDetail }) {
                 className="inline-flex items-center gap-1.5 break-all text-primary-ink underline"
               >
                 {s.url}
-                <ExternalLink className="size-3.5 shrink-0" aria-hidden="true" />
+                <ExternalLink
+                  className="size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
               </a>
               <span className="text-xs text-faint">
-                First seen {dateText(s.first_seen_at)}, last seen {dateText(s.last_seen_at)}
+                First seen {dateText(s.first_seen_at)}, last seen{" "}
+                {dateText(s.last_seen_at)}
               </span>
             </li>
           ))}

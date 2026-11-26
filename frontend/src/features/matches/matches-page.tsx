@@ -1,3 +1,4 @@
+import { recheckSummary } from "@/features/jobs/recheck"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -173,9 +174,9 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
   })
   const recheck = useMutation({
     mutationFn: (id: string) => recheckJob(id),
-    onSuccess: (_d, id) => {
+    onSuccess: (r, id) => {
       invalidateJobs(qc, id)
-      toast.success("Checked the posting again.")
+      toast.success(recheckSummary(r))
     },
     onError: (e) =>
       toast.error(

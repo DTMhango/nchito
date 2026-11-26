@@ -11,7 +11,7 @@ import type {
   SourceInput,
 } from "@/features/sources/api"
 import { db } from "../db"
-import { store, tickRun, withNext } from "./sources-data"
+import { PROPOSED, store, tickRun, withNext } from "@/mocks/data/sources"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -80,16 +80,6 @@ function detect(url: string): Detected {
 
 export const sourcesHandlers = [
   // ---- missed-run policy ----
-  http.get("*/api/settings/schedule.missed_run", () =>
-    HttpResponse.json({ key: "schedule.missed_run", value: store.missedRun })
-  ),
-  http.put("*/api/settings/schedule.missed_run", async ({ request }) => {
-    const { value } = (await request.json()) as {
-      value: "catch_up_once" | "skip"
-    }
-    store.missedRun = value
-    return HttpResponse.json({ key: "schedule.missed_run", value })
-  }),
 
   // ---- sources ----
   http.get("*/api/sources", async () => {
@@ -239,6 +229,7 @@ export const sourcesHandlers = [
       scheduled_for: null,
       dry_run: body.dry_run ?? false,
       counts: {},
+      proposed_actions: body.dry_run ? PROPOSED : [],
       source_results: [],
       cost_minor: 0,
       config_versions: {},

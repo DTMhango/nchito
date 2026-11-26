@@ -2,34 +2,23 @@
  * Matches endpoints, typed against the generated contract. Kept in the feature so the shared
  * `lib/api` hand-written schema does not have to change for this screen.
  */
-import createClient from "openapi-fetch"
 import {
   infiniteQueryOptions,
   queryOptions,
   type QueryClient,
 } from "@tanstack/react-query"
-import { ApiError, unwrap } from "@/lib/api/client"
+import { api, ApiError, unwrap } from "@/lib/api/client"
 import type {
   AppliedMyselfIn,
   BulkActionIn,
   CampaignRuleIn,
   ConditionSet,
   CustomFacetIn,
-  GenPaths,
   JobListOut,
   JobPatch,
   SavedViewIn,
   TagRuleIn,
 } from "./types"
-
-const origin =
-  typeof window !== "undefined" ? window.location.origin : "http://localhost"
-
-const api = createClient<GenPaths>({
-  baseUrl: origin,
-  credentials: "include",
-  fetch: (request: Request) => globalThis.fetch(request),
-})
 
 /** 501 means the backend has the route but not the behaviour yet. */
 export const isNotBuilt = (e: unknown) =>
@@ -94,10 +83,7 @@ export const releaseHeld = (id: string, reason: string) =>
       body: { reason },
     })
   )
-export const recheckJob = (id: string) =>
-  unwrap(
-    api.POST("/api/jobs/{job_id}/recheck", { params: { path: { job_id: id } } })
-  )
+export { recheckJob } from "@/features/jobs/recheck"
 export const fixEmployer = (id: string, canonical_employer: string) =>
   unwrap(
     api.POST("/api/jobs/{job_id}/employer", {

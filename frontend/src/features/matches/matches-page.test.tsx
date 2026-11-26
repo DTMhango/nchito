@@ -3,6 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { renderApp } from "@/test/render"
 import { matchesMock, resetMatchesMock } from "@/mocks/handlers/matches"
+import { campaignsMock } from "@/mocks/handlers/campaigns"
 
 beforeEach(() => resetMatchesMock())
 
@@ -256,10 +257,12 @@ describe("Saved views", () => {
     await user.type(within(dialog).getByLabelText(/Points/), "15")
     await user.click(within(dialog).getByRole("button", { name: "Add rule" }))
     await waitFor(() => {
-      const rules = Object.values(matchesMock.get().campaignRules).flat()
-      expect(rules).toHaveLength(1)
-      expect(rules[0]).toMatchObject({ effect: "penalty", points: 15 })
-      expect(rules[0].conditions).toEqual(view.body.conditions)
+      const added = campaignsMock
+        .get()
+        .flatMap((c) => c.criteria?.rules ?? [])
+        .filter((r) => r.effect === "penalty" && r.points === 15)
+      expect(added).toHaveLength(1)
+      expect(added[0].conditions).toEqual(view.body.conditions)
     })
   })
 })

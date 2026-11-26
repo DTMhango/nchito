@@ -20,7 +20,12 @@ export function ApplicationTab({ job }: { job: JobDetail }) {
     )
   if (app.isPending) return <p className="text-muted-foreground">Loading...</p>
   if (!app.data)
-    return <EmptyState title="Could not load the application" description="Try again in a moment." />
+    return (
+      <EmptyState
+        title="Could not load the application"
+        description="Try again in a moment."
+      />
+    )
 
   const a = app.data
   const open = (pending.data ?? []).filter((p) => p.application_id === a.id)
@@ -32,8 +37,16 @@ export function ApplicationTab({ job }: { job: JobDetail }) {
         <SectionHeader title="How it was applied" />
         <dl className="grid gap-2 panel p-4 sm:grid-cols-2">
           <Row label="Channel" value={a.channel ?? "Not chosen yet"} />
-          <Row label="Applied on" value={a.applied_at ? dateText(a.applied_at) : "Not applied yet"} />
-          <Row label="Applied by" value={a.applied_outside ? "You, outside the app" : "Through the app"} />
+          <Row
+            label="Applied on"
+            value={a.applied_at ? dateText(a.applied_at) : "Not applied yet"}
+          />
+          <Row
+            label="Applied by"
+            value={
+              a.applied_outside ? "You, outside the app" : "Through the app"
+            }
+          />
           <Row label="Next step" value={a.next_step ?? "None"} />
         </dl>
       </section>
@@ -65,14 +78,16 @@ export function ApplicationTab({ job }: { job: JobDetail }) {
             {a.confirmation_evidence.map((e, i) => (
               <li key={i} className="text-sm">
                 <Chip tone="good">{e.kind.replaceAll("_", " ")}</Chip> {e.value}
-                {e.at && <span className="text-faint"> · {dateText(e.at)}</span>}
+                {e.at && (
+                  <span className="text-faint"> · {dateText(e.at)}</span>
+                )}
               </li>
             ))}
           </ul>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Nothing confirms this yet. A sent application stays unconfirmed until a
-            page, reference or email says otherwise.
+            Nothing confirms this yet. A sent application stays unconfirmed
+            until a page, reference or email says otherwise.
           </p>
         )}
       </section>
@@ -82,14 +97,24 @@ export function ApplicationTab({ job }: { job: JobDetail }) {
         {open.length > 0 ? (
           <ul className="panel p-4">
             {open.map((p) => (
-              <li key={p.id} className="border-t border-border row-pad first:border-t-0">
+              <li
+                key={p.id}
+                className="border-t border-border row-pad first:border-t-0"
+              >
                 <b>{p.title}</b>
-                {p.deadline && <span className="text-sm text-faint"> · by {dateText(p.deadline)}</span>}
+                {p.deadline && (
+                  <span className="text-sm text-faint">
+                    {" "}
+                    · by {dateText(p.deadline)}
+                  </span>
+                )}
               </li>
             ))}
           </ul>
         ) : (
-          <p className="text-sm text-muted-foreground">Nothing is waiting for you.</p>
+          <p className="text-sm text-muted-foreground">
+            Nothing is waiting for you.
+          </p>
         )}
       </section>
     </div>

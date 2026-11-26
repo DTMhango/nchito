@@ -14,9 +14,12 @@ export function heldSentence(
   ownScore: number | null | undefined,
   note: string | null
 ) {
-  if (!winnerTitle) return note ?? "held: another role at this employer outranks it"
+  if (!winnerTitle)
+    return note ?? "held: another role at this employer outranks it"
   const scores =
-    winnerScore != null && ownScore != null ? `, ${winnerScore} vs ${ownScore}` : ""
+    winnerScore != null && ownScore != null
+      ? `, ${winnerScore} vs ${ownScore}`
+      : ""
   return `held: outranked by ${winnerTitle}${scores}`
 }
 

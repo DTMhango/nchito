@@ -13,7 +13,11 @@ import { splitJob, type JobDetail } from "../api"
 import { dateText } from "../format"
 import { errorText, useCorrection } from "./use-correction"
 
-type Props = { job: JobDetail; open: boolean; onOpenChange: (v: boolean) => void }
+type Props = {
+  job: JobDetail
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}
 
 /** "Split a wrong merge": pick the sightings that belong to a different role. */
 export function SplitDialog({ job, open, onOpenChange }: Props) {
@@ -51,7 +55,9 @@ export function SplitDialog({ job, open, onOpenChange }: Props) {
                     checked={picked.includes(s.url)}
                     onCheckedChange={(v) =>
                       setPicked(
-                        v ? [...picked, s.url] : picked.filter((u) => u !== s.url)
+                        v
+                          ? [...picked, s.url]
+                          : picked.filter((u) => u !== s.url)
                       )
                     }
                   />

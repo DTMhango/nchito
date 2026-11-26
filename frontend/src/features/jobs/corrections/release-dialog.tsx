@@ -38,8 +38,8 @@ export function ReleaseDialog({ jobId, title, open, onOpenChange }: Props) {
           <DialogTitle>Release this role</DialogTitle>
           <DialogDescription>
             {title} is held because a better role at the same employer outranks
-            it. Releasing it lets it be tailored and applied to as well. Say why;
-            the reason is kept in the activity log.
+            it. Releasing it lets it be tailored and applied to as well. Say
+            why; the reason is kept in the activity log.
           </DialogDescription>
         </DialogHeader>
         <label className="grid gap-1 text-sm">

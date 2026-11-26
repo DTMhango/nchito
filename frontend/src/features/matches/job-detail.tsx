@@ -107,7 +107,7 @@ export function JobDetailPane({
   const a =
     items.find((x) => x.is_conflict_winner) ??
     [...items].sort((x, y) => (y.score ?? 0) - (x.score ?? 0))[0]
-  const source = (j as JobDetail & { source?: string }).source
+  const source = j.source
 
   return (
     <article

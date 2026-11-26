@@ -18,14 +18,22 @@ const COMING = {
     wave: 2,
     title: "CV, letter and attachments",
     body: "Drafts open in the Studio. After you apply, this tab shows the exact files that were sent, read-only.",
-    items: ["The CV and letter as sent", "Attachments, with their checksums", "A link to open the draft in the Studio"],
+    items: [
+      "The CV and letter as sent",
+      "Attachments, with their checksums",
+      "A link to open the draft in the Studio",
+    ],
   },
   messages: {
     icon: Mail,
     wave: 2,
     title: "Email about this role",
     body: "Threads linked to this role appear with their classification: confirmation, rejection or interview. You can draft a reply or a follow-up from here.",
-    items: ["Threads with a classification chip", "Replies and follow-ups drafted from your facts", "Threads that need your review"],
+    items: [
+      "Threads with a classification chip",
+      "Replies and follow-ups drafted from your facts",
+      "Threads that need your review",
+    ],
   },
   interview: {
     icon: MessagesSquare,

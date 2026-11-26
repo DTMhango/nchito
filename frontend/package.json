@@ -18,7 +18,8 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "icons": "node scripts/make-icons.mjs",
     "shots": "node scripts/screenshots.mjs",
-    "gen:api": "node scripts/gen-api.mjs"
+    "gen:api": "node scripts/gen-api.mjs",
+    "gen:mock-settings": "python scripts/gen-mock-settings.py"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

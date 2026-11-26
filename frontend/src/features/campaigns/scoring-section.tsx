@@ -221,9 +221,20 @@ function RubricBlock({
               ? "Fix the problems above before testing."
               : null
           }
+          estimating={m.estimate.isPending}
+          estimate={m.estimate.data ?? null}
+          onEstimate={async (jobIds) => {
+            await auto.flush()
+            m.backtest.reset()
+            m.estimate.mutate({
+              rubric_id: rubric.id,
+              campaign_id: campaignId,
+              job_ids: jobIds,
+            })
+          }}
           running={m.backtest.isPending}
           result={m.backtest.data ?? null}
-          error={m.backtest.error?.message ?? null}
+          error={m.estimate.error?.message ?? m.backtest.error?.message ?? null}
           canActivate={problems.length === 0}
           activating={m.activate.isPending}
           onRun={async (jobIds) => {

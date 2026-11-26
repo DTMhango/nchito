@@ -13,6 +13,7 @@ import type {
   SavedViewOut,
   TagRuleOut,
 } from "@/features/matches/types"
+import { seedCampaigns } from "./campaigns"
 
 /** A job as the mock stores it: the contract's JobDetail plus the source name. */
 export type MockJob = JobDetail & {
@@ -602,6 +603,151 @@ const ROWS: Row[] = [
     "Data",
     "Lead"
   ),
+  // APPLIED_ROWS: roles with an application (Applications, Today, the Job page), in the
+  // order of the application seeds. Kept last so the ids above stay stable.
+  R(
+    "Head of Data",
+    "Kafue Analytics",
+    "Lusaka",
+    "Zambia",
+    "shortlisted",
+    91,
+    "Company site",
+    14,
+    "Data"
+  ),
+  R(
+    "Analytics Lead",
+    "Mulungushi Digital",
+    "Ndola",
+    "Zambia",
+    "shortlisted",
+    78,
+    "Company site",
+    15,
+    "Data"
+  ),
+  R(
+    "Pricing Actuary",
+    "Luangwa Re",
+    "Kitwe",
+    "Zambia",
+    "shortlisted",
+    88,
+    "Company site",
+    16,
+    "Actuarial"
+  ),
+  R(
+    "Risk Data Manager",
+    "Copperline Energy",
+    "Livingstone",
+    "Zambia",
+    "shortlisted",
+    74,
+    "Company site",
+    17,
+    "Data"
+  ),
+  R(
+    "Data Platform Lead",
+    "Zambezi Mining Systems",
+    "Lusaka",
+    "Zambia",
+    "shortlisted",
+    86,
+    "Company site",
+    18,
+    "Data"
+  ),
+  R(
+    "Principal Data Engineer",
+    "Nyika Labs",
+    "Lusaka",
+    "Zambia",
+    "shortlisted",
+    82,
+    "Company site",
+    19,
+    "Data"
+  ),
+  R(
+    "Head of Analytics",
+    "Kariba Freight",
+    "Kitwe",
+    "Zambia",
+    "shortlisted",
+    80,
+    "Company site",
+    20,
+    "Data"
+  ),
+  R(
+    "Director of Data Science",
+    "Lusaka Fintech Co",
+    "Lusaka",
+    "Zambia",
+    "shortlisted",
+    90,
+    "Company site",
+    21,
+    "Data"
+  ),
+  R(
+    "Reserving Actuary",
+    "Chambeshi Insurance",
+    "Lusaka",
+    "Zambia",
+    "shortlisted",
+    76,
+    "Company site",
+    22,
+    "Actuarial"
+  ),
+  R(
+    "BI Manager",
+    "Mpongwe Agritech",
+    "Kabwe",
+    "Zambia",
+    "shortlisted",
+    72,
+    "Company site",
+    23,
+    "Data"
+  ),
+  R(
+    "Head of Risk Analytics",
+    "Kasama Capital",
+    "Kasama",
+    "Zambia",
+    "shortlisted",
+    93,
+    "Company site",
+    24,
+    "Data"
+  ),
+  R(
+    "Analytics Director",
+    "Livingstone Logistics",
+    "Livingstone",
+    "Zambia",
+    "shortlisted",
+    89,
+    "Company site",
+    25,
+    "Data"
+  ),
+  R(
+    "Data Manager",
+    "Ndola Brewing",
+    "Ndola",
+    "Zambia",
+    "shortlisted",
+    61,
+    "Company site",
+    26,
+    "Data"
+  ),
 ]
 
 // ---- facet values cycle so every state appears ------------------------------------------------
@@ -781,7 +927,41 @@ function rawText(row: Row, f: MockJob["facets"]): string {
   return sentences.filter(Boolean).join("\n\n")
 }
 
+/** How many trailing ROWS carry an application (see the APPLIED_ROWS note in ROWS). */
+export const APPLIED_ROWS = 13
+const FIRST_APPLIED = () => ROWS.length - APPLIED_ROWS
+/** The id of the n-th seeded application (1-based); the applications mock uses the same ids. */
+export const applicationIdFor = (n: number) =>
+  `a0000000-0000-4000-8000-${String(n).padStart(12, "0")}`
+/** The job id of the n-th seeded application (1-based). */
+export const appliedJobId = (n: number) =>
+  `00000000-0000-4000-8000-${String(FIRST_APPLIED() + n).padStart(12, "0")}`
+
 export function makeJobs(): MockJob[] {
+  return linkConflicts(buildJobs())
+}
+
+/** A held role names the role that outranks it (the winner at the same employer). */
+function linkConflicts(jobs: MockJob[]): MockJob[] {
+  for (const j of jobs) {
+    if (j.conflict_state !== "held" || !j.conflict) continue
+    const w = jobs.find(
+      (x) =>
+        x.canonical_employer === j.canonical_employer &&
+        x.conflict_state === "winner"
+    )
+    if (!w) continue
+    j.conflict = {
+      ...j.conflict,
+      outranked_by_job_id: w.id,
+      outranked_by_title: w.title,
+      outranked_by_score: w.best_score,
+    }
+  }
+  return jobs
+}
+
+function buildJobs(): MockJob[] {
   return ROWS.map((row, i) => {
     const id = `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`
     const facets = facetsFor(i, row)
@@ -883,11 +1063,24 @@ export function makeJobs(): MockJob[] {
       notes: null,
       last_checked_at: iso(0),
       repost_of_id: null,
-      application_id: null,
+      application_id:
+        i >= FIRST_APPLIED() ? applicationIdFor(i - FIRST_APPLIED() + 1) : null,
       source: row.source,
       pay_state: p.state,
       work_model: facets.work_model?.value ?? "not_stated",
       remote_scope: facets.remote_scope?.value ?? "not_stated",
+      conflict:
+        row.conflict && row.conflict.state !== "none"
+          ? {
+              state: row.conflict.state,
+              note: row.conflict.note ?? null,
+              outranked_by_job_id: null,
+              outranked_by_title: null,
+              score: row.score,
+              outranked_by_score: null,
+              reason: row.conflict.state === "held" ? "outranked" : null,
+            }
+          : null,
     }
   })
 }
@@ -954,20 +1147,8 @@ export const FACTS = [
     }) as FactOut
 )
 
-export const CAMPAIGNS = [
-  {
-    id: "30000000-0000-4000-8000-000000000001",
-    name: "Data leadership, Zambia",
-    priority: 1,
-    status: "active",
-  },
-  {
-    id: "30000000-0000-4000-8000-000000000002",
-    name: "Remote analytics",
-    priority: 0,
-    status: "active",
-  },
-].map((c) => ({ ...c, criteria: { rules: [] } }) as unknown as CampaignOut)
+/** The shared campaigns (data/campaigns): Zambia-based roles in the first, remote in the second. */
+export const CAMPAIGNS: CampaignOut[] = seedCampaigns().slice(0, 2)
 
 /** Integer 0..5 ratings whose weighted points add up to exactly `target`, as even as possible. */
 function ratingsFor(target: number, seed: number): number[] {
@@ -1033,6 +1214,7 @@ export function assessmentFor(job: MockJob, i: number): AssessmentOut {
     rubric_id: RUBRIC_ID,
     rubric_version: 3,
     state: "scored",
+    base_score: null,
     filter_results: [
       {
         name: "Location",

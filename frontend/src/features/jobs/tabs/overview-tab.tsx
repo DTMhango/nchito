@@ -4,7 +4,13 @@ import { Chip } from "@/components/chip"
 import { EvidencePopover } from "@/components/evidence-popover"
 import { assessmentsQuery, type JobDetail } from "../api"
 import { ConflictStatus } from "../conflict-status"
-import { dateText, deadlineText, facetLines, locationText, picture } from "../format"
+import {
+  dateText,
+  deadlineText,
+  facetLines,
+  locationText,
+  picture,
+} from "../format"
 import { NotesEditor } from "../notes-editor"
 import { TagsEditor } from "../tags-editor"
 import { pickAssessment } from "./fit-tab"
@@ -28,7 +34,10 @@ export function OverviewTab({ job }: { job: JobDetail }) {
         <SectionHeader title="At a glance" />
         <dl className="grid gap-2 panel p-4">
           {picture(job).map((p) => (
-            <div key={p.label} className="grid gap-0.5 sm:grid-cols-[110px_1fr] sm:gap-3">
+            <div
+              key={p.label}
+              className="grid gap-0.5 sm:grid-cols-[110px_1fr] sm:gap-3"
+            >
               <dt className="eyebrow">{p.label}</dt>
               <dd>{p.text}</dd>
             </div>
@@ -41,16 +50,22 @@ export function OverviewTab({ job }: { job: JobDetail }) {
           title="Key facts"
           aside="Hover, tap or focus a value to see the sentence it came from"
         />
-        <dl className="grid gap-x-6 sm:grid-cols-2 panel p-4">
+        <dl className="grid gap-x-6 panel p-4 sm:grid-cols-2">
           <Fact label="Employer" value={job.canonical_employer} />
           <Fact label="Location" value={locationText(job.location)} />
           <Fact label="Deadline" value={deadlineText(job.deadline)} />
           <Fact label="Posted" value={dateText(job.posted_at)} />
-          <Fact label="Apply method" value={job.apply_method.replaceAll("_", " ")} />
+          <Fact
+            label="Apply method"
+            value={job.apply_method.replaceAll("_", " ")}
+          />
           {job.function && <Fact label="Function" value={job.function} />}
           {job.level && <Fact label="Level" value={job.level} />}
           {lines.map((l) => (
-            <div key={l.key} className="flex items-baseline justify-between gap-3 border-t border-border py-2 first:border-t-0">
+            <div
+              key={l.key}
+              className="flex items-baseline justify-between gap-3 border-t border-border py-2 first:border-t-0"
+            >
               <dt className="text-sm text-muted-foreground">{l.label}</dt>
               <dd>
                 <EvidencePopover

@@ -1,4 +1,4 @@
-import type { components, paths } from "@/lib/api/schema.d"
+import type { components, paths } from "@/lib/api/types"
 
 type S = components["schemas"]
 
@@ -23,6 +23,7 @@ export type RubricCriterion = S["RubricCriterion"]
 export type RubricPenalty = S["RubricPenalty-Input"]
 export type RubricThresholds = S["RubricThresholds"]
 export type BacktestResult = S["BacktestOut"]
+export type BacktestEstimate = S["BacktestEstimateOut"]
 export type BacktestRow = S["BacktestRow"]
 export type RulePreview = S["RulePreviewOut"]
 export type FacetCatalogEntry = S["FacetCatalogEntry"]

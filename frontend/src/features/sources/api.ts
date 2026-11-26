@@ -3,10 +3,9 @@
  * types (`schema.d.ts`), with TanStack Query keys and options. Kept inside this feature so
  * it does not disturb the wave 0 hand-written contract.
  */
-import createClient from "openapi-fetch"
 import { queryOptions } from "@tanstack/react-query"
-import { unwrap } from "@/lib/api/client"
-import type { components, paths } from "@/lib/api/schema.d"
+import { api, unwrap } from "@/lib/api/client"
+import type { components } from "@/lib/api/types"
 
 export type Source = components["schemas"]["SourceOut"]
 export type SourceInput = components["schemas"]["SourceIn"]
@@ -26,13 +25,7 @@ export type SourceRunResult = components["schemas"]["SourceRunResult"]
 export type ProposedAction = components["schemas"]["ProposedAction"]
 export type Run = RunBase
 
-const origin =
-  typeof window !== "undefined" ? window.location.origin : "http://localhost"
-const gen = createClient<paths>({
-  baseUrl: origin,
-  credentials: "include",
-  fetch: (request: Request) => globalThis.fetch(request),
-})
+const gen = api
 
 export const sourceKeys = {
   sources: ["sources"] as const,

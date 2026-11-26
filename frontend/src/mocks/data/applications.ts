@@ -4,34 +4,28 @@
  * current.
  */
 import type {
+  ApplicationDetail,
   ApplicationSummary,
   DecisionGroup,
   PendingAction,
   TimelineEvent,
   TodayOut,
 } from "@/features/applications/api"
+import { IDS } from "./campaigns"
+import { applicationIdFor, appliedJobId, makeJobs } from "./jobs"
 
 const DAY = 86_400_000
 const ago = (days: number) => new Date(Date.now() - days * DAY).toISOString()
 const ahead = (days: number) => new Date(Date.now() + days * DAY).toISOString()
 const dateAhead = (days: number) => ahead(days).slice(0, 10)
 
-export const CAMPAIGNS = [
-  {
-    id: "c1000000-0000-4000-8000-000000000001",
-    name: "Data leadership, remote",
-  },
-  {
-    id: "c1000000-0000-4000-8000-000000000002",
-    name: "Actuarial, Southern Africa",
-  },
-]
+/** The shared campaigns (data/campaigns): applications belong to the first two. */
+const CAMPAIGNS = [IDS.camp2, IDS.camp1].map((id) => ({ id }))
 
 export type MockApplications = {
   apps: ApplicationSummary[]
   actions: PendingAction[]
   events: Record<string, TimelineEvent[]>
-  snoozed: Record<string, string>
 }
 
 const id = (n: number, p = "a") =>
@@ -172,10 +166,11 @@ const SEEDS: Seed[] = [
 
 export function seedApplications(): MockApplications {
   const apps: ApplicationSummary[] = SEEDS.map((s, i) => ({
-    id: id(i + 1),
+    id: applicationIdFor(i + 1),
     created_at: ago(s[5] + 7),
     updated_at: ago(s[5]),
-    job_id: id(i + 1, "b"),
+    // The same role in Matches and on the Job page (data/jobs APPLIED_ROWS).
+    job_id: appliedJobId(i + 1),
     campaign_id: CAMPAIGNS[s[7]].id,
     stage: s[2],
     channel: s[4],
@@ -187,6 +182,7 @@ export function seedApplications(): MockApplications {
     pinned: i === 0 || i === 10,
     open_pending_actions: 0,
     applied_at: s[8] !== undefined ? ago(s[8]) : null,
+    legacy_fit: null,
     snoozed_until: null,
     snoozed: false,
     deadline: null,
@@ -220,6 +216,7 @@ export function seedApplications(): MockApplications {
     snoozed: false,
     employer: app?.employer ?? null,
     job_title: app?.title ?? null,
+    resolution: null,
   })
 
   const workRights = [
@@ -313,7 +310,7 @@ export function seedApplications(): MockApplications {
       },
     ]
   }
-  return { apps, actions, events, snoozed: {} }
+  return { apps, actions, events }
 }
 
 /** Group open actions by shared blocker (DESIGN 18.4), nearest deadline first. */
@@ -365,9 +362,24 @@ export function groupActions(actions: PendingAction[]): DecisionGroup[] {
 }
 
 export function buildToday(m: MockApplications): TodayOut {
+  // The best new roles in the shared jobs (the same ones Matches lists under New).
+  const top = makeJobs()
+    .filter((j) => j.triage === "new" && j.conflict_state !== "held")
+    .sort((a, b) => (b.best_score ?? 0) - (a.best_score ?? 0))
+    .slice(0, 3)
+  const groups = groupActions(m.actions.filter((a) => a.status === "open"))
   return {
-    needs_you: groupActions(m.actions).length,
-    last_sweep_run_id: "r1000000-0000-4000-8000-000000000001",
+    needs_you: groups.length,
+    needs_you_groups: groups,
+    last_sweep_run_id: "run-1",
+    last_sweep: {
+      run_id: "run-1",
+      status: "succeeded",
+      started_at: ago(0.3),
+      finished_at: ago(0.29),
+      counts: { found: 214, new: 41, passed_filters: 23, above_threshold: 11 },
+      cost_minor: 4,
+    },
     funnel: [
       { stage: "found", count: 214 },
       { stage: "new", count: 41 },
@@ -402,35 +414,41 @@ export function buildToday(m: MockApplications): TodayOut {
         last_success_at: ago(0.1),
       },
     ],
-    top_match_ids: [id(21, "f"), id(22, "f"), id(23, "f")],
+    top_match_ids: top.map((j) => j.id),
+    top_matches: top.map((j) => ({
+      job_id: j.id,
+      title: j.title,
+      employer: j.employer,
+      score: j.best_score,
+    })),
     upcoming: [
       {
         kind: "interview",
         at: ahead(4),
         title: "Second interview, Kasama Capital",
-        job_id: id(11, "b"),
-        application_id: id(11),
+        job_id: appliedJobId(11),
+        application_id: applicationIdFor(11),
       },
       {
         kind: "deadline",
         at: dateAhead(2),
         title: "Closes: Head of Data, Kafue Analytics",
-        job_id: id(1, "b"),
-        application_id: id(1),
+        job_id: appliedJobId(1),
+        application_id: applicationIdFor(1),
       },
       {
         kind: "follow_up",
         at: dateAhead(3),
         title: "Follow up with Lusaka Fintech Co",
-        job_id: id(8, "b"),
-        application_id: id(8),
+        job_id: appliedJobId(8),
+        application_id: applicationIdFor(8),
       },
       {
         kind: "deadline",
         at: dateAhead(9),
         title: "Closes: Analytics Lead, Mulungushi Digital",
-        job_id: id(2, "b"),
-        application_id: id(2),
+        job_id: appliedJobId(2),
+        application_id: applicationIdFor(2),
       },
     ],
     spend: {
@@ -443,37 +461,62 @@ export function buildToday(m: MockApplications): TodayOut {
   }
 }
 
-export const NEW_JOBS = [
-  ["Okavango Mobile", "Head of Data Science", 92, "Remote, Africa", 12],
-  ["Kalahari Risk", "Chief Analytics Officer", 87, "Lusaka, Zambia", 20],
-  [
-    "Victoria Falls Hospitality",
-    "Revenue Analytics Lead",
-    81,
-    "Livingstone, Zambia",
-    6,
-  ],
-].map(([employer, title, score, city, deadlineDays], i) => ({
-  id: id(21 + i, "f"),
-  created_at: ago(0.3),
-  updated_at: ago(0.3),
-  title: title as string,
-  employer: employer as string,
-  canonical_employer: employer as string,
-  location: {
-    city: city as string,
-    country: null,
-    region: null,
-    raw: city as string,
-  },
-  triage: "new",
-  best_score: score as number,
-  conflict_state: "none",
-  conflict_note: null,
-  pay: { state: "not_stated" as const },
-  deadline: { state: "dated" as const, on: dateAhead(deadlineDays as number) },
-  availability: "open",
-  tags: [],
-  pinned: false,
-  posted_at: ago(1),
-}))
+const NEXT: Partial<
+  Record<ApplicationSummary["stage"], ApplicationSummary["stage"][]>
+> = {
+  shortlisted: ["tailoring", "skipped", "withdrawn"],
+  tailoring: ["ready", "withdrawn"],
+  ready: ["withdrawn"],
+  submitted: ["screening", "rejected", "withdrawn"],
+  screening: ["interview", "rejected", "withdrawn"],
+  interview: ["offer", "rejected", "withdrawn"],
+  offer: ["accepted", "rejected", "withdrawn"],
+}
+
+/** The Job page's view of an application: the summary plus spec, checks and evidence. */
+export function toDetail(a: ApplicationSummary): ApplicationDetail {
+  const prepared = ["ready", "applying"].includes(a.stage)
+  return {
+    ...a,
+    spec: {
+      headline: null,
+      summary: null,
+      competencies: [],
+      experience: [],
+      skills: [],
+      letter: [],
+      requirement_match: prepared
+        ? [
+            {
+              requirement: "Six years in data or risk work",
+              strength: "strong",
+              evidence_fact_ids: ["F-112"],
+              note: null,
+            },
+            {
+              requirement: "Power BI dashboards",
+              strength: "strong",
+              evidence_fact_ids: [],
+              note: null,
+            },
+            {
+              requirement: "Python for analysis",
+              strength: "partial",
+              evidence_fact_ids: [],
+              note: null,
+            },
+          ]
+        : [],
+    },
+    check_results: [],
+    approved_packet_id: null,
+    submitted_snapshot: null,
+    confirmation_evidence: [],
+    applied_outside: a.origin === "owner",
+    notes: null,
+    reference: null,
+    apply_url: null,
+    ended_at: null,
+    allowed_next: NEXT[a.stage] ?? [],
+  }
+}

@@ -6,13 +6,8 @@ import { Input } from "@/components/ui/input"
 import { Chip } from "@/components/chip"
 import { PageHeader, SectionHeader } from "@/components/page-header"
 import { meQuery, keys } from "@/lib/api/endpoints"
-import { useSignOut } from "@/features/auth/use-sign-out"
-import {
-  changePassword,
-  totpDisable,
-  totpEnable,
-  totpSetup,
-} from "./api"
+import { SessionsSection } from "./sessions-section"
+import { changePassword, totpDisable, totpEnable, totpSetup } from "./api"
 
 const MIN_PASSWORD = 12
 
@@ -44,25 +39,48 @@ function PasswordForm() {
     change.mutate()
   }
   return (
-    <form onSubmit={submit} className="grid max-w-[420px] gap-3" aria-label="Change password">
+    <form
+      onSubmit={submit}
+      className="grid max-w-[420px] gap-3"
+      aria-label="Change password"
+    >
       <label className="grid gap-1 text-sm">
         Current password
-        <Input type="password" autoComplete="current-password" value={current} onChange={(e) => setCurrent(e.target.value)} />
+        <Input
+          type="password"
+          autoComplete="current-password"
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+        />
       </label>
       <label className="grid gap-1 text-sm">
         New password
-        <Input type="password" autoComplete="new-password" value={next} onChange={(e) => setNext(e.target.value)} />
+        <Input
+          type="password"
+          autoComplete="new-password"
+          value={next}
+          onChange={(e) => setNext(e.target.value)}
+        />
       </label>
       <label className="grid gap-1 text-sm">
         New password again
-        <Input type="password" autoComplete="new-password" value={again} onChange={(e) => setAgain(e.target.value)} />
+        <Input
+          type="password"
+          autoComplete="new-password"
+          value={again}
+          onChange={(e) => setAgain(e.target.value)}
+        />
       </label>
       {error && (
         <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       )}
-      <Button type="submit" className="justify-self-start" disabled={change.isPending || !current}>
+      <Button
+        type="submit"
+        className="justify-self-start"
+        disabled={change.isPending || !current}
+      >
         Change password
       </Button>
     </form>
@@ -76,7 +94,10 @@ function TwoStep({ enabled }: { enabled: boolean }) {
   const [error, setError] = useState<string | null>(null)
   const refreshMe = () => qc.invalidateQueries({ queryKey: keys.me })
 
-  const setup = useMutation({ mutationFn: totpSetup, onError: (e) => setError(errorText(e)) })
+  const setup = useMutation({
+    mutationFn: totpSetup,
+    onError: (e) => setError(errorText(e)),
+  })
   const enable = useMutation({
     mutationFn: () => totpEnable(code),
     onSuccess: () => {
@@ -114,14 +135,32 @@ function TwoStep({ enabled }: { enabled: boolean }) {
         </p>
         <label className="grid gap-1 text-sm">
           Password
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
         </label>
         <label className="grid gap-1 text-sm">
           Authenticator code
-          <Input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
+          <Input
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
         </label>
-        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-        <Button type="submit" variant="destructive" className="justify-self-start" disabled={!password || !code || disable.isPending}>
+        {error && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
+        <Button
+          type="submit"
+          variant="destructive"
+          className="justify-self-start"
+          disabled={!password || !code || disable.isPending}
+        >
           Turn off
         </Button>
       </form>
@@ -131,12 +170,21 @@ function TwoStep({ enabled }: { enabled: boolean }) {
     return (
       <div className="grid gap-2">
         <p className="text-sm text-muted-foreground">
-          Add an authenticator app (any TOTP app) so sign-in needs a six-digit code as well as your password.
+          Add an authenticator app (any TOTP app) so sign-in needs a six-digit
+          code as well as your password.
         </p>
-        <Button className="justify-self-start" onClick={() => setup.mutate()} disabled={setup.isPending}>
+        <Button
+          className="justify-self-start"
+          onClick={() => setup.mutate()}
+          disabled={setup.isPending}
+        >
           Set up an authenticator code
         </Button>
-        {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
       </div>
     )
   }
@@ -154,18 +202,34 @@ function TwoStep({ enabled }: { enabled: boolean }) {
         In your authenticator app, add an account by entering this key, or open
         the link on the phone that has the app.
       </p>
-      <code className="num rounded-sm bg-sunken p-2.5 text-sm break-all select-all">
+      <code className="rounded-sm bg-sunken p-2.5 num text-sm break-all select-all">
         {setup.data.secret}
       </code>
-      <a className="text-sm text-primary-ink underline" href={setup.data.otpauth_uri}>
+      <a
+        className="text-sm text-primary-ink underline"
+        href={setup.data.otpauth_uri}
+      >
         Open in authenticator app
       </a>
       <label className="grid gap-1 text-sm">
         Code from the app
-        <Input inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} />
+        <Input
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
       </label>
-      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
-      <Button type="submit" className="justify-self-start" disabled={code.length < 6 || enable.isPending}>
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
+      <Button
+        type="submit"
+        className="justify-self-start"
+        disabled={code.length < 6 || enable.isPending}
+      >
         Turn on
       </Button>
     </form>
@@ -175,11 +239,13 @@ function TwoStep({ enabled }: { enabled: boolean }) {
 /** Settings, Security: password, two-step sign-in and the sessions you are signed in on. */
 export function SecurityPage() {
   const me = useQuery(meQuery())
-  const signOut = useSignOut()
-  const twoStep = (me.data as { totp_enabled?: boolean } | null | undefined)?.totp_enabled === true
+  const twoStep = me.data?.totp_enabled === true
   return (
     <div className="grid gap-7">
-      <PageHeader title="Security" description="Your password, two-step sign-in and where you are signed in." />
+      <PageHeader
+        title="Security"
+        description="Your password, two-step sign-in and where you are signed in."
+      />
       <section aria-label="Password" className="panel p-4">
         <SectionHeader title="Password" aside="At least 12 characters" />
         <PasswordForm />
@@ -195,21 +261,7 @@ export function SecurityPage() {
         />
         <TwoStep enabled={twoStep} />
       </section>
-      <section aria-label="Sessions" className="panel p-4">
-        <SectionHeader title="Sessions" />
-        <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <b>This browser</b> <Chip tone="good">Current</Chip>
-            <p className="text-sm text-muted-foreground">
-              Signed in as {me.data?.email ?? "you"}. A list of other devices will
-              appear here once the server reports them.
-            </p>
-          </div>
-          <Button variant="outline" size="sm" className="ml-auto" onClick={() => signOut()}>
-            Sign out
-          </Button>
-        </div>
-      </section>
+      <SessionsSection />
     </div>
   )
 }

@@ -14,7 +14,11 @@ import {
 import { jobQuery, mergeJobs, searchJobsQuery, type JobDetail } from "../api"
 import { errorText, useCorrection } from "./use-correction"
 
-type Props = { job: JobDetail; open: boolean; onOpenChange: (v: boolean) => void }
+type Props = {
+  job: JobDetail
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}
 
 /** What stays after a merge, worked out from the roles themselves. */
 export function mergePreview(keep: JobDetail, dupes: JobDetail[]) {

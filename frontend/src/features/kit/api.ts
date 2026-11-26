@@ -3,15 +3,14 @@
  * Feature code imports from here. Query keys are per resource; every write invalidates its
  * list and the review count.
  */
-import createClient from "openapi-fetch"
 import {
   queryOptions,
   useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import { unwrap } from "@/lib/api/client"
-import type { components, paths } from "@/lib/api/schema.d"
+import { api, toFormData, unwrap } from "@/lib/api/client"
+import type { components } from "@/lib/api/types"
 
 type S = components["schemas"]
 export type ExperienceOut = S["ExperienceOut"]
@@ -53,19 +52,11 @@ export type Resource =
   | "vault"
   | "skill-aliases"
 
-const origin =
-  typeof window !== "undefined" ? window.location.origin : "http://localhost"
-
-const client = createClient<paths>({
-  baseUrl: origin,
-  credentials: "include",
-  fetch: (request: Request) => globalThis.fetch(request),
-})
-
-// The paths are one family of identical shapes; one loosely typed call keeps this file short.
-// Public functions below carry the real types.
+// The Kit CRUD paths are one family of identical shapes addressed by a resource name; one
+// loosely typed view of the shared client keeps that family short. Public functions below
+// carry the real types, and the one-off endpoints use the typed client.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const raw = client as any
+const raw = api as any
 
 const base = (r: Resource) =>
   r === "skill-aliases" ? "/api/skill-aliases" : `/api/kit/${r}`
@@ -111,7 +102,7 @@ export const reviewQuery = () =>
   queryOptions<ReviewItem[]>({
     queryKey: kitKeys.review,
     queryFn: async () => {
-      const page = await unwrap<Page<ReviewItem>>(raw.GET("/api/kit/review"))
+      const page = await unwrap(api.GET("/api/kit/review"))
       return page.items
     },
     staleTime: 15_000,
@@ -170,9 +161,13 @@ export function useFactAction() {
   >({
     mutationFn: ({ id, action }) =>
       unwrap(
-        raw.POST(`/api/kit/facts/{item_id}/${action}`, {
-          params: { path: { item_id: id } },
-        })
+        action === "approve"
+          ? api.POST("/api/kit/facts/{item_id}/approve", {
+              params: { path: { item_id: id } },
+            })
+          : api.POST("/api/kit/facts/{item_id}/retire", {
+              params: { path: { item_id: id } },
+            })
       ),
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: kitKeys.list("facts") }),
@@ -189,7 +184,7 @@ export function useReviewDecision() {
   >({
     mutationFn: ({ entity, id, decision }) =>
       unwrap(
-        raw.POST("/api/kit/review/{entity}/{item_id}", {
+        api.POST("/api/kit/review/{entity}/{item_id}", {
           params: { path: { entity, item_id: id } },
           body: { decision },
         })
@@ -205,7 +200,7 @@ export function useGuardrailCheck() {
     { texts: Partial<Record<GuardrailScope, string>>; file_names?: string[] }
   >({
     mutationFn: (body) =>
-      unwrap(raw.POST("/api/kit/guardrails/check", { body })),
+      unwrap(api.POST("/api/kit/guardrails/check", { body })),
   })
 }
 
@@ -221,23 +216,20 @@ export function useUploadDocument() {
       sensitivity: VaultDocumentOut["sensitivity"]
     }
   >({
-    mutationFn: async (v) => {
-      const form = new FormData()
-      form.set("file", v.file)
-      form.set("title", v.title)
-      form.set("doc_type", v.doc_type)
-      form.set("sensitivity", v.sensitivity)
-      const res = await fetch(`${origin}/api/kit/vault`, {
-        method: "POST",
-        body: form,
-        credentials: "include",
-      })
-      if (!res.ok) {
-        const { ApiError } = await import("@/lib/api/client")
-        throw new ApiError(res.status, await res.json().catch(() => undefined))
-      }
-      return (await res.json()) as VaultDocumentOut
-    },
+    mutationFn: (v) =>
+      unwrap(
+        api.POST("/api/kit/vault", {
+          // Multipart: the generated body types the file as a string; the File goes as is.
+          body: {
+            file: v.file as unknown as string,
+            title: v.title,
+            doc_type: v.doc_type,
+            sensitivity: v.sensitivity,
+          },
+          bodySerializer: toFormData,
+        })
+        // The contract types doc_type as a plain string; it is one of the upload's choices.
+      ) as Promise<VaultDocumentOut>,
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: kitKeys.list("vault") })
       void qc.invalidateQueries({ queryKey: kitKeys.review })

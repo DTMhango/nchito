@@ -25,6 +25,8 @@ const make = (over: Partial<SettingOut>): SettingOut => ({
   maximum: 100,
   unit: "points",
   version: 0,
+  updated_by: null,
+  updated_at: null,
   ...over,
 })
 
@@ -36,7 +38,9 @@ describe("parseDraft", () => {
     ["time", "21:00", "21:00"],
     ["cron", "0 6 * * *", "0 6 * * *"],
   ])("accepts a good %s", (kind, text, value) => {
-    expect(parseDraft(make({ kind, minimum: null, maximum: null }), text)).toEqual({ ok: true, value })
+    expect(
+      parseDraft(make({ kind, minimum: null, maximum: null }), text)
+    ).toEqual({ ok: true, value })
   })
 
   it.each([
@@ -53,7 +57,10 @@ describe("parseDraft", () => {
   })
 
   it("lets a nullable setting be empty", () => {
-    expect(parseDraft(make({ nullable: true }), "")).toEqual({ ok: true, value: null })
+    expect(parseDraft(make({ nullable: true }), "")).toEqual({
+      ok: true,
+      value: null,
+    })
   })
 
   it("keeps a choice list to its choices", () => {
@@ -76,8 +83,12 @@ describe("SettingRow", () => {
     const input = screen.getByLabelText("Shortlist threshold")
     await user.clear(input)
     await user.type(input, "150")
-    await user.click(screen.getByRole("button", { name: "Save Shortlist threshold" }))
-    expect(await screen.findByRole("alert")).toHaveTextContent("Must be at most 100.")
+    await user.click(
+      screen.getByRole("button", { name: "Save Shortlist threshold" })
+    )
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Must be at most 100."
+    )
   })
 
   it("shows the server's message when it refuses", async () => {
@@ -85,14 +96,24 @@ describe("SettingRow", () => {
     // the mock enforces 55..100 for nothing; use a key the registry knows with a tighter max
     renderWithTheme(
       <SettingRow
-        setting={make({ key: "schedule.concurrent_sweeps", minimum: 0, maximum: 100, value: 1, default: 1 })}
+        setting={make({
+          key: "schedule.concurrent_sweeps",
+          minimum: 0,
+          maximum: 100,
+          value: 1,
+          default: 1,
+        })}
       />
     )
     const input = screen.getByLabelText("Shortlist threshold")
     await user.clear(input)
     await user.type(input, "9")
-    await user.click(screen.getByRole("button", { name: "Save Shortlist threshold" }))
-    expect(await screen.findByRole("alert")).toHaveTextContent("Must be at most 4.")
+    await user.click(
+      screen.getByRole("button", { name: "Save Shortlist threshold" })
+    )
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Must be at most 4."
+    )
   })
 
   it("resets a changed setting to its default", async () => {
@@ -101,14 +122,26 @@ describe("SettingRow", () => {
     const input = await screen.findByLabelText("Shortlist threshold")
     await user.clear(input)
     await user.type(input, "70")
-    await user.click(screen.getByRole("button", { name: "Save Shortlist threshold" }))
-    await waitFor(() => expect(screen.getByLabelText("Shortlist threshold")).toHaveValue("70"))
-    const reset = await screen.findByRole("button", { name: "Reset Shortlist threshold to default" })
+    await user.click(
+      screen.getByRole("button", { name: "Save Shortlist threshold" })
+    )
+    await waitFor(() =>
+      expect(screen.getByLabelText("Shortlist threshold")).toHaveValue("70")
+    )
+    const reset = await screen.findByRole("button", {
+      name: "Reset Shortlist threshold to default",
+    })
     await waitFor(() => expect(reset).toBeEnabled())
     await user.click(reset)
-    await waitFor(() => expect(screen.getByLabelText("Shortlist threshold")).toHaveValue("60"))
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Reset Shortlist threshold to default" })).toBeDisabled()
+      expect(screen.getByLabelText("Shortlist threshold")).toHaveValue("60")
+    )
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: "Reset Shortlist threshold to default",
+        })
+      ).toBeDisabled()
     )
   })
 
@@ -120,7 +153,9 @@ describe("SettingRow", () => {
     await user.type(input, "3")
     await user.click(screen.getByRole("button", { name: "Save CV pages" }))
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Reset CV pages to default" })).toBeEnabled()
+      expect(
+        screen.getByRole("button", { name: "Reset CV pages to default" })
+      ).toBeEnabled()
     )
     await user.click(screen.getByRole("button", { name: "CV pages history" }))
     const list = await screen.findByRole("list", { name: "CV pages changes" })
@@ -133,14 +168,21 @@ describe("renderer by value type", () => {
   it("draws a switch, a select, checkboxes, a time and a number from metadata alone", async () => {
     const user = userEvent.setup()
     renderWithTheme(<SettingsGroupPage page="automation" />)
-    expect(await screen.findByRole("switch", { name: "Paused" })).toBeInTheDocument()
+    expect(
+      await screen.findByRole("switch", { name: "Paused" })
+    ).toBeInTheDocument()
     expect(screen.getByLabelText("Default mode").tagName).toBe("SELECT")
-    expect(screen.getByLabelText("Quiet hours start")).toHaveAttribute("type", "time")
+    expect(screen.getByLabelText("Quiet hours start")).toHaveAttribute(
+      "type",
+      "time"
+    )
     expect(screen.getByLabelText("Daily cap")).toHaveValue("5")
     await user.click(screen.getByRole("switch", { name: "Paused" }))
     await user.click(screen.getByRole("button", { name: "Save Paused" }))
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Reset Paused to default" })).toBeEnabled()
+      expect(
+        screen.getByRole("button", { name: "Reset Paused to default" })
+      ).toBeEnabled()
     )
   })
 

@@ -1,5 +1,9 @@
 import { useState } from "react"
-import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { History, Undo2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -14,12 +18,23 @@ import {
   type ConfigRevision,
 } from "./api"
 
-const KINDS = ["", "rubric", "prompt", "rule", "model_route", "automation_policy"]
+const KINDS = [
+  "",
+  "rubric",
+  "prompt",
+  "rule",
+  "model_route",
+  "automation_policy",
+]
 
 /** Renders a revision's diff as old to new lines when it has that shape, else as JSON. */
 function Diff({ diff }: { diff: ConfigRevision["diff"] }) {
   if (!diff || Object.keys(diff).length === 0)
-    return <p className="text-sm text-muted-foreground">No field changes recorded.</p>
+    return (
+      <p className="text-sm text-muted-foreground">
+        No field changes recorded.
+      </p>
+    )
   return (
     <dl className="grid gap-1 rounded-sm bg-sunken p-3 text-sm">
       {Object.entries(diff).map(([field, v]) => {
@@ -32,7 +47,9 @@ function Diff({ diff }: { diff: ConfigRevision["diff"] }) {
             <dt className="num font-medium">{field}</dt>
             {pair ? (
               <dd>
-                <span className="text-danger line-through">{show(pair.old)}</span>{" "}
+                <span className="text-danger line-through">
+                  {show(pair.old)}
+                </span>{" "}
                 <span className="text-good">{show(pair.new)}</span>
               </dd>
             ) : (
@@ -60,7 +77,8 @@ function RevisionRow({ rev }: { rev: ConfigRevision }) {
       void qc.invalidateQueries({ queryKey: ["config-history"] })
       void qc.invalidateQueries({ queryKey: settingsKeys.all })
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Rollback failed"),
+    onError: (e) =>
+      toast.error(e instanceof Error ? e.message : "Rollback failed"),
   })
   return (
     <li className="grid gap-2 border-t border-border row-pad first:border-t-0">
@@ -112,7 +130,11 @@ function RevisionRow({ rev }: { rev: ConfigRevision }) {
             >
               Confirm rollback
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirming(false)}>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setConfirming(false)}
+            >
               Cancel
             </Button>
           </div>
@@ -143,7 +165,7 @@ export function HistoryPage() {
             <select
               value={kind}
               onChange={(e) => setKind(e.target.value)}
-              className="h-8 rounded-md border border-input bg-surface px-2 text-base field-focus"
+              className="h-8 rounded-md border field-focus border-input bg-surface px-2 text-base"
             >
               {KINDS.map((k) => (
                 <option key={k} value={k}>

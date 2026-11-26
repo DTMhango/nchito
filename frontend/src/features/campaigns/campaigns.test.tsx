@@ -22,8 +22,10 @@ import { BacktestTable } from "./backtest-panel"
 import { RubricEditor } from "./rubric-editor"
 import { buildDailyCron, parseDailyCron } from "./other-sections"
 import { renderApp } from "@/test/render"
-import { facets, IDS } from "@/mocks/handlers/campaigns-fixtures"
-import { resetCampaignMocks } from "@/mocks/handlers/campaigns"
+import { facets, IDS } from "@/mocks/data/campaigns"
+import { campaignsMock, resetCampaignMocks } from "@/mocks/handlers/campaigns"
+import { matchesMock } from "@/mocks/handlers/matches"
+import { matches as evaluate } from "@/mocks/handlers/matches-evaluator"
 import type { BacktestRow, ConditionSet, RubricBody } from "./types"
 
 beforeEach(() => resetCampaignMocks())
@@ -114,13 +116,13 @@ describe("condition builder", () => {
     expect(out.root?.conditions).toEqual([
       {
         type: "values",
-        facet: "visa_sponsorship",
+        facet: "facets.visa_sponsorship",
         include: ["yes"],
         exclude: ["no"],
       },
       {
         type: "range",
-        facet: "years_experience",
+        facet: "facets.years_experience",
         min: 3,
         not_stated: "include",
       },
@@ -264,6 +266,13 @@ describe("backtest table", () => {
         name: /Start a new draft from this version/,
       })
     )
+    // Step one: the estimate; step two: run it.
+    await user.click(
+      await screen.findByRole("button", { name: "Estimate the backtest" })
+    )
+    expect(
+      await screen.findByText(/to score\. Estimated cost/)
+    ).toBeInTheDocument()
     await user.click(
       await screen.findByRole("button", { name: "Run backtest" })
     )
@@ -298,9 +307,17 @@ describe("preview matches", () => {
     await user.click(
       within(rule).getByRole("button", { name: /Preview matches/ })
     )
+    // Counted over the shared mock jobs, with the same evaluator Matches uses.
+    const rules = campaignsMock.get().find((c) => c.id === IDS.camp1)!.criteria
+      .rules!
+    const n = matchesMock
+      .get()
+      .jobs.filter((j) => evaluate(j, rules[0].conditions as never)).length
     await waitFor(() =>
       expect(
-        within(rule).getByText(/Would catch 4 of your saved jobs/)
+        within(rule).getByText(
+          new RegExp(`Would catch ${n} of your saved jobs`)
+        )
       ).toBeInTheDocument()
     )
   })

@@ -19,7 +19,9 @@ export function money(minor: number, currency: string | null | undefined) {
 export function payText(pay: JobDetail["pay"]): string {
   if (pay.state === "not_stated") return "Pay is not stated in the posting."
   const range =
-    pay.min_minor != null && pay.max_minor != null && pay.min_minor !== pay.max_minor
+    pay.min_minor != null &&
+    pay.max_minor != null &&
+    pay.min_minor !== pay.max_minor
       ? `${money(pay.min_minor, pay.currency)} to ${money(pay.max_minor, pay.currency)}`
       : money((pay.min_minor ?? pay.max_minor) as number, pay.currency)
   const per = pay.period ? ` a ${pay.period}` : ""
@@ -81,12 +83,32 @@ const ev = <T>(
 /** Every single-value facet that has been extracted, with the sentence that supports it. */
 export function facetLines(f: JobFacets): FacetLine[] {
   const lines: [string, string, Shown | null][] = [
-    ["relocation_required", "Relocation required", ev(f.relocation_required, (v) => YNN[v])],
-    ["visa_sponsorship", "Visa sponsorship offered", ev(f.visa_sponsorship, (v) => YNN[v])],
-    ["relocation_assistance", "Relocation assistance offered", ev(f.relocation_assistance, (v) => YNN[v])],
-    ["needs_account", "Needs an account to apply", ev(f.needs_account, (v) => YNN[v])],
+    [
+      "relocation_required",
+      "Relocation required",
+      ev(f.relocation_required, (v) => YNN[v]),
+    ],
+    [
+      "visa_sponsorship",
+      "Visa sponsorship offered",
+      ev(f.visa_sponsorship, (v) => YNN[v]),
+    ],
+    [
+      "relocation_assistance",
+      "Relocation assistance offered",
+      ev(f.relocation_assistance, (v) => YNN[v]),
+    ],
+    [
+      "needs_account",
+      "Needs an account to apply",
+      ev(f.needs_account, (v) => YNN[v]),
+    ],
     ["work_model", "Work model", ev(f.work_model, (v) => WORK_MODEL[v])],
-    ["remote_scope", "Remote scope", ev(f.remote_scope, (v) => REMOTE_SCOPE[v])],
+    [
+      "remote_scope",
+      "Remote scope",
+      ev(f.remote_scope, (v) => REMOTE_SCOPE[v]),
+    ],
     [
       "where_must_live",
       "Where you must live",
@@ -98,19 +120,46 @@ export function facetLines(f: JobFacets): FacetLine[] {
             : "Not stated"
       ),
     ],
-    ["work_rights", "Work rights needed", ev(f.work_rights, (v) => WORK_RIGHTS[v])],
+    [
+      "work_rights",
+      "Work rights needed",
+      ev(f.work_rights, (v) => WORK_RIGHTS[v]),
+    ],
     [
       "timezone_overlap",
       "Time-zone overlap",
       ev(f.timezone_overlap, (v) => {
         const t = v as { zone?: string | null; hours?: number | null }
-        return [t.hours != null ? `${t.hours} hours` : null, t.zone].filter(Boolean).join(" in ") || "Required"
+        return (
+          [t.hours != null ? `${t.hours} hours` : null, t.zone]
+            .filter(Boolean)
+            .join(" in ") || "Required"
+        )
       }),
     ],
-    ["hiring_arrangement", "Hiring arrangement", ev(f.hiring_arrangement, (v) => ARRANGEMENT[v])],
-    ["employment_type", "Employment type", ev(f.employment_type, (v) => EMPLOYMENT[v as keyof typeof EMPLOYMENT] ?? "Not stated")],
-    ["years_experience", "Years of experience asked", ev(f.years_experience, (v) => (v == null ? "Not stated" : `${v}`))],
-    ["travel_percent", "Travel", ev(f.travel_percent, (v) => (v == null ? "Not stated" : `${v}%`))],
+    [
+      "hiring_arrangement",
+      "Hiring arrangement",
+      ev(f.hiring_arrangement, (v) => ARRANGEMENT[v]),
+    ],
+    [
+      "employment_type",
+      "Employment type",
+      ev(
+        f.employment_type,
+        (v) => EMPLOYMENT[v as keyof typeof EMPLOYMENT] ?? "Not stated"
+      ),
+    ],
+    [
+      "years_experience",
+      "Years of experience asked",
+      ev(f.years_experience, (v) => (v == null ? "Not stated" : `${v}`)),
+    ],
+    [
+      "travel_percent",
+      "Travel",
+      ev(f.travel_percent, (v) => (v == null ? "Not stated" : `${v}%`)),
+    ],
   ]
   return lines.flatMap(([key, label, s]) => (s ? [{ key, label, ...s }] : []))
 }
@@ -123,7 +172,9 @@ export function picture(job: JobDetail): { label: string; text: string }[] {
     {
       label: "Location",
       text: `${locationText(job.location)}. ${
-        f.work_model ? `${WORK_MODEL[f.work_model.value]}.` : "Work model not stated."
+        f.work_model
+          ? `${WORK_MODEL[f.work_model.value]}.`
+          : "Work model not stated."
       }${
         f.remote_scope && f.work_model?.value === "remote"
           ? ` Remote scope: ${REMOTE_SCOPE[f.remote_scope.value].toLowerCase()}.`
@@ -131,7 +182,9 @@ export function picture(job: JobDetail): { label: string; text: string }[] {
       }`,
     },
   ]
-  const rights = f.work_rights ? WORK_RIGHTS[f.work_rights.value] : "Work rights are not stated"
+  const rights = f.work_rights
+    ? WORK_RIGHTS[f.work_rights.value]
+    : "Work rights are not stated"
   const visa = f.visa_sponsorship
     ? f.visa_sponsorship.value === "yes"
       ? "They offer visa sponsorship"

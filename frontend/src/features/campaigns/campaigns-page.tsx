@@ -121,11 +121,27 @@ export function CampaignsPage() {
       id: "last",
       header: "Last run",
       hideBelow: "md",
-      sortValue: (c) => c.last_sweep_checkpoint ?? "",
+      sortValue: (c) => c.last_run_at ?? "",
       cell: (c) =>
-        plainDate(c.last_sweep_checkpoint) ?? (
+        plainDate(c.last_run_at) ?? (
           <span className="text-faint">Not run yet</span>
         ),
+    },
+    {
+      id: "matches",
+      header: "Matches",
+      sortValue: (c) => c.match_counts.shortlisted + c.match_counts.new,
+      cell: (c) => (
+        <span className="text-sm">
+          <span className="num">{c.match_counts.new}</span> new,{" "}
+          <span className="num">{c.match_counts.shortlisted}</span> shortlisted
+          {c.match_counts.held > 0 && (
+            <span className="text-muted-foreground">
+              , <span className="num">{c.match_counts.held}</span> held
+            </span>
+          )}
+        </span>
+      ),
     },
     {
       id: "counts",

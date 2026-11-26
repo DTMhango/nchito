@@ -20,12 +20,17 @@ const CHANNELS = [
 ] as const
 const today = () => new Date().toISOString().slice(0, 10)
 
-type Props = { jobId: string; open: boolean; onOpenChange: (v: boolean) => void }
+type Props = {
+  jobId: string
+  open: boolean
+  onOpenChange: (v: boolean) => void
+}
 
 /** "I applied myself": counts at once for duplicates, employer limits and follow-ups. */
 export function AppliedMyselfDialog({ jobId, open, onOpenChange }: Props) {
   const [on, setOn] = useState(today())
-  const [channel, setChannel] = useState<(typeof CHANNELS)[number]["value"]>("browser")
+  const [channel, setChannel] =
+    useState<(typeof CHANNELS)[number]["value"]>("browser")
   const [reference, setReference] = useState("")
   const [note, setNote] = useState("")
   const m = useCorrection(
@@ -63,10 +68,8 @@ export function AppliedMyselfDialog({ jobId, open, onOpenChange }: Props) {
             How
             <select
               value={channel}
-              onChange={(e) =>
-                setChannel(e.target.value as typeof channel)
-              }
-              className="h-8 rounded-md border border-input bg-surface px-2 text-base field-focus"
+              onChange={(e) => setChannel(e.target.value as typeof channel)}
+              className="h-8 rounded-md border field-focus border-input bg-surface px-2 text-base"
             >
               {CHANNELS.map((c) => (
                 <option key={c.value} value={c.value}>

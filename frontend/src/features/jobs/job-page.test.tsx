@@ -2,17 +2,33 @@ import { beforeEach, describe, expect, it } from "vitest"
 import { configure, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { renderApp } from "@/test/render"
-import { resetJobsMock } from "@/mocks/handlers/jobs"
+import { matchesMock } from "@/mocks/handlers/matches"
 import { heldSentence } from "./conflict-status"
 
 // The whole app mounts per test; give a busy machine room.
 configure({ asyncUtilTimeout: 6000 })
 
-beforeEach(() => resetJobsMock())
+// The shared mock dataset: Copperline Bank's Head of Data (88) outranks its Senior Data
+// Analyst (74), one role per employer.
+const jobs = () => matchesMock.get().jobs
+const winner = () =>
+  jobs().find(
+    (j) => j.title === "Head of Data" && j.employer === "Copperline Bank"
+  )!
+const held = () =>
+  jobs().find(
+    (j) => j.title === "Senior Data Analyst" && j.employer === "Copperline Bank"
+  )!
+let WIN = ""
+let HELD = ""
+beforeEach(() => {
+  WIN = winner().id
+  HELD = held().id
+})
 
 describe("job page tabs", () => {
   it("opens the tab named in the link and marks it current", async () => {
-    renderApp("/jobs/job-1?tab=fit")
+    renderApp(`/jobs/${WIN}?tab=fit`)
     expect(
       await screen.findByRole("heading", { name: "Score breakdown" })
     ).toBeInTheDocument()
@@ -22,53 +38,54 @@ describe("job page tabs", () => {
     )
     // the header is there whatever the tab
     expect(
-      screen.getByRole("heading", { name: "Senior Risk Analyst" })
+      screen.getByRole("heading", { name: "Head of Data" })
     ).toBeInTheDocument()
   })
 
   it("falls back to Overview for an unknown tab", async () => {
-    renderApp("/jobs/job-1?tab=nonsense")
+    renderApp(`/jobs/${WIN}?tab=nonsense`)
     expect(await screen.findByText("At a glance")).toBeInTheDocument()
   })
 
   it("shows what a later-wave tab will hold", async () => {
-    renderApp("/jobs/job-1?tab=interview")
+    renderApp(`/jobs/${WIN}?tab=interview`)
     expect(await screen.findByText(/Arrives in wave 3/)).toBeInTheDocument()
   })
 
   it("shows the sentence behind a facet on focus", async () => {
     const user = userEvent.setup()
-    renderApp("/jobs/job-1?tab=overview")
+    const hybrid = jobs().find((j) => j.facets.work_model?.value === "hybrid")!
+    renderApp(`/jobs/${hybrid.id}?tab=overview`)
     const trigger = await screen.findByRole("button", {
       name: /Work model: Hybrid/,
     })
     await user.tab() // move focus into the page, then focus the trigger directly
     trigger.focus()
     expect(
-      await screen.findByText(/Three days on site, two from home/)
+      await screen.findByText(/Three days a week in the office, two from home/)
     ).toBeInTheDocument()
   })
 })
 
 describe("held role", () => {
   it("states who outranked it and by how much", async () => {
-    renderApp("/jobs/job-2?tab=overview")
+    renderApp(`/jobs/${HELD}?tab=overview`)
     expect(
-      await screen.findByText("held: outranked by Senior Risk Analyst, 88 vs 74")
+      await screen.findByText("held: outranked by Head of Data, 88 vs 74")
     ).toBeInTheDocument()
     expect(
-      screen.getByRole("link", { name: /Open Senior Risk Analyst/ })
-    ).toHaveAttribute("href", expect.stringContaining("/jobs/job-1"))
+      screen.getByRole("link", { name: /Open Head of Data/ })
+    ).toHaveAttribute("href", expect.stringContaining(`/jobs/${WIN}`))
   })
 
   it("shows the winner as a winner", async () => {
-    renderApp("/jobs/job-1?tab=overview")
+    renderApp(`/jobs/${WIN}?tab=overview`)
     expect(await screen.findByText("Winner")).toBeInTheDocument()
   })
 
   it("releases only with a reason", async () => {
     const user = userEvent.setup()
-    renderApp("/jobs/job-2?tab=overview")
+    renderApp(`/jobs/${HELD}?tab=overview`)
     await user.click(
       await screen.findByRole("button", { name: "Release this role" })
     )

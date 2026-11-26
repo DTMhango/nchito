@@ -18,7 +18,13 @@ import {
   type JobDetail,
 } from "../api"
 
-type FormState = { name: string; role: string; email: string; link: string; notes: string }
+type FormState = {
+  name: string
+  role: string
+  email: string
+  link: string
+  notes: string
+}
 const blank: FormState = { name: "", role: "", email: "", link: "", notes: "" }
 
 export function PeopleTab({ job }: { job: JobDetail }) {
@@ -42,7 +48,8 @@ export function PeopleTab({ job }: { job: JobDetail }) {
     <div className="grid gap-4">
       <div className="flex items-center gap-2">
         <p className="text-sm text-muted-foreground">
-          Recruiter, hiring manager, interviewers. Added by you or picked up from emails.
+          Recruiter, hiring manager, interviewers. Added by you or picked up
+          from emails.
         </p>
         <Button size="sm" className="ml-auto" onClick={() => setEditing("new")}>
           <Plus aria-hidden="true" />
@@ -71,28 +78,61 @@ export function PeopleTab({ job }: { job: JobDetail }) {
       ) : (
         <ul className="panel p-4">
           {people.map((c) => (
-            <li key={c.id} className="flex flex-wrap items-start gap-3 border-t border-border row-pad first:border-t-0">
+            <li
+              key={c.id}
+              className="flex flex-wrap items-start gap-3 border-t border-border row-pad first:border-t-0"
+            >
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <b>{c.name}</b>
-                  {c.role && <span className="text-sm text-muted-foreground">{c.role}</span>}
-                  {c.origin !== "owner" && <Chip tone="info">From {c.origin}</Chip>}
+                  {c.role && (
+                    <span className="text-sm text-muted-foreground">
+                      {c.role}
+                    </span>
+                  )}
+                  {c.origin !== "owner" && (
+                    <Chip tone="info">From {c.origin}</Chip>
+                  )}
                 </div>
                 <div className="text-sm">
-                  {c.email && <a className="text-primary-ink underline" href={`mailto:${c.email}`}>{c.email}</a>}
+                  {c.email && (
+                    <a
+                      className="text-primary-ink underline"
+                      href={`mailto:${c.email}`}
+                    >
+                      {c.email}
+                    </a>
+                  )}
                   {c.email && c.link && " · "}
                   {c.link && (
-                    <a className="text-primary-ink underline" href={c.link} target="_blank" rel="noreferrer noopener">
+                    <a
+                      className="text-primary-ink underline"
+                      href={c.link}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
                       Profile
                     </a>
                   )}
                 </div>
-                {c.notes && <p className="text-sm text-muted-foreground">{c.notes}</p>}
+                {c.notes && (
+                  <p className="text-sm text-muted-foreground">{c.notes}</p>
+                )}
               </div>
-              <Button size="icon-sm" variant="ghost" aria-label={`Edit ${c.name}`} onClick={() => setEditing(c)}>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`Edit ${c.name}`}
+                onClick={() => setEditing(c)}
+              >
                 <Pencil aria-hidden="true" />
               </Button>
-              <Button size="icon-sm" variant="ghost" aria-label={`Remove ${c.name}`} onClick={() => remove.mutate(c.id)}>
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={`Remove ${c.name}`}
+                onClick={() => remove.mutate(c.id)}
+              >
                 <Trash2 aria-hidden="true" />
               </Button>
             </li>
@@ -142,7 +182,8 @@ function ContactForm({
       toast.success(contact ? "Person updated" : "Person added")
       onDone()
     },
-    onError: (e) => setError(e instanceof Error ? e.message : "Could not save."),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Could not save."),
   })
   const set = (k: keyof FormState) => (e: { target: { value: string } }) =>
     setF({ ...f, [k]: e.target.value })
@@ -163,7 +204,11 @@ function ContactForm({
       </label>
       <label className="grid gap-1 text-sm">
         Role
-        <Input value={f.role} onChange={set("role")} placeholder="Recruiter, hiring manager" />
+        <Input
+          value={f.role}
+          onChange={set("role")}
+          placeholder="Recruiter, hiring manager"
+        />
       </label>
       <label className="grid gap-1 text-sm">
         Email

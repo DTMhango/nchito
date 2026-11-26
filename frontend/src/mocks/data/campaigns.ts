@@ -14,18 +14,19 @@ const T0 = "2026-11-20T08:00:00Z"
 const meta = { created_at: T0, updated_at: T0 }
 
 export const IDS = {
-  trackActuarial: "00000000-0000-4000-8000-000000000a01",
-  trackAnalytics: "00000000-0000-4000-8000-000000000a02",
+  // Tracks and sources are the Kit and Sources mocks' own ids (one dataset).
+  trackActuarial: "tr-3",
+  trackAnalytics: "tr-1",
   camp1: "00000000-0000-4000-8000-000000000c01",
   camp2: "00000000-0000-4000-8000-000000000c02",
   camp3: "00000000-0000-4000-8000-000000000c03",
   rubricActive: "00000000-0000-4000-8000-000000000b01",
   rubricDraft: "00000000-0000-4000-8000-000000000b02",
   rubricFamily: "00000000-0000-4000-8000-000000000bf1",
-  src1: "00000000-0000-4000-8000-000000000d01",
-  src2: "00000000-0000-4000-8000-000000000d02",
-  src3: "00000000-0000-4000-8000-000000000d03",
-  src4: "00000000-0000-4000-8000-000000000d04",
+  src1: "src-gh",
+  src2: "src-himalayas",
+  src3: "src-email",
+  src4: "src-lever",
 }
 
 export const tracks: Track[] = [
@@ -61,7 +62,7 @@ export const tracks: Track[] = [
 
 export const facets: FacetCatalogEntry[] = [
   {
-    facet: "visa_sponsorship",
+    facet: "facets.visa_sponsorship",
     label: "Visa sponsorship offered",
     kind: "values",
     values: [
@@ -71,7 +72,7 @@ export const facets: FacetCatalogEntry[] = [
     ],
   },
   {
-    facet: "relocation_required",
+    facet: "facets.relocation_required",
     label: "Relocation required",
     kind: "values",
     values: [
@@ -81,7 +82,7 @@ export const facets: FacetCatalogEntry[] = [
     ],
   },
   {
-    facet: "work_model",
+    facet: "facets.work_model",
     label: "Work model",
     kind: "values",
     values: [
@@ -91,7 +92,7 @@ export const facets: FacetCatalogEntry[] = [
     ],
   },
   {
-    facet: "employment_type",
+    facet: "facets.employment_type",
     label: "Employment type",
     kind: "values",
     values: [
@@ -101,7 +102,7 @@ export const facets: FacetCatalogEntry[] = [
     ],
   },
   {
-    facet: "required_skills",
+    facet: "facets.required_skills",
     label: "Required skills",
     kind: "values",
     values: [
@@ -111,7 +112,7 @@ export const facets: FacetCatalogEntry[] = [
     ],
   },
   {
-    facet: "min_education",
+    facet: "facets.min_education",
     label: "Minimum education",
     kind: "values",
     values: [
@@ -121,11 +122,12 @@ export const facets: FacetCatalogEntry[] = [
     ],
   },
   {
-    facet: "years_experience",
+    facet: "facets.years_experience",
     label: "Years of experience asked",
     kind: "range",
+    values: [],
   },
-  { facet: "title", label: "Job title", kind: "text" },
+  { facet: "title", label: "Job title", kind: "text", values: [] },
 ]
 
 type MockJob = JobSummary & {
@@ -597,7 +599,7 @@ export function seedCampaigns(): Campaign[] {
                 conditions: [
                   {
                     type: "values",
-                    facet: "min_education",
+                    facet: "facets.min_education",
                     include: ["masters"],
                   },
                 ],
@@ -707,5 +709,14 @@ export function seedCampaigns(): Campaign[] {
       last_sweep_checkpoint: "2026-11-18T06:00:00Z",
       mode_ceiling: "auto_apply",
     },
-  ] as Campaign[]
+  ].map((c) => ({
+    ...c,
+    // The imported campaign still has its items to confirm, one by one.
+    unconfirmed:
+      c.review_state === "needs_review"
+        ? (["titles", "locations", "seniority", "pay_floors"] as const)
+        : [],
+    match_counts: { new: 0, shortlisted: 0, held: 0 },
+    last_run_at: c.last_sweep_checkpoint ?? null,
+  })) as Campaign[]
 }

@@ -61,7 +61,7 @@ export function ActivityPage() {
             onChange={(e) =>
               setDraft({ ...draft, subject_type: e.target.value })
             }
-            className="h-8 rounded-md border border-input bg-surface px-2 text-base field-focus"
+            className="h-8 rounded-md border field-focus border-input bg-surface px-2 text-base"
           >
             {SUBJECTS.map((s) => (
               <option key={s} value={s}>
@@ -113,7 +113,7 @@ export function ActivityPage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id} className="border-t border-border align-top">
-                  <td className="num p-2.5 whitespace-nowrap">
+                  <td className="p-2.5 num whitespace-nowrap">
                     {new Date(r.created_at).toLocaleString()}
                   </td>
                   <td className="p-2.5">{r.actor}</td>

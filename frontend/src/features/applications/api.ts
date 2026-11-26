@@ -3,17 +3,11 @@
  * (`schema.d.ts`, from docs/openapi.json). The wave 0 hand-written `paths` does not cover
  * these endpoints yet, so this feature keeps its own client until the swap in `types.ts`.
  */
-import createClient from "openapi-fetch"
 import { queryOptions } from "@tanstack/react-query"
-import { unwrap } from "@/lib/api/client"
-import type { components, paths } from "@/lib/api/schema.d"
+import { api, toFormData, unwrap } from "@/lib/api/client"
+import type { components } from "@/lib/api/types"
 
-export const gen = createClient<paths>({
-  baseUrl:
-    typeof window !== "undefined" ? window.location.origin : "http://localhost",
-  credentials: "include",
-  fetch: (request: Request) => globalThis.fetch(request),
-})
+export const gen = api
 
 type Schemas = components["schemas"]
 export type ApplicationSummary = Schemas["ApplicationSummary"]
@@ -42,7 +36,21 @@ export const appKeys = {
 }
 
 export const listApplications = () =>
-  unwrap(gen.GET("/api/applications", { params: { query: { limit: 200 } } }))
+  unwrap(
+    gen.GET("/api/applications", {
+      params: { query: { limit: 200, hide_snoozed: true } },
+    })
+  )
+/** Keep the files the owner sent after "I applied myself" (their record, not evidence). */
+export const attachFiles = (id: string, files: File[]) =>
+  unwrap(
+    gen.POST("/api/applications/{application_id}/files", {
+      params: { path: { application_id: id } },
+      // Multipart: the generated body types each file as a string; the Files go as they are.
+      body: { files: files as unknown as string[] },
+      bodySerializer: toFormData,
+    })
+  )
 export const getApplication = (id: string) =>
   unwrap(
     gen.GET("/api/applications/{application_id}", {

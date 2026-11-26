@@ -2,10 +2,9 @@
  * Settings > AI: typed calls against the generated OpenAPI types (`schema.d.ts`), query keys
  * and options. Feature code in this folder imports from here only.
  */
-import createClient from "openapi-fetch"
 import { queryOptions } from "@tanstack/react-query"
-import { unwrap } from "@/lib/api/client"
-import type { components, paths } from "@/lib/api/schema.d"
+import { api, unwrap } from "@/lib/api/client"
+import type { components } from "@/lib/api/types"
 
 type S = components["schemas"]
 export type Connection = S["ConnectionOut"]
@@ -19,14 +18,6 @@ export type SpendSummary = S["SpendSummary"]
 export type SpendMeterData = S["SpendMeter"]
 export type Prompt = S["PromptOut"]
 export type Setting = S["SettingOut"]
-
-const origin =
-  typeof window !== "undefined" ? window.location.origin : "http://localhost"
-const api = createClient<paths>({
-  baseUrl: origin,
-  credentials: "include",
-  fetch: (request: Request) => globalThis.fetch(request),
-})
 
 export const aiKeys = {
   all: ["ai"] as const,

@@ -27,7 +27,9 @@ export function whyToPanel(why: WhyOut): {
       outcome: r.outcome === "info" ? "pass" : r.outcome,
       detail: r.reason,
     })),
-    toProceed: why.rules.flatMap((r) => (r.would_change_if ? [r.would_change_if] : [])),
+    toProceed: why.rules.flatMap((r) =>
+      r.would_change_if ? [r.would_change_if] : []
+    ),
   }
 }
 

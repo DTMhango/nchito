@@ -48,7 +48,8 @@ export function SettingRow({ setting: s }: { setting: SettingOut }) {
       void qc.invalidateQueries({ queryKey: settingsKeys.history(s.key) })
       toast.success(`${s.label} saved`)
     },
-    onError: (e) => setError(e instanceof Error ? e.message : "Could not save."),
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Could not save."),
   })
 
   const submit = () => {
