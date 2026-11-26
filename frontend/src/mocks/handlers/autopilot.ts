@@ -265,6 +265,7 @@ export const autopilotHandlers = [
     const out: DispatchCreateOut = {
       status: "denied",
       reason: "nothing approved is waiting",
+      code: "not_approved",
       dispatch: null,
       gates: [],
       pending_action_id: null,
@@ -273,6 +274,7 @@ export const autopilotHandlers = [
       return HttpResponse.json({
         ...out,
         reason: "automatic sending is paused",
+        code: "paused",
       })
     if (!approved) return HttpResponse.json(out)
     const d: DispatchOut = {
@@ -293,6 +295,8 @@ export const autopilotHandlers = [
       uncertain: false,
       reconcile_attempts: 0,
       last_reconciled_at: null,
+      deferred_reason: null,
+      deferred_until: null,
     }
     dispatchesOf(a).unshift(d)
     a.stage = "applying"
@@ -300,6 +304,7 @@ export const autopilotHandlers = [
       ...out,
       status: "queued",
       reason: "every gate passed",
+      code: null,
       dispatch: d,
       gates: d.gate_results,
     })

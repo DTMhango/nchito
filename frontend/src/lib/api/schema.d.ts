@@ -1599,6 +1599,28 @@ export interface paths {
         patch: operations["jobs_patch"];
         trace?: never;
     };
+    "/api/jobs/{job_id}/apply-email": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Jobs Set Apply Email
+         * @description Set, correct or confirm where this role's application email goes (audited ``job.apply_email_set``).
+         *     An address found in a posting stays unconfirmed until the owner confirms it here (or its domain is a
+         *     trusted site); only a usable address is sent to. A changed address retires a packet addressed elsewhere.
+         */
+        put: operations["jobs_set_apply_email"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/capture": {
         parameters: {
             query?: never;
@@ -2316,6 +2338,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/document-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Document Templates List
+         * @description The cv and letter templates a render can use (built-ins, then the owner's Kit templates; a Kit row with a
+         *     built-in key overrides it), with effective limits, and the default per kind (for ``application_id``, the
+         *     track's choice wins over the documents setting).
+         */
+        get: operations["document_templates_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/applications/{application_id}/documents/{kind}": {
         parameters: {
             query?: never;
@@ -2398,6 +2442,29 @@ export interface paths {
          *     approval when every gate passes, an approval request when the mode lets the system apply.
          */
         post: operations["applications_packet_build"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/packet/prepare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Applications Packet Prepare
+         * @description Prepare the packet exactly as the pipeline does (``app.apply.prepare.prepare_packet``): render the
+         *     checked spec's CV and letter, pick the channel (email to a usable application address when a mailbox is
+         *     connected, else manual; ``channel: manual`` always hands it to the owner), build, then let the automation
+         *     policy act (an approval request, or automatic approval).
+         */
+        post: operations["applications_packet_prepare"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4105,6 +4172,68 @@ export interface components {
              */
             files?: string[];
         };
+        /** ApplyChannelCandidate */
+        ApplyChannelCandidate: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "email" | "browser" | "manual";
+            /** Available */
+            available: boolean;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * ApplyEmailIn
+         * @description Set, correct or confirm the application address. ``address`` null keeps (or goes back to) the
+         *     posting's own address; ``confirmed`` confirms the resulting address, false withdraws a confirmation.
+         */
+        ApplyEmailIn: {
+            /** Address */
+            address?: string | null;
+            /**
+             * Confirmed
+             * @default true
+             */
+            confirmed?: boolean;
+        };
+        /**
+         * ApplyEmailOut
+         * @description The role's application address and where it came from (``app.apply.target``). Usable for the email
+         *     channel only when ``confirmed`` by the owner or on a ``trusted_domain``: unknown is not yes.
+         */
+        ApplyEmailOut: {
+            /** Address */
+            address: string;
+            /**
+             * Found In
+             * @description posting_text: quoted in the posting (see evidence); posting_link: its mailto link; owner: set by the owner
+             * @enum {string}
+             */
+            found_in: "posting_text" | "posting_link" | "owner";
+            /**
+             * Evidence
+             * @description The posting's sentence that gives the address
+             */
+            evidence: string | null;
+            /** Confirmed */
+            confirmed: boolean;
+            /** Confirmed By */
+            confirmed_by: string | null;
+            /** Confirmed At */
+            confirmed_at: string | null;
+            /**
+             * Trusted Domain
+             * @description The address's domain is on the trusted-sites list
+             */
+            trusted_domain: boolean;
+            /**
+             * Usable
+             * @description confirmed or trusted_domain: the email channel may send to it
+             */
+            usable: boolean;
+        };
         /** ApprovalStatusOut */
         ApprovalStatusOut: {
             /** Approved */
@@ -4118,6 +4247,11 @@ export interface components {
             reason: string;
             /** Pending Action Id */
             pending_action_id: string | null;
+            /**
+             * Code
+             * @description Why not approved: a machine code (CONTRACTS, wave 2 send-flow); None when approved
+             */
+            code: string | null;
         };
         /** ApproveIn */
         ApproveIn: {
@@ -5253,6 +5387,11 @@ export interface components {
             gates: components["schemas"]["GateResult"][];
             /** Pending Action Id */
             pending_action_id: string | null;
+            /**
+             * Code
+             * @description Why not queued: a machine code (CONTRACTS, wave 2 send-flow)
+             */
+            code: string | null;
         };
         /** DispatchOut */
         DispatchOut: {
@@ -5317,6 +5456,16 @@ export interface components {
             reconcile_attempts: number;
             /** Last Reconciled At */
             last_reconciled_at: string | null;
+            /**
+             * Deferred Reason
+             * @description Queued but postponed by the send-time check (quiet hours); null otherwise
+             */
+            deferred_reason: "quiet_hours" | null;
+            /**
+             * Deferred Until
+             * @description When a deferred send becomes due again
+             */
+            deferred_until: string | null;
         };
         /** DocumentOut */
         DocumentOut: {
@@ -5370,6 +5519,15 @@ export interface components {
             page_count: number | null;
             /** Warnings */
             warnings: components["schemas"]["RenderWarning"][];
+        };
+        /** DocumentTemplatesOut */
+        DocumentTemplatesOut: {
+            /** Templates */
+            templates: components["schemas"]["TemplateOptionOut"][];
+            /** Defaults */
+            defaults: {
+                [key: string]: components["schemas"]["TemplateDefaultOut"];
+            };
         };
         /**
          * DraftAnswer
@@ -6293,6 +6451,9 @@ export interface components {
             apply_url: string | null;
             /** Apply Method */
             apply_method: string;
+            apply_email: components["schemas"]["ApplyEmailOut"] | null;
+            /** Apply Channel Candidates */
+            apply_channel_candidates: components["schemas"]["ApplyChannelCandidate"][];
             /** Requirements */
             requirements: components["schemas"]["Requirement"][];
             /** Raw Text */
@@ -6914,6 +7075,42 @@ export interface components {
             invalidated_at: string | null;
             /** Invalidated Reason */
             invalidated_reason: string | null;
+        };
+        /**
+         * PacketPrepareIn
+         * @description Prepare the packet the way the pipeline does. ``auto``: email when the role's application address is
+         *     usable (confirmed, or a trusted domain) and a mailbox is connected, else manual. ``manual``: the owner
+         *     applies. Template keys override the track and documents settings (``GET /api/document-templates``).
+         */
+        PacketPrepareIn: {
+            /**
+             * Channel
+             * @default auto
+             * @enum {string}
+             */
+            channel?: "auto" | "manual";
+            /** Cv Template */
+            cv_template?: string | null;
+            /** Letter Template */
+            letter_template?: string | null;
+        };
+        /** PacketPrepareOut */
+        PacketPrepareOut: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "email" | "manual";
+            packet: components["schemas"]["PacketOut"];
+            /**
+             * Created
+             * @description False when the contents were identical to the current packet
+             */
+            created: boolean;
+            /** Changes */
+            changes: components["schemas"]["PacketChange"][];
+            /** @description What the automation policy did with the new packet (None: nothing to do) */
+            approval: components["schemas"]["ApprovalStatusOut"] | null;
         };
         /** Page[AliasOut] */
         Page_AliasOut_: {
@@ -9254,6 +9451,17 @@ export interface components {
             /** Queued */
             queued: boolean;
         };
+        /** TemplateDefaultOut */
+        TemplateDefaultOut: {
+            /** Key */
+            key: string;
+            /**
+             * Source
+             * @description track: the role's track picks it; setting: documents.cv_template / documents.letter_template
+             * @enum {string}
+             */
+            source: "track" | "setting";
+        };
         /** TemplateIn */
         TemplateIn: {
             /** Key */
@@ -9286,6 +9494,32 @@ export interface components {
             paragraphs?: number | null;
             /** Bullets Per Role */
             bullets_per_role?: number | null;
+        };
+        /** TemplateOptionOut */
+        TemplateOptionOut: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "cv" | "letter";
+            /** Name */
+            name: string;
+            /**
+             * Builtin
+             * @description Ships with the app (classic, compact, modern, letter-plain)
+             */
+            builtin: boolean;
+            /**
+             * Overridden
+             * @description A Kit template row with this built-in key changes it
+             */
+            overridden: boolean;
+            /** Section Order */
+            section_order: string[];
+            /** @description Effective limits: the template's own, else the documents settings */
+            limits: components["schemas"]["TemplateLimits"];
         };
         /** TemplateOut */
         TemplateOut: {
@@ -15343,6 +15577,48 @@ export interface operations {
             };
         };
     };
+    jobs_set_apply_email: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyEmailIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobDetail"];
+                };
+            };
+            /** @description Not an email address, or nothing to confirm ({code, reason}) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
     jobs_capture: {
         parameters: {
             query?: never;
@@ -17575,6 +17851,46 @@ export interface operations {
             };
         };
     };
+    document_templates_list: {
+        parameters: {
+            query?: {
+                application_id?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentTemplatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
     applications_document: {
         parameters: {
             query?: {
@@ -17777,6 +18093,57 @@ export interface operations {
                 };
             };
             /** @description The application has gone out */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_packet_prepare: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PacketPrepareIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PacketPrepareOut"];
+                };
+            };
+            /** @description Nothing built: {code, reason} (spec not checked, answers waiting, nowhere to apply, or the application has gone out) */
             409: {
                 headers: {
                     [name: string]: unknown;

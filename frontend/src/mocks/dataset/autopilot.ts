@@ -346,6 +346,8 @@ export function dispatchesFor(app: ApplicationSummary): DispatchOut[] {
     uncertain: false,
     reconcile_attempts: 0,
     last_reconciled_at: null,
+    deferred_reason: null,
+    deferred_until: null,
     ...over,
   })
   switch (app.employer) {
@@ -383,11 +385,13 @@ export function dispatchesFor(app: ApplicationSummary): DispatchOut[] {
     case "Nyika Labs":
       return [
         base(1, { status: "handed_off", channel: "browser" }),
-        // Due inside quiet hours: postponed to their end (timeline `dispatch_deferred`).
+        // Due inside quiet hours: postponed to their end (`deferred_reason`, and timeline `dispatch_deferred`).
         base(2, {
           status: "reserved",
           channel: "email",
           send_after: new Date(Date.now() + 9 * 3_600_000).toISOString(),
+          deferred_reason: "quiet_hours",
+          deferred_until: new Date(Date.now() + 9 * 3_600_000).toISOString(),
         }),
       ]
     default:
