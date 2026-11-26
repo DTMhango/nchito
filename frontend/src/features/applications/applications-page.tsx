@@ -1,55 +1,220 @@
-import { useState } from "react"
-import { Columns3, Table2 } from "lucide-react"
+import { useMemo, useState } from "react"
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type QueryClient,
+} from "@tanstack/react-query"
+import { Columns3, Pin, Search, Table2, X } from "lucide-react"
+import { toast } from "sonner"
 import { DataTable, type Column } from "@/components/data-table"
 import { EmptyState } from "@/components/empty-state"
-import { KanbanBoard, type KanbanColumn } from "@/components/kanban-board"
+import { KanbanBoard } from "@/components/kanban-board"
+import { ScoreRing } from "@/components/score-ring"
 import { Segmented } from "@/components/segmented"
 import { StagePill, type Stage } from "@/components/stage-pill"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { View } from "@/components/view"
+import { meQuery } from "@/lib/api/endpoints"
+import {
+  appKeys,
+  applicationsQuery,
+  campaignsQuery,
+  changeStage,
+  type ApplicationSummary,
+  type Channel,
+} from "./api"
+import {
+  ApplicationCard,
+  ChannelIcon,
+  CHANNEL_META,
+  NextStep,
+} from "./application-card"
+import { AppliedMyselfDialog } from "./applied-myself-dialog"
+import { daysSince } from "./format"
+import { QuickLookDrawer } from "./quick-look-drawer"
+import { PinButton, SnoozeButton } from "./row-actions"
+import { BOARD_COLUMNS, checkMove, columnOf, columnTitle } from "./stages"
+import { useLayoutPreference } from "./use-layout-preference"
 
-/** Board columns group the stages (DESIGN 4); end states share Closed. */
-export const BOARD_COLUMNS: KanbanColumn[] = [
-  { id: "shortlisted", title: "Shortlisted" },
-  { id: "tailoring", title: "Tailoring" },
-  { id: "ready", title: "Ready to apply" },
-  { id: "submitted", title: "Applied" },
-  { id: "interview", title: "Interview" },
-  { id: "closed", title: "Closed" },
-]
+export { BOARD_COLUMNS }
 
-type AppRow = {
-  id: string
-  employer: string
-  role: string
-  stage: Stage
-  next: string
-}
-
-const COLUMNS: Column<AppRow>[] = [
-  {
-    id: "employer",
-    header: "Company",
-    cell: (r) => <span className="font-semibold">{r.employer}</span>,
-    sortValue: (r) => r.employer,
-  },
-  { id: "role", header: "Role", cell: (r) => r.role, sortValue: (r) => r.role },
-  { id: "stage", header: "Stage", cell: (r) => <StagePill stage={r.stage} /> },
-  {
-    id: "next",
-    header: "Next step",
-    cell: (r) => <span className="text-muted-foreground">{r.next}</span>,
-    hideBelow: "md",
-  },
-]
+const ALL = "all"
 
 /** Applications: board and table of every role you are pursuing (DESIGN 10.3). */
 export function ApplicationsPage() {
-  const [layout, setLayout] = useState<"board" | "table">("board")
-  const rows: AppRow[] = []
+  const qc = useQueryClient()
+  const me = useQuery(meQuery())
+  const timeZone = me.data?.timezone
+  const apps = useQuery(applicationsQuery())
+  const campaigns = useQuery(campaignsQuery())
+  const [layout, setLayout] = useLayoutPreference()
+
+  const [text, setText] = useState("")
+  const [channel, setChannel] = useState<string>(ALL)
+  const [campaign, setCampaign] = useState<string>(ALL)
+  const [refusal, setRefusal] = useState<string | null>(null)
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [appliedId, setAppliedId] = useState<string | null>(null)
+
+  const all = useMemo(() => apps.data?.items ?? [], [apps.data])
+  const rows = useMemo(() => {
+    const q = text.trim().toLowerCase()
+    return all.filter(
+      (a) =>
+        (channel === ALL || a.channel === channel) &&
+        (campaign === ALL || a.campaign_id === campaign) &&
+        (!q ||
+          `${a.employer} ${a.title} ${a.next_step ?? ""}`
+            .toLowerCase()
+            .includes(q))
+    )
+  }, [all, text, channel, campaign])
+
+  const campaignOptions = useMemo(() => {
+    const names = new Map(
+      (campaigns.data?.items ?? []).map((c) => [c.id, c.name])
+    )
+    const ids = new Set(
+      all.map((a) => a.campaign_id).filter((x): x is string => !!x)
+    )
+    return [...ids].map((id, i) => ({
+      id,
+      name: names.get(id) ?? `Campaign ${i + 1}`,
+    }))
+  }, [all, campaigns.data])
+
+  const move = useMutation({
+    mutationFn: ({ id, stage }: { id: string; stage: Stage }) =>
+      changeStage(id, stage),
+    onMutate: async ({ id, stage }) => {
+      await qc.cancelQueries({ queryKey: appKeys.list })
+      const before = qc.getQueryData(appKeys.list)
+      patchList(qc, id, { stage })
+      return { before }
+    },
+    onError: (e, _v, ctx) => {
+      if (ctx?.before) qc.setQueryData(appKeys.list, ctx.before)
+      setRefusal(e.message)
+      toast.error(e.message)
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: appKeys.list }),
+  })
+
+  const onMove = (id: string, toColumn: string) => {
+    const app = all.find((a) => a.id === id)
+    if (!app) return
+    const result = checkMove(app.stage, toColumn)
+    if (result.kind === "refused") {
+      setRefusal(
+        `${app.employer} can't move to ${columnTitle(toColumn)}. ${result.reason}`
+      )
+      return
+    }
+    setRefusal(null)
+    if (result.kind === "applied-myself") {
+      setAppliedId(id)
+      return
+    }
+    move.mutate({ id, stage: result.stage })
+  }
+
+  const needStep = all.filter(
+    (a) => a.open_pending_actions > 0 || (a.next_due && !isDone(a.stage))
+  ).length
+  const active = all.filter((a) => !isDone(a.stage)).length
+  const openApp = all.find((a) => a.id === openId) ?? null
+  const appliedApp = all.find((a) => a.id === appliedId) ?? null
+
+  const columns: Column<ApplicationSummary>[] = [
+    {
+      id: "employer",
+      header: "Company",
+      sortValue: (r) => r.employer,
+      cell: (r) => (
+        <span className="inline-flex items-center gap-1 font-semibold">
+          {r.employer}
+          {r.pinned && (
+            <Pin
+              className="size-3 text-primary-ink"
+              strokeWidth={1.5}
+              aria-label="Pinned"
+            />
+          )}
+        </span>
+      ),
+    },
+    {
+      id: "role",
+      header: "Role",
+      sortValue: (r) => r.title,
+      cell: (r) => r.title,
+    },
+    {
+      id: "stage",
+      header: "Stage",
+      sortValue: (r) => columnOf(r.stage),
+      cell: (r) => <StagePill stage={r.stage} />,
+    },
+    {
+      id: "score",
+      header: "Score",
+      sortValue: (r) => r.score ?? -1,
+      hideBelow: "sm",
+      cell: (r) =>
+        r.score === null ? "" : <ScoreRing score={r.score} size={28} />,
+    },
+    {
+      id: "channel",
+      header: "Channel",
+      hideBelow: "md",
+      cell: (r) =>
+        r.channel ? (
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <ChannelIcon channel={r.channel} />
+            {CHANNEL_META[r.channel].label}
+          </span>
+        ) : null,
+    },
+    {
+      id: "days",
+      header: "In stage",
+      sortValue: (r) => daysSince(r.updated_at),
+      hideBelow: "md",
+      cell: (r) => <span className="num">{daysSince(r.updated_at)}d</span>,
+    },
+    {
+      id: "next",
+      header: "Next step",
+      hideBelow: "lg",
+      cell: (r) => <NextStep app={r} timeZone={timeZone} />,
+    },
+    {
+      id: "actions",
+      header: <span className="sr-only">Actions</span>,
+      align: "right",
+      hideBelow: "sm",
+      cell: (r) => (
+        <span className="inline-flex gap-1.5">
+          <PinButton app={r} />
+          <SnoozeButton app={r} timeZone={timeZone} />
+        </span>
+      ),
+    },
+  ]
 
   return (
     <View>
-      <div className="mb-4 flex flex-wrap items-center gap-2.5 pr-1">
+      <div className="mb-3 flex flex-wrap items-center gap-2.5 pr-1">
         <Segmented
           aria-label="Layout"
           value={layout}
@@ -60,22 +225,123 @@ export function ApplicationsPage() {
           ]}
         />
         <span className="text-[0.9rem] text-muted-foreground">
-          0 active · nothing needs a step
+          <span className="num">{active}</span> active ·{" "}
+          {needStep === 0 ? (
+            "nothing needs a step"
+          ) : (
+            <>
+              <span className="num">{needStep}</span> with a next step
+            </>
+          )}
         </span>
         <span className="ml-auto text-[0.84rem] text-faint max-md:hidden">
           Drag cards between stages, or focus a card and use the arrow keys
         </span>
       </div>
 
-      {layout === "board" ? (
-        <KanbanBoard<AppRow>
+      <div
+        role="search"
+        aria-label="Filter applications"
+        className="mb-4 flex flex-wrap items-center gap-2"
+      >
+        <div className="relative min-w-[200px] flex-1 sm:max-w-xs">
+          <Search
+            className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-faint"
+            strokeWidth={1.5}
+            aria-hidden="true"
+          />
+          <Input
+            aria-label="Search applications"
+            placeholder="Search employer or role"
+            className="pl-8"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </div>
+        <Select value={channel} onValueChange={setChannel}>
+          <SelectTrigger aria-label="Channel" size="sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL}>All channels</SelectItem>
+            {(Object.keys(CHANNEL_META) as Channel[]).map((c) => (
+              <SelectItem key={c} value={c}>
+                {CHANNEL_META[c].label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {campaignOptions.length > 0 && (
+          <Select value={campaign} onValueChange={setCampaign}>
+            <SelectTrigger aria-label="Campaign" size="sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL}>All campaigns</SelectItem>
+              {campaignOptions.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        {(text || channel !== ALL || campaign !== ALL) && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setText("")
+              setChannel(ALL)
+              setCampaign(ALL)
+            }}
+          >
+            <X aria-hidden="true" />
+            Clear filters
+          </Button>
+        )}
+      </div>
+
+      {refusal && (
+        <Alert variant="destructive" className="mb-3" role="alert">
+          <AlertTitle>Move refused</AlertTitle>
+          <AlertDescription>{refusal}</AlertDescription>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Dismiss"
+            className="absolute top-2 right-2"
+            onClick={() => setRefusal(null)}
+          >
+            <X aria-hidden="true" />
+          </Button>
+        </Alert>
+      )}
+
+      {apps.isError ? (
+        <Alert variant="destructive" role="alert">
+          <AlertTitle>Couldn't load applications</AlertTitle>
+          <AlertDescription>
+            {apps.error.message}{" "}
+            <Button
+              variant="link"
+              size="xs"
+              onClick={() => void apps.refetch()}
+            >
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : layout === "board" ? (
+        <KanbanBoard<ApplicationSummary>
           columns={BOARD_COLUMNS}
           items={rows}
           getId={(r) => r.id}
-          getColumn={(r) => r.stage}
-          getLabel={(r) => `${r.employer}, ${r.role}`}
-          renderCard={() => null}
-          onMove={() => {}}
+          getColumn={(r) => columnOf(r.stage)}
+          getLabel={(r) => `${r.employer}, ${r.title}`}
+          renderCard={(r) => <ApplicationCard app={r} timeZone={timeZone} />}
+          onMove={onMove}
+          onOpen={setOpenId}
           emptyColumn={(c) => (
             <p className="rounded-sm border border-dashed border-border-strong px-3 py-4 text-center text-sm text-faint">
               {c.id === "shortlisted"
@@ -86,18 +352,58 @@ export function ApplicationsPage() {
         />
       ) : (
         <DataTable
-          columns={COLUMNS}
+          columns={columns}
           rows={rows}
           getRowId={(r) => r.id}
           caption="Applications"
+          onRowClick={(r) => setOpenId(r.id)}
           empty={
             <EmptyState
-              title="No applications yet"
-              description="Every role you shortlist, tailor or apply to is listed here with its stage and next step."
+              title={
+                apps.isPending ? "Loading applications" : "No applications"
+              }
+              description={
+                all.length > 0
+                  ? "Nothing matches these filters."
+                  : "Every role you shortlist, tailor or apply to is listed here with its stage and next step."
+              }
             />
           }
         />
       )}
+
+      <QuickLookDrawer
+        app={openApp}
+        timeZone={timeZone}
+        onClose={() => setOpenId(null)}
+      />
+      <AppliedMyselfDialog
+        app={appliedApp}
+        timeZone={timeZone}
+        onClose={() => setAppliedId(null)}
+      />
     </View>
+  )
+}
+
+const isDone = (s: Stage) =>
+  ["rejected", "withdrawn", "closed", "skipped", "accepted"].includes(s)
+
+function patchList(
+  qc: QueryClient,
+  id: string,
+  patch: Partial<ApplicationSummary>
+) {
+  qc.setQueryData<{ items: ApplicationSummary[] } | undefined>(
+    appKeys.list,
+    (old) =>
+      old && {
+        ...old,
+        items: old.items.map((a) =>
+          a.id === id
+            ? { ...a, ...patch, updated_at: new Date().toISOString() }
+            : a
+        ),
+      }
   )
 }

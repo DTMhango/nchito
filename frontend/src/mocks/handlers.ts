@@ -12,6 +12,7 @@ import { aiHandlers } from "./handlers/ai"
 import { kitHandlers } from "./handlers/kit"
 import { sourcesHandlers } from "./handlers/sources"
 import { campaignHandlers } from "./handlers/campaigns"
+import { applicationsHandlers } from "./handlers/applications"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -195,4 +196,7 @@ export const handlers = [
   }),
   ...aiHandlers,
   ...campaignHandlers,
+
+  // Today, applications, pending actions (wave 1). Last, so other streams' handlers win on overlap.
+  ...applicationsHandlers,
 ]
