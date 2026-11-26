@@ -233,6 +233,8 @@ class Job(Base, Entity):
     conflict_state: Mapped[ConflictState] = mapped_column(str_enum(ConflictState), nullable=False,
                                                           default=ConflictState.none)
     conflict_note: Mapped[str | None] = mapped_column(Text)
+    conflict_detail: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, doc="Held: outranking job id, title and both scores (7.1)")
     facets: Mapped[JobFacets] = mapped_column(PydanticJSON(JobFacets), nullable=False, default=JobFacets)
     custom_facets: Mapped[dict[str, CustomFacetValue]] = mapped_column(
         PydanticJSON(dict[str, CustomFacetValue]), nullable=False, default=dict)
