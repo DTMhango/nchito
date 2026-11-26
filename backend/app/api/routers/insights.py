@@ -12,16 +12,17 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES
 from app.api.deps import RequireOwner, SessionDep
 from app.api.routers.pending_actions import DecisionGroup, open_decisions
 from app.core.clock import utcnow
 from app.core.settings import service as settings_service
 from app.llm.money import effective_cap_micros, micros_to_minor
-from app.models.applications import END_STAGES, Application, InterviewRound, Stage
+from app.models.applications import END_STAGES, Application, Channel, InterviewRound, Stage
 from app.models.applications import InterviewPack as InterviewPackRow
 from app.models.platform import LedgerEntry, LedgerKind
 from app.models.search import Assessment, Job, Run, RunKind, Source
+from app.ops.insights import InsightFilters, InsightsOut, SpendPeriod, build_insights
 
 router = APIRouter(prefix="/api", tags=["insights"], dependencies=[RequireOwner],
                    responses=NOT_IMPLEMENTED_RESPONSES)
@@ -88,19 +89,6 @@ class TodayOut(BaseModel):
     top_matches: list[TopMatch] = Field(default_factory=list)
     upcoming: list[UpcomingItem]
     spend: SpendMeter
-
-
-class Series(BaseModel):
-    key: str
-    points: list[tuple[str, float]]
-
-
-class InsightsOut(BaseModel):
-    funnel_by_campaign: dict[str, list[FunnelStage]]
-    response_rate: list[Series]
-    time_in_stage_days: dict[str, float]
-    spend_by_stage: list[Series]
-    spend_by_model: list[Series]
 
 
 STAGE_ORDER = list(Stage)
@@ -209,5 +197,14 @@ async def today(session: SessionDep, top: int = Query(default=5, ge=1, le=20),
 
 
 @router.get("/insights", response_model=InsightsOut, name="insights_get")
-async def insights(since: date | None = None, campaign_id: uuid.UUID | None = None) -> InsightsOut:
-    not_implemented(4, "insights")
+async def insights(
+    session: SessionDep, since: date | None = None, until: date | None = None, campaign_id: uuid.UUID | None = None,
+    track_id: uuid.UUID | None = None, source_id: uuid.UUID | None = None,
+    country: str | None = Query(default=None, max_length=100), channel: Channel | None = None,
+    period: SpendPeriod = "week",
+) -> InsightsOut:
+    """Funnel, response rates with sample sizes, time in stage, spend, source quality and automation outcomes
+    for one date range and filter set. Counting rules are in ``app.ops.insights``."""
+    filters = InsightFilters(since=since, until=until, campaign_id=campaign_id, track_id=track_id,
+                             source_id=source_id, country=country, channel=channel)
+    return await build_insights(session, filters, period=period)

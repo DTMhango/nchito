@@ -3429,7 +3429,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Insights Get */
+        /**
+         * Insights Get
+         * @description Funnel, response rates with sample sizes, time in stage, spend, source quality and automation outcomes
+         *     for one date range and filter set. Counting rules are in ``app.ops.insights``.
+         */
         get: operations["insights_get"];
         put?: never;
         post?: never;
@@ -4809,6 +4813,21 @@ export interface components {
             /** Next Before */
             next_before: string | null;
         };
+        /** AutomationOutcomes */
+        AutomationOutcomes: {
+            /** Auto */
+            auto: number;
+            /** Approved */
+            approved: number;
+            /** Manual */
+            manual: number;
+            /** Uncertain Sends */
+            uncertain_sends: number;
+            /** Blockers */
+            blockers: components["schemas"]["CountRow"][];
+            /** Permits Denied */
+            permits_denied: components["schemas"]["CountRow"][];
+        };
         /** AutomationPolicy */
         AutomationPolicy: {
             /**
@@ -5118,6 +5137,15 @@ export interface components {
             /** Deprioritise Themes */
             deprioritise_themes: string[];
         };
+        /** CampaignFunnel */
+        CampaignFunnel: {
+            /** Campaign Id */
+            campaign_id: string | null;
+            /** Campaign */
+            campaign: string;
+            /** Steps */
+            steps: components["schemas"]["FunnelStep"][];
+        };
         /** CampaignIn */
         CampaignIn: {
             /** Name */
@@ -5303,6 +5331,11 @@ export interface components {
              */
             status: "queued";
         };
+        /**
+         * Channel
+         * @enum {string}
+         */
+        Channel: "email" | "browser" | "manual";
         /** CheckResult */
         CheckResult: {
             /** Check */
@@ -5707,6 +5740,13 @@ export interface components {
             /** Origin */
             origin: string;
         };
+        /** CountRow */
+        CountRow: {
+            /** Key */
+            key: string;
+            /** Count */
+            count: number;
+        };
         /** CriterionRating */
         CriterionRating: {
             /** Criterion */
@@ -6053,6 +6093,19 @@ export interface components {
              * Format: uuid
              */
             run_id: string;
+        };
+        /** DurationRow */
+        DurationRow: {
+            /** Stage */
+            stage: string;
+            /** N */
+            n: number;
+            /** Median Days */
+            median_days: number | null;
+            /** P75 Days */
+            p75_days: number | null;
+            /** Too Few */
+            too_few: boolean;
         };
         /** Education */
         Education: {
@@ -6485,6 +6538,22 @@ export interface components {
             /** Count */
             count: number;
         };
+        /** FunnelStep */
+        FunnelStep: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+            /**
+             * Of Previous
+             * @description Share of the step before (null when that is zero)
+             */
+            of_previous: number | null;
+            /** Of Found */
+            of_found: number | null;
+        };
         /**
          * GateResult
          * @description One gate's result. ``outcome`` is the three-state answer (unknown is never a pass); ``passed`` is
@@ -6794,22 +6863,50 @@ export interface components {
             /** Application Id */
             application_id: string | null;
         };
+        /** InsightFilters */
+        InsightFilters: {
+            /** Since */
+            since: string | null;
+            /** Until */
+            until: string | null;
+            /** Campaign Id */
+            campaign_id: string | null;
+            /** Track Id */
+            track_id: string | null;
+            /** Source Id */
+            source_id: string | null;
+            /** Country */
+            country: string | null;
+            channel: components["schemas"]["Channel"] | null;
+        };
         /** InsightsOut */
         InsightsOut: {
-            /** Funnel By Campaign */
-            funnel_by_campaign: {
-                [key: string]: components["schemas"]["FunnelStage"][];
-            };
-            /** Response Rate */
-            response_rate: components["schemas"]["Series"][];
-            /** Time In Stage Days */
-            time_in_stage_days: {
-                [key: string]: number;
-            };
-            /** Spend By Stage */
-            spend_by_stage: components["schemas"]["Series"][];
-            /** Spend By Model */
-            spend_by_model: components["schemas"]["Series"][];
+            /**
+             * Since
+             * Format: date
+             */
+            since: string;
+            /**
+             * Until
+             * Format: date
+             */
+            until: string;
+            filters: components["schemas"]["InsightFilters"];
+            /** Notes */
+            notes: string[];
+            /** Funnel */
+            funnel: components["schemas"]["CampaignFunnel"][];
+            response: components["schemas"]["RateTables"];
+            time_in_stage: components["schemas"]["TimeInStage"];
+            spend: components["schemas"]["SpendReport"];
+            /** Sources */
+            sources: components["schemas"]["SourceRow"][];
+            automation: components["schemas"]["AutomationOutcomes"];
+            /**
+             * Exclusions
+             * @description Hard filters that excluded the most roles, most first
+             */
+            exclusions: components["schemas"]["CountRow"][];
         };
         /** InterviewEstimateOut */
         InterviewEstimateOut: {
@@ -8798,6 +8895,43 @@ export interface components {
              */
             burst?: number;
         };
+        /** RateRow */
+        RateRow: {
+            /**
+             * Key
+             * @description Track id, source id or country; the filter value for a drill-through
+             */
+            key: string;
+            /** Label */
+            label: string;
+            /** Sent */
+            sent: number;
+            /** Replies */
+            replies: number;
+            /** Interviews */
+            interviews: number;
+            /**
+             * Rate
+             * @description replies / sent; null when nothing was sent
+             */
+            rate: number | null;
+            /**
+             * Too Few
+             * @description Fewer than insights.min_sample sent: do not read the rate as a trend
+             */
+            too_few: boolean;
+        };
+        /** RateTables */
+        RateTables: {
+            /** Min Sample */
+            min_sample: number;
+            /** By Track */
+            by_track: components["schemas"]["RateRow"][];
+            /** By Source */
+            by_source: components["schemas"]["RateRow"][];
+            /** By Market */
+            by_market: components["schemas"]["RateRow"][];
+        };
         /** Ready */
         Ready: {
             /** Ready */
@@ -9743,16 +9877,6 @@ export interface components {
             /** High */
             high: string;
         };
-        /** Series */
-        Series: {
-            /** Key */
-            key: string;
-            /** Points */
-            points: [
-                string,
-                number
-            ][];
-        };
         /** SessionOut */
         SessionOut: {
             /**
@@ -10104,6 +10228,23 @@ export interface components {
             /** Last Success At */
             last_success_at: string | null;
         };
+        /** SourceRow */
+        SourceRow: {
+            /** Source Id */
+            source_id: string | null;
+            /** Name */
+            name: string;
+            /** Found */
+            found: number;
+            /** Duplicates */
+            duplicates: number;
+            /** Passed */
+            passed: number;
+            /** Applied */
+            applied: number;
+            /** Replies */
+            replies: number;
+        };
         /** SourceRunResult */
         SourceRunResult: {
             /** Source Id */
@@ -10314,6 +10455,42 @@ export interface components {
              * @default 0
              */
             estimated_unbilled_micros: number;
+        };
+        /** SpendReport */
+        SpendReport: {
+            /** Currency */
+            currency: string;
+            /**
+             * Period
+             * @enum {string}
+             */
+            period: "week" | "month";
+            /** Rows */
+            rows: components["schemas"]["SpendRow"][];
+            /** Total Micros */
+            total_micros: number;
+            /** Sent */
+            sent: number;
+            /** Interviews */
+            interviews: number;
+            /** Per Sent Micros */
+            per_sent_micros: number | null;
+            /** Per Interview Micros */
+            per_interview_micros: number | null;
+        };
+        /** SpendRow */
+        SpendRow: {
+            /**
+             * Period
+             * @description First day of the week or month, ISO date
+             */
+            period: string;
+            /** Stage */
+            stage: string;
+            /** Model */
+            model: string;
+            /** Micros */
+            micros: number;
         };
         /** SpendSummary */
         SpendSummary: {
@@ -10740,6 +10917,12 @@ export interface components {
             id: string;
             /** Builtin */
             builtin: boolean;
+        };
+        /** TimeInStage */
+        TimeInStage: {
+            /** Stages */
+            stages: components["schemas"]["DurationRow"][];
+            first_reply: components["schemas"]["DurationRow"];
         };
         /** TimelineEvent */
         TimelineEvent: {
@@ -21706,7 +21889,13 @@ export interface operations {
         parameters: {
             query?: {
                 since?: string | null;
+                until?: string | null;
                 campaign_id?: string | null;
+                track_id?: string | null;
+                source_id?: string | null;
+                country?: string | null;
+                channel?: components["schemas"]["Channel"] | null;
+                period?: "week" | "month";
             };
             header?: never;
             path?: never;

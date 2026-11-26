@@ -43,7 +43,7 @@ def test_gateway_tools_have_schemas():
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/insights"),
+    # Wave 4 implemented insights; remaining 501 stubs are listed here.
 ])
 async def test_later_wave_endpoints_answer_501(owner_client, method, path):
     body = {"rubric_id": str(uuid.uuid4()), "campaign_id": str(uuid.uuid4())} if method == "POST" else None

@@ -61,6 +61,7 @@ GROUPS: dict[str, str] = {
     "accounts": "Portal accounts",
     "data": "Data import and export",
     "sources": "Discovery sources",
+    "insights": "Insights",
 }
 
 AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
@@ -323,6 +324,15 @@ _int("tracking.change_check_every_hours", "Posting recheck interval",
      12, 24, 1, 720, "hours")
 _int("tracking.change_batch_size", "Rechecks per pass",
      "The most roles rechecked in one scheduled pass; the rest wait for the next pass.", 20, 5, 1, 200)
+
+# Insights (10.3)
+_int("insights.min_sample", "Smallest sample worth a rate",
+     "A response rate based on fewer sent applications than this is marked 'too few to tell'.", 10, 5, 1, 1000,
+     "applications")
+_int("insights.default_range_days", "Default range",
+     "How far back Insights looks when no dates are chosen.", 90, 30, 7, 3650, "days")
+_enum("insights.week_start", "Week starts on", "The first day of the week in weekly spend and counts.",
+      "monday", "sunday", ("monday", "sunday"))
 
 # Portal accounts and sign-in handoff (8.4)
 def _positive_ints(value: Any) -> None:

@@ -24,6 +24,7 @@ import {
 } from "@tanstack/react-router"
 import { lazy, type ComponentType } from "react"
 import { z } from "zod"
+import { insightsSearchSchema } from "@/features/insights/lib"
 import {
   requireNoOwner,
   requireSession,
@@ -347,7 +348,22 @@ const campaignEditorRoute = createRoute({
   },
 })
 const sourcesRoute = page("/sources", "Sources", SourcesPage)
-const insightsRoute = page("/insights", "Insights", InsightsPage)
+const insightsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/insights",
+  staticData: { title: "Insights" },
+  validateSearch: insightsSearchSchema,
+  component: function InsightsRoute() {
+    const search = insightsRoute.useSearch()
+    const navigate = insightsRoute.useNavigate()
+    return (
+      <InsightsPage
+        search={search}
+        onSearch={(next) => void navigate({ search: next, replace: true })}
+      />
+    )
+  },
+})
 
 const jobSearch = z.object({
   tab: z.enum(JOB_TABS).catch("overview").default("overview"),

@@ -14501,6 +14501,7 @@
           "insights"
         ],
         "summary": "Insights Get",
+        "description": "Funnel, response rates with sample sizes, time in stage, spend, source quality and automation outcomes\nfor one date range and filter set. Counting rules are in ``app.ops.insights``.",
         "operationId": "insights_get",
         "parameters": [
           {
@@ -14521,6 +14522,23 @@
             }
           },
           {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
             "name": "campaign_id",
             "in": "query",
             "required": false,
@@ -14535,6 +14553,87 @@
                 }
               ],
               "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "track_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Track Id"
+            }
+          },
+          {
+            "name": "source_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Id"
+            }
+          },
+          {
+            "name": "country",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Channel"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "week",
+                "month"
+              ],
+              "type": "string",
+              "default": "week",
+              "title": "Period"
             }
           }
         ],
@@ -18381,6 +18480,50 @@
         ],
         "title": "AuditPage"
       },
+      "AutomationOutcomes": {
+        "properties": {
+          "auto": {
+            "type": "integer",
+            "title": "Auto"
+          },
+          "approved": {
+            "type": "integer",
+            "title": "Approved"
+          },
+          "manual": {
+            "type": "integer",
+            "title": "Manual"
+          },
+          "uncertain_sends": {
+            "type": "integer",
+            "title": "Uncertain Sends"
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/CountRow"
+            },
+            "type": "array",
+            "title": "Blockers"
+          },
+          "permits_denied": {
+            "items": {
+              "$ref": "#/components/schemas/CountRow"
+            },
+            "type": "array",
+            "title": "Permits Denied"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auto",
+          "approved",
+          "manual",
+          "uncertain_sends",
+          "blockers",
+          "permits_denied"
+        ],
+        "title": "AutomationOutcomes"
+      },
       "AutomationPolicy": {
         "properties": {
           "mode": {
@@ -19206,6 +19349,40 @@
         "type": "object",
         "title": "CampaignCriteria"
       },
+      "CampaignFunnel": {
+        "properties": {
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "campaign": {
+            "type": "string",
+            "title": "Campaign"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/FunnelStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campaign_id",
+          "campaign",
+          "steps"
+        ],
+        "title": "CampaignFunnel"
+      },
       "CampaignIn": {
         "properties": {
           "name": {
@@ -19702,6 +19879,15 @@
           "status"
         ],
         "title": "CaptureOut"
+      },
+      "Channel": {
+        "type": "string",
+        "enum": [
+          "email",
+          "browser",
+          "manual"
+        ],
+        "title": "Channel"
       },
       "CheckResult": {
         "properties": {
@@ -20802,6 +20988,24 @@
         ],
         "title": "ContactOut"
       },
+      "CountRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "count"
+        ],
+        "title": "CountRow"
+      },
       "CriterionRating": {
         "properties": {
           "criterion": {
@@ -21678,6 +21882,53 @@
           "run_id"
         ],
         "title": "DryRunOut"
+      },
+      "DurationRow": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "n": {
+            "type": "integer",
+            "title": "N"
+          },
+          "median_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Days"
+          },
+          "p75_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P75 Days"
+          },
+          "too_few": {
+            "type": "boolean",
+            "title": "Too Few"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "n",
+          "median_days",
+          "p75_days",
+          "too_few"
+        ],
+        "title": "DurationRow"
       },
       "Education": {
         "properties": {
@@ -22788,6 +23039,53 @@
         ],
         "title": "FunnelStage"
       },
+      "FunnelStep": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "of_previous": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Of Previous",
+            "description": "Share of the step before (null when that is zero)"
+          },
+          "of_found": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Of Found"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "count",
+          "of_previous"
+        ],
+        "title": "FunnelStep"
+      },
       "GateResult": {
         "properties": {
           "gate": {
@@ -23686,54 +23984,163 @@
         ],
         "title": "ImportRowOut"
       },
+      "InsightFilters": {
+        "properties": {
+          "since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "track_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Track Id"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Channel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "InsightFilters"
+      },
       "InsightsOut": {
         "properties": {
-          "funnel_by_campaign": {
-            "additionalProperties": {
-              "items": {
-                "$ref": "#/components/schemas/FunnelStage"
-              },
-              "type": "array"
-            },
-            "type": "object",
-            "title": "Funnel By Campaign"
+          "since": {
+            "type": "string",
+            "format": "date",
+            "title": "Since"
           },
-          "response_rate": {
+          "until": {
+            "type": "string",
+            "format": "date",
+            "title": "Until"
+          },
+          "filters": {
+            "$ref": "#/components/schemas/InsightFilters"
+          },
+          "notes": {
             "items": {
-              "$ref": "#/components/schemas/Series"
+              "type": "string"
             },
             "type": "array",
-            "title": "Response Rate"
+            "title": "Notes"
           },
-          "time_in_stage_days": {
-            "additionalProperties": {
-              "type": "number"
-            },
-            "type": "object",
-            "title": "Time In Stage Days"
-          },
-          "spend_by_stage": {
+          "funnel": {
             "items": {
-              "$ref": "#/components/schemas/Series"
+              "$ref": "#/components/schemas/CampaignFunnel"
             },
             "type": "array",
-            "title": "Spend By Stage"
+            "title": "Funnel"
           },
-          "spend_by_model": {
+          "response": {
+            "$ref": "#/components/schemas/RateTables"
+          },
+          "time_in_stage": {
+            "$ref": "#/components/schemas/TimeInStage"
+          },
+          "spend": {
+            "$ref": "#/components/schemas/SpendReport"
+          },
+          "sources": {
             "items": {
-              "$ref": "#/components/schemas/Series"
+              "$ref": "#/components/schemas/SourceRow"
             },
             "type": "array",
-            "title": "Spend By Model"
+            "title": "Sources"
+          },
+          "automation": {
+            "$ref": "#/components/schemas/AutomationOutcomes"
+          },
+          "exclusions": {
+            "items": {
+              "$ref": "#/components/schemas/CountRow"
+            },
+            "type": "array",
+            "title": "Exclusions",
+            "description": "Hard filters that excluded the most roles, most first"
           }
         },
         "type": "object",
         "required": [
-          "funnel_by_campaign",
-          "response_rate",
-          "time_in_stage_days",
-          "spend_by_stage",
-          "spend_by_model"
+          "since",
+          "until",
+          "filters",
+          "notes",
+          "funnel",
+          "response",
+          "time_in_stage",
+          "spend",
+          "sources",
+          "automation",
+          "exclusions"
         ],
         "title": "InsightsOut"
       },
@@ -29531,6 +29938,96 @@
         "type": "object",
         "title": "RateLimit"
       },
+      "RateRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "Track id, source id or country; the filter value for a drill-through"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "sent": {
+            "type": "integer",
+            "title": "Sent"
+          },
+          "replies": {
+            "type": "integer",
+            "title": "Replies"
+          },
+          "interviews": {
+            "type": "integer",
+            "title": "Interviews"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate",
+            "description": "replies / sent; null when nothing was sent"
+          },
+          "too_few": {
+            "type": "boolean",
+            "title": "Too Few",
+            "description": "Fewer than insights.min_sample sent: do not read the rate as a trend"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "sent",
+          "replies",
+          "interviews",
+          "rate",
+          "too_few"
+        ],
+        "title": "RateRow"
+      },
+      "RateTables": {
+        "properties": {
+          "min_sample": {
+            "type": "integer",
+            "title": "Min Sample"
+          },
+          "by_track": {
+            "items": {
+              "$ref": "#/components/schemas/RateRow"
+            },
+            "type": "array",
+            "title": "By Track"
+          },
+          "by_source": {
+            "items": {
+              "$ref": "#/components/schemas/RateRow"
+            },
+            "type": "array",
+            "title": "By Source"
+          },
+          "by_market": {
+            "items": {
+              "$ref": "#/components/schemas/RateRow"
+            },
+            "type": "array",
+            "title": "By Market"
+          }
+        },
+        "type": "object",
+        "required": [
+          "min_sample",
+          "by_track",
+          "by_source",
+          "by_market"
+        ],
+        "title": "RateTables"
+      },
       "Ready": {
         "properties": {
           "ready": {
@@ -31954,37 +32451,6 @@
         ],
         "title": "ScoreRamp"
       },
-      "Series": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "points": {
-            "items": {
-              "prefixItems": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "number"
-                }
-              ],
-              "type": "array",
-              "maxItems": 2,
-              "minItems": 2
-            },
-            "type": "array",
-            "title": "Points"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "points"
-        ],
-        "title": "Series"
-      },
       "SessionOut": {
         "properties": {
           "id": {
@@ -32829,6 +33295,57 @@
         ],
         "title": "SourceOut"
       },
+      "SourceRow": {
+        "properties": {
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "found": {
+            "type": "integer",
+            "title": "Found"
+          },
+          "duplicates": {
+            "type": "integer",
+            "title": "Duplicates"
+          },
+          "passed": {
+            "type": "integer",
+            "title": "Passed"
+          },
+          "applied": {
+            "type": "integer",
+            "title": "Applied"
+          },
+          "replies": {
+            "type": "integer",
+            "title": "Replies"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source_id",
+          "name",
+          "found",
+          "duplicates",
+          "passed",
+          "applied",
+          "replies"
+        ],
+        "title": "SourceRow"
+      },
       "SourceRunResult": {
         "properties": {
           "source_id": {
@@ -33301,6 +33818,104 @@
           "estimated_unbilled_minor"
         ],
         "title": "SpendMeter"
+      },
+      "SpendReport": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "period": {
+            "type": "string",
+            "enum": [
+              "week",
+              "month"
+            ],
+            "title": "Period"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/SpendRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "total_micros": {
+            "type": "integer",
+            "title": "Total Micros"
+          },
+          "sent": {
+            "type": "integer",
+            "title": "Sent"
+          },
+          "interviews": {
+            "type": "integer",
+            "title": "Interviews"
+          },
+          "per_sent_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Sent Micros"
+          },
+          "per_interview_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Interview Micros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "currency",
+          "period",
+          "rows",
+          "total_micros",
+          "sent",
+          "interviews",
+          "per_sent_micros",
+          "per_interview_micros"
+        ],
+        "title": "SpendReport"
+      },
+      "SpendRow": {
+        "properties": {
+          "period": {
+            "type": "string",
+            "title": "Period",
+            "description": "First day of the week or month, ISO date"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "micros": {
+            "type": "integer",
+            "title": "Micros"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period",
+          "stage",
+          "model",
+          "micros"
+        ],
+        "title": "SpendRow"
       },
       "SpendSummary": {
         "properties": {
@@ -34459,6 +35074,26 @@
           "builtin"
         ],
         "title": "ThemeOut"
+      },
+      "TimeInStage": {
+        "properties": {
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/DurationRow"
+            },
+            "type": "array",
+            "title": "Stages"
+          },
+          "first_reply": {
+            "$ref": "#/components/schemas/DurationRow"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stages",
+          "first_reply"
+        ],
+        "title": "TimeInStage"
       },
       "TimelineEvent": {
         "properties": {
