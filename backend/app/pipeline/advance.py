@@ -27,7 +27,7 @@ from app.pipeline.decisions import decide
 from app.pipeline.filters import campaign_record, load_records
 
 TAILOR_VERDICTS = frozenset({"tailor", "ask_owner", "auto_apply"})
-ORIGIN = "pipeline"
+ORIGIN = "system"
 
 
 async def _application(session: AsyncSession, job: Job, campaign: Campaign) -> Application | None:

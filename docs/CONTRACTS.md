@@ -662,7 +662,7 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   application rendered from that version (`spec_hash`) with the same sha256.
 - **Pipeline**: after scoring, a real (non-dry) sweep requests tailoring for each role whose verdict is `tailor`,
   `ask_owner` or `auto_apply` (`app.pipeline.advance.tailor_winners`; held roles never), creating a shortlisted
-  application (`origin = pipeline`) when the role has none. A finished draft whose checks pass is rendered (PDF and
+  application (`origin = system`) when the role has none. A finished draft whose checks pass is rendered (PDF and
   text), packed by `app.apply.prepare.prepare_packet` (email when the posting has `apply_email` and a mailbox is
   connected, body = the letter text, subject = setting `automation.email_subject_template`; else manual with
   `apply_url`), and handed to `approval.after_packet_built`; `apply_tick` dispatches. Not built (audited
