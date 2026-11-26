@@ -136,7 +136,7 @@ New event names follow `<entity>.<past tense verb>` and are added to this table.
 ## 4. Settings registry
 
 `backend/app/core/settings/registry.py` is the **only** place a business setting and its
-default exist. 77 settings in groups `general, appearance, schedule, scoring, matching,
+default exist. 83 settings in groups `general, appearance, schedule, scoring, matching,
 automation, answers, reconcile, ai, budget, documents, retention, backups, notifications,
 runners`. Read them with `await settings_service.values(session)` (one query) or
 `get_value(session, key)`; write with `set_value(session, key, value, actor=..., reason=...)`,
@@ -286,7 +286,7 @@ themselves; nothing else imports a concrete implementation directly.
 | `LLMClient` | `backend/app/llm/client.py` | `complete(stage, messages, schema, *, max_cost_micros, model=None) -> (result, Usage)`, `estimate_cost_micros`. Costs are integer micros (millionths of the major unit, `app/llm/money.py`), stored and summed in micros, converted to minor units only for display and cap comparison. Ledger reservation first, structured output only, untrusted content only in `DataBlock`, no secrets or keep-out facts in prompts, tests use a fake. Production client: `app.llm.service.LLMService` (`.for_run(run_id)` for the per-run cap). Refusals raise `BudgetExhausted(scope)` (subclass of `BudgetExceeded`; park the work as resumable); route problems raise `LLMConfigError`. Tests import `app.llm.fake.FakeLLMClient`. Stage prompts: `app.llm.prompts.active_prompt(session, stage)`. Score escalation: `app.llm.routing.escalation_model(values, score)`. Untrusted text: `app.llm.untrusted.wrap_untrusted(text, label)` |
 | `Mailbox` | `backend/app/connect/mailbox.py` | `send(OutgoingMail) -> provider id \| None`, `list_messages(since)`, `find_sent(idempotency_key)`, `check()`. Narrowest read, send only from the email channel, no retries, reconcile from sent items |
 | `FileStore` | `backend/app/connect/filestore.py` | `put -> StoredFile(sha256)`, `get`, `delete`, `exists`, `share_link`. App-folder scope, explicit share links recorded in the packet, never deletes duplicate-protection history |
-| `RunHandler` | `backend/app/pipeline/runs.py` | `async (session, run) -> RunStatus`, registered per `RunKind` with `register()`. The worker's `run_pipeline` task calls it; a kind without a handler is recorded `skipped`, never `succeeded`. Idempotent per run; a failed sweep does not move the checkpoint |
+| `RunHandler` | `backend/app/pipeline/runs.py` | `async (session, run) -> RunStatus`, registered per `RunKind` with `register()`. The worker's `run_pipeline` task calls it; a kind without a handler is recorded `skipped`, never `succeeded`. Idempotent per run. Each source keeps its own checkpoint per campaign (`campaign.source_checkpoints`): a failing source delays only itself. A budget refusal parks the remaining paid work and ends the run `paused` (reason in `run.error`); the scheduler tick re-queues it once the cap changes or a new month begins. A dry run runs every stage (jobs, facets and scores are saved, spend is ledgered) but moves no checkpoint, touches no source health and creates no applications or pending actions; `proposed_actions` come from the decision table |
 
 Queue: Procrastinate on PostgreSQL (`backend/app/worker/queue.py`). Queues `system` (scheduler
 tick, every minute, periodic) and `runs`. Sweeps share the lock `"sweep"`, so they run one at
