@@ -370,8 +370,57 @@ def _work_model(data: DecisionInput, ctx: _Ctx, out: _Eligibility) -> None:
                                       would_change_if=f"add {actual} to the campaign's work models"))
 
 
+def _kit_fact_text(fact: Mapping[str, Any] | None, label: str) -> str:
+    if not fact or fact.get("value") is None:
+        return ""
+    return f"; your answer '{fact.get('question')}' ({label})"
+
+
+def _work_rights_from_kit(data: DecisionInput, ctx: _Ctx, out: _Eligibility, kit: Mapping[str, Any]) -> None:
+    """Work rights from the Kit's confirmed answers against the job's where-you-must-live, work-rights-needed
+    and sponsorship-offered facets. Unconfirmed answers never reach here: they resolve to unknown."""
+    job = data.job
+    need = _facet(job, "work_rights")
+    offered = _facet(job, "visa_sponsorship")
+    sponsored = need == "sponsorship_possible" or offered == "yes"
+    right, needs = kit.get("right") or {}, kit.get("needs_sponsorship") or {}
+    campaign_rights = data.campaign.get("work_rights")
+    held: bool | None = right.get("value")
+    if held is None and campaign_rights is not None and (places := _job_places(job)):
+        held = bool(places & {_norm(r) for r in campaign_rights}) or None
+    ref = RuleRef("kit.work_rights", {"right": right.get("value"), "needs_sponsorship": needs.get("value")}, "kit")
+    ask = "answer the work-rights question in your Kit and confirm it"
+    if held is True:
+        out.gates.append(GateDecision("work_rights", "eligibility", "pass",
+                                      "you have the right to work there" + _kit_fact_text(right, "yes"), (ref,)))
+    elif sponsored:
+        why = "sponsorship is offered"
+        if needs.get("value") is True:
+            why += " and you need it" + _kit_fact_text(needs, "yes")
+        elif held is False:
+            why += "; you have no right to work there" + _kit_fact_text(right, "no")
+        out.gates.append(GateDecision("work_rights", "eligibility", "pass", why, (ref,)))
+    elif need == "not_stated" and offered == "not_stated":
+        _add(out, _apply_policy("work_rights", "eligibility", "eligibility", "work-rights requirement not stated",
+                                [ref], ctx, "the posting states its work-rights requirement"))
+    elif held is False:
+        no_sponsor = "; sponsorship is not offered" if offered == "no" else ""
+        out.gates.append(GateDecision(
+            "work_rights", "eligibility", "fail",
+            "existing right to work required where you have none" + no_sponsor + _kit_fact_text(right, "no"),
+            (ref,), would_change_if="the employer offers sponsorship"))
+    else:
+        _add(out, _apply_policy("work_rights", "eligibility", "eligibility",
+                                "existing right to work required; your rights there are not known"
+                                + (f" ({right['note']})" if right.get("note") else ""), [ref], ctx, ask))
+
+
 def _work_rights(data: DecisionInput, ctx: _Ctx, out: _Eligibility) -> None:
     job = data.job
+    kit = job.get("kit_work_rights")
+    if isinstance(kit, Mapping):
+        _work_rights_from_kit(data, ctx, out, kit)
+        return
     need = _facet(job, "work_rights")
     rights = data.campaign.get("work_rights")
     ref = RuleRef("kit.work_rights", rights if rights is not None else "not known", "kit")
