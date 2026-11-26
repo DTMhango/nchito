@@ -7,7 +7,7 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import Select, or_, select
@@ -21,7 +21,7 @@ from app.core.conditions import ConditionSet
 from app.core.config import get_config
 from app.core.settings import service as settings_service
 from app.kit import answers as answer_matcher
-from app.kit import crud, guardrails, service, vault
+from app.kit import crud, guardrails, service, vault, waivers
 from app.kit import usage as answer_usage
 from app.kit.crud import Resource, add_kit_crud
 from app.llm import prompts as prompt_registry
@@ -32,6 +32,7 @@ from app.models.kit import (
     Fact,
     FactStatus,
     Guardrail,
+    GuardrailWaiver,
     Person,
     Reference,
     Skill,
@@ -188,6 +189,8 @@ class GuardrailCheckIn(BaseModel):
 
     texts: dict[GuardrailScope, str]
     file_names: list[str] = Field(default_factory=list)
+    application_id: uuid.UUID | None = Field(
+        default=None, description="Take this application's waivers of 'block, waivable once' guardrails into account")
 
 
 class GuardrailCheckOut(BaseModel):
@@ -458,13 +461,73 @@ async def check_guardrails(body: GuardrailCheckIn, session: SessionDep) -> Guard
     ] + guardrails.never_skill_rules(never)
     docs = [guardrails.Document(scope=scope, text=text) for scope, text in body.texts.items()]
     violations = guardrails.check(rules, docs, file_names=body.file_names)
+    waived = await waivers.waived_ids(session, body.application_id) if body.application_id else set()
     failed = {v.guardrail_id for v in violations}
     results = [
-        CheckResult(check=v.name, status=v.status, detail=v.detail, guardrail_id=v.guardrail_id)
+        CheckResult(check=v.name, status=v.status, detail=v.detail, guardrail_id=v.guardrail_id,
+                    waived=v.waivable and v.guardrail_id in waived)
         for v in violations
     ] + [CheckResult(check=r.name, status="pass", guardrail_id=r.id) for r in rules
          if r.id not in failed and r.params.type in CODE_ENFORCED]
-    return GuardrailCheckOut(results=results, blocked=guardrails.blocked(violations))
+    return GuardrailCheckOut(results=results, blocked=guardrails.blocked(violations, waived=waived))
+
+
+class WaiverIn(BaseModel):
+    application_id: uuid.UUID
+    reason: str = Field(min_length=1, max_length=2000, description="Why this application may break the rule")
+
+
+class WaiverOut(Timestamps):
+    guardrail_id: uuid.UUID
+    application_id: uuid.UUID
+    reason: str
+    waived_by: str
+
+
+def _waiver_out(w: GuardrailWaiver) -> WaiverOut:
+    return WaiverOut(id=w.id, created_at=w.created_at, updated_at=w.updated_at, guardrail_id=w.guardrail_id,
+                     application_id=w.application_id, reason=w.reason, waived_by=w.waived_by)
+
+
+@router.post("/guardrails/{item_id}/waivers", response_model=WaiverOut, status_code=status.HTTP_201_CREATED,
+             name="kit_guardrails_waive",
+             responses={409: {"description": "Not waivable (always block, or only advises), or already waived"}})
+async def waive_guardrail(item_id: uuid.UUID, body: WaiverIn, principal: PrincipalDep,
+                          session: SessionDep) -> WaiverOut:
+    """Waive a 'block, waivable once' guardrail for ONE application, with a reason. Audited."""
+    guardrail = await session.get(Guardrail, item_id)
+    if guardrail is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="guardrail not found")
+    try:
+        row = await waivers.create(session, guardrail, body.application_id, body.reason, actor=principal.actor)
+    except waivers.WaiverError as exc:
+        raise HTTPException(exc.status_code, detail=str(exc)) from exc
+    return _waiver_out(row)
+
+
+@router.get("/guardrail-waivers", response_model=list[WaiverOut], name="kit_guardrail_waivers_list")
+async def list_waivers(session: SessionDep, application_id: uuid.UUID | None = None,
+                       guardrail_id: uuid.UUID | None = None) -> list[WaiverOut]:
+    stmt = select(GuardrailWaiver).order_by(GuardrailWaiver.created_at.desc())
+    if application_id:
+        stmt = stmt.where(GuardrailWaiver.application_id == application_id)
+    if guardrail_id:
+        stmt = stmt.where(GuardrailWaiver.guardrail_id == guardrail_id)
+    return [_waiver_out(w) for w in (await session.scalars(stmt)).all()]
+
+
+@router.delete("/guardrail-waivers/{waiver_id}", status_code=status.HTTP_204_NO_CONTENT,
+               name="kit_guardrail_waivers_delete")
+async def delete_waiver(waiver_id: uuid.UUID, principal: PrincipalDep, session: SessionDep) -> Response:
+    """Take a waiver back: the guardrail blocks that application again. Audited."""
+    row = await session.get(GuardrailWaiver, waiver_id)
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="waiver not found")
+    await audit.record(session, actor=principal.actor, action="kit.guardrail.waiver_removed",
+                       subject_type="guardrail", subject_id=row.guardrail_id,
+                       detail={"application_id": str(row.application_id), "waiver_id": str(row.id)})
+    await session.delete(row)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/answers/match", response_model=AnswerMatchOut, name="kit_answers_match")
