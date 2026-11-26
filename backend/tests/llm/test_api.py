@@ -52,8 +52,9 @@ async def test_provider_validation_and_non_llm_providers_wait_for_wave_2(owner_c
     r = await owner_client.post("/api/connections", json={"provider": "anthropic", "label": "x",
                                                           "config": {"api_key": "oops"}})
     assert r.status_code == 422
+    # OneDrive (wave 4 msgraph) signs in with OAuth: pasting keys is refused.
     r = await owner_client.post("/api/connections", json={"provider": "onedrive", "label": "Drive"})
-    assert r.status_code == 501
+    assert r.status_code == 422 and "Connect button" in r.text
 
 
 async def test_connection_test_makes_one_tiny_budgeted_call(owner_client: httpx.AsyncClient,
