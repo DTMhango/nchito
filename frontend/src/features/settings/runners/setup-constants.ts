@@ -20,7 +20,7 @@ export const API_KEY_PLACEHOLDER = "<your Anthropic API key>"
 
 /** Environment variable names, with the kit file that reads each. */
 export const RUNNER_ENV = {
-  /** The instance address (install.ps1 -Url, start.*, check.*, mcp.template.json). */
+  /** The instance address, without `/mcp` (both runners). */
   url: "NCHITO_URL",
   /** The bearer token (install.ps1 -SetToken, start.*, mcp.template.json, server config.py). */
   token: "NCHITO_RUNNER_TOKEN",
@@ -30,21 +30,31 @@ export const RUNNER_ENV = {
   loop: "NCHITO_LOOP",
   /** start.sh: no permission prompts, self-check first (start.ps1 -Unattended). */
   unattended: "NCHITO_UNATTENDED",
-  /** Server runner (config.py): the gateway endpoint. */
-  serverMcpUrl: "NCHITO_MCP_URL",
-  /** Server runner: its own key, separate spend (set from RUNNER_ANTHROPIC_API_KEY). */
-  serverApiKey: "ANTHROPIC_API_KEY",
 } as const
 
 /** Compose variables for the `runner` service (docker-compose.yml). */
 export const COMPOSE_ENV = {
   /** Becomes NCHITO_RUNNER_TOKEN inside the container. */
   token: "RUNNER_TOKEN",
-  /** Becomes ANTHROPIC_API_KEY inside the container (its own spend line). */
+  /** The server runner's own Anthropic key (its own spend line). */
   apiKey: "RUNNER_ANTHROPIC_API_KEY",
-  /** Becomes NCHITO_MCP_URL (defaults to the web service's /mcp). */
-  mcpUrl: "RUNNER_MCP_URL",
+  /** Optional: becomes NCHITO_URL (defaults to the web service, http://web:8000). */
+  url: "RUNNER_NCHITO_URL",
 } as const
+
+/**
+ * Optional compose variables. The ceilings can only lower the owner's `runners.*` settings; the
+ * model is the owner's setting, not an environment value.
+ */
+export const COMPOSE_OPTIONAL_ENV = [
+  "RUNNER_TASK_MAX_COST_USD",
+  "RUNNER_DAY_MAX_COST_USD",
+  "RUNNER_TASK_MAX_TOKENS",
+  "RUNNER_DAY_MAX_TOKENS",
+  "RUNNER_POLL_SECONDS",
+  "RUNNER_TASK_KINDS",
+  "RUNNER_DRY_RUN",
+] as const
 
 /** The compose profile that alone starts the server runner. */
 export const COMPOSE_PROFILE = "runner"

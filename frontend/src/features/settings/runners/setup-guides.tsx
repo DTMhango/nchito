@@ -2,6 +2,7 @@ import type { ReactNode } from "react"
 import { SectionHeader } from "@/components/page-header"
 import {
   COMPOSE_ENV,
+  COMPOSE_OPTIONAL_ENV,
   COMPOSE_PROFILE,
   INSTANCE_PLACEHOLDER,
   LOCAL_COMMANDS,
@@ -144,9 +145,18 @@ export function SetupGuides() {
               Add the token as <code>{COMPOSE_ENV.token}</code> and its own API
               key as <code>{COMPOSE_ENV.apiKey}</code> in the server's
               environment (paste your values in place of the placeholders). The
-              container reads them as <code>{RUNNER_ENV.token}</code> and{" "}
-              <code>{RUNNER_ENV.serverApiKey}</code>.
+              container reads the token as <code>{RUNNER_ENV.token}</code>.
               <Code>{SERVER_COMMANDS.env}</Code>
+              Optional: <code>{COMPOSE_ENV.url}</code> when the runner reaches
+              this instance at another address, and{" "}
+              {COMPOSE_OPTIONAL_ENV.map((n, i) => (
+                <span key={n}>
+                  {i > 0 && ", "}
+                  <code className="break-all">{n}</code>
+                </span>
+              ))}
+              . Ceilings set here can only lower the limits in Runner settings;
+              the model is chosen there too.
             </li>
             <li>
               Start it with the <code>{COMPOSE_PROFILE}</code> compose profile.
