@@ -54,6 +54,35 @@ describe("messages on the job page", { timeout: 20_000 }, () => {
   })
 })
 
+describe("approving while winding down", { timeout: 20_000 }, () => {
+  it("repeats that approved messages still send, only while a wind-down is on", async () => {
+    const jobId = appliedJobId(3)
+    seedMessage(appFor(jobId).id, { kind: "withdraw" })
+    followupsMock().windDown.status = "active"
+    followupsMock().windDown.autopilot_paused = true
+    renderApp(`/jobs/${jobId}?tab=messages`)
+    const card = await screen.findByRole("listitem", {
+      name: /Withdraw/,
+    })
+    expect(
+      await within(card).findByRole("note", { name: "Wind-down is on" })
+    ).toHaveTextContent(/still send\. Approving this one lets it send\./)
+  })
+
+  it("says nothing extra without a wind-down", async () => {
+    const jobId = appliedJobId(3)
+    seedMessage(appFor(jobId).id)
+    renderApp(`/jobs/${jobId}?tab=messages`)
+    const card = await screen.findByRole("listitem", {
+      name: "Follow-up message",
+    })
+    await within(card).findByRole("button", { name: "Approve" })
+    expect(
+      within(card).queryByRole("note", { name: "Wind-down is on" })
+    ).toBeNull()
+  })
+})
+
 describe("follow-ups due list", { timeout: 20_000 }, () => {
   it("marks one not needed and drafts another", async () => {
     const user = userEvent.setup()
@@ -77,6 +106,11 @@ describe("wind-down", { timeout: 20_000 }, () => {
     expect(
       await screen.findByText("Automatic sending paused")
     ).toBeInTheDocument()
+    expect(
+      screen.getByRole("note", { name: "What still sends" })
+    ).toHaveTextContent(
+      /Automatic sending is paused.*withdrawals and declines, still send/
+    )
     const campaigns = await screen.findByRole("region", {
       name: "Campaigns and schedules",
     })

@@ -9,6 +9,7 @@ import {
   followupKeys,
   reopenWindDown,
   startWindDown,
+  WIND_DOWN_SENDING,
   WIND_DOWN_SUMMARY_URL,
   windDownQuery,
   type WindDownChoice,
@@ -50,6 +51,9 @@ export function WindDownPage() {
           title="Wind down"
           description="Accepted an offer? This pauses every automatic send at once, then lets you decide what happens to everything else."
         />
+        <p className="mb-3 max-w-prose text-sm text-muted-foreground">
+          Once you start: {lowerFirst(WIND_DOWN_SENDING)}
+        </p>
         {wd.status === "reopened" && (
           <p className="mb-3 text-sm" role="status">
             Your search was reopened: everything came back paused. Resume
@@ -104,6 +108,15 @@ export function WindDownPage() {
           </div>
         }
       />
+      <p
+        role="note"
+        aria-label="What still sends"
+        className="mb-4 max-w-prose rounded-md border border-border bg-warn-soft px-3 py-2 text-sm text-foreground"
+      >
+        {wd.autopilot_paused
+          ? WIND_DOWN_SENDING
+          : "Autopilot was resumed during this wind-down. Messages you approve still send."}
+      </p>
       <div className="grid gap-5">
         <Section title="Queued sends" items={wd.queued_sends} onSet={set} />
         <Section
@@ -134,6 +147,8 @@ export function WindDownPage() {
     </div>
   )
 }
+
+const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1)
 
 function Section({
   title,

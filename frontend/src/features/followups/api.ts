@@ -113,6 +113,13 @@ export const followupNotNeeded = (appId: string) =>
     })
   )
 
+/**
+ * What a wind-down pauses and what it does not, said the same way on the wind-down screen and
+ * next to every Approve while one is active (DESIGN 18.4: owner-approved messages pass the pause).
+ */
+export const WIND_DOWN_SENDING =
+  "Automatic sending is paused: no application, follow-up or other message goes out on its own. Messages you approve yourself, such as withdrawals and declines, still send."
+
 export const windDownQuery = () =>
   queryOptions({
     queryKey: followupKeys.windDown,

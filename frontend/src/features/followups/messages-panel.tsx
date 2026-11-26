@@ -13,6 +13,8 @@ import {
   messageAction,
   messagesQuery,
   sendMessage,
+  WIND_DOWN_SENDING,
+  windDownQuery,
   type MessageKind,
   type MessageOut,
 } from "./api"
@@ -186,6 +188,7 @@ function MessageCard({
     m.send_state === "cancelled"
   const editable = open && m.status !== "discarded"
   const s = SEND_TEXT[m.send_state]
+  const windingDown = useQuery(windDownQuery()).data?.status === "active"
 
   return (
     <li
@@ -247,6 +250,16 @@ function MessageCard({
         </pre>
       )}
       <MessageChecks message={m} />
+      {windingDown && open && m.status !== "discarded" && (
+        <p
+          role="note"
+          aria-label="Wind-down is on"
+          className="rounded-md border border-border bg-warn-soft px-3 py-2 text-sm text-foreground"
+        >
+          You are winding down. {WIND_DOWN_SENDING} Approving this one lets it
+          send.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         {editable && !editing && (
           <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
