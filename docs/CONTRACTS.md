@@ -427,3 +427,27 @@ the registry under its own group prefix only.
   `block, waivable once`; 409 if already waived; 422 blank reason), `GET /api/kit/guardrail-waivers?application_id=`,
   `DELETE /api/kit/guardrail-waivers/{id}`. `POST /api/kit/guardrails/check` takes an optional `application_id`: a waived
   violation shows `waived: true` and no longer sets `blocked`. Audited `kit.guardrail.waived`, `kit.guardrail.waiver_removed`.
+
+## Wave 2 kit-io additions
+
+- `POST /api/data/export` and `/export/preview`: `ExportIn` gains `acknowledge_personal_details`
+  (default false). A `share_setup` whose scan finds personal details returns 409 until the owner
+  removes them or acknowledges. Share setup also drops campaign pay floors and seniority, track
+  lead facts, and every guardrail type except `format`, `limit`, `attach_policy`.
+- `GET /api/data/exports/{export_id}`: downloads a prepared export (`download_url` points here);
+  404 once `data.export_link_minutes` has passed. Files live under `FILES_DIR/exports/`.
+- `POST /api/data/import` (`kit_file`, `old_kit_zip`, `history_csv`, `free_form`) stages the upload
+  under `FILES_DIR/imports/<id>/` and writes nothing to the database; `/import/commit` re-reads
+  and re-validates the staged bytes, applies in one transaction, and consumes the staging.
+  `exclude_keys` entries are `entity:key` as shown in the preview diff. `change` is `conflict`
+  when the incoming item differs from one the owner already confirmed.
+- Kit file zip rules: only `kit.json` and `vault/<file>` (no subfolders); every vault file listed
+  with a matching sha256; a newer `schema_version` is refused, an older one runs through
+  `kitfile.MIGRATIONS`. Vault paths are `vault/<sha256><ext>`.
+- Setup sections that can act on their own import inert: sources disabled, campaigns draft with
+  every criteria group unconfirmed and automation lowered to `prepare`, rubrics and prompts as
+  inactive new versions.
+- `GET /api/data/onboarding`: computed wizard state (`kit_present`, `facts_confirmed`,
+  `campaign_exists`, `criteria_confirmed`, `mail_connected`), plus `complete` and `next_step`.
+- Settings (group `data`): `import_max_zip_mb`, `import_max_file_mb`, `import_max_files`,
+  `import_staging_hours`, `export_link_minutes`, `old_kit_ai_extraction` (default off).

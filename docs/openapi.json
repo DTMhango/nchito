@@ -13185,6 +13185,7 @@
           "data"
         ],
         "summary": "Data Export Preview",
+        "description": "What would be exported. A share setup is scanned for personal details first (18.5).",
         "operationId": "data_export_preview",
         "requestBody": {
           "content": {
@@ -13268,6 +13269,9 @@
               }
             }
           },
+          "409": {
+            "description": "Personal details found in a share setup"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -13281,13 +13285,93 @@
         }
       }
     },
+    "/api/data/exports/{export_id}": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Data Export Download",
+        "operationId": "data_export_download",
+        "parameters": [
+          {
+            "name": "export_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Export Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or expired export"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/onboarding": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Data Onboarding",
+        "description": "Which wizard steps are done, computed from the data (13).",
+        "operationId": "data_onboarding",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data/import": {
       "post": {
         "tags": [
           "data"
         ],
         "summary": "Data Import Preview",
-        "description": "Validate and diff; nothing is written until commit. Imported items land as needs_review.",
+        "description": "Validate and diff; nothing is written to the database until commit. Imported items land as needs_review.",
         "operationId": "data_import_preview",
         "requestBody": {
           "content": {
@@ -13320,15 +13404,11 @@
               }
             }
           },
+          "413": {
+            "description": "Upload too large"
+          },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "Not importable"
           }
         }
       }
@@ -13339,6 +13419,7 @@
           "data"
         ],
         "summary": "Data Import Commit",
+        "description": "Apply a previewed import in one transaction (everything or nothing). Re-validates the staged bytes.",
         "operationId": "data_import_commit",
         "requestBody": {
           "content": {
@@ -13371,15 +13452,11 @@
               }
             }
           },
+          "404": {
+            "description": "Unknown or expired import"
+          },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "Not importable"
           }
         }
       }
@@ -18895,6 +18972,12 @@
               "personal_backup"
             ],
             "title": "Kind"
+          },
+          "acknowledge_personal_details": {
+            "type": "boolean",
+            "title": "Acknowledge Personal Details",
+            "description": "Share setup only: export even though the preview found personal details",
+            "default": false
           }
         },
         "type": "object",
@@ -21822,6 +21905,68 @@
           "fields"
         ],
         "title": "OmitField"
+      },
+      "OnboardingOut": {
+        "properties": {
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingStepOut"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "next_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Step",
+            "description": "Key of the first step not done, or null"
+          }
+        },
+        "type": "object",
+        "required": [
+          "steps",
+          "complete",
+          "next_step"
+        ],
+        "title": "OnboardingOut"
+      },
+      "OnboardingStepOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "done",
+          "detail"
+        ],
+        "title": "OnboardingStepOut"
       },
       "Override": {
         "properties": {
