@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/pending-actions", tags=["pending_actions"], depe
 
 PendingType = Literal["approve", "sign_in", "create_account", "captcha", "unknown_question", "assessment",
                       "declaration", "confirm_submission", "review_import", "conflict_choice", "answer_review_due",
-                      "follow_up"]
+                      "follow_up", "unsupported_form", "redirect_off_domain", "page_instruction"]
 ScopeT = Literal["this_application", "this_employer", "this_country", "all_matching"]
 StatusT = Literal["open", "resolved", "dismissed", "expired"]
 
@@ -55,6 +55,8 @@ class PendingActionOut(Timestamps):
     employer: str | None = None
     job_title: str | None = None
     resolution: dict[str, Any] | None = None
+    kind: str | None = Field(default=None, description="The exact kind within the type (``detail.kind``): e.g. "
+                                                       "posting_changed, posting_closed, verification_code")
 
 
 class DecisionGroup(BaseModel):
@@ -128,7 +130,7 @@ async def _outs(session: AsyncSession, actions: list[PendingAction]) -> list[Pen
             application_id=a.application_id, agent_task_id=a.agent_task_id, group_key=a.group_key, title=a.title,
             detail=a.detail, checkpoint=a.checkpoint, deadline=a.deadline, status=a.status.value,
             snoozed_until=a.snoozed_until, snoozed=_is_snoozed(a, now, days), employer=employer, job_title=title,
-            resolution=a.resolution))
+            resolution=a.resolution, kind=(a.detail or {}).get("kind")))
     return out
 
 
@@ -189,12 +191,16 @@ def _group_title(actions: list[PendingAction]) -> str:
 
 @router.get("", response_model=Page[PendingActionOut], name="pending_actions_list")
 async def list_pending(session: SessionDep, status: StatusT = "open", type: PendingType | None = None,
+                       kind: str | None = Query(default=None, max_length=60),
                        include_snoozed: bool = False, cursor: str | None = None,
                        limit: int = Query(default=100, ge=1, le=500)) -> Page[PendingActionOut]:
-    """Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back."""
+    """Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back. ``kind`` filters on
+    ``detail.kind`` (e.g. ``posting_changed`` for posting change actions)."""
     stmt = select(PendingAction).where(PendingAction.status == PendingStatus(status))
     if type:
         stmt = stmt.where(PendingAction.type == PendingActionType(type))
+    if kind:
+        stmt = stmt.where(PendingAction.detail["kind"].astext == kind)
     rows = list(await session.scalars(stmt.order_by(PendingAction.deadline.asc().nulls_last(),
                                                     PendingAction.created_at, PendingAction.id)))
     if status == "open" and not include_snoozed:

@@ -449,3 +449,17 @@ async def test_reinstating_a_paused_runner_needs_an_explicit_acknowledgement(own
     assert r.status_code == 200 and r.json()["suspended_at"] is None
     event = (await audits("gateway.token_reinstated"))[0]
     assert event.detail["acknowledged"] is True and event.detail["note"] == "checked the application by hand"
+
+
+async def test_new_blocker_types_and_change_actions_are_listed_for_today(owner_client):
+    w = await world()
+    task_id = await claim(w.runner_a)
+    await call(w.runner_a, "raise_blocker", task_id=task_id, type="unsupported_form", detail="a drawing widget")
+    async with maker()() as s:
+        s.add(PendingAction(type=PendingActionType.follow_up, application_id=w.app_id, title="The posting changed",
+                            detail={"kind": "posting_changed"}))
+        await s.commit()
+    r = await owner_client.get("/api/pending-actions", params={"type": "unsupported_form"})
+    assert r.status_code == 200 and [a["kind"] for a in r.json()["items"]] == ["unsupported_form"]
+    r = await owner_client.get("/api/pending-actions", params={"kind": "posting_changed"})
+    assert r.status_code == 200 and [a["title"] for a in r.json()["items"]] == ["The posting changed"]

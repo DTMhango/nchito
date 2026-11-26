@@ -12396,7 +12396,7 @@
           "pending_actions"
         ],
         "summary": "Pending Actions List",
-        "description": "Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back.",
+        "description": "Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back. ``kind`` filters on\n``detail.kind`` (e.g. ``posting_changed`` for posting change actions).",
         "operationId": "pending_actions_list",
         "parameters": [
           {
@@ -12434,7 +12434,10 @@
                     "review_import",
                     "conflict_choice",
                     "answer_review_due",
-                    "follow_up"
+                    "follow_up",
+                    "unsupported_form",
+                    "redirect_off_domain",
+                    "page_instruction"
                   ],
                   "type": "string"
                 },
@@ -12443,6 +12446,23 @@
                 }
               ],
               "title": "Type"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
             }
           },
           {
@@ -27810,7 +27830,10 @@
               "review_import",
               "conflict_choice",
               "answer_review_due",
-              "follow_up"
+              "follow_up",
+              "unsupported_form",
+              "redirect_off_domain",
+              "page_instruction"
             ],
             "title": "Type"
           },
@@ -27941,6 +27964,18 @@
               }
             ],
             "title": "Resolution"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "The exact kind within the type (``detail.kind``): e.g. posting_changed, posting_closed, verification_code"
           }
         },
         "type": "object",
