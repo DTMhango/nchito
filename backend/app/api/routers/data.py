@@ -92,7 +92,7 @@ class BackupOut(BaseModel):
     id: str
     created_at: datetime
     size_bytes: int
-    target: Literal["local", "s3", "gdrive"]
+    target: Literal["local", "s3", "gdrive", "onedrive"]
     encrypted: bool
 
 
@@ -295,7 +295,7 @@ SETTING_KIND = "setting"
 def _backup_rows(info: ops_backup.BackupInfo) -> list[BackupOut]:
     rows = [BackupOut(id=info.id, created_at=info.created_at, size_bytes=info.size_bytes, target="local",
                       encrypted=info.encrypted)]
-    if info.remote_key and info.remote_target in ("gdrive", "s3"):
+    if info.remote_key and info.remote_target in ("gdrive", "onedrive", "s3"):
         rows.append(BackupOut(id=f"{info.id}:{info.remote_target}", created_at=info.created_at,
                               size_bytes=info.size_bytes, target=info.remote_target,  # type: ignore[arg-type]
                               encrypted=info.encrypted))

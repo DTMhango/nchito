@@ -10,6 +10,7 @@ import {
   type ConnectionTest,
 } from "./api"
 import { ConnectForm } from "./connect-form"
+import { DefaultChoice } from "./default-choice"
 import { FORMS } from "./forms"
 
 /** What each permission means, in plain words. Unknown scopes are shown as the server sent them. */
@@ -25,6 +26,17 @@ const SCOPE_WORDS: [RegExp, string][] = [
     "See and change only the files this app puts in your Drive",
   ],
   [/drive\.readonly/, "Read the files in your Drive"],
+  [/^offline_access$/i, "Stay signed in without asking you again"],
+  [/^User\.Read$/i, "See your name and email address"],
+  [/^Mail\.Send$/i, "Send email as you"],
+  [
+    /^Mail\.Read$/i,
+    "Read your whole mailbox (Outlook cannot limit this to one folder)",
+  ],
+  [
+    /^Files\.ReadWrite\.AppFolder$/i,
+    "See and change only the files this app puts in its own OneDrive folder",
+  ],
 ]
 export const scopeInWords = (scope: string) =>
   SCOPE_WORDS.find(([re]) => re.test(scope))?.[1] ?? scope
@@ -47,7 +59,14 @@ const checked = (iso: string | null) =>
  * One saved connection. Secrets are never shown: the server only says which ones are saved,
  * and this card shows that they exist, not what they are.
  */
-export function ConnectionCard({ c }: { c: Connection }) {
+export function ConnectionCard({
+  c,
+  all = [],
+}: {
+  c: Connection
+  /** Every connection, so a mailbox or file store can be made the default when there are several. */
+  all?: Connection[]
+}) {
   const qc = useQueryClient()
   const [result, setResult] = useState<ConnectionTest | null>(null)
   const [confirming, setConfirming] = useState(false)
@@ -148,6 +167,7 @@ export function ConnectionCard({ c }: { c: Connection }) {
             Change
           </Button>
         )}
+        <DefaultChoice c={c} all={all} />
         {!confirming ? (
           <Button
             size="sm"

@@ -28,7 +28,8 @@ but no worker heartbeat is fresh; `down` (HTTP 503) means the database is unreac
    (`docker run --rm <image> nchito gen-key`), optionally `APP_NAME`, `S3_*` and
    `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` (one Google OAuth client for both the Gmail and the
    Drive connection; register `https://$DOMAIN/api/connections/oauth/gmail/callback` and
-   `.../oauth/gdrive/callback` as redirect URIs).
+   `.../oauth/gdrive/callback` as redirect URIs), `MS_OAUTH_CLIENT_ID` / `MS_OAUTH_CLIENT_SECRET` /
+   `MS_OAUTH_TENANT` (see "Outlook and OneDrive").
 3. Deploy. Traefik routes `https://$DOMAIN` to `web:8000` on the `dokploy-network`.
 4. Keep a copy of `ENCRYPTION_KEY` outside the server. It is never stored in the database or
    in backups; without it, stored provider tokens cannot be decrypted and must be reconnected.
@@ -75,7 +76,8 @@ copies are kept (default 14; older ones are deleted together with their remote c
 uploads each archive to the connected Google Drive folder (`backups/`); `local` only writes locally. A failed upload
 keeps the local copy and marks the run partial. The `s3` target is not available in this build: the backup stays
 local. `pg_dump` and `pg_restore` must be in the image (`postgresql-client`, the same major version as the database;
-set `PG_BIN_DIR` if they are not on PATH). Run one now with Settings, Data, or `nchito backup`.
+set `PG_BIN_DIR` if they are not on PATH). `backups.target` `onedrive` uploads to the connected OneDrive app folder
+the same way. Run one now with Settings, Data, or `nchito backup`.
 
 **Restore (new or wiped server).**
 
@@ -101,6 +103,30 @@ To rehearse: `nchito restore <file> --yes --database-url postgresql://user:pw@ho
   approvals of roles that were ready but unsent are withdrawn (the old instance may have sent them after the backup).
   `GET /api/autopilot/restore` lists what is outstanding; `POST /api/autopilot/resume-after-restore` is refused until
   it is empty (settle any by hand with a dispatch's `reconcile`). Never resume before checking the reconciliation list.
+
+## Outlook and OneDrive (Microsoft sign-in)
+
+One Microsoft Entra app registration serves both connections.
+
+1. Entra admin center (entra.microsoft.com), App registrations, New registration. Supported account types: pick
+   "personal Microsoft accounts only" for `MS_OAUTH_TENANT=consumers`, or "any directory and personal accounts"
+   for `common` (the default). Platform: Web.
+2. Redirect URIs (exact, one per connection): `BASE_URL/api/connections/oauth/msgraph/callback` and
+   `BASE_URL/api/connections/oauth/onedrive/callback`.
+3. API permissions, Microsoft Graph, Delegated: `offline_access`, `User.Read`, `Mail.Send`, `Mail.Read` (Outlook)
+   and `Files.ReadWrite.AppFolder` (OneDrive). Nothing else is requested, and no admin consent is needed for a
+   personal account.
+4. Certificates and secrets, New client secret. Put the value (not the id) in `MS_OAUTH_CLIENT_SECRET` and the
+   Application (client) id in `MS_OAUTH_CLIENT_ID`; `MS_OAUTH_TENANT` defaults to `common`. Restart the stack.
+   Until both are set, Connect answers "set MS_OAUTH_CLIENT_ID/SECRET".
+5. Settings, Connections, Connect Outlook / Connect OneDrive. For Outlook, then use Change to name the one folder
+   the app may read (Mail.Read covers the whole mailbox; the app reads only that folder and Sent Items).
+
+Notes. Microsoft keeps the app folder (`Apps/<app name>` in OneDrive) only for personal OneDrive accounts: a work
+or school OneDrive refuses it and the test says so. Outlook sends through a draft so the message carries the
+`X-Nchito-Idempotency-Key` header and a fixed Message-ID; a send that times out is never resent, it is settled from
+Sent Items. Attachments over 3 MB are refused on Outlook. When more than one mailbox is connected, "Use as default"
+on the card sets `mail.default_mailbox`; backups go to `backups.target`.
 
 ## Retention
 

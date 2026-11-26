@@ -89,7 +89,7 @@ async def test_webhook_connection_test_is_signed_and_secret_update_keeps_old_whe
 
 
 async def test_providers_no_stream_manages_stay_501(owner_client) -> None:
-    r = await make(owner_client, "msgraph", {}, {})
+    r = await make(owner_client, "s3", {}, {})
     assert r.status_code == 501
 
 

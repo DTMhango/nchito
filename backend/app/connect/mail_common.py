@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email import policy
 from email.message import EmailMessage
@@ -39,6 +39,7 @@ class TransportTimeout(Exception):
 class HttpResult:
     status: int
     data: Any  # parsed JSON when the body is JSON, else text
+    headers: Mapping[str, str] = field(default_factory=dict)  # response headers (Retry-After, ...)
 
 
 class HttpTransport(Protocol):
@@ -66,7 +67,7 @@ class HttpxTransport:
             data: Any = r.json()
         except ValueError:
             data = r.text
-        return HttpResult(r.status_code, data)
+        return HttpResult(r.status_code, data, dict(r.headers))
 
 
 class SmtpRejected(Exception):

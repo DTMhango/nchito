@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import string
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -112,6 +113,13 @@ def _theme_id_check(value: Any) -> None:
     """A theme id is a slug (built-ins, owner themes created with one) or a UUID."""
     if not _THEME_ID_RE.match(str(value)):
         raise SettingValueError(f"not a valid theme id: {value!r}")
+
+
+def _uuid_check(value: Any) -> None:
+    try:
+        uuid.UUID(str(value))
+    except ValueError as exc:
+        raise SettingValueError(f"not a valid id: {value!r}") from exc
 
 
 def _accent_check(value: Any) -> None:
@@ -410,6 +418,11 @@ _int("mail.initial_lookback_days", "First check lookback",
      "How far back the first check of a new mailbox (or alert source) reads.", 14, 30, 1, 365, "days")
 _int("mail.max_messages_per_check", "Messages per check",
      "Most messages read from a mailbox in one check.", 200, 50, 1, 1000)
+_add("mail.default_mailbox", "uuid", "Default mailbox",
+     "The mailbox connection used first when more than one is connected (sending identity, notices). Empty: "
+     "the one connected first. Set it with Use as default on the Connections screen.",
+     None, "5b1c2f0e-8f4a-4d57-9c3e-2a6d7e8f9a10", str | None, nullable=True, validators=(_uuid_check,),
+     invalid_example="not-a-connection", has_invalid_example=True)
 _add("mail.auto_link_confidence", "float", "Link replies automatically at",
      "A reply matched to an application at or above this confidence is linked; below it goes to review.",
      0.8, 0.9, float, minimum=0.5, maximum=1.0, invalid_example=0.1, has_invalid_example=True)
@@ -668,7 +681,8 @@ _int("retention.temp_files_days", "Keep temporary files",
 # Backups (14)
 _cron("backups.cron", "Backup schedule", "When the nightly backup runs.", "0 2 * * *", "30 3 * * *")
 _int("backups.keep", "Copies kept", "Number of backups kept.", 14, 30, 1, 365)
-_enum("backups.target", "Backup target", "Where backups are written.", "local", "s3", ("local", "s3", "gdrive"))
+_enum("backups.target", "Backup target", "Where backups are written. Also the file store to use when more than one is "
+      "connected.", "local", "s3", ("local", "s3", "gdrive", "onedrive"))
 
 # Notifications
 _enum("notifications.digest", "Digest", "When the digest is sent.",

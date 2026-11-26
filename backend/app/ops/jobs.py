@@ -15,7 +15,7 @@ from croniter import croniter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.connect import records
+from app.connect import onedrive_records, records
 from app.connect.filestore import FileStore
 from app.core import audit
 from app.core.clock import utcnow
@@ -60,6 +60,11 @@ async def remote_store(session: AsyncSession, target: str) -> tuple[FileStore | 
             return await records.drive_store(session), None
         except Exception as exc:
             return None, f"Google Drive unavailable: {type(exc).__name__}: {exc}"[:300]
+    if target == "onedrive":
+        try:
+            return await onedrive_records.onedrive_store(session), None
+        except Exception as exc:
+            return None, f"OneDrive unavailable: {type(exc).__name__}: {exc}"[:300]
     if target == "s3":
         try:
             return await records.first_s3_store(session), None

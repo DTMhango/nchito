@@ -1054,3 +1054,19 @@ Theme studio (DESIGN 10.4). Code: `backend/app/themes/` (`tokens.py`, `colour.py
   `themes.revisions_kept` (50), `themes.status_min_distance` (0.02, OKLab distance the studio requires between
   status colours, also under protanopia/deuteranopia/tritanopia simulation; a warning, not a block).
 - **Migration** `0019_themes`: `theme.current_revision`, `theme.contrast_waiver`, table `theme_revision`.
+
+## Wave 4 msgraph additions
+
+- **No new endpoints or models.** `POST /api/connections/oauth/{msgraph|onedrive}/start` and
+  `GET .../callback` (already declared) are implemented: start answers 409 "set MS_OAUTH_CLIENT_ID/SECRET" until
+  the server has the Entra app; callback redirects to `/settings/connections?connected=msgraph|onedrive`.
+  `POST /api/connections` with `msgraph` or `onedrive` answers 422 (they connect through sign-in).
+- `msgraph` is a mailbox provider (same `Mailbox` contract and email channel as Gmail). Its non-secret config is
+  `from_address` (set at sign-in) and `read_folder` (a well-known name such as `inbox`, or a folder name; empty
+  means nothing is read). Secrets (access/refresh token, expiry) are encrypted and masked.
+- `onedrive` is a `FileStore` (`kind = "onedrive"`, scope `Files.ReadWrite.AppFolder`). Secrets are `{"tokens"}`.
+  Only its label and `enabled` change through `PUT`.
+- `BackupOut.target` and the setting `backups.target` gain `onedrive`.
+- New setting `mail.default_mailbox` (uuid or empty): the mailbox connection every "first mailbox" choice prefers.
+- `HttpResult` (mail transport) gains `headers` (response headers, for `Retry-After`).
+- Env: `MS_OAUTH_CLIENT_ID`, `MS_OAUTH_CLIENT_SECRET`, `MS_OAUTH_TENANT` (default `common`).

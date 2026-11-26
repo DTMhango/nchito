@@ -17,21 +17,25 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.connect import gmail
+from app.connect import gmail, msgraph_auth, msgraph_mail
 from app.connect.gmail import GmailConfig, GmailMailbox
 from app.connect.imap_smtp import ImapSmtpConfig, ImapSmtpMailbox, ServerSettings, StdlibImap, StdlibSmtp
 from app.connect.mail_common import HttpTransport, HttpxTransport, ImapTransport, SmtpTransport
 from app.connect.mailbox import MailAuthError, Mailbox, MailConfigError
+from app.connect.msgraph_mail import MsGraphConfig, MsGraphMailbox
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.config import get_config
 from app.core.crypto import decrypt, encrypt
 from app.core.db import get_sessionmaker
+from app.core.settings import service as settings_service
 from app.models.platform import Connection, ConnectionProvider
 
-MAIL_PROVIDERS = frozenset({"gmail", "imap_smtp"})
+MAIL_PROVIDERS = frozenset({"gmail", "imap_smtp", "msgraph"})
+MAIL_ENUMS = (ConnectionProvider.gmail, ConnectionProvider.imap_smtp, ConnectionProvider.msgraph)
 INTERNAL_KEYS = ("checkpoint_at", "last_sync_at", "last_error")
 GMAIL_KEYS = ("from_address", "read_label", "read_query", "client_id")
+MSGRAPH_KEYS = ("from_address", "read_folder")
 IMAP_KEYS = ("from_address", "username", "imap_host", "imap_port", "imap_security", "read_folder", "sent_folder",
              "smtp_host", "smtp_port", "smtp_security")
 SECURITY = ("ssl", "starttls", "none")
@@ -63,7 +67,7 @@ def _port(config: dict[str, Any], key: str) -> None:
 
 def validate_config(provider: str, config: dict[str, Any]) -> dict[str, Any]:
     """Return the cleaned non-secret config or raise ``ValueError`` (shown to the owner)."""
-    allowed = GMAIL_KEYS if provider == "gmail" else IMAP_KEYS
+    allowed = {"gmail": GMAIL_KEYS, "msgraph": MSGRAPH_KEYS}.get(provider, IMAP_KEYS)
     unknown = set(config) - set(allowed) - set(INTERNAL_KEYS)
     if unknown:
         raise ValueError(f"unknown config keys: {', '.join(sorted(unknown))} (secrets go in 'secrets')")
@@ -71,7 +75,7 @@ def validate_config(provider: str, config: dict[str, Any]) -> dict[str, Any]:
     out = {k: v for k, v in out.items() if v not in ("", None)}
     if "from_address" in out and "@" not in str(out["from_address"]):
         raise ValueError("from_address must be an email address")
-    if provider == "gmail":
+    if provider in ("gmail", "msgraph"):
         return out
     for key in ("imap_security", "smtp_security"):
         if key in out and out[key] not in SECURITY:
@@ -82,7 +86,7 @@ def validate_config(provider: str, config: dict[str, Any]) -> dict[str, Any]:
 
 
 def check_complete(provider: str, config: dict[str, Any], secrets: dict[str, str]) -> None:
-    if provider == "gmail":
+    if provider in ("gmail", "msgraph"):
         return
     missing = [k for k in ("from_address", "imap_host", "smtp_host") if not config.get(k)]
     if missing:
@@ -102,12 +106,19 @@ def reads_description(provider: str, config: dict[str, Any]) -> str:
         return ("Granted: send mail, and read-only access to the whole mailbox (Google offers no narrower read "
                 f"scope). This app reads only {target}, and searches sent items for the message ids it sent. "
                 "A dedicated job-search mailbox is recommended.")
+    if provider == "msgraph":
+        target = f'the folder "{config["read_folder"]}"' if config.get("read_folder") else "nothing yet (set a folder)"
+        return ("Granted: send mail, and read-only access to the whole mailbox (Microsoft offers no narrower read "
+                f"permission). This app reads only {target}, and searches Sent Items for the message ids it sent. "
+                "A dedicated job-search mailbox is recommended.")
     folder = config.get("read_folder") or "nothing yet (set a folder)"
     return (f"Sends through your SMTP server. Reads only the folder {folder!r}, plus the sent folder to confirm "
             "what it sent. Uses an app password stored encrypted.")
 
 
 def _scopes(provider: str) -> list[str]:
+    if provider == "msgraph":
+        return list(msgraph_auth.MAIL_SCOPES)
     return list(gmail.GMAIL_SCOPES) if provider == "gmail" else []
 
 
@@ -115,6 +126,8 @@ async def create(session: AsyncSession, *, provider: str, label: str, config: di
                  secrets: dict[str, str], actor: str) -> Connection:
     if provider == "gmail":
         raise ValueError("Gmail connects through Google sign-in; use the Connect Gmail button")
+    if provider == "msgraph":
+        raise ValueError("Outlook connects through Microsoft sign-in; use the Connect Outlook button")
     clean = validate_config(provider, config)
     given = {k: v for k, v in secrets.items() if v}
     check_complete(provider, clean, given)
@@ -215,14 +228,27 @@ def build_mailbox(conn: Connection, *, http: HttpTransport | None = None, smtp: 
         return ImapSmtpMailbox(
             smtp=smtp or StdlibSmtp(smtp_server), imap=imap or StdlibImap(imap_server),
             config=ImapSmtpConfig(c["from_address"], c.get("read_folder"), c.get("sent_folder", "Sent")))
+    if conn.provider == ConnectionProvider.msgraph:
+        cfg = get_config()
+        if not cfg.ms_oauth_client_id or not cfg.ms_oauth_client_secret:
+            raise MailConfigError("Outlook sign-in is not set up on this server (Microsoft client id and secret)")
+        if not c.get("from_address"):
+            raise MailConfigError("this Outlook connection has no sending address; reconnect it")
+        return MsGraphMailbox(http=http or HttpxTransport(), tokens=ConnectionTokenStore(conn.id),
+                              client_id=cfg.ms_oauth_client_id, client_secret=cfg.ms_oauth_client_secret,
+                              tenant=cfg.ms_oauth_tenant, config=MsGraphConfig(c["from_address"], c.get("read_folder")))
     raise MailConfigError(f"{conn.provider.value} is not a mailbox provider")
 
 
 async def mail_connections(session: AsyncSession) -> list[Connection]:
-    rows = await session.scalars(select(Connection).where(
-        Connection.provider.in_([ConnectionProvider.gmail, ConnectionProvider.imap_smtp]),
-        Connection.enabled.is_(True)).order_by(Connection.created_at))
-    return list(rows)
+    """The enabled mailbox connections, oldest first, except that the owner's default mailbox
+    (``mail.default_mailbox``) comes first; every "first mailbox" choice follows that."""
+    rows = list(await session.scalars(select(Connection).where(
+        Connection.provider.in_(MAIL_ENUMS), Connection.enabled.is_(True)).order_by(Connection.created_at)))
+    default = await settings_service.get_value(session, "mail.default_mailbox")
+    if default:
+        rows.sort(key=lambda c: str(c.id) != str(default))  # stable: the rest keep their order
+    return rows
 
 
 async def resolve_for_identity(session: AsyncSession, sending_identity: str) -> Connection | None:
@@ -293,5 +319,64 @@ async def oauth_callback(session: AsyncSession, *, code: str, state: str, actor:
     await session.flush()
     await audit.record(session, actor=actor, action="connection.created", subject_type="connection",
                        subject_id=conn.id, detail={"provider": "gmail", "label": conn.label,
+                                                   "secret_names": ["access_token", "expires_at", "refresh_token"]})
+    return conn
+
+
+# ----- Outlook (Microsoft Graph) OAuth ----------------------------------------------------------
+
+
+def _ms_serializer() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(get_config().secret_key, salt="nchito-oauth-msgraph")
+
+
+def ms_redirect_uri() -> str:
+    return f"{get_config().base_origin}/api/connections/oauth/msgraph/callback"
+
+
+def msgraph_oauth_start() -> str:
+    cfg = get_config()
+    if not cfg.ms_oauth_client_id or not cfg.ms_oauth_client_secret:
+        raise MailConfigError("Outlook sign-in is not set up on this server: set MS_OAUTH_CLIENT_ID and "
+                              "MS_OAUTH_CLIENT_SECRET")
+    state = _ms_serializer().dumps({"nonce": pysecrets.token_hex(8)})
+    return msgraph_auth.authorize_url(tenant=cfg.ms_oauth_tenant, client_id=cfg.ms_oauth_client_id,
+                                      redirect_uri=ms_redirect_uri(), state=state, scopes=msgraph_auth.MAIL_SCOPES)
+
+
+async def msgraph_oauth_callback(session: AsyncSession, *, code: str, state: str, actor: str,
+                                 http: HttpTransport | None = None) -> Connection:
+    try:
+        _ms_serializer().loads(state, max_age=OAUTH_MAX_AGE_SECONDS)
+    except BadSignature as exc:
+        raise MailAuthError("the sign-in link expired or was altered; start again") from exc
+    cfg = get_config()
+    if not cfg.ms_oauth_client_id or not cfg.ms_oauth_client_secret:
+        raise MailConfigError("Outlook sign-in is not set up on this server")
+    transport = http or HttpxTransport()
+    tokens = await msgraph_mail.exchange_code(
+        transport, tenant=cfg.ms_oauth_tenant, client_id=cfg.ms_oauth_client_id,
+        client_secret=cfg.ms_oauth_client_secret, redirect_uri=ms_redirect_uri(), code=code, now=utcnow())
+    address = (await msgraph_mail.mailbox_address(transport, tokens["access_token"])).lower()
+    granted = msgraph_auth.scopes_granted(tokens.get("scope", ""), msgraph_auth.MAIL_SCOPES)
+    secrets_now = {k: v for k, v in tokens.items() if k != "scope"}
+    existing = next((c for c in await session.scalars(select(Connection).where(
+        Connection.provider == ConnectionProvider.msgraph)) if c.config.get("from_address") == address), None)
+    if existing is not None:  # signing in again as the same account refreshes it; the folder choice stays
+        _store_secrets(existing, secrets_now)
+        existing.scopes_granted, existing.health = granted, "unknown"
+        await session.flush()
+        await audit.record(session, actor=actor, action="connection.updated", subject_type="connection",
+                           subject_id=existing.id, detail={"provider": "msgraph", "changed": ["secrets"]})
+        return existing
+    config = {"from_address": address}
+    conn = Connection(provider=ConnectionProvider.msgraph, label=f"Outlook ({address})", config=config,
+                      scopes_granted=granted, reads_description=reads_description("msgraph", config),
+                      health="unknown", enabled=True)
+    _store_secrets(conn, secrets_now)
+    session.add(conn)
+    await session.flush()
+    await audit.record(session, actor=actor, action="connection.created", subject_type="connection",
+                       subject_id=conn.id, detail={"provider": "msgraph", "label": conn.label,
                                                    "secret_names": ["access_token", "expires_at", "refresh_token"]})
     return conn
