@@ -47,6 +47,7 @@ import {
   SettingsSection,
 } from "@/features/settings/settings-pages"
 import { AppearancePage } from "@/features/settings/appearance-page"
+import { AiSettingsPage } from "@/features/settings/ai/ai-page"
 import { OnboardingPage } from "@/features/onboarding/onboarding-page"
 
 declare module "@tanstack/react-router" {
@@ -225,8 +226,14 @@ const settingsChild = (path: SettingsKey) =>
     path,
     component: () => <SettingsSection section={path} />,
   })
+const aiRoute = createRoute({
+  getParentRoute: () => settingsRoute,
+  path: "ai",
+  staticData: { title: "AI" },
+  component: AiSettingsPage,
+})
 const settingsChildren = [
-  settingsChild("ai"),
+  aiRoute,
   settingsChild("connections"),
   settingsChild("notifications"),
   settingsChild("runners"),
