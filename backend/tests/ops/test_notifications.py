@@ -90,7 +90,7 @@ async def test_collect_then_deliver_sends_once_even_if_run_repeatedly(session, t
     message = telegram.sent[0]
     assert message.event_id == f"pending:{pa.id}"
     assert message.title == "Needs you: Sign in at Acme"
-    assert [b.label for b in message.buttons] == ["Open"]
+    assert [b.label for b in message.buttons] == ["I've signed in, continue", "Open"]
     assert message.link and message.link.endswith(f"/today?action={pa.id}")
     row = (await rows(session))[0]
     assert row.channels_sent == ["telegram"]

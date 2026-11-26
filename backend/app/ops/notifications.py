@@ -199,6 +199,9 @@ def compose(n: Notification, values: dict[str, Any], app_name: str, now: datetim
         buttons.append(Button("Open", link))
         if n.kind == "pending_action" and n.payload.get("action_type") == "approve":
             buttons.insert(0, Button("Approve", link + ("&" if "?" in link else "?") + "intent=approve"))
+        if n.kind == "pending_action" and n.payload.get("action_type") in ("sign_in", "create_account", "captcha"):
+            sep = "&" if "?" in link else "?"
+            buttons.insert(0, Button("I've signed in, continue", f"{link}{sep}intent=continue"))
     return OutboundMessage(event_id=n.dedupe_key or str(n.id), kind=n.kind, title=title[:MAX_TITLE], body=body,
                            created_at=n.created_at, link=link, buttons=tuple(buttons))
 

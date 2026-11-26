@@ -58,6 +58,7 @@ GROUPS: dict[str, str] = {
     "notifications": "Notifications",
     "health": "Health",
     "runners": "Runners",
+    "accounts": "Portal accounts",
     "data": "Data import and export",
     "sources": "Discovery sources",
 }
@@ -305,6 +306,38 @@ _int("tracking.imminent_deadline_days", "Imminent deadline",
      "days")
 _int("tracking.stale_pending_days", "Stale pending action",
      "Remind the owner when an open pending action has waited this long.", 3, 7, 1, 90, "days")
+
+# Portal accounts and sign-in handoff (8.4)
+def _positive_ints(value: Any) -> None:
+    if not all(isinstance(v, int) and not isinstance(v, bool) and 0 < v <= 24 * 30 for v in value):
+        raise SettingValueError("hours must be whole numbers between 1 and 720")
+
+
+_add("accounts.portals_requiring_account", "list", "Portals that need an account",
+     "Application systems (the job's apply method) known to need an account before applying.",
+     ["workday", "icims", "taleo", "successfactors"], ["workday", "icims"], list[str],
+     validators=(unique_items,), invalid_example=["workday", "workday"], has_invalid_example=True)
+_add("accounts.account_free_methods", "list", "Methods that need no account",
+     "Apply methods known to need no account. A method in neither list is unknown, never 'no account'.",
+     ["email", "greenhouse", "lever", "ashby", "workable"], ["email", "lever"], list[str],
+     validators=(unique_items,), invalid_example=["email", "email"], has_invalid_example=True)
+_enum("accounts.runner_for_account_roles", "Runner for roles that need an account",
+      "Where roles that need (or may need) an account are sent: the PC runner, where you can sign in, or the "
+      "server runner.", "pc", "server", ("pc", "server"))
+_add("accounts.reminder_offsets_hours", "list", "Sign-in reminders",
+     "Hours before the nearest deadline at which an open sign-in or account request is sent again.",
+     [72, 24, 6], [48, 12], list[int], validators=(unique_items, _positive_ints),
+     invalid_example=[24, 24], has_invalid_example=True)
+_add("accounts.create_title", "string", "Wording: create an account",
+     "Title of the request to create an account. Fields: {employer}, {count}, {waiting}.",
+     "Create an account at {employer} careers: {waiting}", "{employer}: create an account ({count} waiting)", str,
+     validators=(_title_template(frozenset({"employer", "count", "waiting"})), max_length(200)),
+     invalid_example="Create an account at {salary}", has_invalid_example=True)
+_add("accounts.sign_in_title", "string", "Wording: sign in",
+     "Title of the request to sign in. Fields: {employer}, {count}, {waiting}.",
+     "Sign in at {employer} careers: {waiting}", "{employer}: sign in ({count} waiting)", str,
+     validators=(_title_template(frozenset({"employer", "count", "waiting"})), max_length(200)),
+     invalid_example="Sign in at {salary}", has_invalid_example=True)
 
 # Answer bank (5.4)
 _enum("answers.routine_default_scope", "Default scope: routine answers",

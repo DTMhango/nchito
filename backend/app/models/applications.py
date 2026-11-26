@@ -344,6 +344,7 @@ class PortalAccount(Base, Entity):
     signed_in_runner: Mapped[str | None] = mapped_column(String(120))
     email_used: Mapped[str | None] = mapped_column(String(320))
     last_sign_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    notes: Mapped[str | None] = mapped_column(Text, doc="The owner's notes. Never a password.")
 
     __table_args__ = (UniqueConstraint("portal", "tenant", name="portal_tenant"),)
 

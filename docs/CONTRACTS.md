@@ -783,3 +783,29 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   done|paused|failed`), `POST /api/interview-practice/{id}/retry`, `GET .../export?fmt=pdf|docx|txt` (built-in docs
   template `pack`; header `X-Flagged-Sections`), `GET|POST .../rounds`, `PUT /api/interview-rounds/{id}`.
   `thank_you_draft` stays null in this wave.
+
+## Wave 3 accounts additions
+
+- **Module `app/apply/accounts.py`.** `needs_account(session, job) -> AccountNeed` (`yes` / `no` / `unknown`; unknown is
+  never "no"), `preferred_runner_kind(session, job)` (`"pc"` or `"server"`; `None` when no account is needed; the
+  runner already holding a session wins), `portal_ref(job)` (key = `<ats>:<tenant host[/site]>`, lower case),
+  `register_blocker(session, *, kind, job, task_id, runner_id, detail)` for the gateway's `raise_blocker`, `tick`,
+  `continue_blocker`, `give_up`.
+- **Blocker convention.** `detail.kind` in `sign_in`, `create_account`, `verification_code`, `captcha`, `assessment`,
+  `declaration`, `unsupported_form`, plus `portal_key`, `portal_url`, `task_id`, `runner_id`, `runner_kind`,
+  `applications[]`, `tasks[]`. The pending action *type* is the nearest existing one (`verification_code` -> `sign_in`,
+  `unsupported_form` -> `assessment`); no enum change. `sign_in` and `create_account` are one open action per tenant
+  (`group_key = portal:<key>`, `application_id` null, every waiting application in `detail.applications`, `deadline` =
+  nearest); the other kinds are one action per task (`group_key = task:<id>`).
+- **Continue.** `owner_actions.continue_task` delegates to `accounts.continue_blocker`: marks the account signed in on
+  the runner, re-checks the posting (open check, deadline), duplicates, employer hold and state per application, requeues
+  each task with `payload.resume`, `resume_runner_token_id`, `resume_runner_kind` and its checkpoint, cancels tasks that
+  must not resume (reasons in `resolution.not_resumed`). A submit permit is still required.
+- **Endpoints** (`/api/portal-accounts`, owner only, audited): `GET` list (`?status=`), `POST`, `GET/PATCH/DELETE /{id}`,
+  `POST /actions/{action_id}/give-up {outcome: manual_handoff|skipped, application_ids?, note?}`, `POST /refresh`.
+  No password or secret field exists; any key containing password, secret, token, pin, otp, cookie or credential is a 422.
+- **Model.** `PortalAccount.notes` (migration `0013_accounts`).
+- **Notifications.** The first message reuses the key `pending:<id>` so `collect` never repeats it; reminders use
+  `portal-account:<id>:r<hours>`. The continue button (`intent=continue`) is added for sign_in, create_account, captcha.
+- **Settings (group `accounts`):** `portals_requiring_account`, `account_free_methods`, `runner_for_account_roles`,
+  `reminder_offsets_hours`, `create_title`, `sign_in_title`. Worker task `portal_accounts_tick` every 10 minutes.
