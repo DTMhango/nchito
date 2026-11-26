@@ -2,6 +2,7 @@ import {
   BarChart3,
   Briefcase,
   Columns3,
+  FileCheck2,
   FileText,
   Gauge,
   Inbox,
@@ -54,6 +55,12 @@ export const NAV_MAIN: NavItem[] = [
     label: "Studio",
     icon: FileText,
     keywords: ["cv", "letter", "tailor", "documents"],
+  },
+  {
+    to: "/approvals",
+    label: "Approvals",
+    icon: FileCheck2,
+    keywords: ["approve", "packet", "review", "send", "needs you"],
   },
   {
     to: "/autopilot",

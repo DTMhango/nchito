@@ -150,7 +150,18 @@ export function DecisionRow({ group }: { group: DecisionGroup }) {
                 {kit.secondary.label}
               </Button>
             )}
-            {primaryIsLink ? (
+            {primaryIsLink &&
+            first.type === "approve" &&
+            first.application_id ? (
+              <Button asChild size="sm">
+                <Link
+                  to="/approvals/$applicationId"
+                  params={{ applicationId: first.application_id }}
+                >
+                  {kit.primary.label}
+                </Link>
+              </Button>
+            ) : primaryIsLink ? (
               <Button asChild size="sm">
                 <Link
                   to="/studio"
