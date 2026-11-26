@@ -23,6 +23,8 @@ export const resetKitMock = () => {
   waivers = []
 }
 export const kitStore = () => store
+/** The waivers given so far (the Studio mock honours them when it re-runs checks). */
+export const kitWaivers = () => waivers
 
 const unauthorized = () =>
   HttpResponse.json({ detail: "Not signed in." }, { status: 401 })

@@ -152,7 +152,12 @@ export function DecisionRow({ group }: { group: DecisionGroup }) {
             )}
             {primaryIsLink ? (
               <Button asChild size="sm">
-                <Link to="/studio">{kit.primary.label}</Link>
+                <Link
+                  to="/studio"
+                  search={{ application: first.application_id ?? undefined }}
+                >
+                  {kit.primary.label}
+                </Link>
               </Button>
             ) : (
               <Button

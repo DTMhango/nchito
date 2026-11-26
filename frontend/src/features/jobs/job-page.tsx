@@ -214,7 +214,9 @@ function JobHeader({ job }: { job: JobDetail }) {
         )}
         {application && (
           <Button asChild size="sm" variant="outline">
-            <Link to="/studio">Open in Studio</Link>
+            <Link to="/studio" search={{ application: application.id }}>
+              Open in Studio
+            </Link>
           </Button>
         )}
         <Button
