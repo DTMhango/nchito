@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
-import { renderApp } from "@/test/render"
+import { renderApp, setupUser } from "@/test/render"
 import { aiMockState } from "@/mocks/handlers/ai"
 
 describe("Settings > Connections", () => {
   it("saves a mailbox without ever showing its password", async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     renderApp("/settings/connections")
     const form = await screen.findByRole("form", { name: "Add Mailbox" })
     await user.type(
@@ -91,7 +90,7 @@ describe("Settings > Connections", () => {
   })
 
   it("tests and disconnects a connection after a confirming click", async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     aiMockState().connections.push({
       id: "w1",
       created_at: "",
@@ -124,7 +123,7 @@ describe("Settings > Connections", () => {
 
 describe("Settings > Data", () => {
   it("explains the two exports and checks the template for personal details", async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     renderApp("/settings/data")
     const backup = await screen.findByRole("article", {
       name: "Personal backup",
@@ -149,7 +148,7 @@ describe("Settings > Data", () => {
   })
 
   it("runs a backup and shows the last one", async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     renderApp("/settings/data")
     await screen.findByText(/Last backup:/)
     const kept = () =>
@@ -169,8 +168,9 @@ describe("Settings > Notifications and health", () => {
     await screen.findByRole("heading", { name: "Notifications" })
     const status = await screen.findByRole("list", { name: "Channel status" })
     expect(within(status).getAllByText("Not connected")).toHaveLength(3)
+    // The settings blocks render after the settings query; the channel list does not wait.
     expect(
-      screen.getByRole("list", { name: "Quiet hours" })
+      await screen.findByRole("list", { name: "Quiet hours" })
     ).toBeInTheDocument()
   })
 

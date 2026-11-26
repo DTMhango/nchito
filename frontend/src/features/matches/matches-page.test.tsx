@@ -18,11 +18,7 @@ const search = (router: ReturnType<typeof renderApp>["router"]) =>
   router.state.location.search as Record<string, unknown>
 
 async function ready() {
-  await screen.findByRole(
-    "heading",
-    { level: 2, name: "Analytics Lead" },
-    { timeout: 5000 }
-  )
+  await screen.findByRole("heading", { level: 2, name: "Analytics Lead" })
 }
 
 describe("Matches triage", () => {
@@ -131,11 +127,7 @@ describe("Matches triage", () => {
         ) +
         "&g=facets.visa_sponsorship"
     )
-    const groups = await screen.findAllByRole(
-      "button",
-      { expanded: true },
-      { timeout: 5000 }
-    )
+    const groups = await screen.findAllByRole("button", { expanded: true })
     const jobs = matchesMock
       .get()
       .jobs.filter(
@@ -270,11 +262,10 @@ describe("Saved views", () => {
 describe("Why? panel and bulk", () => {
   it("renders each rule's value, source and what would change it", async () => {
     renderApp("/matches?tab=held")
-    await screen.findByRole(
-      "heading",
-      { level: 2, name: "Senior Data Analyst" },
-      { timeout: 5000 }
-    )
+    await screen.findByRole("heading", {
+      level: 2,
+      name: "Senior Data Analyst",
+    })
     const why = await screen.findByRole("region", { name: "Why?" })
     expect(within(why).getByText("Held")).toBeInTheDocument()
     expect(within(why).getByText("One role per employer")).toBeInTheDocument()

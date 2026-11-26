@@ -6,9 +6,13 @@ import { db } from "@/mocks/db"
 import { resetAllMocks } from "@/mocks/reset"
 import { resetSystemDark } from "./media"
 
-// Screens are lazy route chunks; the first import of a chunk under a parallel run can take
-// longer than Testing Library's 1 s default.
-configure({ asyncUtilTimeout: 5000 })
+// Screens are lazy route chunks. The first query in a file waits for that chunk's import, which
+// takes ~3 s alone and over 5 s when the full parallel run shares the CPU with other work, so
+// queries wait up to 10 s (Testing Library's default is 1 s). Only a failing query uses it.
+configure({ asyncUtilTimeout: 10_000 })
+// A test's own budget must exceed one query's wait; otherwise the test times out at the same
+// moment as its first slow query, with no message about what it was waiting for.
+vi.setConfig({ testTimeout: 20_000 })
 
 // ---- browser APIs jsdom lacks ----
 class ResizeObserverStub {

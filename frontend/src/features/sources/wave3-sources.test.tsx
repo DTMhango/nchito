@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 import { store } from "@/mocks/dataset/sources"
 import { settingValues } from "@/mocks/dataset/settings"
 import { aiMockState } from "@/mocks/handlers/ai"
-import { renderApp } from "@/test/render"
+import { renderApp, setupUser } from "@/test/render"
 import type { Source } from "./api"
 
 const searchConn = (over: Record<string, unknown> = {}) => {
@@ -26,7 +25,7 @@ const searchConn = (over: Record<string, unknown> = {}) => {
 }
 
 async function openAdd() {
-  const user = userEvent.setup()
+  const user = setupUser()
   renderApp("/sources")
   await user.click(await screen.findByRole("button", { name: "Add source" }))
   const dialog = await screen.findByRole("dialog")
@@ -34,7 +33,7 @@ async function openAdd() {
 }
 
 const pick = async (
-  user: ReturnType<typeof userEvent.setup>,
+  user: ReturnType<typeof setupUser>,
   dialog: HTMLElement,
   label: RegExp
 ) => user.click(within(dialog).getByRole("radio", { name: label }))
@@ -148,7 +147,7 @@ describe("JobSpy", () => {
       access: "html",
       config: {},
     } as Source)
-    const user = userEvent.setup()
+    const user = setupUser()
     renderApp("/sources")
     await user.click(
       await screen.findByRole("button", {
@@ -214,7 +213,7 @@ describe("Web search", () => {
 
 describe("Discovery settings tab", () => {
   it("lists the sources settings group", async () => {
-    const user = userEvent.setup()
+    const user = setupUser()
     renderApp("/sources")
     await user.click(
       await screen.findByRole("tab", { name: "Discovery settings" })

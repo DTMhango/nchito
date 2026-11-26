@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
 import { aiMockState } from "@/mocks/handlers/ai"
-import { renderApp } from "@/test/render"
+import { renderApp, setupUser } from "@/test/render"
 import { checkSearchApi } from "./forms"
 
 const KEY = "sk-example-search-key-1234"
 
 async function openSection() {
-  const user = userEvent.setup()
+  const user = setupUser()
   renderApp("/settings/connections")
   const section = await screen.findByRole("region", { name: "Search API" })
   const form = within(section).getByRole("form", { name: "Add Search API" })

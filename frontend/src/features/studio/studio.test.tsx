@@ -216,7 +216,10 @@ describe("Studio", { timeout: 30_000 }, () => {
         { timeout: 10000 }
       )
     ).toBeInTheDocument()
-    expect(screen.getByTestId("tailor-cost-chip")).toHaveTextContent("$0.04")
+    // The draft and the finished run come from separate queries; the chip waits for the run.
+    expect(await screen.findByTestId("tailor-cost-chip")).toHaveTextContent(
+      "$0.04"
+    )
   })
 
   it("lists applications to open when none is chosen", async () => {
