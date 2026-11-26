@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react"
+import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Chip } from "@/components/chip"
@@ -6,22 +6,21 @@ import { SectionHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { errorText } from "@/features/autopilot/api"
-import {
-  accountKeys,
-  runnerCapsQuery,
-  saveRunnerCaps,
-} from "@/features/accounts/api"
-import type { RunnerCaps } from "@/features/accounts/w3-pending-types"
+import { settingsQuery, type SettingOut } from "@/features/settings/api"
+import { displayValue } from "@/features/settings/setting-value"
 import { RunnerActivity } from "./activity-view"
 import {
   reinstateToken,
   tokenKeys,
   tokensQuery,
   runnerStatusQuery,
+  type RunnerStatus,
 } from "./api"
 import {
   canUnpause,
   KIND_LABEL,
+  reinstateErrorText,
+  RUNNER_LIMIT_KEYS,
   runnerRows,
   seenText,
   type RunnerRow,
@@ -111,8 +110,8 @@ function RunnerCard({ row }: { row: RunnerRow }) {
           {showActivity ? "Hide activity" : "Show activity"}
         </Button>
       </div>
-      {showActivity && <RunnerActivity tokenId={s.token_id} name={s.name} />}
-      <CapsEditor tokenId={s.token_id} name={s.name} />
+      {showActivity && <RunnerActivity runner={s} />}
+      <RunnerLimits runner={s} />
     </li>
   )
 }
@@ -121,14 +120,19 @@ function RunnerCard({ row }: { row: RunnerRow }) {
 function PausedNotice({ row }: { row: RunnerRow }) {
   const qc = useQueryClient()
   const [ack, setAck] = useState(false)
+  const [note, setNote] = useState("")
   const reinstate = useMutation({
-    mutationFn: () => reinstateToken(row.status.token_id),
+    mutationFn: () =>
+      reinstateToken(row.status.token_id, {
+        acknowledged: ack,
+        note: note.trim() || null,
+      }),
     onSuccess: () => {
       toast.success("Runner un-paused.")
       void qc.invalidateQueries({ queryKey: tokenKeys.tokens })
       void qc.invalidateQueries({ queryKey: tokenKeys.runners })
     },
-    onError: (e) => toast.error(errorText(e)),
+    onError: (e) => toast.error(reinstateErrorText(e, errorText(e))),
   })
   const id = `ack-${row.status.token_id}`
   return (
@@ -155,6 +159,10 @@ function PausedNotice({ row }: { row: RunnerRow }) {
         I have read why it was paused and checked what it did. I want it to work
         again.
       </label>
+      <label className="grid max-w-md gap-1">
+        Note for the record (optional)
+        <Input value={note} onChange={(e) => setNote(e.target.value)} />
+      </label>
       <div>
         <Button
           size="sm"
@@ -168,110 +176,46 @@ function PausedNotice({ row }: { row: RunnerRow }) {
   )
 }
 
-const FIELDS: { key: keyof RunnerCaps; label: string; step: string }[] = [
-  { key: "max_tasks_per_day", label: "Tasks per day", step: "1" },
-  { key: "max_steps_per_task", label: "Steps per task", step: "1" },
-  {
-    key: "cost_ceiling_per_task",
-    label: "Cost ceiling per task",
-    step: "0.01",
-  },
-]
-
-/** Per-runner limits. An empty box means no limit from you. */
-function CapsEditor({ tokenId, name }: { tokenId: string; name: string }) {
-  const q = useQuery(runnerCapsQuery(tokenId))
-  if (!q.data) return null
+/** The gateway settings that bound this runner, read-only. One set for every runner of a kind. */
+function RunnerLimits({ runner }: { runner: RunnerStatus }) {
+  const q = useQuery(settingsQuery())
+  const all = (q.data ?? []).flatMap((g) => g.settings)
+  const rows = RUNNER_LIMIT_KEYS[runner.runner_kind]
+    .map((k) => all.find((s) => s.key === k))
+    .filter((s): s is SettingOut => !!s)
+  if (!q.isSuccess) return null
   return (
-    <CapsForm
-      key={JSON.stringify(q.data)}
-      tokenId={tokenId}
-      name={name}
-      caps={q.data}
-    />
-  )
-}
-
-function CapsForm({
-  tokenId,
-  name,
-  caps,
-}: {
-  tokenId: string
-  name: string
-  caps: RunnerCaps
-}) {
-  const qc = useQueryClient()
-  const [vals, setVals] = useState<Record<keyof RunnerCaps, string>>({
-    max_tasks_per_day: caps.max_tasks_per_day?.toString() ?? "",
-    max_steps_per_task: caps.max_steps_per_task?.toString() ?? "",
-    cost_ceiling_per_task: caps.cost_ceiling_per_task?.toString() ?? "",
-  })
-  const [error, setError] = useState<string | null>(null)
-  const save = useMutation({
-    mutationFn: (b: RunnerCaps) => saveRunnerCaps(tokenId, b),
-    onSuccess: () => {
-      toast.success("Limits saved.")
-      void qc.invalidateQueries({ queryKey: accountKeys.caps(tokenId) })
-    },
-    onError: (e) => setError(errorText(e)),
-  })
-  const submit = (e: FormEvent) => {
-    e.preventDefault()
-    const out = {} as RunnerCaps
-    for (const f of FIELDS) {
-      const raw = vals[f.key].trim()
-      if (raw === "") {
-        out[f.key] = null
-        continue
-      }
-      const n = Number(raw)
-      if (!Number.isFinite(n) || n <= 0)
-        return setError(`${f.label} must be a number above zero, or empty.`)
-      if (f.step === "1" && !Number.isInteger(n))
-        return setError(`${f.label} must be a whole number.`)
-      out[f.key] = n
-    }
-    setError(null)
-    save.mutate(out)
-  }
-  return (
-    <form
-      onSubmit={submit}
-      aria-label={`Limits for ${name}`}
+    <section
+      aria-label={`Limits for ${runner.name}`}
       className="grid gap-2 border-t border-border pt-2"
     >
-      <h5 className="eyebrow">Limits</h5>
-      <div className="grid gap-2 sm:grid-cols-3">
-        {FIELDS.map((f) => (
-          <label key={f.key} className="grid gap-1 text-sm">
-            {f.label}
-            <Input
-              inputMode="decimal"
-              value={vals[f.key]}
-              placeholder="No limit"
-              onChange={(e) =>
-                setVals((v) => ({ ...v, [f.key]: e.target.value }))
-              }
-            />
-          </label>
-        ))}
-      </div>
-      {error && (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
-      )}
-      <div>
-        <Button
-          type="submit"
-          size="sm"
-          variant="outline"
-          disabled={save.isPending}
+      <div className="flex flex-wrap items-center gap-2">
+        <h5 className="eyebrow">Limits</h5>
+        <span className="text-sm text-faint">
+          The same for every {KIND_LABEL[runner.runner_kind].toLowerCase()}{" "}
+          runner.
+        </span>
+        <a
+          href="#runner-settings"
+          className="ml-auto text-sm text-primary underline underline-offset-2"
         >
-          Save limits
-        </Button>
+          Change in runner settings
+        </a>
       </div>
-    </form>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No runner settings are registered.
+        </p>
+      ) : (
+        <dl className="grid gap-x-4 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
+          {rows.map((s) => (
+            <div key={s.key} className="contents">
+              <dt className="text-faint">{s.label}</dt>
+              <dd>{displayValue(s, s.value)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </section>
   )
 }

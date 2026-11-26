@@ -1,4 +1,5 @@
 /** Runner and token wording and rules. No I/O. */
+import { isApiError } from "@/lib/api/client"
 import type { RunnerStatus, Scope, Token } from "./api"
 
 export const SCOPES: { value: Scope; label: string; hint: string }[] = [
@@ -15,7 +16,7 @@ export const SCOPES: { value: Scope; label: string; hint: string }[] = [
   {
     value: "gateway:permits",
     label: "Ask for submit permits",
-    hint: "Ask to press Submit. Each permit is for one application, lasts 10 minutes and works once.",
+    hint: "Ask to press Submit. Each permit is for one application and one claimed task, and works once.",
   },
   {
     value: "gateway:sweep",
@@ -74,3 +75,46 @@ export const canUnpause = (acknowledged: boolean, paused: boolean) =>
 
 export const tokenState = (t: Token) =>
   t.revoked_at ? "revoked" : t.suspended_at ? "paused" : "active"
+
+/**
+ * Gateway settings (group `runners`) shown read-only on each runner card. They apply to every
+ * runner of that kind; there are no per-runner caps. Edited in the runner settings section.
+ */
+export const RUNNER_LIMIT_KEYS: Record<RunnerStatus["runner_kind"], string[]> =
+  {
+    pc: [
+      "runners.task_lease_minutes",
+      "runners.max_claimed_tasks",
+      "runners.claims_per_hour",
+      "runners.calls_per_minute",
+      "runners.evidence_max_kb",
+    ],
+    server: [
+      "runners.server_runner_enabled",
+      "runners.task_lease_minutes",
+      "runners.max_claimed_tasks",
+      "runners.claims_per_hour",
+      "runners.calls_per_minute",
+      "runners.server_day_cap_minor",
+      "runners.server_task_max_tokens",
+      "runners.server_day_max_tokens",
+      "runners.evidence_max_kb",
+    ],
+  }
+
+/** Plain words for a refused un-pause. */
+export function reinstateErrorText(e: unknown, fallback: string): string {
+  if (isApiError(e, 409))
+    return "This token was revoked. A revoked token cannot work again; create a new one."
+  if (isApiError(e, 422)) {
+    const d = e.body?.detail
+    if (
+      d &&
+      !Array.isArray(d) &&
+      typeof d === "object" &&
+      d.code === "acknowledgement_required"
+    )
+      return "Tick the box to say you have read why it was paused."
+  }
+  return fallback
+}

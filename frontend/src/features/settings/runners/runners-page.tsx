@@ -1,10 +1,11 @@
 import { Link } from "@tanstack/react-router"
 import { PageHeader } from "@/components/page-header"
 import { RunnersSection } from "./runners-section"
+import { RunnerSettings } from "./runner-settings"
 import { RunnerRules, SetupGuides } from "./setup-guides"
 import { TokensSection } from "./tokens-section"
 
-/** Settings > Runners: tokens, runners, what they may do, and how to set one up. */
+/** Settings > Runners: tokens, runners, their settings, what they may do, and how to set one up. */
 export function RunnersPage() {
   return (
     <div className="grid gap-6">
@@ -23,6 +24,7 @@ export function RunnersPage() {
       <RunnerRules />
       <RunnersSection />
       <TokensSection />
+      <RunnerSettings />
       <SetupGuides />
     </div>
   )

@@ -1,181 +1,179 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { Chip, type ChipTone } from "@/components/chip"
+import { Chip } from "@/components/chip"
 import { Skeleton } from "@/components/ui/skeleton"
-import { runnerTasksQuery } from "@/features/accounts/api"
-import { BLOCKER_TITLE, dateText } from "@/features/accounts/logic"
-import type {
-  PermitEvent,
-  RunnerTask,
-  TaskEvidence,
-} from "@/features/accounts/w3-pending-types"
+import {
+  releasesQuery,
+  type PendingAction,
+  type ReleaseRecord,
+} from "@/features/accounts/api"
+import {
+  BLOCKER_TITLE,
+  blockerKind,
+  dateText,
+  readBlocker,
+  roleText,
+  waitingOn,
+} from "@/features/accounts/logic"
+import { pendingQuery } from "@/features/autopilot/api"
+import type { RunnerStatus } from "./api"
 
-const STATUS: Record<RunnerTask["status"], { label: string; tone: ChipTone }> =
-  {
-    queued: { label: "Queued", tone: "neutral" },
-    running: { label: "Running", tone: "info" },
-    blocked: { label: "Waiting on you", tone: "warn" },
-    done: { label: "Done", tone: "good" },
-    failed: { label: "Failed", tone: "danger" },
-  }
-
-const PERMIT: Record<
-  PermitEvent["outcome"],
-  { label: string; tone: ChipTone }
-> = {
-  granted: { label: "Permit granted", tone: "good" },
-  denied: { label: "Permit denied", tone: "danger" },
-  wait_for_owner: { label: "Permit waiting on you", tone: "warn" },
+/** Open blockers this runner raised: the action names it (`runner_id`) or lists one of its tasks. */
+export function blockersOf(tokenId: string, actions: PendingAction[]) {
+  return actions.filter((a) => {
+    if (!blockerKind(a)) return false
+    const d = readBlocker(a)
+    return (
+      d.runnerId === tokenId || d.tasks.some((t) => t.runner_id === tokenId)
+    )
+  })
 }
 
-const RESULT = {
-  submitted: "Submitted",
-  uncertain: "Not sure it went",
-  failed: "Failed",
-} as const
+/** Task ids of this runner named on its blockers. */
+const taskIdsOf = (tokenId: string, actions: PendingAction[]) =>
+  new Set(
+    actions.flatMap((a) => {
+      const d = readBlocker(a)
+      const own = d.tasks.filter((t) => t.runner_id === tokenId || !t.runner_id)
+      return [
+        ...own.map((t) => t.task_id),
+        ...(a.agent_task_id ? [a.agent_task_id] : []),
+      ]
+    })
+  )
 
-/** Recent tasks of one runner: checkpoints, blockers, permits and results with evidence. */
-export function RunnerActivity({
-  tokenId,
-  name,
-}: {
-  tokenId: string
-  name: string
-}) {
-  const q = useQuery(runnerTasksQuery(tokenId))
+/**
+ * What a runner is doing, from what the API offers: its current task (`/api/tokens/runners`),
+ * the open blockers it raised (pending actions), and per application what it was given and
+ * entered (`/api/applications/{id}/releases`). There is no per-runner task history endpoint.
+ */
+export function RunnerActivity({ runner }: { runner: RunnerStatus }) {
+  const q = useQuery(pendingQuery())
+  const blockers = blockersOf(runner.token_id, q.data ?? [])
+  const taskIds = taskIdsOf(runner.token_id, blockers)
+  const appIds = [
+    ...new Set(
+      blockers.flatMap((a) => waitingOn(a).map((w) => w.application_id))
+    ),
+  ]
+  const current = runner.current_task_id
+  const currentBlocked = !!current && taskIds.has(current)
   return (
-    <section aria-label={`Recent activity of ${name}`} className="grid gap-2">
-      <h5 className="eyebrow">Recent tasks</h5>
+    <section
+      aria-label={`Recent activity of ${runner.name}`}
+      className="grid gap-2"
+    >
+      <h5 className="eyebrow">Now</h5>
+      <p className="text-sm text-muted-foreground">
+        {current
+          ? currentBlocked
+            ? "Its current task is waiting on you (below)."
+            : "Working on a task now."
+          : "Not holding a task."}{" "}
+        Last call {dateText(runner.last_seen_at)}.
+      </p>
+      <h5 className="eyebrow">Waiting on you</h5>
       {q.isPending && <Skeleton className="h-16 w-full bg-sunken" />}
       {q.isError && (
         <p role="alert" className="text-sm text-danger">
-          Could not load this runner's tasks.
+          Could not load what this runner is waiting on.
         </p>
       )}
-      {q.isSuccess && q.data.length === 0 && (
+      {q.isSuccess && blockers.length === 0 && (
         <p className="text-sm text-muted-foreground">
-          This runner has not worked on anything yet.
+          Nothing from this runner is waiting on you.
         </p>
       )}
       <ul className="grid gap-2">
-        {q.data?.map((t) => (
-          <TaskRow key={t.id} task={t} />
+        {blockers.map((a) => (
+          <BlockerRow key={a.id} action={a} />
         ))}
       </ul>
+      {appIds.length > 0 && (
+        <>
+          <h5 className="eyebrow">Given and entered</h5>
+          <ul className="grid gap-2">
+            {appIds.map((id) => (
+              <Releases key={id} applicationId={id} taskIds={taskIds} />
+            ))}
+          </ul>
+        </>
+      )}
     </section>
   )
 }
 
-function TaskRow({ task: t }: { task: RunnerTask }) {
+function BlockerRow({ action: a }: { action: PendingAction }) {
+  const kind = blockerKind(a)
+  const waiting = waitingOn(a)
   return (
-    <li className="grid gap-1.5 rounded-md border border-border p-2.5 text-sm">
+    <li className="grid gap-1 rounded-md border border-border p-2.5 text-sm">
       <div className="flex flex-wrap items-center gap-2">
-        <Chip tone={STATUS[t.status].tone}>{STATUS[t.status].label}</Chip>
-        <span className="font-medium">{t.title}</span>
-        <span className="text-faint">{dateText(t.started_at)}</span>
+        <Chip tone="warn">{kind ? BLOCKER_TITLE[kind] : "Blocked"}</Chip>
+        <span className="font-medium">{a.title}</span>
+        <span className="text-faint">{dateText(a.created_at)}</span>
+        <Link
+          to="/accounts/handoff/$actionId"
+          params={{ actionId: a.id }}
+          className="ml-auto text-primary underline underline-offset-2"
+        >
+          Open
+        </Link>
       </div>
-      {t.checkpoints.length > 0 && (
+      {waiting.length > 0 && (
         <p className="text-muted-foreground">
-          <span className="text-faint">Checkpoints: </span>
-          {t.checkpoints.map((c) => c.step).join(" → ")}
+          <span className="text-faint">Waiting: </span>
+          {waiting.map(roleText).join("; ")}
         </p>
-      )}
-      {t.blockers.length > 0 && (
-        <ul className="grid gap-0.5">
-          {t.blockers.map((b) => (
-            <li key={`${b.at}-${b.kind}`} className="text-muted-foreground">
-              <span className="text-faint">Blocker: </span>
-              {BLOCKER_TITLE[b.kind]} ({dateText(b.at)})
-              {b.action_id && (
-                <>
-                  {" "}
-                  <Link
-                    to="/accounts/handoff/$actionId"
-                    params={{ actionId: b.action_id }}
-                    className="text-primary underline underline-offset-2"
-                  >
-                    Open
-                  </Link>
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      {t.permits.length > 0 && (
-        <ul className="grid gap-0.5">
-          {t.permits.map((p) => (
-            <li
-              key={`${p.at}-${p.outcome}`}
-              className="flex flex-wrap items-center gap-1.5"
-            >
-              <Chip tone={PERMIT[p.outcome].tone}>
-                {PERMIT[p.outcome].label}
-              </Chip>
-              <span className="text-faint">{dateText(p.at)}</span>
-              {p.reason && (
-                <span className="text-muted-foreground">{p.reason}</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-      {t.result && (
-        <div className="grid gap-1">
-          <p>
-            <span className="text-faint">Result: </span>
-            <b className="font-medium">{RESULT[t.result.outcome]}</b>
-            {t.result.detail && ` · ${t.result.detail}`}
-          </p>
-          {t.result.evidence.length > 0 && (
-            <ul className="flex flex-wrap gap-2" aria-label="Evidence">
-              {t.result.evidence.map((e) => (
-                <Evidence key={`${e.kind}-${e.label}`} e={e} />
-              ))}
-            </ul>
-          )}
-        </div>
       )}
     </li>
   )
 }
 
-function Evidence({ e }: { e: TaskEvidence }) {
-  if (e.kind === "screenshot" && e.url)
+const fieldsText = (released: ReleaseRecord["released"]) => {
+  const given = Array.isArray(released.given) ? released.given : []
+  return given.length
+    ? `packet given ${given.length} time${given.length === 1 ? "" : "s"}`
+    : "no packet given"
+}
+
+function enteredText(entered: ReleaseRecord["entered"]): string | null {
+  if (!entered || typeof entered !== "object" || !("at" in entered)) return null
+  const answers = Array.isArray(entered.answers) ? entered.answers.length : 0
+  const files = Array.isArray(entered.files) ? entered.files.length : 0
+  return `asked for a submit permit with ${answers} answer${answers === 1 ? "" : "s"} and ${files} file${files === 1 ? "" : "s"}${typeof entered.at === "string" ? ` (${dateText(entered.at)})` : ""}`
+}
+
+function Releases({
+  applicationId,
+  taskIds,
+}: {
+  applicationId: string
+  taskIds: Set<string>
+}) {
+  const q = useQuery(releasesQuery(applicationId))
+  const mine = (q.data ?? []).filter((r) => taskIds.has(r.agent_task_id))
+  if (q.isError)
     return (
-      <li>
-        <a
-          href={e.url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="block"
-          aria-label={`${e.label} (opens in a new tab)`}
-        >
-          <img
-            src={e.url}
-            alt={e.label}
-            loading="lazy"
-            className="h-16 w-24 rounded-sm border border-border object-cover"
-          />
-        </a>
-      </li>
-    )
-  if (e.url)
-    return (
-      <li>
-        <a
-          href={e.url}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="text-primary underline underline-offset-2"
-        >
-          {e.label}
-        </a>
+      <li className="text-sm text-muted-foreground">
+        What was released for one application could not be loaded.
       </li>
     )
   return (
-    <li className="rounded-sm bg-sunken px-2 py-1 text-muted-foreground">
-      {e.label}
-    </li>
+    <>
+      {mine.map((r) => {
+        const entered = enteredText(r.entered)
+        return (
+          <li
+            key={r.agent_task_id}
+            aria-label="Release"
+            className="rounded-md bg-sunken px-2 py-1 text-sm text-muted-foreground"
+          >
+            Task {r.agent_task_id.slice(0, 8)}: {fieldsText(r.released)}
+            {entered ? `; ${entered}` : "; nothing entered yet"}.
+          </li>
+        )
+      })}
+    </>
   )
 }

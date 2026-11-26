@@ -3,8 +3,7 @@ import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { renderApp } from "@/test/render"
 import { runnersMock } from "@/mocks/handlers/runners"
-import { PC_ID } from "@/mocks/dataset/runners"
-import { canUnpause, runnerRows, seenText } from "./logic"
+import { canUnpause, reinstateErrorText, runnerRows, seenText } from "./logic"
 
 /** A runner's card: the Tokens list has a row with the same name, so look in the Runners list. */
 const runnerCard = async (name: string) => {
@@ -125,33 +124,86 @@ describe("page content", () => {
     expect(screen.getAllByText(/--profile runner/).length).toBeGreaterThan(0)
   })
 
-  it("saves per-runner limits and shows recent activity with evidence", async () => {
+  it("shows the runner settings read-only per runner, with a link to edit them", async () => {
+    renderApp("/settings/runners")
+    const card = await runnerCard("Office PC")
+    const limits = await within(card).findByRole("region", {
+      name: "Limits for Office PC",
+    })
+    expect(within(limits).getByText("Task lease")).toBeInTheDocument()
+    expect(within(limits).getByText("20 minutes")).toBeInTheDocument()
+    expect(within(limits).queryByRole("textbox")).toBeNull()
+    expect(
+      within(limits).getByRole("link", { name: "Change in runner settings" })
+    ).toHaveAttribute("href", "#runner-settings")
+    // The server runner also shows its spend and token caps.
+    const server = await runnerCard("Home server")
+    expect(await within(server).findByText(/minor units/)).toBeInTheDocument()
+    // The runners group is editable in one place, through the settings API.
+    const settings = screen.getByRole("list", { name: "Runner settings" })
+    expect(within(settings).getAllByRole("listitem").length).toBeGreaterThan(5)
+  })
+
+  it("builds activity from the current task, the blockers it raised and what it was given", async () => {
     const user = userEvent.setup()
     renderApp("/settings/runners")
     const card = await runnerCard("Office PC")
-    const form = await within(card).findByRole("form", {
-      name: "Limits for Office PC",
-    })
-    const tasks = within(form).getByLabelText("Tasks per day")
-    await user.clear(tasks)
-    await user.type(tasks, "5")
-    await user.click(within(form).getByRole("button", { name: "Save limits" }))
-    await waitFor(() =>
-      expect(runnersMock().caps[PC_ID].max_tasks_per_day).toBe(5)
-    )
-
     await user.click(
       within(card).getByRole("button", { name: "Show activity" })
     )
+    const activity = await within(card).findByRole("region", {
+      name: "Recent activity of Office PC",
+    })
     expect(
-      await within(card).findByRole("img", { name: "Confirmation page" })
+      await within(activity).findByText(/current task is waiting on you/)
     ).toBeInTheDocument()
-    expect(within(card).getAllByText(/KA-2041/).length).toBeGreaterThan(0)
-    expect(await within(card).findByText(/Permit granted/)).toBeInTheDocument()
-    expect(within(card).getByText(/Permit denied/)).toBeInTheDocument()
     expect(
-      within(card).getByText(/The posting closed on 20 Nov/)
+      await within(activity).findByText(/Solve the CAPTCHA for/)
     ).toBeInTheDocument()
-    expect(within(card).getAllByText(/Blocker:/).length).toBeGreaterThan(0)
+    expect(within(activity).getByText("Verification code")).toBeInTheDocument()
+    const opens = within(activity).getAllByRole("link", { name: "Open" })
+    expect(opens.length).toBeGreaterThanOrEqual(4)
+    expect(
+      await within(activity).findByText(
+        /asked for a submit permit with 1 answer/
+      )
+    ).toBeInTheDocument()
   }, 20_000)
+})
+
+describe("un-pause refusals", () => {
+  it("sends acknowledged and a note; the server refuses without the acknowledgement", async () => {
+    const paused = runnersMock().tokens.find((t) => t.name === "Old laptop")!
+    const call = (body: unknown) =>
+      fetch(`/api/tokens/${paused.id}/reinstate`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    const refused = await call({ acknowledged: false })
+    expect(refused.status).toBe(422)
+    expect(await refused.json()).toMatchObject({
+      detail: { code: "acknowledgement_required" },
+    })
+    expect((await call({ acknowledged: true, note: "checked" })).status).toBe(
+      200
+    )
+  })
+
+  it("words a 409 for a revoked token and a 422 acknowledgement refusal", async () => {
+    const { ApiError } = await import("@/lib/api/client")
+    expect(reinstateErrorText(new ApiError(409, { detail: "x" }), "f")).toMatch(
+      /revoked/
+    )
+    expect(
+      reinstateErrorText(
+        new ApiError(422, {
+          detail: { code: "acknowledgement_required", reason: "r" },
+        }),
+        "f"
+      )
+    ).toMatch(/Tick the box/)
+    expect(reinstateErrorText(new Error("x"), "fallback")).toBe("fallback")
+  })
 })

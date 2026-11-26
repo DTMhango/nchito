@@ -10,6 +10,7 @@ export type TokenCreated = S["TokenCreated"]
 export type RunnerStatus = S["RunnerStatus"]
 export type Scope = NonNullable<TokenCreate["scopes"]>[number]
 export type RunnerKind = TokenCreate["runner_kind"] & string
+export type ReinstateIn = S["ReinstateIn"]
 
 export const tokenKeys = {
   tokens: ["tokens"] as const,
@@ -37,9 +38,11 @@ export const revokeToken = (id: string) =>
       params: { path: { token_id: id } },
     })
   )
-export const reinstateToken = (id: string) =>
+/** Lifting a suspension needs `acknowledged: true` (422 `acknowledgement_required`); 409 for a revoked token. */
+export const reinstateToken = (id: string, body: ReinstateIn) =>
   unwrap(
     api.POST("/api/tokens/{token_id}/reinstate", {
       params: { path: { token_id: id } },
+      body,
     })
   )

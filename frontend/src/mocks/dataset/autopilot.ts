@@ -447,5 +447,6 @@ export function mailProposalFor(app: ApplicationSummary): PendingAction {
     employer: app.employer,
     job_title: app.title,
     resolution: null,
+    kind: "mail_stage_proposal",
   }
 }

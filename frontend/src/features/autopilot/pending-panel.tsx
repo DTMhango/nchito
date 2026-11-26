@@ -219,7 +219,28 @@ function PendingRow({ action }: { action: PendingAction }) {
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          {info.kind === "review" ? (
+          {info.kind === "handoff" ? (
+            <Button asChild>
+              <Link
+                to="/accounts/handoff/$actionId"
+                params={{ actionId: action.id }}
+              >
+                {info.primary}
+              </Link>
+            </Button>
+          ) : info.kind === "changes" ? (
+            typeof detail.job_id === "string" ? (
+              <Button asChild>
+                <Link
+                  to="/jobs/$id"
+                  params={{ id: detail.job_id }}
+                  search={{ tab: "changes" }}
+                >
+                  {info.primary}
+                </Link>
+              </Button>
+            ) : null
+          ) : info.kind === "review" ? (
             action.application_id ? (
               <Button asChild>
                 <Link
@@ -247,7 +268,7 @@ function PendingRow({ action }: { action: PendingAction }) {
                 It did not go out
               </Button>
             )}
-          {isHandoff(action) && (
+          {isHandoff(action) && info.kind !== "handoff" && (
             <Button asChild type="button" variant="outline">
               <Link
                 to="/accounts/handoff/$actionId"
