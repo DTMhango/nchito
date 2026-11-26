@@ -1,0 +1,10 @@
+<article class="cv">
+<header><h1>{{ doc.name }}</h1>{% if doc.headline %}<p class="headline">{{ doc.headline }}</p>{% endif %}
+{% if doc.contact %}<p class="contact">{{ doc.contact | join(" | ") }}</p>{% endif %}</header>
+{% for s in doc.sections %}<section class="{{ s.key }}"><h2>{{ s.title }}</h2>
+{% for p in s.paragraphs %}<p>{{ p }}</p>{% endfor %}
+{% if s.bullets %}<ul>{% for b in s.bullets %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+{% for e in s.entries %}<div class="entry"><h3>{{ e.title }}</h3>{% if e.subtitle %}<p class="sub">{{ e.subtitle }}</p>{% endif %}
+{% if e.bullets %}<ul>{% for b in e.bullets %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}</div>{% endfor %}
+</section>{% endfor %}
+</article>

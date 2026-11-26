@@ -487,3 +487,31 @@ the registry under its own group prefix only.
   retry_attempts, retry_minutes}`, `retention.{cron, notifications_days, temp_files_days}`,
   `health.{sweep_stale_hours, backup_stale_hours, disk_min_free_mb}` (new group `health`). Env: `BACKUP_DIR`, `PG_BIN_DIR`,
   `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+
+## Wave 2 render additions
+
+Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `service.py`, `layouts.py`, `model.py`,
+`emit_pdf|docx|html|text.py`, `store.py`). Table `application_document` (migration `0007_render`).
+
+- `GET /api/applications/{id}/documents` -> `DocumentOut[]` (newest first; files from earlier spec versions stay).
+- `POST /api/applications/{id}/documents/render` `{kind: cv|letter, template_key?, formats?: [pdf, docx, txt, html]}`
+  (default pdf, docx, txt) -> `{documents: DocumentOut[], warnings: RenderWarning[]}`. Idempotent: the same spec,
+  Kit rows, template and renderer version return the rows already stored (`input_hash`, unique per application,
+  kind and format).
+- `GET /api/applications/{id}/documents/{kind}?fmt=pdf|docx|txt|html&template=` downloads the current spec's file
+  (rendering it if needed). `fmt` gained `txt`. Headers: `X-Content-SHA256`, `X-Document-Id`, `X-Render-Warnings`
+  (count). `kind=answers` stays 501 (the apply stream builds it from the packet).
+- `GET /api/applications/{id}/document-files/{document_id}` downloads a stored file exactly as rendered.
+- `DocumentOut`: `spec_hash` (sha256 of the canonical spec JSON it came from), `content_hash` (sha256 of the stored
+  file; a packet's `PacketFile.sha256` and `document_id` come from here), `page_count`, `warnings`.
+- `RenderWarning {code, message, detail, severity: "warn"}`; codes: `page_limit`, `paragraph_limit`,
+  `bullets_per_role`, `section_omitted`, `unknown_experience`, `no_name`, `empty`, `font_substituted`. Content is
+  never trimmed to fit.
+- Templates: built-ins `classic`, `compact`, `modern` (cv) and `letter-plain` (letter), defined as data in
+  `app/docs/layouts.py`. A `Template` row with the same key overrides section order, limits, accent and name; a row
+  with a new key starts from `classic` / `letter-plain`. Empty limits fall back to `documents.cv_pages`,
+  `documents.letter_pages`, `documents.letter_paragraphs`. Default template per kind: `documents.cv_template`,
+  `documents.letter_template`; the render request's `template_key` overrides it.
+- New settings: `documents.letter_template`, `documents.letter_salutation`, `documents.letter_signoff`.
+- The CV header shows only `show_on_cv` person fields. Education lines come from approved, confirmed `education` facts.
+- PDF is produced with ReportLab (no headless browser) and DOCX with python-docx; both are byte-stable for equal input.

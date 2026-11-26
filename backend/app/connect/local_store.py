@@ -12,10 +12,11 @@ import mimetypes
 from pathlib import Path
 from typing import Literal
 
-from app.connect.filestore import StoredFile
+from app.connect.filestore import FileStore, StoredFile
+from app.core.config import get_config
 
 
-class LocalStoreError(RuntimeError):
+class LocalStoreError(ValueError):
     pass
 
 
@@ -73,3 +74,8 @@ class LocalFileStore:
 
     async def share_link(self, key: str, *, audience: Literal["anyone_with_link"]) -> str:
         raise LocalStoreError("the local store cannot create share links; use a cloud store")
+
+
+def default_file_store() -> FileStore:
+    """The one default store: the local files volume at ``FILES_DIR``."""
+    return LocalFileStore(get_config().files_dir)

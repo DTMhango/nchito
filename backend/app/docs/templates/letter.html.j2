@@ -1,0 +1,6 @@
+<article class="letter">
+<header><p class="name">{{ doc.name }}</p>{% if doc.contact %}<p class="contact">{{ doc.contact | join(" | ") }}</p>{% endif %}</header>
+{% if doc.salutation %}<p>{{ doc.salutation }}</p>{% endif %}
+{% for p in doc.paragraphs %}<p>{{ p }}</p>{% endfor %}
+{% if doc.signoff %}<p>{{ doc.signoff }}<br>{{ doc.name }}</p>{% endif %}
+</article>
