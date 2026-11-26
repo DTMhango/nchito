@@ -1,174 +1,477 @@
 import { useId, useState } from "react"
-import { CircleHelp, Printer, RefreshCw } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  AlertTriangle,
+  CircleHelp,
+  History,
+  Printer,
+  RefreshCw,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Chip } from "@/components/chip"
 import { SectionHeader } from "@/components/page-header"
 import type { FactIndex } from "@/features/studio/draft"
-import type { PackItem, PackSection } from "../w3-pending-types"
-import { ClaimView, FactChips } from "./claim-view"
+import { dateText } from "../format"
+import {
+  editSection,
+  packKeys,
+  refusalCode,
+  regenerateSection,
+  saveNote,
+  versionsQuery,
+} from "./api"
+import { ClaimView } from "./claim-view"
+import {
+  CODE_SECTIONS,
+  sectionTitle,
+  type Claim,
+  type CribSheet,
+  type Gaps,
+  type PackSection,
+  type PaySheet,
+  type Questions,
+  type QuestionsToAsk,
+  type RoleBrief,
+  type Stories,
+  type WhyYou,
+} from "./shapes"
+import { StoryCard } from "./story"
 
-export const UNKNOWN_WORDS = "Decide before the interview"
+const QUESTION_ORDER = [
+  "behavioural",
+  "technical",
+  "role",
+  "motivation",
+  "logistics",
+]
 
-export type SectionActions = {
-  saveItem: (itemId: string, text: string) => void
-  saveNotes: (notes: string) => void
-  regenerate: () => void
-  restore: (version: number) => void
-  favourite: (itemId: string, on: boolean) => void
-  busy: boolean
+const PAY_STATUS: Record<PaySheet["lines"][number]["status"], string> = {
+  confirmed: "Your confirmed answer",
+  told_them: "What you told them",
+  not_disclosed: "Not disclosed",
+  decide: "Decide",
 }
 
-const QUESTION_ORDER = ["technical", "leadership", "behavioural", "motivation"]
-
-function Logistics({ item, index }: { item: PackItem; index: FactIndex }) {
-  const unknown = item.value == null || item.value.trim() === ""
-  return (
-    <li
-      data-pack-item={item.id}
-      data-state={unknown ? "unknown" : "known"}
-      className="grid gap-1 rounded-md border border-border bg-surface p-3 sm:grid-cols-[14rem_1fr] sm:items-center"
-    >
-      <span className="font-semibold">{item.label}</span>
-      <span className="flex flex-wrap items-center gap-1.5">
-        {unknown ? (
-          <Chip tone="warn" icon={CircleHelp}>
-            {UNKNOWN_WORDS}
-          </Chip>
-        ) : (
-          <>
-            <span>{item.value}</span>
-            <FactChips item={item} index={index} />
-          </>
-        )}
-      </span>
-    </li>
-  )
+/** A copy of `content` with the claim at `path` reworded. */
+function withClaimText(
+  content: Record<string, unknown>,
+  path: (string | number)[],
+  text: string
+): Record<string, unknown> {
+  const next = structuredClone(content)
+  let node: unknown = next
+  for (const p of path) node = (node as Record<string | number, unknown>)[p]
+  ;(node as Claim).text = text
+  return next
 }
 
-function Body({
-  section,
-  index,
-  actions,
-}: {
+type BodyProps = {
+  jobId: string
+  sectionKey: string
   section: PackSection
   index: FactIndex
-  actions: SectionActions
-}) {
-  const claim = (
-    it: PackItem,
-    extra?: { lead?: string | null; fav?: boolean }
-  ) => (
-    <ClaimView
-      key={it.id}
-      item={it}
-      index={index}
-      lead={extra?.lead}
-      saving={actions.busy}
-      onSave={(text) => actions.saveItem(it.id, text)}
-      onFavourite={
-        extra?.fav ? (on) => actions.favourite(it.id, on) : undefined
-      }
-    />
-  )
-  if (section.key === "logistics")
-    return (
-      <ul className="m-0 grid list-none gap-2 p-0">
-        {section.items.map((it) => (
-          <Logistics key={it.id} item={it} index={index} />
+  locked: boolean
+  busy: boolean
+  editClaim: (path: (string | number)[], text: string) => void
+}
+
+const List = ({ items, label }: { items: string[]; label: string }) =>
+  items.length ? (
+    <div className="grid gap-1">
+      <h4 className="eyebrow">{label}</h4>
+      <ul className="m-0 grid list-disc gap-0.5 pl-5 text-sm">
+        {items.map((t) => (
+          <li key={t}>{t}</li>
         ))}
       </ul>
-    )
-  if (section.key === "questions") {
-    const cats = [
-      ...QUESTION_ORDER,
-      ...section.items.map((i) => i.category ?? "other"),
-    ].filter((c, i, a) => a.indexOf(c) === i)
-    return (
-      <div className="grid gap-4">
-        {cats.map((c) => {
-          const items = section.items.filter(
-            (i) => (i.category ?? "other") === c
-          )
-          if (!items.length) return null
-          return (
-            <div key={c} className="grid gap-2">
-              <h4 className="eyebrow capitalize">{c}</h4>
-              <ul className="m-0 grid list-none gap-2 p-0">
-                {items.map((it) => claim(it, { lead: it.question }))}
-              </ul>
-            </div>
-          )
-        })}
-      </div>
-    )
+    </div>
+  ) : null
+
+function Body(p: BodyProps) {
+  const { section, index, sectionKey: key } = p
+  const c = section.content
+  const claim = (
+    id: string,
+    cl: Claim,
+    path: (string | number)[],
+    lead?: string,
+    detail?: string
+  ) => (
+    <ClaimView
+      key={id}
+      id={id}
+      claim={cl}
+      index={index}
+      lead={lead}
+      detail={detail}
+      saving={p.busy}
+      onSave={p.locked ? undefined : (t) => p.editClaim(path, t)}
+    />
+  )
+
+  switch (key) {
+    case "role_brief": {
+      const r = c as unknown as RoleBrief
+      return (
+        <div className="grid gap-3">
+          {r.posting_changed && (
+            <p role="alert" className="text-sm font-semibold text-warn">
+              The posting changed after you applied: this brief reads the
+              current posting.
+            </p>
+          )}
+          {r.summary && <p className="whitespace-pre-wrap">{r.summary}</p>}
+          <List label="What the posting stresses" items={r.emphasised} />
+          <List label="What it asks for" items={r.requirements} />
+          {r.level_notes && <p className="text-sm">{r.level_notes}</p>}
+          <List label="About the employer" items={r.company_notes} />
+          {r.research_note && (
+            <p className="text-xs text-muted-foreground">{r.research_note}</p>
+          )}
+        </div>
+      )
+    }
+    case "why_you": {
+      const w = c as unknown as WhyYou
+      return (
+        <ul className="m-0 grid list-none gap-2 p-0">
+          {w.points.map((pt, i) =>
+            claim(
+              `why_you.${i}`,
+              pt.point,
+              ["points", i, "point"],
+              pt.requirement || undefined
+            )
+          )}
+        </ul>
+      )
+    }
+    case "questions": {
+      const q = c as unknown as Questions
+      const cats = [
+        ...QUESTION_ORDER,
+        ...q.items.map((i) => i.category),
+      ].filter((x, i, a) => a.indexOf(x) === i)
+      return (
+        <div className="grid gap-4">
+          {cats.map((cat) => {
+            const items = q.items
+              .map((it, i) => ({ it, i }))
+              .filter(({ it }) => it.category === cat)
+            if (!items.length) return null
+            return (
+              <div key={cat} className="grid gap-2">
+                <h4 className="eyebrow capitalize">{cat}</h4>
+                <ul className="m-0 grid list-none gap-2 p-0">
+                  {items.map(({ it, i }) =>
+                    claim(
+                      `questions.${i}`,
+                      it.answer,
+                      ["items", i, "answer"],
+                      it.question,
+                      it.why_asked
+                    )
+                  )}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+      )
+    }
+    case "stories": {
+      const s = c as unknown as Stories
+      const sorted = [...s.items].sort(
+        (a, b) => Number(b.favourite) - Number(a.favourite)
+      )
+      return (
+        <ul className="m-0 grid list-none gap-2 p-0">
+          {sorted.map((st) => (
+            <StoryCard
+              key={st.id}
+              jobId={p.jobId}
+              story={st}
+              index={index}
+              baseVersion={section.version}
+              locked={p.locked}
+            />
+          ))}
+        </ul>
+      )
+    }
+    case "questions_to_ask": {
+      const q = c as unknown as QuestionsToAsk
+      return (
+        <ul className="m-0 grid list-none gap-2 p-0">
+          {q.items.map((it) => (
+            <li
+              key={it.question}
+              className="grid gap-0.5 rounded-md border border-border bg-surface p-3"
+            >
+              <span className="font-semibold">{it.question}</span>
+              {it.why && (
+                <span className="text-xs text-muted-foreground">{it.why}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    case "gaps": {
+      const g = c as unknown as Gaps
+      return (
+        <ul className="m-0 grid list-none gap-2 p-0">
+          {g.items.map((it, i) =>
+            claim(
+              `gaps.${i}`,
+              it.answer,
+              ["items", i, "answer"],
+              it.requirement,
+              it.gap
+            )
+          )}
+        </ul>
+      )
+    }
+    case "pay_sheet": {
+      const ps = c as unknown as PaySheet
+      return (
+        <div className="grid gap-2">
+          <p className="text-sm">
+            <b>Pay in the posting: </b>
+            {ps.posting_pay ?? (
+              <span className="text-muted-foreground italic">Not stated</span>
+            )}
+          </p>
+          <ul className="m-0 grid list-none gap-2 p-0">
+            {ps.lines.map((l) => {
+              const value =
+                l.status === "confirmed"
+                  ? l.kit_answer
+                  : l.status === "told_them"
+                    ? l.told_them
+                    : null
+              return (
+                <li
+                  key={l.topic}
+                  data-pay-line={l.topic}
+                  data-state={l.status}
+                  className="grid gap-1 rounded-md border border-border bg-surface p-3 sm:grid-cols-[14rem_1fr] sm:items-center"
+                >
+                  <span className="grid">
+                    <span className="font-semibold">{l.topic}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {l.question}
+                    </span>
+                  </span>
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {value ? (
+                      <>
+                        <span className="eyebrow">{PAY_STATUS[l.status]}</span>
+                        <span>{value}</span>
+                      </>
+                    ) : (
+                      <Chip
+                        tone={l.status === "decide" ? "warn" : "line"}
+                        icon={CircleHelp}
+                      >
+                        {PAY_STATUS[l.status]}
+                      </Chip>
+                    )}
+                    {l.note && <span className="text-sm">{l.note}</span>}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )
+    }
+    case "crib_sheet": {
+      const cs = c as unknown as CribSheet
+      return (
+        <div id="crib-print" className="grid gap-2">
+          {cs.role && <p className="font-semibold">{cs.role}</p>}
+          <List label="Points" items={cs.points} />
+          <List label="Stories" items={cs.stories} />
+          <List label="Questions to ask" items={cs.questions_to_ask} />
+          <List label="Pay" items={cs.pay} />
+          <List label="Gaps" items={cs.gaps} />
+          {cs.flagged.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Left out because they failed the truth checks:{" "}
+              {cs.flagged.map(sectionTitle).join(", ")}.
+            </p>
+          )}
+        </div>
+      )
+    }
+    default:
+      return (
+        <pre className="text-xs whitespace-pre-wrap">
+          {JSON.stringify(c, null, 2)}
+        </pre>
+      )
   }
-  if (section.key === "stories") {
-    const sorted = [...section.items].sort(
-      (a, b) => Number(!!b.favourite) - Number(!!a.favourite)
-    )
+}
+
+function Versions({
+  jobId,
+  sectionKey,
+  current,
+  title,
+  disabled,
+  onUse,
+}: {
+  jobId: string
+  sectionKey: string
+  current: number
+  title: string
+  disabled: boolean
+  onUse: (content: Record<string, unknown>) => void
+}) {
+  const q = useQuery(versionsQuery(jobId, sectionKey))
+  const [pick, setPick] = useState<number | null>(null)
+  if (q.isPending)
+    return <p className="text-sm text-muted-foreground">Loading versions...</p>
+  if (q.isError)
     return (
-      <ul className="m-0 grid list-none gap-2 p-0">
-        {sorted.map((it) =>
-          claim(it, {
-            lead: it.requirement ? `For: ${it.requirement}` : null,
-            fav: true,
-          })
-        )}
-      </ul>
+      <p role="alert" className="text-sm text-danger">
+        Couldn't load the versions. {q.error.message}
+      </p>
     )
-  }
+  const rows = [...q.data].sort((a, b) => b.version - a.version)
+  const chosen = rows.find((r) => r.version === pick)
   return (
-    <ul className="m-0 grid list-none gap-2 p-0">
-      {section.items.map((it) => claim(it))}
-    </ul>
+    <div className="grid gap-1.5 rounded-md border border-border p-2 text-sm">
+      <ol
+        aria-label={`Versions of ${title}`}
+        className="m-0 grid list-none gap-1 p-0"
+      >
+        {rows.map((v) => (
+          <li
+            key={v.version}
+            data-version={v.version}
+            className="flex flex-wrap items-center gap-1.5"
+          >
+            <label className="inline-flex items-center gap-1.5">
+              <input
+                type="radio"
+                name={`v-${sectionKey}`}
+                checked={pick === v.version}
+                disabled={v.version === current}
+                onChange={() => setPick(v.version)}
+              />
+              Version {v.version}
+            </label>
+            <span className="text-faint">
+              {v.origin === "owner" ? "your edit" : v.origin},{" "}
+              {dateText(v.created_at)}
+            </span>
+            {v.version === current && <Chip tone="line">Current</Chip>}
+            {v.flagged && <Chip tone="danger">Flagged</Chip>}
+          </li>
+        ))}
+      </ol>
+      {chosen && (
+        <Button
+          size="xs"
+          className="justify-self-start"
+          disabled={disabled}
+          onClick={() => onUse(chosen.content)}
+        >
+          Use version {chosen.version} again
+        </Button>
+      )}
+    </div>
   )
 }
 
-/** One section of the pack: its lines, version switch, regenerate, and the owner's notes. */
+/** One section: its content, version history, regenerate, owner edits and the owner's note. */
 export function PackSectionView({
+  jobId,
+  sectionKey,
   section,
+  note,
   index,
-  actions,
+  locked,
 }: {
+  jobId: string
+  sectionKey: string
   section: PackSection
+  note: string
   index: FactIndex
-  actions: SectionActions
+  /** Generation is queued or running: edits and regeneration wait. */
+  locked: boolean
 }) {
+  const qc = useQueryClient()
+  const title = sectionTitle(sectionKey)
   const notesId = useId()
-  const [notes, setNotes] = useState(section.notes)
-  const dirty = notes !== section.notes
+  const [draftNote, setDraftNote] = useState(note)
+  const [showVersions, setShowVersions] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const refresh = () => {
+    void qc.invalidateQueries({
+      queryKey: packKeys.versions(jobId, sectionKey),
+    })
+    return qc.invalidateQueries({ queryKey: packKeys.pack(jobId) })
+  }
+  const onError = (e: Error) => {
+    const code = refusalCode(e)
+    setError(
+      code === "still_queued"
+        ? "The pack is still being generated. Try again when it is done."
+        : code === "invalid_section"
+          ? `That edit doesn't fit this section: ${e.message}`
+          : e.message
+    )
+  }
+  const edit = useMutation({
+    mutationFn: (content: Record<string, unknown>) =>
+      editSection(jobId, sectionKey, content),
+    onMutate: () => setError(null),
+    onSuccess: refresh,
+    onError,
+  })
+  const regen = useMutation({
+    mutationFn: () => regenerateSection(jobId, sectionKey),
+    onMutate: () => setError(null),
+    onSuccess: (p) => qc.setQueryData(packKeys.pack(jobId), p),
+    onError,
+  })
+  const saveN = useMutation({
+    mutationFn: () => saveNote(jobId, sectionKey, draftNote),
+    onSuccess: (p) => qc.setQueryData(packKeys.pack(jobId), p),
+    onError,
+  })
+  const busy = edit.isPending || regen.isPending
+  const problems = section.check_results.filter(
+    (r) => r.status !== "pass" && !r.waived
+  )
+
   return (
     <section
-      aria-label={section.title}
-      id={`pack-${section.key}`}
+      aria-label={title}
+      id={`pack-${sectionKey}`}
+      data-flagged={section.flagged || undefined}
       className="grid gap-2.5"
     >
       <SectionHeader
-        title={section.title}
-        aside={
-          section.versions.length > 1
-            ? `Version ${section.version} of ${section.versions.length}`
-            : undefined
-        }
+        title={title}
+        aside={`Version ${section.version}${section.origin === "owner" ? ", your edit" : ""}`}
         action={
           <span className="inline-flex items-center gap-1.5">
-            {section.versions.length > 1 && (
-              <select
-                aria-label={`Version of ${section.title}`}
-                value={section.version}
-                disabled={actions.busy}
-                onChange={(e) => actions.restore(Number(e.target.value))}
-                className="h-7 rounded-md border border-border bg-transparent px-1.5 text-xs"
-              >
-                {section.versions.map((v) => (
-                  <option key={v.version} value={v.version}>
-                    Version {v.version}: {v.note}
-                  </option>
-                ))}
-              </select>
-            )}
-            {section.key === "crib" && (
+            <Button
+              size="xs"
+              variant="ghost"
+              aria-expanded={showVersions}
+              onClick={() => setShowVersions((s) => !s)}
+            >
+              <History aria-hidden="true" />
+              Versions
+            </Button>
+            {sectionKey === "crib_sheet" && (
               <Button
                 size="xs"
                 variant="outline"
@@ -178,43 +481,95 @@ export function PackSectionView({
                 Print
               </Button>
             )}
-            <Button
-              size="xs"
-              variant="ghost"
-              disabled={actions.busy}
-              onClick={actions.regenerate}
-              aria-label={`Regenerate ${section.title}`}
-            >
-              <RefreshCw aria-hidden="true" />
-              Regenerate
-            </Button>
+            {!CODE_SECTIONS.has(sectionKey) && (
+              <Button
+                size="xs"
+                variant="ghost"
+                disabled={busy || locked}
+                onClick={() => regen.mutate()}
+                aria-label={`Regenerate ${title}`}
+              >
+                <RefreshCw aria-hidden="true" />
+                Regenerate
+              </Button>
+            )}
           </span>
         }
       />
-      {section.key === "crib" ? (
-        <div id="crib-print" className="grid gap-2">
-          <Body section={section} index={index} actions={actions} />
+      {section.flagged && (
+        <div
+          role="note"
+          data-flag="section"
+          className="grid gap-1 rounded-md border border-danger bg-danger-soft p-2 text-sm"
+        >
+          <span className="inline-flex items-center gap-1.5 font-semibold text-danger">
+            <AlertTriangle className="size-4" aria-hidden="true" />
+            Flagged: this section failed the truth checks and is left out of the
+            crib sheet.
+          </span>
+          {problems.map((r) => (
+            <span key={`${r.check}-${r.detail}`}>
+              {r.check.replace(/_/g, " ")}
+              {r.detail ? `: ${r.detail}` : ""}
+            </span>
+          ))}
         </div>
-      ) : (
-        <Body section={section} index={index} actions={actions} />
       )}
+      {!section.flagged && problems.length > 0 && (
+        <ul className="m-0 grid list-none gap-1 p-0 text-sm">
+          {problems.map((r) => (
+            <li key={`${r.check}-${r.detail}`}>
+              <Chip tone={r.status === "block" ? "danger" : "warn"}>
+                {r.check.replace(/_/g, " ")}
+              </Chip>{" "}
+              {r.detail}
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
+      {showVersions && (
+        <Versions
+          jobId={jobId}
+          sectionKey={sectionKey}
+          current={section.version}
+          title={title}
+          disabled={busy || locked}
+          onUse={(content) => edit.mutate(content)}
+        />
+      )}
+      <Body
+        jobId={jobId}
+        sectionKey={sectionKey}
+        section={section}
+        index={index}
+        locked={locked}
+        busy={busy}
+        editClaim={(path, text) =>
+          edit.mutate(withClaimText(section.content, path, text))
+        }
+      />
       <div className="grid gap-1.5">
         <label htmlFor={notesId} className="text-sm font-semibold">
-          Your notes on {section.title.toLowerCase()}
+          Your notes on {title.toLowerCase()}
         </label>
         <Textarea
           id={notesId}
           rows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          value={draftNote}
+          onChange={(e) => setDraftNote(e.target.value)}
           placeholder="Anything you want to remember. Notes stay when you regenerate."
         />
-        {dirty && (
+        {draftNote !== note && (
           <Button
             size="xs"
             className="justify-self-start"
-            disabled={actions.busy}
-            onClick={() => actions.saveNotes(notes)}
+            disabled={saveN.isPending}
+            onClick={() => saveN.mutate()}
           >
             Save notes
           </Button>

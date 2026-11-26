@@ -51,7 +51,13 @@ describe("job page tabs", () => {
 
   it("explains the Interview tab when there is no application yet", async () => {
     renderApp(`/jobs/${WIN}?tab=interview`)
-    expect(await screen.findByText("No application yet")).toBeInTheDocument()
+    // The pack is per role: without an application it rests on the posting and the Kit only.
+    expect(
+      await screen.findByText(/no application for this role yet/)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Generate the pack" })
+    ).toBeInTheDocument()
   })
 
   it("shows the sentence behind a facet on focus", async () => {

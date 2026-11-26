@@ -1,28 +1,30 @@
-import { useState } from "react"
-import { AlertTriangle, Pencil, Star } from "lucide-react"
+import { useState, type ReactNode } from "react"
+import { AlertTriangle, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Chip } from "@/components/chip"
 import { FactTag } from "@/components/fact-tag"
 import { cn } from "@/lib/utils"
 import { traceClaim, type FactIndex } from "@/features/studio/draft"
-import type { PackItem } from "../w3-pending-types"
+import type { Claim } from "./shapes"
 
 /** What is wrong with a claim's tracing, in words; empty when it is sound. */
-export function claimFlags(item: PackItem, index: FactIndex): string[] {
-  if (!item.owner_claim || !item.text.trim()) return []
+export function claimFlags(
+  key: string,
+  claim: Claim,
+  index: FactIndex
+): string[] {
+  if (!claim.text.trim()) return []
   const t = traceClaim(
-    { key: item.id, text: item.text, fact_ids: item.fact_ids },
+    { key, text: claim.text, fact_ids: claim.fact_ids },
     index
   )
   const out: string[] = []
-  if (t.state === "untraced" || item.flag === "untraced")
+  if (t.state === "untraced")
     out.push("Untraced: no fact in your Kit behind this claim")
-  if (item.flag === "stray_figure" || t.strayFigures.length)
+  if (t.strayFigures.length)
     out.push(
-      t.strayFigures.length
-        ? `${t.strayFigures.map((n) => `"${n}"`).join(", ")} is not in its facts`
-        : "A figure here is not in its facts"
+      `${t.strayFigures.map((n) => `"${n}"`).join(", ")} is not in its facts`
     )
   for (const f of t.facts.filter((x) => x.status !== "approved"))
     out.push(`${f.code} is not an approved fact`)
@@ -32,25 +34,24 @@ export function claimFlags(item: PackItem, index: FactIndex): string[] {
 
 /** The Kit facts a claim rests on, as the same chips the Studio uses. */
 export function FactChips({
-  item,
+  factIds,
   index,
 }: {
-  item: PackItem
+  factIds: string[]
   index: FactIndex
 }) {
-  const t = traceClaim(
-    { key: item.id, text: item.text, fact_ids: item.fact_ids },
-    index
-  )
-  if (!t.facts.length) return null
+  const facts = factIds
+    .map((id) => index.get(id))
+    .filter((f, i, a) => !!f && a.indexOf(f) === i)
+  if (!facts.length) return null
   return (
     <span className="inline-flex flex-wrap items-center gap-1" data-fact-chips>
-      {t.facts.map((f) => (
+      {facts.map((f) => (
         <FactTag
-          key={f.id}
-          code={f.code}
-          text={f.text}
-          status={f.status as "approved" | "draft" | "retired"}
+          key={f!.id}
+          code={f!.code}
+          text={f!.text}
+          status={f!.status as "approved" | "draft" | "retired"}
         />
       ))}
     </span>
@@ -58,33 +59,38 @@ export function FactChips({
 }
 
 type Props = {
-  item: PackItem
+  /** Stable id for tests and tracing (`why_you.0`). */
+  id: string
+  claim: Claim
   index: FactIndex
   /** Heading above the text (a question, a requirement). */
-  lead?: string | null
-  onSave: (text: string) => void
+  lead?: ReactNode
+  /** Small print under the lead (why it is asked). */
+  detail?: string | null
+  /** Save an owner edit of the wording; absent while edits are held. */
+  onSave?: (text: string) => void
   saving?: boolean
-  onFavourite?: (favourite: boolean) => void
 }
 
-/** One line of the pack: wording, its fact chips, any tracing flag, edit and favourite. */
+/** One claim about the owner: wording, its fact chips, any tracing flag, and an edit. */
 export function ClaimView({
-  item,
+  id,
+  claim,
   index,
   lead,
+  detail,
   onSave,
   saving,
-  onFavourite,
 }: Props) {
   const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState(item.text)
-  const flags = claimFlags(item, index)
+  const [draft, setDraft] = useState(claim.text)
+  const flags = claimFlags(id, claim, index)
   const flagged = flags.length > 0
-  const star = item.star
+  const name = typeof lead === "string" ? lead : claim.text.slice(0, 40)
 
   return (
     <li
-      data-pack-item={item.id}
+      data-pack-item={id}
       data-trace={flagged ? "flagged" : "ok"}
       className={cn(
         "grid gap-1.5 rounded-md border border-border bg-surface p-3",
@@ -94,66 +100,33 @@ export function ClaimView({
       <div className="flex items-start gap-2">
         <div className="grid min-w-0 flex-1 gap-1">
           {lead && <p className="font-semibold">{lead}</p>}
-          {item.category && (
-            <span className="eyebrow">{item.category.replace(/_/g, " ")}</span>
-          )}
+          {detail && <p className="text-xs text-muted-foreground">{detail}</p>}
           {editing ? (
             <Textarea
-              aria-label={`Edit: ${lead ?? item.text.slice(0, 40)}`}
+              aria-label={`Edit: ${name}`}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={4}
             />
-          ) : star ? (
-            <dl className="grid gap-1 text-sm">
-              {(["situation", "action", "result"] as const).map((k) => (
-                <div key={k} className="grid grid-cols-[5.5rem_1fr] gap-2">
-                  <dt className="font-semibold text-muted-foreground capitalize">
-                    {k}
-                  </dt>
-                  <dd>{star[k]}</dd>
-                </div>
-              ))}
-            </dl>
           ) : (
-            <p className="whitespace-pre-wrap">{item.text}</p>
+            <p className="whitespace-pre-wrap">{claim.text}</p>
           )}
         </div>
-        <span className="flex shrink-0 items-center gap-0.5">
-          {onFavourite && (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-pressed={!!item.favourite}
-              aria-label={
-                item.favourite
-                  ? `Remove from favourites: ${lead ?? item.text.slice(0, 40)}`
-                  : `Favourite: ${lead ?? item.text.slice(0, 40)}`
-              }
-              onClick={() => onFavourite(!item.favourite)}
-            >
-              <Star
-                aria-hidden="true"
-                className={cn(item.favourite && "fill-current text-warn")}
-              />
-            </Button>
-          )}
-          {!editing && !star && (
-            <Button
-              size="icon-xs"
-              variant="ghost"
-              aria-label={`Edit: ${lead ?? item.text.slice(0, 40)}`}
-              onClick={() => {
-                setDraft(item.text)
-                setEditing(true)
-              }}
-            >
-              <Pencil aria-hidden="true" />
-            </Button>
-          )}
-        </span>
+        {!editing && onSave && (
+          <Button
+            size="icon-xs"
+            variant="ghost"
+            aria-label={`Edit: ${name}`}
+            onClick={() => {
+              setDraft(claim.text)
+              setEditing(true)
+            }}
+          >
+            <Pencil aria-hidden="true" />
+          </Button>
+        )}
       </div>
-      {editing && (
+      {editing && onSave && (
         <div className="flex gap-1.5">
           <Button
             size="xs"
@@ -170,22 +143,20 @@ export function ClaimView({
           </Button>
         </div>
       )}
-      {item.owner_claim && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FactChips item={item} index={index} />
-          {flags.map((f) => (
-            <Chip
-              key={f}
-              tone="danger"
-              icon={AlertTriangle}
-              data-flag={f.startsWith("Untraced") ? "untraced" : "warning"}
-              className="whitespace-normal"
-            >
-              {f}
-            </Chip>
-          ))}
-        </div>
-      )}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <FactChips factIds={claim.fact_ids} index={index} />
+        {flags.map((f) => (
+          <Chip
+            key={f}
+            tone="danger"
+            icon={AlertTriangle}
+            data-flag={f.startsWith("Untraced") ? "untraced" : "warning"}
+            className="whitespace-normal"
+          >
+            {f}
+          </Chip>
+        ))}
+      </div>
     </li>
   )
 }

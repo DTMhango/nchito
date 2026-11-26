@@ -10,15 +10,15 @@ import { PageHeader } from "@/components/page-header"
 import { View } from "@/components/view"
 import { cn } from "@/lib/utils"
 import { searchJobsQuery } from "../api"
-import type { CompareJob } from "../w3-pending-types"
 import {
   compareQuery,
+  type CompareOut,
   joinIds,
   MAX_COMPARE,
   MIN_COMPARE,
   parseIds,
 } from "./api"
-import { buildRows, differs } from "./rows"
+import { BestMark, CellView, differs, groupRows } from "./rows"
 
 /** Compare 2 to 4 roles side by side (DESIGN 18.4). The roles live in the link, so it can be shared. */
 export function ComparePage({
@@ -30,7 +30,6 @@ export function ComparePage({
 }) {
   const ids = parseIds(raw)
   const q = useQuery(compareQuery(ids))
-  const jobs = q.data?.jobs ?? []
   const set = (next: string[]) => onIds(joinIds(next))
 
   return (
@@ -75,7 +74,10 @@ export function ComparePage({
           Couldn't load the comparison. {q.error.message}
         </p>
       ) : (
-        <Grid jobs={jobs} onRemove={(id) => set(ids.filter((x) => x !== id))} />
+        <Grid
+          data={q.data}
+          onRemove={(id) => set(ids.filter((x) => x !== id))}
+        />
       )}
     </View>
   )
@@ -141,94 +143,123 @@ function Picker({
 }
 
 function Grid({
-  jobs,
+  data,
   onRemove,
 }: {
-  jobs: CompareJob[]
+  data: CompareOut
   onRemove: (id: string) => void
 }) {
-  const sections = buildRows(jobs)
+  const { jobs } = data
+  const winner = jobs.find((j) => j.id === data.winner_id)
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[40rem] border-collapse text-sm">
-        <caption className="sr-only">Roles side by side</caption>
-        <thead>
-          <tr>
-            <th scope="col" className="w-44 p-2 text-left" />
-            {jobs.map((j) => (
-              <th
-                key={j.job_id}
-                scope="col"
-                className="min-w-44 border-b border-border p-2 text-left align-top"
-              >
-                <span className="flex items-start gap-1">
-                  <span className="grid min-w-0 flex-1">
-                    <Link
-                      to="/jobs/$id"
-                      params={{ id: j.job_id }}
-                      search={{ tab: "overview" }}
-                      className="font-semibold text-primary-ink underline"
-                    >
-                      {j.title}
-                    </Link>
-                    <span className="font-normal text-muted-foreground">
-                      {j.employer}
-                    </span>
-                  </span>
-                  <Button
-                    size="icon-xs"
-                    variant="ghost"
-                    aria-label={`Remove ${j.title} from the comparison`}
-                    onClick={() => onRemove(j.job_id)}
-                  >
-                    <X aria-hidden="true" />
-                  </Button>
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        {sections.map((s) => (
-          <tbody key={s.section} aria-label={s.section}>
+    <div className="grid gap-3">
+      {winner && (
+        <p role="status" data-winner={winner.id} className="text-sm">
+          <b>{winner.title}</b> is the employer group's chosen role
+          {data.winner_reason ? `: ${data.winner_reason}` : "."}
+        </p>
+      )}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[40rem] border-collapse text-sm">
+          <caption className="sr-only">Roles side by side</caption>
+          <thead>
             <tr>
-              <th
-                colSpan={jobs.length + 1}
-                scope="colgroup"
-                className="pt-5 pb-1 text-left eyebrow"
-              >
-                {s.section}
-              </th>
-            </tr>
-            {s.rows.map((r) => {
-              const diff = differs(r)
-              return (
-                <tr
-                  key={r.id}
-                  data-row={r.id}
-                  data-differs={diff || undefined}
-                  className={cn(
-                    "border-t border-border",
-                    diff && "bg-highlight-soft"
-                  )}
+              <th scope="col" className="w-44 p-2 text-left" />
+              {jobs.map((j) => (
+                <th
+                  key={j.id}
+                  scope="col"
+                  className="min-w-44 border-b border-border p-2 text-left align-top"
                 >
-                  <th
-                    scope="row"
-                    className="p-2 text-left align-top font-semibold"
+                  <span className="flex items-start gap-1">
+                    <span className="grid min-w-0 flex-1">
+                      <Link
+                        to="/jobs/$id"
+                        params={{ id: j.id }}
+                        search={{ tab: "overview" }}
+                        className="font-semibold text-primary-ink underline"
+                      >
+                        {j.title}
+                      </Link>
+                      <span className="font-normal text-muted-foreground">
+                        {j.employer}
+                        {j.location ? `, ${j.location}` : ""}
+                      </span>
+                      {j.campaign_name && (
+                        <span className="text-xs font-normal text-faint">
+                          Scored by {j.campaign_name}
+                        </span>
+                      )}
+                    </span>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label={`Remove ${j.title} from the comparison`}
+                      onClick={() => onRemove(j.id)}
+                    >
+                      <X aria-hidden="true" />
+                    </Button>
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          {groupRows(data.rows).map((s) => (
+            <tbody key={s.group} aria-label={s.title}>
+              <tr>
+                <th
+                  colSpan={jobs.length + 1}
+                  scope="colgroup"
+                  className="pt-5 pb-1 text-left eyebrow"
+                >
+                  {s.title}
+                </th>
+              </tr>
+              {s.rows.map((r) => {
+                const diff = differs(r)
+                return (
+                  <tr
+                    key={r.key}
+                    data-row={r.key}
+                    data-differs={diff || undefined}
+                    data-comparable={r.comparable}
+                    className={cn(
+                      "border-t border-border",
+                      diff && "bg-highlight-soft"
+                    )}
                   >
-                    {r.label}
-                    {diff && <span className="sr-only"> (differs)</span>}
-                  </th>
-                  {r.cells.map((c, i) => (
-                    <td key={jobs[i].job_id} className="p-2 align-top">
-                      {c.node}
-                    </td>
-                  ))}
-                </tr>
-              )
-            })}
-          </tbody>
-        ))}
-      </table>
+                    <th
+                      scope="row"
+                      className="p-2 text-left align-top font-semibold"
+                    >
+                      {r.label}
+                      {diff && <span className="sr-only"> (differs)</span>}
+                      {r.note && (
+                        <span
+                          className="mt-0.5 block text-xs font-normal text-muted-foreground"
+                          data-row-note
+                        >
+                          {r.comparable ? r.note : `Not comparable: ${r.note}`}
+                        </span>
+                      )}
+                    </th>
+                    {r.cells.map((c, i) => (
+                      <td
+                        key={jobs[i]?.id ?? i}
+                        data-best={r.best_index === i || undefined}
+                        className="p-2 align-top"
+                      >
+                        <CellView cell={c} pay={r.group === "pay"} />
+                        {r.best_index === i && <BestMark />}
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
+            </tbody>
+          ))}
+        </table>
+      </div>
     </div>
   )
 }

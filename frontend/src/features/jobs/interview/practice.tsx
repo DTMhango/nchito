@@ -1,30 +1,138 @@
 import { useState } from "react"
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { PauseCircle, RotateCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Chip } from "@/components/chip"
-import { FactTag } from "@/components/fact-tag"
-import { indexFacts } from "@/features/studio/draft"
-import type { FactOut } from "@/features/studio/api"
-import type { PackItem } from "../w3-pending-types"
-import { practice } from "./api"
+import { formatCost } from "@/lib/cost"
+import type { FactIndex } from "@/features/studio/draft"
+import { packKeys, practiceQuery, practise, retryPractice } from "./api"
+import { ClaimView } from "./claim-view"
+import type { LikelyQuestion, PracticeFeedback, PracticeOut } from "./shapes"
+
+function Attempt({
+  row,
+  index,
+  currency,
+  onRetry,
+  retrying,
+}: {
+  row: PracticeOut
+  index: FactIndex
+  currency: string | undefined
+  onRetry: () => void
+  retrying: boolean
+}) {
+  const fb = row.feedback as PracticeFeedback | null
+  return (
+    <li
+      data-practice={row.id}
+      data-status={row.status}
+      className="grid gap-1.5 rounded-md border border-border bg-surface p-3 text-sm"
+    >
+      <p className="font-semibold">{row.question}</p>
+      <p className="whitespace-pre-wrap text-muted-foreground">
+        {row.draft_answer}
+      </p>
+      {row.status === "done" && fb && (
+        <div aria-live="polite" className="grid gap-1.5">
+          <p>{fb.feedback}</p>
+          {fb.strengths.length > 0 && (
+            <span className="flex flex-wrap gap-1">
+              {fb.strengths.map((s) => (
+                <Chip key={s} tone="good">
+                  {s}
+                </Chip>
+              ))}
+            </span>
+          )}
+          {fb.improve.length > 0 && (
+            <span className="flex flex-wrap gap-1">
+              {fb.improve.map((s) => (
+                <Chip key={s} tone="warn">
+                  {s}
+                </Chip>
+              ))}
+            </span>
+          )}
+          {fb.suggested_answer && (
+            <ul className="m-0 grid list-none p-0">
+              <ClaimView
+                id={`practice.${row.id}`}
+                claim={fb.suggested_answer}
+                index={index}
+                lead="A stronger answer from your facts"
+              />
+            </ul>
+          )}
+          {row.cost_micros > 0 && (
+            <span className="text-xs text-faint">
+              Cost {formatCost(row.cost_micros, { currency })}
+            </span>
+          )}
+        </div>
+      )}
+      {row.status !== "done" && (
+        <div role="alert" className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 font-semibold text-warn">
+            <PauseCircle className="size-4" aria-hidden="true" />
+            {row.status === "paused"
+              ? "Paused: the AI budget is used up"
+              : `No feedback: ${row.error ?? "the request failed"}`}
+          </span>
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={retrying}
+            onClick={onRetry}
+          >
+            <RotateCw aria-hidden="true" />
+            Retry
+          </Button>
+        </div>
+      )}
+    </li>
+  )
+}
 
 /** Practice mode: pick a likely question, write your answer, get feedback against your facts. */
 export function PracticePanel({
-  appId,
+  jobId,
   questions,
-  facts,
+  index,
+  currency,
 }: {
-  appId: string
-  questions: PackItem[]
-  facts: FactOut[]
+  jobId: string
+  questions: LikelyQuestion[]
+  index: FactIndex
+  /** Currency of the AI budget, for the cost line (from the pack estimate). */
+  currency?: string
 }) {
-  const [qid, setQid] = useState(questions[0]?.id ?? "")
+  const qc = useQueryClient()
+  const [qi, setQi] = useState(0)
   const [draft, setDraft] = useState("")
+  const history = useQuery(practiceQuery(jobId))
+  const refresh = () =>
+    qc.invalidateQueries({ queryKey: packKeys.practice(jobId) })
   const run = useMutation({
-    mutationFn: () => practice(appId, { question_id: qid, draft }),
+    mutationFn: () => {
+      const q = questions[qi]
+      return practise(jobId, {
+        question: q.question,
+        category: q.category,
+        draft_answer: draft,
+      })
+    },
+    onSuccess: () => {
+      setDraft("")
+      return refresh()
+    },
   })
-  const index = indexFacts(facts)
+  const retry = useMutation({
+    mutationFn: (id: string) => retryPractice(id),
+    onSuccess: refresh,
+  })
+
   if (!questions.length)
     return (
       <p className="text-sm text-muted-foreground">
@@ -36,15 +144,15 @@ export function PracticePanel({
       <label className="grid gap-1 text-sm font-semibold">
         Question
         <select
-          value={qid}
+          value={qi}
           onChange={(e) => {
-            setQid(e.target.value)
+            setQi(Number(e.target.value))
             run.reset()
           }}
           className="h-9 rounded-md border border-border bg-transparent px-2 font-normal"
         >
-          {questions.map((q) => (
-            <option key={q.id} value={q.id}>
+          {questions.map((q, i) => (
+            <option key={q.question} value={i}>
               {q.question}
             </option>
           ))}
@@ -73,28 +181,27 @@ export function PracticePanel({
           {run.error.message}
         </p>
       )}
-      {run.data && (
-        <div aria-live="polite" className="grid gap-1.5 text-sm">
-          <p>{run.data.feedback}</p>
-          <span className="flex flex-wrap items-center gap-1.5">
-            {run.data.fact_ids.map((id) => {
-              const f = index.get(id)
-              return f ? (
-                <FactTag
-                  key={id}
-                  code={f.code}
-                  text={f.text}
-                  status={f.status as "approved" | "draft" | "retired"}
-                />
-              ) : null
-            })}
-            {run.data.gaps.map((g) => (
-              <Chip key={g} tone="warn">
-                {g}
-              </Chip>
-            ))}
-          </span>
-        </div>
+      {retry.isError && (
+        <p role="alert" className="text-sm text-danger">
+          {retry.error.message}
+        </p>
+      )}
+      {history.data && history.data.length > 0 && (
+        <ol
+          aria-label="Your practice answers"
+          className="m-0 grid list-none gap-2 p-0"
+        >
+          {history.data.map((row) => (
+            <Attempt
+              key={row.id}
+              row={row}
+              index={index}
+              currency={currency}
+              retrying={retry.isPending}
+              onRetry={() => retry.mutate(row.id)}
+            />
+          ))}
+        </ol>
       )}
     </div>
   )
