@@ -7,6 +7,8 @@ import {
   FileText,
   Gauge,
   Inbox,
+  MailCheck,
+  Flag,
   Radio,
   UserRoundCheck,
   Settings,
@@ -65,6 +67,12 @@ export const NAV_MAIN: NavItem[] = [
     keywords: ["approve", "packet", "review", "send", "needs you"],
   },
   {
+    to: "/follow-ups",
+    label: "Follow-ups",
+    icon: MailCheck,
+    keywords: ["follow up", "reply", "thank you", "messages", "chase"],
+  },
+  {
     to: "/autopilot",
     label: "Autopilot",
     icon: Gauge,
@@ -110,6 +118,12 @@ export const NAV_SETUP: NavItem[] = [
     label: "Insights",
     icon: BarChart3,
     keywords: ["funnel", "response rate", "spend", "analytics"],
+  },
+  {
+    to: "/wind-down",
+    label: "Wind down",
+    icon: Flag,
+    keywords: ["accepted an offer", "stop", "withdraw", "finish", "reopen"],
   },
 ]
 

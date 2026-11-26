@@ -240,9 +240,17 @@ async def recheck(session: AsyncSession, attempt: DispatchAttempt, app: Applicat
     def fail(gate: str, reason: str) -> None:
         failures.append({"gate": gate, "passed": False, "outcome": "fail", "detail": f"fail: {reason}"})
 
+    packet = await session.get(ApplicationPacket, attempt.packet_id)
+    if packets.is_message(packet):
+        from app.pipeline.followups import sending  # messages about the application: their own gates
+
+        assert packet is not None
+        return await sending.recheck(session, attempt, app, packet, now=now), None
     if await is_paused(session):
         fail("global_pause", "autopilot is paused")
-    packet = await session.get(ApplicationPacket, attempt.packet_id)
+    campaign_paused = await campaign_pause(session, app)
+    if campaign_paused:
+        fail("campaign_paused", campaign_paused)
     current = await packets.current(session, app.id)
     changed = None
     if packet is None or current is None or current.id != attempt.packet_id \
@@ -283,6 +291,17 @@ async def recheck(session: AsyncSession, attempt: DispatchAttempt, app: Applicat
         if quiet_hours_end(values, now) == "unknown":
             fail("quiet_hours", "quiet hours or the time zone are not known")
     return failures, changed
+
+
+async def campaign_pause(session: AsyncSession, app: Application) -> str | None:
+    """Why the application's campaign stops sends now (paused, until a date or indefinitely), or None."""
+    from app.models.search import Campaign, CampaignStatus
+
+    campaign = await session.get(Campaign, app.campaign_id) if app.campaign_id else None
+    if campaign is None or campaign.status != CampaignStatus.paused:
+        return None
+    until = f" until {campaign.paused_until.isoformat()}" if campaign.paused_until else ""
+    return f"campaign {campaign.name!r} is paused{until}"
 
 
 async def _claim(session: AsyncSession, attempt_id: uuid.UUID, now: datetime) -> DispatchAttempt | None:
@@ -355,6 +374,10 @@ async def run(session: AsyncSession, attempt_id: uuid.UUID, *, now: datetime | N
 async def _after_failure(session: AsyncSession, attempt: DispatchAttempt, *, now: datetime) -> None:
     """A definite failure: a bounded retry with a new permit and a new attempt, or the claim goes back."""
     retry = None
+    if await outcomes.is_message_attempt(session, attempt):
+        # A message is never resent on its own: the owner sees it failed and sends it again.
+        await outcomes._log(session, attempt, "dispatch.gave_up", "system", reason=f"send failed: {attempt.error}")
+        return
     if not await is_paused(session):
         retry = await queue(session, attempt.application_id, actor="system", automatic_retry=True, now=now)
     if retry is not None and retry.queued and retry.attempt is not None:

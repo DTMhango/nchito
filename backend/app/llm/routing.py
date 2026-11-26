@@ -21,6 +21,7 @@ STAGE_SETTING: dict[str, str] = {
     "browser_agent": "ai.model_browser_agent",
     "interview": "ai.model_tailor",
     "import": "ai.model_extract",
+    "followup": "ai.model_tailor",
 }
 ESCALATION_SETTING = "ai.model_score_escalation"
 SCORE_THRESHOLD_SETTINGS = ("scoring.threshold_shortlist", "scoring.threshold_tailor", "scoring.threshold_auto_apply")

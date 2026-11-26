@@ -20,7 +20,9 @@ CODES: tuple[str, ...] = (
     "waiver_reason_required", "note_required", "not_found", "already_handed_over", "already_settled",
     "not_uncertain", "not_started", "still_queued", "nothing_to_submit", "system_channel", "invalid_address",
     "no_address", "below_auto_threshold", "unknown_data", "pay_not_stated", "always_ask_first",
-    "campaign_unconfirmed", "refused",
+    "campaign_unconfirmed", "campaign_paused", "reply_received", "recipient_unconfirmed", "recipient_changed",
+    "not_plain_follow_up", "followup_cap", "message_not_draft", "message_questions", "no_recipient", "winddown_active",
+    "no_winddown", "refused",
 )
 
 GATE_CODES: dict[str, str] = {
@@ -34,6 +36,10 @@ GATE_CODES: dict[str, str] = {
     "untrusted_site", "answers_auto": "answers_not_automatic", "runner": "runner_refused",
     "auto_threshold": "below_auto_threshold", "known_data": "unknown_data", "pay_stated": "pay_not_stated",
     "always_ask_first": "always_ask_first", "campaign_ready": "campaign_unconfirmed",
+    "campaign_paused": "campaign_paused", "employer_reply": "reply_received",
+    "recipient_known": "recipient_unconfirmed",
+    "recipient_sent_before": "recipient_changed", "plain_follow_up": "not_plain_follow_up",
+    "followup_cap": "followup_cap", "message_checks": "check_blocking", "message_current": "packet_superseded",
 }
 
 

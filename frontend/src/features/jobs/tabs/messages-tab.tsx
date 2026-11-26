@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/empty-state"
 import { SectionHeader } from "@/components/page-header"
 import { mailThreadsQuery, type JobDetail, type MailThread } from "../api"
 import { dateText } from "../format"
+import { MessagesPanel } from "@/features/followups/messages-panel"
 
 const CLASS: Record<
   MailThread["classification"],
@@ -43,24 +44,27 @@ export function MessagesTab({ job }: { job: JobDetail }) {
     )
 
   return (
-    <section aria-label="Mail threads" className="grid gap-2">
-      <SectionHeader title="Email about this role" />
-      <p className="text-sm text-muted-foreground">
-        Linking a thread never changes the stage on its own: it proposes the
-        change, and the proposal waits for you under pending actions.
-      </p>
-      {threads.data.length === 0 ? (
+    <div className="grid gap-6">
+      <section aria-label="Mail threads" className="grid gap-2">
+        <SectionHeader title="Email about this role" />
         <p className="text-sm text-muted-foreground">
-          No email is linked to this application yet.
+          Linking a thread never changes the stage on its own: it proposes the
+          change, and the proposal waits for you under pending actions.
         </p>
-      ) : (
-        <ul className="panel p-0" aria-label="Threads">
-          {threads.data.map((t) => (
-            <ThreadRow key={t.id} thread={t} />
-          ))}
-        </ul>
-      )}
-    </section>
+        {threads.data.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No email is linked to this application yet.
+          </p>
+        ) : (
+          <ul className="panel p-0" aria-label="Threads">
+            {threads.data.map((t) => (
+              <ThreadRow key={t.id} thread={t} />
+            ))}
+          </ul>
+        )}
+      </section>
+      <MessagesPanel applicationId={job.application_id} />
+    </div>
   )
 }
 

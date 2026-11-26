@@ -3680,6 +3680,331 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/applications/{application_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Messages List
+         * @description The application's mail thread (as far as it is known) and every message drafted for it.
+         */
+        get: operations["messages_list"];
+        put?: never;
+        /**
+         * Messages Create
+         * @description Draft a message from Kit facts and the thread (one budgeted model call, then the checks). Never sent
+         *     from here. A budget refusal returns the message as ``budget_paused``.
+         */
+        post: operations["messages_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Messages Get */
+        get: operations["messages_get"];
+        /**
+         * Messages Update
+         * @description The owner's edit. Withdraws an approval (the old packet and its permits go), clears the automatic
+         *     flag, and re-runs the code checks. New addresses stay unconfirmed unless ``confirm_recipients``.
+         */
+        put: operations["messages_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Regenerate
+         * @description Write the draft again (one budgeted model call).
+         */
+        post: operations["messages_regenerate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Check
+         * @description Run the code checks again, plus the model claim check when ``tailoring.claim_check_enabled``.
+         */
+        post: operations["messages_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Approve
+         * @description The owner's approval: the checks run again, then the message is snapshotted as a hashed packet.
+         *     409 ``check_blocking`` / ``message_questions`` / ``no_recipient`` / ``no_identity`` with the results.
+         */
+        post: operations["messages_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Send
+         * @description Ask for the single-use permit (every message gate) and queue the approved message behind the email
+         *     send delay. ``denied`` carries the first blocking gate's code and every gate.
+         */
+        post: operations["messages_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Cancel
+         * @description Cancel a queued send during the delay. 409 ``already_handed_over`` once the mailbox has it.
+         */
+        post: operations["messages_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Messages Discard */
+        post: operations["messages_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/follow-ups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Followups List
+         * @description Follow-ups due, snoozed or drafted, and those coming up in the next 30 days, soonest first.
+         */
+        get: operations["followups_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/follow-ups/{application_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Followups Draft
+         * @description Draft the follow-up that is due (or the next one, early). For your approval: never sent from here.
+         */
+        post: operations["followups_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/follow-ups/{application_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Followups Snooze */
+        post: operations["followups_snooze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/follow-ups/{application_id}/not-needed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Followups Not Needed */
+        post: operations["followups_not_needed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wind-down": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Winddown Get
+         * @description The latest wind-down with what is still in motion (``status: none`` before the first).
+         */
+        get: operations["winddown_get"];
+        put?: never;
+        /**
+         * Winddown Start
+         * @description "I've accepted an offer": the master pause goes on at once (queued sends cancelled, permits revoked),
+         *     then the view is listed. Sends nothing. Starting again while one is active returns it.
+         */
+        post: operations["winddown_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wind-down/choices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Winddown Choose
+         * @description Keep, pause or withdraw one item. Withdrawing a sent application drafts an email for your approval.
+         */
+        post: operations["winddown_choose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wind-down/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Winddown Reopen
+         * @description "Reopen my search": everything comes back paused, never deleted; the master pause stays on.
+         */
+        post: operations["winddown_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wind-down/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Winddown Summary
+         * @description The final summary as Markdown (download).
+         */
+        get: operations["winddown_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data/export/preview": {
         parameters: {
             query?: never;
@@ -6464,6 +6789,53 @@ export interface components {
              */
             mandatory: boolean;
         };
+        /** FollowupItemOut */
+        FollowupItemOut: {
+            /**
+             * Id
+             * @description The due row; null while only upcoming
+             */
+            id: string | null;
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Title */
+            title: string;
+            /** Employer */
+            employer: string;
+            /** Stage */
+            stage: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "upcoming" | "due" | "snoozed" | "not_needed" | "drafted" | "sent";
+            /** Message Id */
+            message_id: string | null;
+            /** Message State */
+            message_state: ("none" | "queued" | "sending" | "sent" | "uncertain" | "failed" | "cancelled") | null;
+        };
+        /** FollowupListOut */
+        FollowupListOut: {
+            /** Items */
+            items: components["schemas"]["FollowupItemOut"][];
+            /** Auto Send */
+            auto_send: boolean;
+        };
         /** FormatRule */
         FormatRule: {
             /**
@@ -7500,6 +7872,242 @@ export interface components {
             /** Duplicate Ids */
             duplicate_ids: string[];
         };
+        /** MessageCreateIn */
+        MessageCreateIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "follow_up" | "thank_you" | "info_reply" | "slot_accept" | "slot_decline" | "withdraw" | "offer_decline";
+            /**
+             * Note
+             * @description What you want said (your words)
+             */
+            note?: string | null;
+            /**
+             * Slot
+             * @description The interview slot, exactly as it should be written (slot answers)
+             */
+            slot?: string | null;
+            /**
+             * Excerpt
+             * @description The employer's message, pasted (treated as data, never instructions)
+             */
+            excerpt?: string | null;
+        };
+        /** MessageDispatchOut */
+        MessageDispatchOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Status */
+            status: string;
+            /** Send After */
+            send_after: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Outcome At */
+            outcome_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Provider Message Id */
+            provider_message_id: string | null;
+        };
+        /** MessageEditIn */
+        MessageEditIn: {
+            /** To */
+            to?: string[] | null;
+            /** Cc */
+            cc?: string[] | null;
+            /** Subject */
+            subject?: string | null;
+            /** Body */
+            body?: string | null;
+            /**
+             * Confirm Recipients
+             * @description Confirm addresses this application has not used
+             * @default false
+             */
+            confirm_recipients?: boolean;
+        };
+        /** MessageOut */
+        MessageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "follow_up" | "thank_you" | "info_reply" | "slot_accept" | "slot_decline" | "withdraw" | "offer_decline";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "approved" | "discarded" | "budget_paused" | "failed";
+            /**
+             * Send State
+             * @description From the dispatch attempts of the message's packet
+             * @enum {string}
+             */
+            send_state: "none" | "queued" | "sending" | "sent" | "uncertain" | "failed" | "cancelled";
+            /**
+             * Automatic
+             * @description Drafted by the automatic follow-up path; any owner edit clears it
+             */
+            automatic: boolean;
+            /** Thread Id */
+            thread_id: string | null;
+            /**
+             * Thread Ref
+             * @description The mail thread the email replies in, if one is known
+             */
+            thread_ref: string | null;
+            /** To */
+            to: string[];
+            /** Cc */
+            cc: string[];
+            /**
+             * Known Recipients
+             * @description Where the application went and who wrote back
+             */
+            known_recipients: string[];
+            /**
+             * Confirmed Recipients
+             * @description Other addresses the owner confirmed
+             */
+            confirmed_recipients: string[];
+            /**
+             * Unconfirmed Recipients
+             * @description Recipients that still need the owner's confirmation
+             */
+            unconfirmed_recipients: string[];
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /** Paragraphs */
+            paragraphs: components["schemas"]["SpecItem"][];
+            /**
+             * Questions
+             * @description What the owner must decide before this can be approved
+             */
+            questions: string[];
+            /** Check Results */
+            check_results: components["schemas"]["CheckResult"][];
+            /**
+             * Checked
+             * @description The checks ran on exactly this content
+             */
+            checked: boolean;
+            /**
+             * Check Status
+             * @enum {string}
+             */
+            check_status: "pass" | "warn" | "block";
+            /** Note */
+            note: string | null;
+            /** Slot */
+            slot: string | null;
+            /** Excerpt */
+            excerpt: string | null;
+            /** Sequence */
+            sequence: number | null;
+            /** Origin */
+            origin: string;
+            /** Model */
+            model: string | null;
+            /** Cost Micros */
+            cost_micros: number;
+            /** Error */
+            error: string | null;
+            /** Created By */
+            created_by: string;
+            packet: components["schemas"]["MessagePacketOut"] | null;
+            dispatch: components["schemas"]["MessageDispatchOut"] | null;
+        };
+        /** MessagePacketOut */
+        MessagePacketOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Version */
+            version: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Approved At */
+            approved_at: string | null;
+            /** Approved By */
+            approved_by: string | null;
+            /** Invalidated At */
+            invalidated_at: string | null;
+        };
+        /** MessageSendOut */
+        MessageSendOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "denied";
+            /** Reason */
+            reason: string;
+            /** Code */
+            code: string | null;
+            /** Gates */
+            gates: {
+                [key: string]: unknown;
+            }[];
+            message: components["schemas"]["MessageOut"];
+        };
+        /** MessageThreadOut */
+        MessageThreadOut: {
+            /** Thread Id */
+            thread_id: string | null;
+            /** Subject */
+            subject: string | null;
+            /** Sender */
+            sender: string | null;
+            /** Last Message At */
+            last_message_at: string | null;
+            /** Employer Replied */
+            employer_replied: boolean;
+            /** Sent To */
+            sent_to: string[];
+            /** Sending Identity */
+            sending_identity: string | null;
+        };
+        /** MessagesOut */
+        MessagesOut: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            thread: components["schemas"]["MessageThreadOut"];
+            /** Messages */
+            messages: components["schemas"]["MessageOut"][];
+        };
         /** NeverMention */
         NeverMention: {
             /**
@@ -7717,6 +8325,11 @@ export interface components {
              * @description Content hash of the job as it was packed
              */
             job_version: string | null;
+            /**
+             * Message Kind
+             * @description Set when the packet is a message about the application
+             */
+            message_kind?: ("follow_up" | "thank_you" | "info_reply" | "slot_accept" | "slot_decline" | "withdraw" | "offer_decline") | null;
         };
         /** PacketDestination */
         PacketDestination: {
@@ -7745,6 +8358,11 @@ export interface components {
             subject: string;
             /** Body */
             body: string;
+            /**
+             * Thread Ref
+             * @description The mail thread a message replies in (provider thread id)
+             */
+            thread_ref?: string | null;
         };
         /** PacketFile */
         PacketFile: {
@@ -9969,15 +10587,6 @@ export interface components {
             /** Note */
             note: string | null;
         };
-        /** SnoozeIn */
-        SnoozeIn: {
-            /**
-             * Until
-             * Format: date-time
-             * @description The action comes back at this time
-             */
-            until: string;
-        };
         /** SortSpec */
         SortSpec: {
             /** Field */
@@ -11362,6 +11971,79 @@ export interface components {
             /** Would Change If */
             would_change_if: string | null;
         };
+        /** WindDownChoiceIn */
+        WindDownChoiceIn: {
+            /** Key */
+            key: string;
+            /**
+             * Choice
+             * @enum {string}
+             */
+            choice: "keep" | "pause" | "withdraw";
+        };
+        /** WindDownItemOut */
+        WindDownItemOut: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "queued_send" | "approved" | "message" | "application" | "interview" | "pending_action" | "campaign";
+            /** Label */
+            label: string;
+            /** Detail */
+            detail: string;
+            /** Choices */
+            choices: ("keep" | "pause" | "withdraw")[];
+            /** Choice */
+            choice: ("keep" | "pause" | "withdraw") | null;
+            /** Effect */
+            effect: string | null;
+            /** Application Id */
+            application_id: string | null;
+        };
+        /** WindDownOut */
+        WindDownOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "none" | "active" | "reopened";
+            /** Id */
+            id: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Started By */
+            started_by: string | null;
+            /** Reopened At */
+            reopened_at: string | null;
+            /** Autopilot Paused */
+            autopilot_paused: boolean;
+            /** Queued Sends */
+            queued_sends: components["schemas"]["WindDownItemOut"][];
+            /** Approved Unsent */
+            approved_unsent: components["schemas"]["WindDownItemOut"][];
+            /** Live Applications */
+            live_applications: {
+                [key: string]: components["schemas"]["WindDownItemOut"][];
+            };
+            /** Interviews */
+            interviews: components["schemas"]["WindDownItemOut"][];
+            /** Pending Actions */
+            pending_actions: components["schemas"]["WindDownItemOut"][];
+            /** Campaigns */
+            campaigns: components["schemas"]["WindDownItemOut"][];
+        };
+        /** WindDownStartIn */
+        WindDownStartIn: {
+            /** Reason */
+            reason?: string | null;
+            /** Accepted Application Id */
+            accepted_application_id?: string | null;
+        };
         /** WorkerHealth */
         WorkerHealth: {
             /** Ok */
@@ -11419,6 +12101,14 @@ export interface components {
              */
             notices: string[];
         };
+        /** SnoozeIn */
+        app__api__routers__followups__SnoozeIn: {
+            /**
+             * Until
+             * @description Default: followups.snooze_days from now
+             */
+            until?: string | null;
+        };
         /** AnswerIn */
         app__api__routers__kit__AnswerIn: {
             patterns: components["schemas"]["AnswerPatterns"];
@@ -11471,6 +12161,15 @@ export interface components {
             answer_scope?: ("this_application" | "this_employer" | "this_country" | "all_matching") | null;
             /** Note */
             note?: string | null;
+        };
+        /** SnoozeIn */
+        app__api__routers__pending_actions__SnoozeIn: {
+            /**
+             * Until
+             * Format: date-time
+             * @description The action comes back at this time
+             */
+            until: string;
         };
     };
     responses: never;
@@ -20436,7 +21135,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SnoozeIn"];
+                "application/json": components["schemas"]["app__api__routers__pending_actions__SnoozeIn"];
             };
         };
         responses: {
@@ -22280,6 +22979,568 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_regenerate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageSendOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_discard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    followups_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupListOut"];
+                };
+            };
+        };
+    };
+    followups_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    followups_snooze: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routers__followups__SnoozeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    followups_not_needed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    winddown_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindDownOut"];
+                };
+            };
+        };
+    };
+    winddown_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindDownStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindDownOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    winddown_choose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindDownChoiceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindDownOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    winddown_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindDownOut"];
+                };
+            };
+        };
+    };
+    winddown_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                    "text/markdown": unknown;
                 };
             };
         };

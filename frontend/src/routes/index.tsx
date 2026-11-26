@@ -80,6 +80,14 @@ const ApprovalsPage = lazyPage(
   () => import("@/features/approvals/approvals-page"),
   "ApprovalsPage"
 )
+const FollowupsPage = lazyPage(
+  () => import("@/features/followups/followups-page"),
+  "FollowupsPage"
+)
+const WindDownPage = lazyPage(
+  () => import("@/features/winddown/winddown-page"),
+  "WindDownPage"
+)
 const ApprovalReviewPage = lazyPage(
   () => import("@/features/approvals/review-page"),
   "ReviewPage"
@@ -307,6 +315,8 @@ const studioRoute = createRoute({
 })
 const autopilotRoute = page("/autopilot", "Autopilot", AutopilotPage)
 const approvalsRoute = page("/approvals", "Approvals", ApprovalsPage)
+const followupsRoute = page("/follow-ups", "Follow-ups", FollowupsPage)
+const windDownRoute = page("/wind-down", "Wind down", WindDownPage)
 const approvalReviewRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/approvals/$applicationId",
@@ -519,6 +529,8 @@ export const routeTree = rootRoute.addChildren([
       autopilotRoute,
       approvalsRoute,
       approvalReviewRoute,
+      followupsRoute,
+      windDownRoute,
       runsRoute,
       runDetailRoute,
       accountsRoute,

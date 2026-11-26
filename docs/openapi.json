@@ -12714,7 +12714,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/SnoozeIn"
+                "$ref": "#/components/schemas/app__api__routers__pending_actions__SnoozeIn"
               }
             }
           }
@@ -15442,6 +15442,771 @@
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/messages": {
+      "get": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages List",
+        "description": "The application's mail thread (as far as it is known) and every message drafted for it.",
+        "operationId": "messages_list",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagesOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Create",
+        "description": "Draft a message from Kit facts and the thread (one budgeted model call, then the checks). Never sent\nfrom here. A budget refusal returns the message as ``budget_paused``.",
+        "operationId": "messages_create",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageCreateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/{message_id}": {
+      "get": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Get",
+        "operationId": "messages_get",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Update",
+        "description": "The owner's edit. Withdraws an approval (the old packet and its permits go), clears the automatic\nflag, and re-runs the code checks. New addresses stay unconfirmed unless ``confirm_recipients``.",
+        "operationId": "messages_update",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MessageEditIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/{message_id}/regenerate": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Regenerate",
+        "description": "Write the draft again (one budgeted model call).",
+        "operationId": "messages_regenerate",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/{message_id}/check": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Check",
+        "description": "Run the code checks again, plus the model claim check when ``tailoring.claim_check_enabled``.",
+        "operationId": "messages_check",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/{message_id}/approve": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Approve",
+        "description": "The owner's approval: the checks run again, then the message is snapshotted as a hashed packet.\n409 ``check_blocking`` / ``message_questions`` / ``no_recipient`` / ``no_identity`` with the results.",
+        "operationId": "messages_approve",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/{message_id}/send": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Send",
+        "description": "Ask for the single-use permit (every message gate) and queue the approved message behind the email\nsend delay. ``denied`` carries the first blocking gate's code and every gate.",
+        "operationId": "messages_send",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSendOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/{message_id}/cancel": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Cancel",
+        "description": "Cancel a queued send during the delay. 409 ``already_handed_over`` once the mailbox has it.",
+        "operationId": "messages_cancel",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/messages/{message_id}/discard": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Messages Discard",
+        "operationId": "messages_discard",
+        "parameters": [
+          {
+            "name": "message_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Message Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/follow-ups": {
+      "get": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Followups List",
+        "description": "Follow-ups due, snoozed or drafted, and those coming up in the next 30 days, soonest first.",
+        "operationId": "followups_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowupListOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/follow-ups/{application_id}/draft": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Followups Draft",
+        "description": "Draft the follow-up that is due (or the next one, early). For your approval: never sent from here.",
+        "operationId": "followups_draft",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/follow-ups/{application_id}/snooze": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Followups Snooze",
+        "operationId": "followups_snooze",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__routers__followups__SnoozeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowupItemOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/follow-ups/{application_id}/not-needed": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Followups Not Needed",
+        "operationId": "followups_not_needed",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowupItemOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wind-down": {
+      "get": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Winddown Get",
+        "description": "The latest wind-down with what is still in motion (``status: none`` before the first).",
+        "operationId": "winddown_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WindDownOut"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Winddown Start",
+        "description": "\"I've accepted an offer\": the master pause goes on at once (queued sends cancelled, permits revoked),\nthen the view is listed. Sends nothing. Starting again while one is active returns it.",
+        "operationId": "winddown_start",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WindDownStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WindDownOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wind-down/choices": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Winddown Choose",
+        "description": "Keep, pause or withdraw one item. Withdrawing a sent application drafts an email for your approval.",
+        "operationId": "winddown_choose",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WindDownChoiceIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WindDownOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wind-down/reopen": {
+      "post": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Winddown Reopen",
+        "description": "\"Reopen my search\": everything comes back paused, never deleted; the master pause stays on.",
+        "operationId": "winddown_reopen",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WindDownOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wind-down/summary": {
+      "get": {
+        "tags": [
+          "followups"
+        ],
+        "summary": "Winddown Summary",
+        "description": "The final summary as Markdown (download).",
+        "operationId": "winddown_summary",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "text/markdown": {}
             }
           }
         }
@@ -22733,6 +23498,132 @@
         ],
         "title": "FilterResult"
       },
+      "FollowupItemOut": {
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id",
+            "description": "The due row; null while only upcoming"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "upcoming",
+              "due",
+              "snoozed",
+              "not_needed",
+              "drafted",
+              "sent"
+            ],
+            "title": "Status"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          },
+          "message_state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "queued",
+                  "sending",
+                  "sent",
+                  "uncertain",
+                  "failed",
+                  "cancelled"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "application_id",
+          "job_id",
+          "title",
+          "employer",
+          "stage",
+          "sequence",
+          "due_at",
+          "status"
+        ],
+        "title": "FollowupItemOut"
+      },
+      "FollowupListOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FollowupItemOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "auto_send": {
+            "type": "boolean",
+            "title": "Auto Send"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "auto_send"
+        ],
+        "title": "FollowupListOut"
+      },
       "FormatRule": {
         "properties": {
           "type": {
@@ -25734,6 +26625,734 @@
         ],
         "title": "MergeIn"
       },
+      "MessageCreateIn": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "follow_up",
+              "thank_you",
+              "info_reply",
+              "slot_accept",
+              "slot_decline",
+              "withdraw",
+              "offer_decline"
+            ],
+            "title": "Kind"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "What you want said (your words)"
+          },
+          "slot": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot",
+            "description": "The interview slot, exactly as it should be written (slot answers)"
+          },
+          "excerpt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt",
+            "description": "The employer's message, pasted (treated as data, never instructions)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "MessageCreateIn"
+      },
+      "MessageDispatchOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "send_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Send After"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "outcome_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome At"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "provider_message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "send_after",
+          "started_at",
+          "outcome_at",
+          "error",
+          "provider_message_id"
+        ],
+        "title": "MessageDispatchOut"
+      },
+      "MessageEditIn": {
+        "properties": {
+          "to": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "cc": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cc"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "confirm_recipients": {
+            "type": "boolean",
+            "title": "Confirm Recipients",
+            "description": "Confirm addresses this application has not used",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "MessageEditIn"
+      },
+      "MessageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "follow_up",
+              "thank_you",
+              "info_reply",
+              "slot_accept",
+              "slot_decline",
+              "withdraw",
+              "offer_decline"
+            ],
+            "title": "Kind"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "approved",
+              "discarded",
+              "budget_paused",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "send_state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "queued",
+              "sending",
+              "sent",
+              "uncertain",
+              "failed",
+              "cancelled"
+            ],
+            "title": "Send State",
+            "description": "From the dispatch attempts of the message's packet"
+          },
+          "automatic": {
+            "type": "boolean",
+            "title": "Automatic",
+            "description": "Drafted by the automatic follow-up path; any owner edit clears it"
+          },
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          },
+          "thread_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Ref",
+            "description": "The mail thread the email replies in, if one is known"
+          },
+          "to": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "To"
+          },
+          "cc": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Cc"
+          },
+          "known_recipients": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Known Recipients",
+            "description": "Where the application went and who wrote back"
+          },
+          "confirmed_recipients": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Confirmed Recipients",
+            "description": "Other addresses the owner confirmed"
+          },
+          "unconfirmed_recipients": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unconfirmed Recipients",
+            "description": "Recipients that still need the owner's confirmation"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "paragraphs": {
+            "items": {
+              "$ref": "#/components/schemas/SpecItem"
+            },
+            "type": "array",
+            "title": "Paragraphs"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Questions",
+            "description": "What the owner must decide before this can be approved"
+          },
+          "check_results": {
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            },
+            "type": "array",
+            "title": "Check Results"
+          },
+          "checked": {
+            "type": "boolean",
+            "title": "Checked",
+            "description": "The checks ran on exactly this content"
+          },
+          "check_status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "warn",
+              "block"
+            ],
+            "title": "Check Status"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "slot": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slot"
+          },
+          "excerpt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Excerpt"
+          },
+          "sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sequence"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "packet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessagePacketOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dispatch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageDispatchOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "application_id",
+          "kind",
+          "status",
+          "send_state",
+          "automatic",
+          "thread_id",
+          "thread_ref",
+          "to",
+          "cc",
+          "known_recipients",
+          "confirmed_recipients",
+          "unconfirmed_recipients",
+          "subject",
+          "body",
+          "paragraphs",
+          "questions",
+          "check_results",
+          "checked",
+          "check_status",
+          "sequence",
+          "origin",
+          "model",
+          "cost_micros",
+          "error",
+          "created_by",
+          "packet",
+          "dispatch"
+        ],
+        "title": "MessageOut"
+      },
+      "MessagePacketOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "approved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved At"
+          },
+          "approved_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approved By"
+          },
+          "invalidated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalidated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "version",
+          "content_hash",
+          "approved_at",
+          "approved_by",
+          "invalidated_at"
+        ],
+        "title": "MessagePacketOut"
+      },
+      "MessageSendOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "denied"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "gates": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Gates"
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason",
+          "message"
+        ],
+        "title": "MessageSendOut"
+      },
+      "MessageThreadOut": {
+        "properties": {
+          "thread_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Id"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "sender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
+          },
+          "employer_replied": {
+            "type": "boolean",
+            "title": "Employer Replied"
+          },
+          "sent_to": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sent To"
+          },
+          "sending_identity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sending Identity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "thread_id",
+          "subject",
+          "sender",
+          "last_message_at",
+          "employer_replied",
+          "sent_to",
+          "sending_identity"
+        ],
+        "title": "MessageThreadOut"
+      },
+      "MessagesOut": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "thread": {
+            "$ref": "#/components/schemas/MessageThreadOut"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "thread",
+          "messages"
+        ],
+        "title": "MessagesOut"
+      },
       "NeverMention": {
         "properties": {
           "type": {
@@ -26294,6 +27913,28 @@
             ],
             "title": "Job Version",
             "description": "Content hash of the job as it was packed"
+          },
+          "message_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "follow_up",
+                  "thank_you",
+                  "info_reply",
+                  "slot_accept",
+                  "slot_decline",
+                  "withdraw",
+                  "offer_decline"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Kind",
+            "description": "Set when the packet is a message about the application",
+            "x-omitted-when-null": true
           }
         },
         "additionalProperties": false,
@@ -26357,6 +27998,19 @@
           "body": {
             "type": "string",
             "title": "Body"
+          },
+          "thread_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thread Ref",
+            "description": "The mail thread a message replies in (provider thread id)",
+            "x-omitted-when-null": true
           }
         },
         "additionalProperties": false,
@@ -32540,21 +34194,6 @@
         ],
         "title": "SkillOut"
       },
-      "SnoozeIn": {
-        "properties": {
-          "until": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Until",
-            "description": "The action comes back at this time"
-          }
-        },
-        "type": "object",
-        "required": [
-          "until"
-        ],
-        "title": "SnoozeIn"
-      },
       "SortSpec": {
         "properties": {
           "field": {
@@ -36046,6 +37685,275 @@
         ],
         "title": "WhyRule"
       },
+      "WindDownChoiceIn": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 100,
+            "title": "Key"
+          },
+          "choice": {
+            "type": "string",
+            "enum": [
+              "keep",
+              "pause",
+              "withdraw"
+            ],
+            "title": "Choice"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "choice"
+        ],
+        "title": "WindDownChoiceIn"
+      },
+      "WindDownItemOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "queued_send",
+              "approved",
+              "message",
+              "application",
+              "interview",
+              "pending_action",
+              "campaign"
+            ],
+            "title": "Kind"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          },
+          "choices": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "keep",
+                "pause",
+                "withdraw"
+              ]
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "keep",
+                  "pause",
+                  "withdraw"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
+          "effect": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effect"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "label",
+          "detail",
+          "choices"
+        ],
+        "title": "WindDownItemOut"
+      },
+      "WindDownOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "active",
+              "reopened"
+            ],
+            "title": "Status"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "started_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started By"
+          },
+          "reopened_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reopened At"
+          },
+          "autopilot_paused": {
+            "type": "boolean",
+            "title": "Autopilot Paused"
+          },
+          "queued_sends": {
+            "items": {
+              "$ref": "#/components/schemas/WindDownItemOut"
+            },
+            "type": "array",
+            "title": "Queued Sends"
+          },
+          "approved_unsent": {
+            "items": {
+              "$ref": "#/components/schemas/WindDownItemOut"
+            },
+            "type": "array",
+            "title": "Approved Unsent"
+          },
+          "live_applications": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/WindDownItemOut"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Live Applications"
+          },
+          "interviews": {
+            "items": {
+              "$ref": "#/components/schemas/WindDownItemOut"
+            },
+            "type": "array",
+            "title": "Interviews"
+          },
+          "pending_actions": {
+            "items": {
+              "$ref": "#/components/schemas/WindDownItemOut"
+            },
+            "type": "array",
+            "title": "Pending Actions"
+          },
+          "campaigns": {
+            "items": {
+              "$ref": "#/components/schemas/WindDownItemOut"
+            },
+            "type": "array",
+            "title": "Campaigns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "autopilot_paused"
+        ],
+        "title": "WindDownOut"
+      },
+      "WindDownStartIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "accepted_application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted Application Id"
+          }
+        },
+        "type": "object",
+        "title": "WindDownStartIn"
+      },
       "WorkerHealth": {
         "properties": {
           "ok": {
@@ -36179,6 +38087,25 @@
           "notices"
         ],
         "title": "ImportPreviewOut"
+      },
+      "app__api__routers__followups__SnoozeIn": {
+        "properties": {
+          "until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until",
+            "description": "Default: followups.snooze_days from now"
+          }
+        },
+        "type": "object",
+        "title": "SnoozeIn"
       },
       "app__api__routers__kit__AnswerIn": {
         "properties": {
@@ -36327,6 +38254,21 @@
           "answer_value"
         ],
         "title": "AnswerIn"
+      },
+      "app__api__routers__pending_actions__SnoozeIn": {
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until",
+            "description": "The action comes back at this time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "until"
+        ],
+        "title": "SnoozeIn"
       }
     }
   }

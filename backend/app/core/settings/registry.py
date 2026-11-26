@@ -61,6 +61,7 @@ GROUPS: dict[str, str] = {
     "accounts": "Portal accounts",
     "data": "Data import and export",
     "sources": "Discovery sources",
+    "followups": "Follow-ups and messages",
 }
 
 AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
@@ -820,6 +821,87 @@ _add("sources.search.query_template", "string", "Web search phrase",
      validators=(_query_template_check, max_length(200)), invalid_example="jobs for {role}",
      has_invalid_example=True)
 
+
+# Follow-ups and messages, wind-down (8.2, 18.4; wave 4)
+FOLLOWUP_STAGES = ("submitted", "screening", "interview", "offer")
+MESSAGE_KINDS = ("follow_up", "thank_you", "info_reply", "slot_accept", "slot_decline", "withdraw", "offer_decline")
+
+
+def _stage_days(value: Any) -> None:
+    seen: set[str] = set()
+    for item in value:
+        stage, _, days = str(item).partition("|")
+        stage = stage.strip()
+        if stage not in FOLLOWUP_STAGES:
+            raise SettingValueError(f"{item!r}: the stage must be one of {', '.join(FOLLOWUP_STAGES)}")
+        if stage in seen:
+            raise SettingValueError(f"{stage} is listed twice")
+        seen.add(stage)
+        if not days.strip().isdigit() or not 1 <= int(days) <= 120:
+            raise SettingValueError(f"{item!r}: write 'stage|days' with 1 to 120 days")
+
+
+def _kind_lines(value: Any) -> None:
+    for item in value:
+        kind, _, text = str(item).partition("|")
+        if kind.strip() not in MESSAGE_KINDS or not text.strip():
+            raise SettingValueError(f"{item!r}: write 'kind|instruction' with kind one of {', '.join(MESSAGE_KINDS)}")
+
+
+def _commitment_lines(value: Any) -> None:
+    for item in value:
+        parts = [p.strip() for p in str(item).split("|")]
+        if len(parts) != 3 or not all(parts) or not any(t.strip() for t in parts[2].split(",")):
+            raise SettingValueError(f"{item!r}: write 'Topic|Question in the answer bank|term, term'")
+
+
+_add("followups.due_days", "list", "Follow-up after no reply",
+     "Days without a reply before a follow-up is due, per stage, as 'stage|days'. A stage not listed gets no "
+     "follow-up.", ["submitted|10", "screening|7", "interview|7", "offer|3"], ["submitted|14", "interview|5"],
+     list[str], validators=(_stage_days,), invalid_example=["applied|10"], has_invalid_example=True)
+_int("followups.max_per_application", "Follow-ups per application",
+     "Most follow-ups after no reply for one application (sent or drafted).", 2, 1, 0, 10)
+_int("followups.snooze_days", "Snooze", "How long 'snooze' puts a due follow-up off.", 3, 7, 1, 60, "days")
+_bool("followups.auto_send", "Send plain follow-ups automatically",
+      "Only the plain no-reply follow-up, only to an address the application was already sent to, within the "
+      "follow-up caps and quiet hours, and never after any reply from the employer. Every other message waits "
+      "for your approval.", False)
+_int("followups.auto_daily_cap", "Automatic follow-ups per day",
+     "Most follow-ups sent automatically in one day (your time zone).", 3, 5, 0, 50)
+_int("followups.max_paragraphs", "Message length", "Most paragraphs in a drafted message.", 4, 3, 1, 10,
+     "paragraphs")
+_int("followups.max_facts", "Facts sent per message",
+     "Most Kit facts offered to the model for one message.", 12, 20, 0, 100, "facts")
+_int("followups.context_max_chars", "Thread excerpt length",
+     "Longest excerpt of the employer's message passed to the model (as data, never instructions).",
+     4000, 2000, 200, 20_000, "characters")
+_add("followups.subject_prefix", "string", "Reply subject prefix",
+     "Put before the original subject when a message replies in the thread.", "Re: ", "RE: ", str,
+     validators=(max_length(20),), invalid_example="x" * 21, has_invalid_example=True)
+_add("followups.kind_briefs", "list", "What each message is for",
+     "One line per message kind, as 'kind|instruction'. The instruction tells the model what to write.",
+     ["follow_up|A short, polite follow-up asking whether there is any news on the application. No pressure.",
+      "thank_you|Thank the interviewers for their time; mention one or two points from the interview notes "
+      "if given.",
+      "info_reply|Reply to the employer's request for information using only the facts and confirmed answers "
+      "given; list anything else as a question for the owner.",
+      "slot_accept|Confirm the interview slot given by the owner, exactly as given.",
+      "slot_decline|Politely say the slot offered does not work and ask for another, using the owner's note "
+      "if given.",
+      "withdraw|Politely withdraw the application and thank them for their time. Give no reason unless the "
+      "owner's note gives one.",
+      "offer_decline|Politely decline the offer and thank them. Give no reason unless the owner's note "
+      "gives one."],
+     ["follow_up|Ask briefly whether there is any news."], list[str],
+     validators=(unique_items, _kind_lines), invalid_example=["hello|world"], has_invalid_example=True)
+_add("followups.commitment_topics", "list", "Commitments that need a confirmed answer",
+     "One line per topic, as 'Topic|Question in the answer bank|term, term'. A message that mentions a term must "
+     "use your confirmed answer to that question word for word; otherwise it becomes a question for you.",
+     ["Pay|What are your salary expectations?|salary, pay, compensation, remuneration, package, rate",
+      "Notice period|What is your notice period?|notice, start date, available from, availability",
+      "Relocation|Are you willing to relocate?|relocat, move to"],
+     ["Pay|What are your salary expectations?|salary"], list[str],
+     validators=(unique_items, _commitment_lines), invalid_example=["Pay|salary"], has_invalid_example=True)
 
 REGISTRY: dict[str, SettingDef] = {d.key: d for d in _DEFS}
 if len(REGISTRY) != len(_DEFS):  # pragma: no cover - guards against copy-paste errors

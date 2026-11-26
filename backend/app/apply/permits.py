@@ -124,6 +124,40 @@ async def request(session: AsyncSession, application_id: uuid.UUID, *, packet_ha
     return PermitResult("granted", evaluation.reason, permit, evaluation.gate_results())
 
 
+async def grant_message(session: AsyncSession, packet: ApplicationPacket, checks: list[GateResult], *,
+                        actor: str, now: datetime | None = None) -> PermitResult:
+    """The permit for a message packet (wave 4 follow-ups). The message gates (``checks``, computed by
+    ``app.pipeline.followups.sending`` under :func:`lock_permits`) replace the application's decision table, since
+    the application has already gone out; everything else is this module's: one permit per packet hash, short
+    lived, single use (:func:`consume`), audited. Granted only when every check passes (unknown is not yes)."""
+    now = now or utcnow()
+    await lock_permits(session)
+    gates_out = [c.model_dump() for c in checks]
+    failing = [c for c in checks if c.outcome != "pass"]
+    outstanding = await session.scalar(select(SubmitPermit.id).where(
+        SubmitPermit.packet_id == packet.id, SubmitPermit.used_at.is_(None), SubmitPermit.expires_at > now).limit(1))
+    if outstanding is not None:
+        failing.append(GateResult(gate="outstanding_permit", passed=False,
+                                  detail="a permit for this message is already outstanding"))
+        gates_out.append(failing[-1].model_dump())
+    detail = {"packet_hash": packet.content_hash, "channel": packet.contents.channel,
+              "message_kind": packet.contents.message_kind, "gates": gates_out}
+    if failing:
+        reason = "; ".join(f"{c.gate}: {c.detail}" for c in failing)
+        await audit.record(session, actor=actor, action="permit.denied", subject_type="application",
+                           subject_id=packet.application_id, detail={**detail, "reason": reason})
+        return PermitResult("denied", reason, None, gates_out)
+    minutes = int(await settings_service.get_value(session, "automation.permit_valid_minutes"))
+    permit = SubmitPermit(application_id=packet.application_id, packet_id=packet.id, packet_hash=packet.content_hash,
+                          issued_at=now, expires_at=now + timedelta(minutes=minutes), checks=list(checks))
+    session.add(permit)
+    await session.flush()
+    await audit.record(session, actor=actor, action="permit.granted", subject_type="submit_permit",
+                       subject_id=permit.id, detail={**detail, "application_id": str(packet.application_id),
+                                                     "expires_at": permit.expires_at.isoformat()})
+    return PermitResult("granted", "every message gate passed", permit, gates_out)
+
+
 async def consume(session: AsyncSession, permit_id: uuid.UUID, *, packet_hash: str, channel: str,
                   runner_token_id: uuid.UUID | None = None, actor: str = "system",
                   now: datetime | None = None) -> SubmitPermit:
@@ -163,13 +197,16 @@ async def consume(session: AsyncSession, permit_id: uuid.UUID, *, packet_hash: s
     return permit
 
 
-async def revoke(session: AsyncSession, *, application_id: uuid.UUID | None = None, reason: str, actor: str,
+async def revoke(session: AsyncSession, *, application_id: uuid.UUID | None = None,
+                 packet_id: uuid.UUID | None = None, reason: str, actor: str,
                  now: datetime | None = None) -> list[uuid.UUID]:
-    """Expire every outstanding permit (of one application, or all of them). Returns their ids."""
+    """Expire every outstanding permit (of one application, of one packet, or all of them). Returns their ids."""
     now = now or utcnow()
     stmt = update(SubmitPermit).where(SubmitPermit.used_at.is_(None), SubmitPermit.expires_at > now)
     if application_id is not None:
         stmt = stmt.where(SubmitPermit.application_id == application_id)
+    if packet_id is not None:
+        stmt = stmt.where(SubmitPermit.packet_id == packet_id)
     rows = (await session.execute(stmt.values(expires_at=now).returning(SubmitPermit.id,
                                                                         SubmitPermit.application_id))).all()
     for pid, _ in rows:

@@ -53,7 +53,8 @@ def _matches(question: str, terms: list[str]) -> bool:
 
 async def _previous(session: AsyncSession, packet: ApplicationPacket) -> ApplicationPacket | None:
     return await session.scalar(select(ApplicationPacket).where(
-        ApplicationPacket.application_id == packet.application_id, ApplicationPacket.version < packet.version)
+        ApplicationPacket.application_id == packet.application_id, ApplicationPacket.version < packet.version,
+        packets.is_application_packet())
         .order_by(ApplicationPacket.version.desc()).limit(1))
 
 

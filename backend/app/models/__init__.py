@@ -17,6 +17,7 @@ from app.models.applications import (
 from app.models.base import Base
 from app.models.changes import JobChange, JobVersion, JobWatch
 from app.models.documents import ApplicationDocument
+from app.models.followups import FollowupDue, OutboundMessage, WindDown
 from app.models.kit import (
     Answer,
     Experience,
@@ -70,11 +71,13 @@ __all__ = [
     "AgentTask", "Answer", "ApiToken", "Application", "ApplicationDocument", "ApplicationEvent",
     "ApplicationPacket", "Assessment",
     "AuditEvent", "AuthSession", "Base", "Campaign", "ConfigRevision", "Connection", "Contact", "CustomFacet",
-    "DispatchAttempt", "EmployerAlias", "Experience", "Fact", "Guardrail", "GuardrailWaiver", "InterviewPack",
+    "DispatchAttempt", "EmployerAlias", "Experience", "Fact", "FollowupDue", "Guardrail", "GuardrailWaiver",
+    "InterviewPack",
     "InterviewRound", "Job", "JobChange", "JobSighting", "JobVersion", "JobWatch",
     "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread", "Notification",
-    "Owner",
+    "OutboundMessage", "Owner",
     "PayEstimate", "PendingAction", "Person", "PortalAccount", "Prompt", "Reference", "Rubric", "Run",
     "SavedView", "Schedule", "Setting", "SettingRevision", "Skill", "SkillAlias", "Source", "SubmitPermit",
-    "TagRule", "Template", "Theme", "Track", "TrustedSite", "VaultDocument", "WatchedEmployer", "WorkerHeartbeat",
+    "TagRule", "Template", "Theme", "Track", "TrustedSite", "VaultDocument", "WatchedEmployer", "WindDown",
+    "WorkerHeartbeat",
 ]
