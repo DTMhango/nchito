@@ -87,8 +87,10 @@ class AnthropicAdapter:
     async def call(self, request: ProviderRequest, credentials: Credentials) -> ProviderReply:
         if not credentials.api_key:
             raise ProviderCallError("no API key for the Anthropic provider", retryable=False)
+        # gzip only: some installed brotli/zstd decoders are incompatible with the SDK's HTTP client.
         client = anthropic.AsyncAnthropic(api_key=credentials.api_key, base_url=credentials.base_url or None,
-                                          max_retries=0, timeout=request.timeout_seconds)
+                                          max_retries=0, timeout=request.timeout_seconds,
+                                          default_headers={"Accept-Encoding": "gzip, deflate"})
         try:
             response = await client.messages.create(
                 model=request.model,
@@ -101,7 +103,8 @@ class AnthropicAdapter:
         except anthropic.APITimeoutError as exc:
             raise ProviderCallError("Anthropic request timed out", retryable=True, may_have_billed=True) from exc
         except anthropic.APIConnectionError as exc:
-            raise ProviderCallError("could not reach Anthropic", retryable=True) from exc
+            reason = type(exc.__cause__ or exc).__name__
+            raise ProviderCallError(f"could not reach Anthropic ({reason})", retryable=True) from exc
         except anthropic.RateLimitError as exc:
             raise ProviderCallError("Anthropic rate limit", retryable=True) from exc
         except anthropic.APIStatusError as exc:
