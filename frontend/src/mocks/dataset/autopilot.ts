@@ -5,8 +5,11 @@
 import type {
   ApplicationSummary,
   DispatchOut,
+  GateResult,
   ManualHandoffOut,
   PacketOut,
+  PendingAction,
+  TimelineEvent,
   ReceiptOut,
   RunnerStatus,
   TrustedSiteOut,
@@ -28,6 +31,10 @@ export type MockAutopilot = {
   dispatches: Record<string, DispatchOut[]>
   trusted: TrustedSiteOut[]
   runners: RunnerStatus[]
+  /** When set, approve answers 409 `approval_refused` with this reason and the open gates. */
+  refuseApproval: string | null
+  /** Reject and request-changes calls, in order (tests read them). */
+  decisions: { id: string; kind: "reject" | "changes"; text: string | null }[]
 }
 
 type Pair = [employer: string, build: (app: ApplicationSummary) => PacketOut[]]
@@ -106,6 +113,8 @@ function packet(
         },
       ],
       link_permissions: [],
+      channel: app.channel ?? null,
+      job_version: null,
       ...contents,
     },
     ...over,
@@ -165,11 +174,12 @@ export function packetsFor(
 }
 
 /** Gate results for a packet. The Zambezi packet has one failed and one unknown gate. */
-export function gatesFor(app: ApplicationSummary) {
-  const pass = (gate: string, detail?: string) => ({
+export function gatesFor(app: ApplicationSummary): GateResult[] {
+  const pass = (gate: string, detail?: string): GateResult => ({
     gate,
     passed: true,
     detail: detail ?? null,
+    outcome: "pass",
   })
   if (app.employer === "Zambezi Mining Systems")
     return [
@@ -179,13 +189,15 @@ export function gatesFor(app: ApplicationSummary) {
       {
         gate: "role_open",
         passed: false,
-        detail: "Unknown: the posting has not been rechecked in 3 days.",
+        detail: "The posting has not been rechecked in 3 days.",
+        outcome: "unknown",
       },
       {
         gate: "always_ask",
         passed: false,
         detail:
           "careers.zambezi-mining.example is not a trusted site yet, so the agent must ask first.",
+        outcome: "fail",
       },
       pass("daily_cap", "2 of 5 used today."),
       pass("conflict_winner", "Highest score among roles at this employer."),
@@ -264,6 +276,8 @@ export function seedAutopilot(): MockAutopilot {
   return {
     packets: {},
     dispatches: {},
+    refuseApproval: null,
+    decisions: [],
     trusted: [
       trusted(
         1,
@@ -327,6 +341,11 @@ export function dispatchesFor(app: ApplicationSummary): DispatchOut[] {
     outcome_at: null,
     gate_results: [],
     error: null,
+    started_at: null,
+    evidence: null,
+    uncertain: false,
+    reconcile_attempts: 0,
+    last_reconciled_at: null,
     ...over,
   })
   switch (app.employer) {
@@ -338,26 +357,91 @@ export function dispatchesFor(app: ApplicationSummary): DispatchOut[] {
           created_at: ago(2),
           outcome_at: ago(2),
         }),
-        base(2, { status: "unknown", outcome_at: null }),
+        base(2, {
+          status: "unknown",
+          outcome_at: null,
+          started_at: ago(1),
+          uncertain: true,
+          reconcile_attempts: 2,
+          last_reconciled_at: ago(0.5),
+        }),
       ]
     case "Lusaka Fintech Co":
       return [
         base(1, {
           status: "acknowledged",
           provider_message_id: "<msg-4821@mail.example.com>",
+          evidence: {
+            kind: "sent_mail_id",
+            value: "<msg-4821@mail.example.com>",
+            screenshot_ref: null,
+            at: ago(3),
+          },
           outcome_at: ago(3),
         }),
       ]
     case "Nyika Labs":
       return [
         base(1, { status: "handed_off", channel: "browser" }),
+        // Due inside quiet hours: postponed to their end (timeline `dispatch_deferred`).
         base(2, {
           status: "reserved",
           channel: "email",
-          send_after: new Date(Date.now() + 8 * 60_000).toISOString(),
+          send_after: new Date(Date.now() + 9 * 3_600_000).toISOString(),
         }),
       ]
     default:
       return []
+  }
+}
+
+/** Timeline entries the dispatch layer writes: a quiet-hours postponement for each deferred send. */
+export function dispatchEvents(
+  app: ApplicationSummary,
+  dispatches: DispatchOut[]
+): TimelineEvent[] {
+  if (app.employer !== "Nyika Labs") return []
+  return dispatches
+    .filter((d) => d.status === "reserved" && d.send_after)
+    .map((d) => ({
+      id: uuid("f", Number(d.id.slice(-4))),
+      created_at: ago(0.01),
+      kind: "dispatch_deferred",
+      actor: "system",
+      detail: {
+        attempt_id: d.id,
+        reason: "quiet hours",
+        send_after: d.send_after,
+      },
+    }))
+}
+
+/** A stage change proposed from the mailbox: a pending action to approve, never applied silently. */
+export function mailProposalFor(app: ApplicationSummary): PendingAction {
+  return {
+    id: uuid("a", 900),
+    created_at: ago(0.1),
+    updated_at: ago(0.1),
+    type: "follow_up",
+    application_id: app.id,
+    agent_task_id: null,
+    group_key: null,
+    title: `${app.employer} sent an interview invitation: move to interview?`,
+    detail: {
+      kind: "mail_stage_proposal",
+      category: "interview",
+      thread_id: uuid("a", 901),
+      message_id: "<invite-77@mail.example.com>",
+      proposed_stage: "interview",
+      subject: "Interview: next steps",
+    },
+    checkpoint: null,
+    deadline: null,
+    status: "open",
+    snoozed_until: null,
+    snoozed: false,
+    employer: app.employer,
+    job_title: app.title,
+    resolution: null,
   }
 }

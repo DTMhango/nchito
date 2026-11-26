@@ -200,15 +200,7 @@ export const handlers = [
     if (!db.get().session) return unauthorized()
     return HttpResponse.json(db.get().autopilot)
   }),
-  http.put("*/api/autopilot", async ({ request }) => {
-    if (!db.get().session) return unauthorized()
-    const { paused } = (await request.json()) as { paused: boolean }
-    db.update((s) => {
-      s.autopilot.paused = paused
-      s.autopilot.paused_at = paused ? new Date().toISOString() : null
-    })
-    return HttpResponse.json(db.get().autopilot)
-  }),
+  // PUT /api/autopilot is served by the autopilot handlers (pause effects, restore lock).
   ...aiHandlers,
   ...campaignHandlers,
 

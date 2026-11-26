@@ -22,11 +22,23 @@ const STATE_VIEW: Record<
  * "Why can or can't this go automatically": every gate with its reason. A gate the server
  * could not decide is shown as Unknown, never as a pass (DESIGN 8.1, unknown is not yes).
  */
-export function GateList({ gates }: { gates: readonly GateResult[] }) {
+export function GateList({
+  gates,
+  label,
+}: {
+  gates: readonly GateResult[]
+  /** A second list (for example the gates of a refusal) needs its own name. */
+  label?: string
+}) {
   const verdict = autoVerdict(gates)
   return (
-    <section aria-label="Automatic sending checks" className="grid gap-2">
-      <h4 className="eyebrow">Why this can or cannot go automatically</h4>
+    <section
+      aria-label={label ?? "Automatic sending checks"}
+      className="grid gap-2"
+    >
+      <h4 className="eyebrow">
+        {label ?? "Why this can or cannot go automatically"}
+      </h4>
       <p
         className="text-sm font-medium"
         data-verdict={verdict.canAuto ? "auto" : "ask"}

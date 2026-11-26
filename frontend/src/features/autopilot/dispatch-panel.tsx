@@ -1,10 +1,5 @@
-import { useState, type FormEvent } from "react"
-import {
-  useMutation,
-  useQuery,
-  useQueryClient,
-  type QueryClient,
-} from "@tanstack/react-query"
+﻿import { useState, type FormEvent } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -17,19 +12,22 @@ import {
   cancelDispatch,
   dispatchAppsQuery,
   dispatchesQuery,
-  markSent,
+  errorText,
+  reconcileDispatch,
+  timelineQuery,
   type ApplicationSummary,
   type DispatchOut,
+  type ReconcileIn,
 } from "./api"
-import { CHANNEL_LABEL, canCancel, dispatchView, shortHash } from "./logic"
-
-const stamp = (iso: string) =>
-  new Date(iso).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+import {
+  CHANNEL_LABEL,
+  canCancel,
+  dispatchView,
+  evidenceLabel,
+  postponedUntil,
+  shortHash,
+  stamp,
+} from "./logic"
 
 /** Attempts per application with what each one means (DESIGN 8.5, 18.3). */
 export function DispatchPanel() {
@@ -62,8 +60,10 @@ export function DispatchPanel() {
 
 function AppAttempts({ app }: { app: ApplicationSummary }) {
   const attempts = useQuery(dispatchesQuery(app.id))
-  const qc = useQueryClient()
   const list = attempts.data ?? []
+  // Only needed to tell a quiet-hours postponement from the normal send delay.
+  const waiting = list.some((d) => d.status === "reserved" && d.send_after)
+  const timeline = useQuery({ ...timelineQuery(app.id), enabled: waiting })
   if (attempts.isSuccess && list.length === 0) return null
   return (
     <li
@@ -82,7 +82,12 @@ function AppAttempts({ app }: { app: ApplicationSummary }) {
       </div>
       <ul className="grid gap-2">
         {list.map((d) => (
-          <Attempt key={d.id} app={app} d={d} qc={qc} />
+          <Attempt
+            key={d.id}
+            app={app}
+            d={d}
+            postponed={postponedUntil(d, timeline.data ?? [])}
+          />
         ))}
       </ul>
     </li>
@@ -92,16 +97,19 @@ function AppAttempts({ app }: { app: ApplicationSummary }) {
 function Attempt({
   app,
   d,
-  qc,
+  postponed,
 }: {
   app: ApplicationSummary
   d: DispatchOut
-  qc: QueryClient
+  postponed: string | null
 }) {
-  const v = dispatchView(d)
+  const qc = useQueryClient()
+  const v = dispatchView(d, postponed)
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: apKeys.dispatches(app.id) })
     void qc.invalidateQueries({ queryKey: apKeys.dispatchApps })
+    void qc.invalidateQueries({ queryKey: ["applications"] })
+    void qc.invalidateQueries({ queryKey: ["pending-actions"] })
   }
   const cancel = useMutation({
     mutationFn: () => cancelDispatch(app.id, d.id),
@@ -109,10 +117,18 @@ function Attempt({
       toast.success("Cancelled. Nothing was sent.")
       refresh()
     },
-    onError: (e) => toast.error(e.message),
+    // 409 once handed over: say so plainly and show the real state.
+    onError: (e) => {
+      toast.error(errorText(e))
+      refresh()
+    },
   })
   return (
-    <li className="grid gap-1.5 rounded-md bg-sunken p-2.5">
+    <li
+      aria-label={`${CHANNEL_LABEL[d.channel]} attempt, ${v.label}`}
+      data-kind={v.kind}
+      className="grid gap-1.5 rounded-md bg-sunken p-2.5"
+    >
       <div className="flex flex-wrap items-center gap-2">
         <Chip tone={v.tone}>{v.label}</Chip>
         <span className="text-sm font-medium">{CHANNEL_LABEL[d.channel]}</span>
@@ -134,47 +150,61 @@ function Attempt({
       <p className="text-sm text-muted-foreground">{v.explain}</p>
       {v.evidence && (
         <p className="text-sm">
-          <span className="text-faint">Proof: </span>
+          <span className="text-faint">{evidenceLabel(d)}: </span>
           <span className="num">{v.evidence}</span>
         </p>
       )}
-      {v.kind === "uncertain" && <Reconcile app={app} onDone={refresh} />}
+      {(d.started_at || d.reconcile_attempts > 0) && (
+        <p className="text-xs text-faint">
+          {d.started_at && `Started ${stamp(d.started_at)}.`}
+          {d.reconcile_attempts > 0 &&
+            ` Checked ${d.reconcile_attempts} time${d.reconcile_attempts === 1 ? "" : "s"}${d.last_reconciled_at ? `, last ${stamp(d.last_reconciled_at)}` : ""}.`}
+        </p>
+      )}
+      {v.kind === "uncertain" && <Reconcile app={app} d={d} onDone={refresh} />}
     </li>
   )
 }
 
+const RESULT_TEXT = {
+  sent: "Recorded: it went out.",
+  not_sent: "Recorded: it did not go out. It is back with you to decide.",
+  waiting: "Checked: still no answer either way. It stays locked.",
+} as const
+
 /**
  * The only ways forward from an uncertain attempt. There is deliberately no retry: sending
- * again could contact the employer twice. The owner checks, then records what happened.
+ * again could contact the employer twice. Ask the channel now, or record what happened.
  */
 function Reconcile({
   app,
+  d,
   onDone,
 }: {
   app: ApplicationSummary
+  d: DispatchOut
   onDone: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [reference, setReference] = useState("")
-  const qc = useQueryClient()
-  const record = useMutation({
-    mutationFn: () =>
-      markSent(
-        app.id,
-        reference.trim() || null,
-        "Reconciled by the owner after an uncertain send."
-      ),
-    onSuccess: () => {
-      toast.success(`Recorded: ${app.employer} received it.`)
-      void qc.invalidateQueries({ queryKey: ["applications"] })
+  const [error, setError] = useState<string | null>(null)
+  const decide = useMutation({
+    mutationFn: (body: ReconcileIn) => reconcileDispatch(app.id, d.id, body),
+    onSuccess: (out) => {
+      setError(null)
+      toast.success(RESULT_TEXT[out.result])
       setOpen(false)
       onDone()
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => setError(errorText(e)),
   })
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    record.mutate()
+    decide.mutate({
+      decision: "sent",
+      reference: reference.trim() || null,
+      note: "Reconciled by the owner after an uncertain send.",
+    })
   }
   return (
     <div className="grid gap-2 border-t border-border pt-2">
@@ -197,7 +227,7 @@ function Reconcile({
               className="w-72 max-w-full"
             />
           </label>
-          <Button type="submit" disabled={record.isPending}>
+          <Button type="submit" disabled={decide.isPending}>
             Record that it arrived
           </Button>
           <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
@@ -206,15 +236,36 @@ function Reconcile({
         </form>
       ) : (
         <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={decide.isPending}
+            onClick={() => decide.mutate({ decision: "check" })}
+          >
+            Check again now
+          </Button>
           <Button size="sm" onClick={() => setOpen(true)}>
             I checked: it arrived
           </Button>
-          <Button asChild size="sm" variant="outline">
-            <Link to="/jobs/$id" params={{ id: app.job_id }}>
-              Open the role
-            </Link>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={decide.isPending}
+            onClick={() =>
+              decide.mutate({
+                decision: "not_sent",
+                note: "The owner checked: it did not go out.",
+              })
+            }
+          >
+            I checked: it did not go out
           </Button>
         </div>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
       )}
     </div>
   )

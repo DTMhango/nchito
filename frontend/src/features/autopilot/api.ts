@@ -3,10 +3,17 @@
  * the generated contract. Components import from here, never from openapi-fetch.
  */
 import { queryOptions } from "@tanstack/react-query"
-import { api, unwrap } from "@/lib/api/client"
+import { api, isApiError, unwrap } from "@/lib/api/client"
 import type { Schemas } from "@/lib/api/types"
+import { resolveAction } from "@/features/applications/api"
 
 export type PacketOut = Schemas["PacketOut"]
+export type DispatchCreateOut = Schemas["DispatchCreateOut"]
+export type ReconcileIn = Schemas["ReconcileIn"]
+export type ReconcileOut = Schemas["ReconcileOut"]
+export type RestoreStateOut = Schemas["RestoreStateOut"]
+export type AutopilotState = Schemas["AutopilotState"]
+export type TimelineEvent = Schemas["TimelineEvent"]
 export type PacketContents = Schemas["PacketContents"]
 export type ReceiptOut = Schemas["ReceiptOut"]
 export type PacketChange = Schemas["PacketChange"]
@@ -34,11 +41,60 @@ export const apKeys = {
   packets: (id: string) => ["autopilot", "packets", id] as const,
   handoff: (id: string) => ["autopilot", "handoff", id] as const,
   dispatches: (id: string) => ["autopilot", "dispatches", id] as const,
+  packet: (id: string) => ["autopilot", "packet", id] as const,
+  timeline: (id: string) => ["autopilot", "timeline", id] as const,
   dispatchApps: ["autopilot", "dispatch-apps"] as const,
   held: ["autopilot", "held-roles"] as const,
-  pending: ["autopilot", "pending"] as const,
+  restore: ["autopilot", "restore"] as const,
+  // Under "pending-actions" so the wave 1 invalidations (Today, live updates) refresh it too.
+  pending: ["pending-actions", "autopilot"] as const,
   trusted: ["autopilot", "trusted-sites"] as const,
 }
+
+/** A structured 409 from the apply layer: `{code, reason, gates?, outstanding?}`. */
+export type Refusal = {
+  code: string | null
+  reason: string
+  gates: GateResult[]
+  outstanding: string[]
+}
+
+/** Read a refusal from an error; null when it is not a structured refusal. */
+export function refusalOf(e: unknown): Refusal | null {
+  if (!isApiError(e)) return null
+  const d = (e.body as { detail?: unknown } | undefined)?.detail
+  if (!d || typeof d !== "object" || Array.isArray(d)) return null
+  const o = d as Record<string, unknown>
+  return {
+    code: typeof o.code === "string" ? o.code : null,
+    reason: typeof o.reason === "string" ? o.reason : e.message,
+    gates: Array.isArray(o.gates) ? (o.gates as GateResult[]) : [],
+    outstanding: Array.isArray(o.outstanding)
+      ? o.outstanding.filter((x): x is string => typeof x === "string")
+      : [],
+  }
+}
+
+/** Plain words for any error: the refusal's reason when there is one. */
+export const errorText = (e: unknown) =>
+  refusalOf(e)?.reason ?? (e instanceof Error ? e.message : String(e))
+
+// ---- master pause and restore ----
+export const writeAutopilot = (paused: boolean, reason?: string | null) =>
+  unwrap(
+    api.PUT("/api/autopilot", {
+      body: { paused, reason: reason?.trim() ? reason.trim() : null },
+    })
+  )
+
+export const restoreQuery = () =>
+  queryOptions({
+    queryKey: apKeys.restore,
+    queryFn: () => unwrap(api.GET("/api/autopilot/restore")),
+  })
+
+export const resumeAfterRestore = () =>
+  unwrap(api.POST("/api/autopilot/resume-after-restore"))
 
 // ---- policy ----
 export const campaignsQuery = () =>
@@ -151,15 +207,39 @@ export const approvePacket = (
     })
   )
 
-export const moveApplication = (
-  id: string,
-  stage: "skipped" | "tailoring",
-  note: string
-) =>
+/** The current packet, or null when none has been built (404). */
+export const currentPacketQuery = (id: string) =>
+  queryOptions({
+    queryKey: apKeys.packet(id),
+    queryFn: async (): Promise<PacketOut | null> => {
+      try {
+        return await unwrap(
+          api.GET("/api/applications/{application_id}/packet", {
+            params: { path: { application_id: id } },
+          })
+        )
+      } catch (e) {
+        if (isApiError(e, 404)) return null
+        throw e
+      }
+    },
+  })
+
+/** Say no: the role is skipped and the next role at the employer is promoted. */
+export const rejectApplication = (id: string, reason: string | null) =>
   unwrap(
-    api.POST("/api/applications/{application_id}/stage", {
+    api.POST("/api/applications/{application_id}/reject", {
       params: { path: { application_id: id } },
-      body: { stage, note },
+      body: { reason },
+    })
+  )
+
+/** Retire the packet and send the application back to tailoring with a note. */
+export const requestChanges = (id: string, note: string) =>
+  unwrap(
+    api.POST("/api/applications/{application_id}/request-changes", {
+      params: { path: { application_id: id } },
+      body: { note },
     })
   )
 
@@ -212,13 +292,44 @@ export const cancelDispatch = (applicationId: string, dispatchId: string) =>
     )
   )
 
-export const markSent = (id: string, reference: string | null, note: string) =>
+/** Send the current approved packet: permit, then the attempt (manual is handed off at once). */
+export const createDispatch = (id: string) =>
   unwrap(
-    api.POST("/api/applications/{application_id}/mark-submitted", {
+    api.POST("/api/applications/{application_id}/dispatches", {
       params: { path: { application_id: id } },
-      body: { reference, note },
+      body: {},
     })
   )
+
+/** Settle one uncertain attempt: ask its channel now, or record that it went out or did not. */
+export const reconcileDispatch = (
+  applicationId: string,
+  dispatchId: string,
+  body: ReconcileIn
+) =>
+  unwrap(
+    api.POST(
+      "/api/applications/{application_id}/dispatches/{dispatch_id}/reconcile",
+      {
+        params: {
+          path: { application_id: applicationId, dispatch_id: dispatchId },
+        },
+        body,
+      }
+    )
+  )
+
+/** The application timeline: where a quiet-hours postponement (`dispatch_deferred`) is recorded. */
+export const timelineQuery = (id: string) =>
+  queryOptions({
+    queryKey: apKeys.timeline(id),
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/applications/{application_id}/timeline", {
+          params: { path: { application_id: id } },
+        })
+      ),
+  })
 
 // ---- handoff ----
 export const handoffQuery = (id: string) =>
@@ -246,13 +357,9 @@ export const pendingQuery = () =>
       ).items,
   })
 
+/** The wave 1 resolve call, shared with Today. */
 export const resolvePending = (id: string, body: ResolveIn) =>
-  unwrap(
-    api.POST("/api/pending-actions/{action_id}/resolve", {
-      params: { path: { action_id: id } },
-      body,
-    })
-  )
+  resolveAction(id, body)
 
 // ---- trusted sites ----
 export const trustedQuery = () =>

@@ -17,31 +17,38 @@ import { Chip } from "@/components/chip"
 import { SectionHeader } from "@/components/page-header"
 import { View } from "@/components/view"
 import { appKeys, getApplication } from "@/features/applications/api"
+import { isApiError } from "@/lib/api/client"
 import {
   apKeys,
   approvePacket,
+  createDispatch,
+  currentPacketQuery,
+  errorText,
   heldRolesQuery,
-  moveApplication,
   packetsQuery,
   receiptQuery,
+  refusalOf,
+  rejectApplication,
+  requestChanges,
   type Channel,
+  type GateResult,
   type PacketContents,
 } from "@/features/autopilot/api"
 import {
   approvalStanding,
   CHANNEL_LABEL,
   shortHash,
+  stamp,
 } from "@/features/autopilot/logic"
 import { GateList } from "./gate-list"
 import { HandoffPanel } from "./handoff-panel"
 
-const stamp = (iso: string) =>
-  new Date(iso).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+type Problem = { message: string; gates: GateResult[] }
+
+const problemOf = (e: unknown): Problem => {
+  const r = refusalOf(e)
+  return { message: r?.reason ?? errorText(e), gates: r?.gates ?? [] }
+}
 
 /** Packet review: exactly what will be sent, why it can or cannot go automatically, and the decision. */
 export function ReviewPage({ applicationId }: { applicationId: string }) {
@@ -51,18 +58,27 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
     queryKey: appKeys.detail(applicationId),
     queryFn: () => getApplication(applicationId),
   })
-  const receipt = useQuery(receiptQuery(applicationId))
+  const current = useQuery(currentPacketQuery(applicationId))
+  const hasPacket = current.isSuccess && current.data !== null
+  const receipt = useQuery({
+    ...receiptQuery(applicationId),
+    enabled: hasPacket,
+  })
   const packets = useQuery(packetsQuery(applicationId))
   const held = useQuery(heldRolesQuery())
-  const [changing, setChanging] = useState(false)
+  const [mode, setMode] = useState<"changes" | "reject" | null>(null)
   const [note, setNote] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [problem, setProblem] = useState<Problem | null>(null)
+  const setError = (message: string | null) =>
+    setProblem(message ? { message, gates: [] } : null)
 
   const refresh = () => {
+    void qc.invalidateQueries({ queryKey: apKeys.packet(applicationId) })
     void qc.invalidateQueries({ queryKey: apKeys.receipt(applicationId) })
     void qc.invalidateQueries({ queryKey: apKeys.packets(applicationId) })
+    void qc.invalidateQueries({ queryKey: apKeys.dispatches(applicationId) })
     void qc.invalidateQueries({ queryKey: apKeys.queue })
-    void qc.invalidateQueries({ queryKey: appKeys.list })
+    void qc.invalidateQueries({ queryKey: ["applications"] })
     void qc.invalidateQueries({ queryKey: ["pending-actions"] })
     void qc.invalidateQueries({ queryKey: ["today"] })
   }
@@ -73,30 +89,65 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
       approvePacket(applicationId, receipt.data!.packet, channel),
     onSuccess: () => {
       toast.success("Approved. It goes out under the checks shown.")
-      setError(null)
+      setProblem(null)
       refresh()
     },
+    // 409 approval_refused: the reason (and gates, when given) shown plainly.
     onError: (e) => {
-      setError(e.message)
+      setProblem(problemOf(e))
       refresh()
     },
   })
-  const move = useMutation({
-    mutationFn: (v: { stage: "skipped" | "tailoring"; note: string }) =>
-      moveApplication(applicationId, v.stage, v.note),
+  const send = useMutation({
+    mutationFn: () => createDispatch(applicationId),
+    onSuccess: (out) => {
+      if (out.status === "queued") {
+        setProblem(null)
+        toast.success("Queued. You can cancel it under Autopilot, Sending.")
+      } else
+        setProblem({
+          message:
+            out.status === "wait_for_owner"
+              ? `Waiting for you: ${out.reason}`
+              : `Not sent: ${out.reason}`,
+          gates: out.gates,
+        })
+      refresh()
+    },
+    onError: (e) => setProblem(problemOf(e)),
+  })
+  const decide = useMutation({
+    mutationFn: (v: { kind: "changes" | "reject"; text: string }) =>
+      v.kind === "reject"
+        ? rejectApplication(applicationId, v.text || null)
+        : requestChanges(applicationId, v.text),
     onSuccess: (_d, v) => {
       toast.success(
-        v.stage === "skipped"
-          ? "Skipped. Nothing will be sent."
+        v.kind === "reject"
+          ? "Rejected. Nothing will be sent."
           : "Sent back for changes."
       )
       refresh()
       void navigate({ to: "/approvals" })
     },
-    onError: (e) => setError(e.message),
+    onError: (e) => setProblem(problemOf(e)),
   })
 
-  if (receipt.isError || app.isError)
+  if (current.isSuccess && current.data === null)
+    return (
+      <View>
+        <BackLink />
+        <p className="text-sm text-muted-foreground" role="status">
+          No packet has been built for this application yet, so there is nothing
+          to approve.
+        </p>
+      </View>
+    )
+  if (
+    current.isError ||
+    app.isError ||
+    (receipt.isError && !isApiError(receipt.error, 404))
+  )
     return (
       <View>
         <BackLink />
@@ -125,13 +176,12 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
   )
   const c = packet.contents
 
-  const sendBack = (e: FormEvent) => {
+  const submitDecision = (e: FormEvent) => {
     e.preventDefault()
-    if (!note.trim()) return setError("Say what should change.")
-    move.mutate({
-      stage: "tailoring",
-      note: `Changes requested: ${note.trim()}`,
-    })
+    if (!mode) return
+    if (mode === "changes" && !note.trim())
+      return setError("Say what should change.")
+    decide.mutate({ kind: mode, text: note.trim() })
   }
 
   return (
@@ -256,66 +306,78 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
 
       {channel === "manual" && <HandoffPanel app={app.data} />}
 
-      {error && (
-        <p role="alert" className="text-sm text-danger">
-          {error}
-        </p>
+      {problem && (
+        <div role="alert" className="grid gap-2">
+          <p className="text-sm text-danger">{problem.message}</p>
+          {problem.gates.length > 0 && (
+            <GateList gates={problem.gates} label="Checks that stopped it" />
+          )}
+        </div>
       )}
       <footer className="grid gap-3 border-t border-border pt-4">
-        {changing ? (
+        {mode ? (
           <form
-            onSubmit={sendBack}
-            aria-label="Request changes"
+            onSubmit={submitDecision}
+            aria-label={mode === "changes" ? "Request changes" : "Reject"}
             className="flex flex-wrap items-end gap-2"
           >
             <label className="grid gap-1 text-sm font-medium">
-              What should change?
+              {mode === "changes"
+                ? "What should change?"
+                : "Why not? (optional)"}
               <Input
                 value={note}
                 onChange={(e) => {
                   setNote(e.target.value)
-                  setError(null)
+                  setProblem(null)
                 }}
                 className="w-80 max-w-full"
               />
             </label>
-            <Button type="submit" disabled={move.isPending}>
-              Send back for changes
+            <Button type="submit" disabled={decide.isPending}>
+              {mode === "changes"
+                ? "Send back for changes"
+                : "Reject this role"}
             </Button>
             <Button
               type="button"
               variant="ghost"
-              onClick={() => setChanging(false)}
+              onClick={() => {
+                setMode(null)
+                setNote("")
+              }}
             >
               Cancel
             </Button>
           </form>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {channel !== "manual" && (
+            {channel !== "manual" && !approvedNow && (
               <Button
                 size="lg"
-                disabled={approve.isPending || approvedNow}
+                disabled={approve.isPending}
                 onClick={() => approve.mutate()}
               >
                 {r.action_label}
               </Button>
             )}
+            {channel !== "manual" && approvedNow && (
+              <Button
+                size="lg"
+                disabled={send.isPending}
+                onClick={() => send.mutate()}
+              >
+                Send now
+              </Button>
+            )}
             <Button
               variant="outline"
               size="lg"
-              onClick={() => setChanging(true)}
+              onClick={() => setMode("changes")}
             >
               Request changes
             </Button>
-            <Button
-              variant="ghost"
-              size="lg"
-              disabled={move.isPending}
-              onClick={() =>
-                move.mutate({ stage: "skipped", note: "Rejected at review." })
-              }
-            >
+            <Button variant="ghost" size="lg" onClick={() => setMode("reject")}>
               Reject
             </Button>
           </div>
@@ -373,8 +435,8 @@ function WhatWillBeSent({
         {c.email && (
           <>
             <Row label="To">{c.email.to.join(", ")}</Row>
-            {c.email.cc.length > 0 && (
-              <Row label="Cc">{c.email.cc.join(", ")}</Row>
+            {(c.email.cc ?? []).length > 0 && (
+              <Row label="Cc">{(c.email.cc ?? []).join(", ")}</Row>
             )}
             <Row label="Subject">{c.email.subject}</Row>
             <Row label="Message">

@@ -19,18 +19,15 @@ import type {
 export type GateState = "pass" | "fail" | "unknown"
 
 /**
- * A gate counts as passing only when the server says `passed: true` and does not describe
- * the result as unknown. Missing, null or malformed values are never a pass (unknown is not yes).
+ * The gate's tri-state comes from `outcome` alone. Only `pass` passes; `fail` fails; `unknown`,
+ * null, missing or anything else is unknown (unknown is not yes). `passed` is never read.
  */
 export function gateState(
   g: Partial<GateResult> | null | undefined
 ): GateState {
-  if (!g || g.passed !== true) {
-    if (g && g.passed === false && !/^\s*unknown\b/i.test(g.detail ?? ""))
-      return "fail"
-    return "unknown"
-  }
-  return /^\s*unknown\b/i.test(g.detail ?? "") ? "unknown" : "pass"
+  if (g?.outcome === "pass") return "pass"
+  if (g?.outcome === "fail") return "fail"
+  return "unknown"
 }
 
 export const GATE_STATE_TEXT: Record<GateState, string> = {
@@ -187,7 +184,13 @@ export const CHANNEL_RULES: {
 // ---- dispatch (DESIGN 8.5, 18.3) ----
 
 export type DispatchKind =
-  "queued" | "handed_off" | "sent" | "uncertain" | "failed" | "cancelled"
+  | "queued"
+  | "postponed"
+  | "handed_off"
+  | "sent"
+  | "uncertain"
+  | "failed"
+  | "cancelled"
 
 export type DispatchView = {
   kind: DispatchKind
@@ -198,25 +201,90 @@ export type DispatchView = {
   evidence: string | null
 }
 
+const EVIDENCE_LABEL: Record<
+  NonNullable<DispatchOut["evidence"]>["kind"],
+  string
+> = {
+  confirmation_page: "Confirmation page",
+  reference: "Reference",
+  sent_mail_id: "Sent mail ID",
+  confirmation_email: "Confirmation email",
+  owner_marked: "Recorded by you",
+}
+
+/** The recorded proof, in words: the evidence the server holds, else the provider message id. */
+export function evidenceText(
+  d: Pick<DispatchOut, "evidence" | "provider_message_id">
+): string | null {
+  if (d.evidence?.value) return d.evidence.value
+  return d.provider_message_id ?? null
+}
+
+export const evidenceLabel = (d: Pick<DispatchOut, "evidence">) =>
+  d.evidence ? EVIDENCE_LABEL[d.evidence.kind] : "Proof"
+
+export const stamp = (iso: string) =>
+  new Date(iso).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  })
+
 /**
- * What an attempt means to the owner. "Sent" needs evidence (a provider message id). An
- * attempt with no recorded outcome is uncertain, and an uncertain attempt is never retried.
+ * When a queued send was postponed by quiet hours: the dispatch row keeps `reserved` with a new
+ * `send_after`, and the timeline records `dispatch_deferred` for that attempt. Null otherwise.
+ */
+export function postponedUntil(
+  d: Pick<DispatchOut, "id" | "status" | "send_after">,
+  events: readonly { kind: string; detail: Record<string, unknown> }[]
+): string | null {
+  if (d.status !== "reserved" || !d.send_after) return null
+  const deferred = events.some(
+    (e) => e.kind === "dispatch_deferred" && e.detail.attempt_id === d.id
+  )
+  return deferred ? d.send_after : null
+}
+
+type DispatchFacts = Pick<
+  DispatchOut,
+  "status" | "provider_message_id" | "error" | "send_after"
+> &
+  Partial<Pick<DispatchOut, "evidence" | "uncertain">>
+
+/**
+ * What an attempt means to the owner. "Sent" needs evidence. An attempt the server marks
+ * uncertain (or `unknown`) is never retried; the owner reconciles it. A send postponed by quiet
+ * hours is waiting, not failed.
  */
 export function dispatchView(
-  d: Pick<
-    DispatchOut,
-    "status" | "provider_message_id" | "error" | "send_after"
-  >
+  d: DispatchFacts,
+  postponed: string | null = null
 ): DispatchView {
-  const evidence = d.provider_message_id ?? null
+  const evidence = evidenceText({
+    evidence: d.evidence ?? null,
+    provider_message_id: d.provider_message_id,
+  })
+  if (d.uncertain && d.status !== "cancelled")
+    return uncertain(
+      "We cannot tell whether this left. It stays locked as submitted-unconfirmed and is never sent again automatically, so you cannot send it twice."
+    )
   switch (d.status) {
     case "reserved":
+      if (postponed)
+        return {
+          kind: "postponed",
+          label: "Postponed",
+          tone: "info",
+          explain: `Postponed until ${stamp(postponed)} (quiet hours). It goes out then; you can cancel it until it is sent.`,
+          evidence: null,
+        }
       return {
         kind: "queued",
         label: "Queued",
         tone: "info",
         explain: d.send_after
-          ? "Waiting in the outbox. You can cancel it until it is sent."
+          ? `Waiting in the outbox until ${stamp(d.send_after)}. You can cancel it until it is sent.`
           : "Reserved and about to go. You can cancel it until it is sent.",
         evidence: null,
       }
@@ -240,12 +308,16 @@ export function dispatchView(
             explain:
               d.status === "acknowledged"
                 ? "The employer acknowledged it."
-                : "It left, and the provider gave a message ID as proof.",
+                : "It left, and the proof is recorded.",
             evidence,
           }
-        : uncertain(
-            "It was marked as sent but no proof was recorded, so it is treated as uncertain."
-          )
+        : {
+            kind: "sent",
+            label: "Sent, no proof recorded",
+            tone: "warn",
+            explain: "It was recorded as sent, but no proof was kept with it.",
+            evidence: null,
+          }
     case "unknown":
       return uncertain(
         "We cannot tell whether this left. It stays locked as submitted-unconfirmed and is never sent again automatically, so you cannot send it twice."
@@ -287,8 +359,9 @@ function uncertain(explain: string): DispatchView {
   }
 }
 
-/** Only a queued attempt can be cancelled. Nothing can be retried, least of all an uncertain one. */
-export const canCancel = (v: DispatchView) => v.kind === "queued"
+/** Only a waiting attempt can be cancelled. Nothing can be retried, least of all an uncertain one. */
+export const canCancel = (v: DispatchView) =>
+  v.kind === "queued" || v.kind === "postponed"
 
 // ---- limits (DESIGN 8.1, settings registry) ----
 
@@ -389,7 +462,14 @@ export const MODE_LABEL: Record<AutomationMode, string> = {
 // ---- pending actions (DESIGN 8.4, 18.4) ----
 
 export type ChoiceKind =
-  "continue" | "answer" | "confirm" | "choose" | "review" | "none"
+  | "continue"
+  | "answer"
+  | "confirm"
+  | "submitted"
+  | "choose"
+  | "review"
+  | "proposal"
+  | "none"
 
 export type PendingKindInfo = {
   label: string
@@ -454,7 +534,7 @@ export const PENDING_KINDS: Record<PendingAction["type"], PendingKindInfo> = {
     label: "Confirm it arrived",
     waiting:
       "We could not confirm this left. Check your sent mail or the portal, then tell us.",
-    kind: "confirm",
+    kind: "submitted",
     primary: "Yes, it arrived",
     resolution: "confirmed",
   },
@@ -489,22 +569,86 @@ export const PENDING_KINDS: Record<PendingAction["type"], PendingKindInfo> = {
   },
 }
 
-export type RoleChoice = { application_id: string; label: string }
+const STAGE_WORDS: Record<string, string> = {
+  submitted: "submitted",
+  interview: "interview",
+  rejected: "rejected",
+  info_requested: "information requested",
+  offer: "offer",
+}
 
-/** Candidates for a "choose a role" action, read defensively from the untyped `detail`. */
+/**
+ * The kind info for one action. A stage change proposed from the mailbox
+ * (`detail.kind == "mail_stage_proposal"`) is approved, never applied silently.
+ */
+export function pendingInfo(action: Pick<PendingAction, "type" | "detail">) {
+  const d = action.detail as Record<string, unknown>
+  if (d.kind === "mail_stage_proposal") {
+    const stage =
+      typeof d.proposed_stage === "string"
+        ? (STAGE_WORDS[d.proposed_stage] ?? d.proposed_stage.replace(/_/g, " "))
+        : null
+    return {
+      label: "From your mailbox",
+      waiting: stage
+        ? `A message in your mailbox suggests moving this to ${stage}. Nothing changes until you approve.`
+        : "A message in your mailbox suggests a change. Nothing changes until you approve.",
+      kind: "proposal",
+      primary: "Approve the change",
+      resolution: "approved",
+    } satisfies PendingKindInfo
+  }
+  return PENDING_KINDS[action.type]
+}
+
+export type RoleChoice = { job_id: string; label: string }
+
+const asObj = (v: unknown) =>
+  v && typeof v === "object" && !Array.isArray(v)
+    ? (v as Record<string, unknown>)
+    : null
+
+function choice(o: Record<string, unknown> | null, note: string): RoleChoice[] {
+  if (!o || typeof o.job_id !== "string") return []
+  const label = [
+    typeof o.title === "string" ? o.title : null,
+    o.score != null ? `score ${String(o.score)}` : null,
+    note,
+  ]
+    .filter(Boolean)
+    .join(", ")
+  return [{ job_id: o.job_id, label }]
+}
+
+/**
+ * The two roles of a "choose a role" action, read defensively from the untyped `detail`:
+ * `displace_prepared` (current vs challenger) or `better_role_after_applying` (applied vs
+ * candidate). Answered with `chosen_job_id`.
+ */
 export function roleChoices(detail: Record<string, unknown>): RoleChoice[] {
-  const raw = detail.candidates ?? detail.options
-  if (!Array.isArray(raw)) return []
-  return raw.flatMap((c): RoleChoice[] => {
-    if (!c || typeof c !== "object") return []
-    const o = c as Record<string, unknown>
-    const id = o.application_id
-    if (typeof id !== "string") return []
-    const label = [o.title, o.score != null ? `score ${o.score}` : null]
-      .filter(Boolean)
-      .join(", ")
-    return [{ application_id: id, label: label || id }]
-  })
+  if (detail.kind === "better_role_after_applying") {
+    const applied =
+      typeof detail.applied_job_id === "string"
+        ? [
+            {
+              job_id: detail.applied_job_id,
+              label: [
+                "The role you already applied for",
+                detail.applied_score != null
+                  ? `score ${String(detail.applied_score)}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(", "),
+            },
+          ]
+        : []
+    return [...applied, ...choice(asObj(detail.candidate), "the newer role")]
+  }
+  return [
+    ...choice(asObj(detail.current), "the one being prepared"),
+    ...choice(asObj(detail.challenger), "the new contender"),
+  ]
 }
 
 export const answerOptions = (detail: Record<string, unknown>): string[] =>

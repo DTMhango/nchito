@@ -9,14 +9,15 @@ import { EmptyState } from "@/components/empty-state"
 import { SectionHeader } from "@/components/page-header"
 import { NativeSelect } from "@/features/campaigns/bits"
 import {
-  apKeys,
+  errorText,
   pendingQuery,
+  reconcileDispatch,
   resolvePending,
   settingsQuery,
   type PendingAction,
   type ResolveIn,
 } from "./api"
-import { PENDING_KINDS, answerOptions, roleChoices } from "./logic"
+import { answerOptions, pendingInfo, roleChoices } from "./logic"
 
 type Scope = NonNullable<ResolveIn["answer_scope"]>
 const SCOPES: { value: Scope; label: string }[] = [
@@ -52,7 +53,7 @@ export function PendingPanel() {
 }
 
 function PendingRow({ action }: { action: PendingAction }) {
-  const info = PENDING_KINDS[action.type]
+  const info = pendingInfo(action)
   const qc = useQueryClient()
   const settings = useQuery(settingsQuery())
   const detail = action.detail as Record<string, unknown>
@@ -66,6 +67,7 @@ function PendingRow({ action }: { action: PendingAction }) {
   const [answer, setAnswer] = useState("")
   const [scope, setScope] = useState<Scope | null>(null)
   const [chosen, setChosen] = useState("")
+  const [reference, setReference] = useState("")
   const [error, setError] = useState<string | null>(null)
 
   const resolve = useMutation({
@@ -74,11 +76,26 @@ function PendingRow({ action }: { action: PendingAction }) {
       toast.success(
         body.resolution === "dismissed" ? "Dismissed." : "Done. Thank you."
       )
-      void qc.invalidateQueries({ queryKey: apKeys.pending })
       void qc.invalidateQueries({ queryKey: ["pending-actions"] })
+      void qc.invalidateQueries({ queryKey: ["applications"] })
+      void qc.invalidateQueries({ queryKey: ["autopilot"] })
       void qc.invalidateQueries({ queryKey: ["today"] })
     },
-    onError: (e) => setError(e.message),
+    onError: (e) => setError(errorText(e)),
+  })
+  // "Did not go out" is the attempt's reconcile with not_sent, not a resolution.
+  const notSent = useMutation({
+    mutationFn: () =>
+      reconcileDispatch(action.application_id!, String(detail.attempt_id), {
+        decision: "not_sent",
+      }),
+    onSuccess: () => {
+      toast.success("Recorded: it did not go out.")
+      void qc.invalidateQueries({ queryKey: ["pending-actions"] })
+      void qc.invalidateQueries({ queryKey: ["applications"] })
+      void qc.invalidateQueries({ queryKey: ["autopilot"] })
+    },
+    onError: (e) => setError(errorText(e)),
   })
 
   const options = answerOptions(detail)
@@ -96,11 +113,13 @@ function PendingRow({ action }: { action: PendingAction }) {
     }
     if (info.kind === "choose") {
       if (!chosen) return setError("Choose one role first.")
-      return resolve.mutate({
-        resolution: "chosen",
-        chosen_application_id: chosen,
-      })
+      return resolve.mutate({ resolution: "chosen", chosen_job_id: chosen })
     }
+    if (info.kind === "submitted")
+      return resolve.mutate({
+        resolution: "confirmed",
+        reference: reference.trim() || null,
+      })
     if (info.resolution) resolve.mutate({ resolution: info.resolution })
   }
 
@@ -157,13 +176,13 @@ function PendingRow({ action }: { action: PendingAction }) {
           <fieldset className="grid gap-1">
             <legend className="sr-only">Which role</legend>
             {choices.map((c) => (
-              <label key={c.application_id} className="flex gap-2 text-sm">
+              <label key={c.job_id} className="flex gap-2 text-sm">
                 <input
                   type="radio"
                   name={`choice-${action.id}`}
-                  value={c.application_id}
-                  checked={chosen === c.application_id}
-                  onChange={() => setChosen(c.application_id)}
+                  value={c.job_id}
+                  checked={chosen === c.job_id}
+                  onChange={() => setChosen(c.job_id)}
                 />
                 {c.label}
               </label>
@@ -175,6 +194,24 @@ function PendingRow({ action }: { action: PendingAction }) {
             )}
           </fieldset>
         )}
+        {info.kind === "submitted" && (
+          <label className="grid max-w-sm gap-1 text-sm font-medium">
+            Reference or what you saw (optional)
+            <Input
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder="Confirmation number or email subject"
+            />
+          </label>
+        )}
+        {info.kind === "proposal" &&
+          typeof detail.subject === "string" &&
+          detail.subject && (
+            <p className="text-sm">
+              <span className="text-faint">Message: </span>
+              {detail.subject}
+            </p>
+          )}
         {error && (
           <p role="alert" className="text-sm text-danger">
             {error}
@@ -197,6 +234,18 @@ function PendingRow({ action }: { action: PendingAction }) {
               {info.primary}
             </Button>
           )}
+          {info.kind === "submitted" &&
+            action.application_id &&
+            typeof detail.attempt_id === "string" && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={notSent.isPending}
+                onClick={() => notSent.mutate()}
+              >
+                It did not go out
+              </Button>
+            )}
           <Button
             type="button"
             variant="ghost"

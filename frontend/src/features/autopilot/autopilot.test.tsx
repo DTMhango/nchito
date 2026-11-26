@@ -3,50 +3,58 @@ import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { renderApp } from "@/test/render"
 import { applicationsMock } from "@/mocks/handlers/applications"
-import { autopilotMock } from "@/mocks/handlers/autopilot"
+import { autopilotMock, enterRestoreMock } from "@/mocks/handlers/autopilot"
 import {
   approvalStanding,
   autoVerdict,
   canCancel,
   dispatchView,
   gateState,
+  postponedUntil,
+  roleChoices,
   shortHash,
   validateLimit,
 } from "./logic"
-import type { PacketOut } from "./api"
+import type { GateResult, PacketOut } from "./api"
 
 const appId = (employer: string) =>
   applicationsMock().apps.find((a) => a.employer === employer)!.id
 
 describe("gates: unknown is never a pass", () => {
-  it("reads missing, malformed and unknown results as not passing", () => {
+  it("reads the tri-state from outcome only; null, missing and unknown never pass", () => {
     expect(gateState(undefined)).toBe("unknown")
     expect(gateState(null)).toBe("unknown")
     expect(gateState({ gate: "x" })).toBe("unknown")
-    expect(gateState({ gate: "x", passed: undefined })).toBe("unknown")
+    // A null outcome is unknown even when the legacy flag says passed.
+    expect(gateState({ gate: "x", passed: true, outcome: null })).toBe(
+      "unknown"
+    )
+    expect(gateState({ gate: "x", passed: true, outcome: "unknown" })).toBe(
+      "unknown"
+    )
+    expect(gateState({ gate: "x", passed: false, outcome: "fail" })).toBe(
+      "fail"
+    )
+    // No string-prefix inference: the detail wording does not matter.
     expect(
-      gateState({ gate: "x", passed: true, detail: "Unknown: stale" })
-    ).toBe("unknown")
-    expect(
-      gateState({ gate: "x", passed: false, detail: "Unknown: stale" })
-    ).toBe("unknown")
-    expect(
-      gateState({ gate: "x", passed: false, detail: "Over the cap" })
-    ).toBe("fail")
-    expect(gateState({ gate: "x", passed: true })).toBe("pass")
+      gateState({ gate: "x", passed: true, detail: "Unknown", outcome: "pass" })
+    ).toBe("pass")
   })
 
   it("cannot go automatically unless every gate clearly passed", () => {
+    const g = (
+      gate: string,
+      outcome: "pass" | "fail" | "unknown" | null
+    ): GateResult => ({
+      gate,
+      passed: outcome === "pass",
+      detail: null,
+      outcome,
+    })
     expect(autoVerdict([]).canAuto).toBe(false)
-    expect(
-      autoVerdict([
-        { gate: "a", passed: true, detail: null },
-        { gate: "b", passed: false, detail: "Unknown: not checked" },
-      ]).canAuto
-    ).toBe(false)
-    expect(
-      autoVerdict([{ gate: "a", passed: true, detail: null }]).canAuto
-    ).toBe(true)
+    expect(autoVerdict([g("a", "pass"), g("b", "unknown")]).canAuto).toBe(false)
+    expect(autoVerdict([g("a", "pass"), g("b", null)]).canAuto).toBe(false)
+    expect(autoVerdict([g("a", "pass")]).canAuto).toBe(true)
   })
 
   it("renders an unknown gate as Unknown and never as Passed", async () => {
@@ -134,6 +142,75 @@ describe("approval and packet change", () => {
     expect(current.approved_at).toBeNull()
   })
 
+  it("shows an approval refusal plainly, with the gates that stopped it", async () => {
+    const user = userEvent.setup()
+    const id = appId("Zambezi Mining Systems")
+    autopilotMock().refuseApproval = "role_open is unknown"
+    renderApp(`/approvals/${id}`)
+    await user.click(
+      await screen.findByRole("button", { name: "Let the agent submit" })
+    )
+    const msg = await screen.findByText("role_open is unknown")
+    const alert = msg.closest<HTMLElement>("[role=alert]")!
+    const stopped = within(alert)
+      .getByText("Checks that stopped it")
+      .closest<HTMLElement>("section")!
+    expect(stopped).toHaveAttribute("aria-label", "Checks that stopped it")
+    expect(
+      within(stopped).getByText("Role confirmed open recently").closest("li")
+    ).toHaveAttribute("data-state", "unknown")
+    expect(autopilotMock().packets[id].at(-1)!.approved_at).toBeNull()
+  })
+
+  it("rejects through the reject endpoint, with an optional reason", async () => {
+    const user = userEvent.setup()
+    const id = appId("Zambezi Mining Systems")
+    renderApp(`/approvals/${id}`)
+    await user.click(await screen.findByRole("button", { name: "Reject" }))
+    const form = screen.getByRole("form", { name: "Reject" })
+    await user.type(within(form).getByRole("textbox"), "Too far to commute")
+    await user.click(
+      within(form).getByRole("button", { name: "Reject this role" })
+    )
+    await waitFor(() =>
+      expect(autopilotMock().decisions).toEqual([
+        { id, kind: "reject", text: "Too far to commute" },
+      ])
+    )
+  })
+
+  it("requests changes through its endpoint and needs a note", async () => {
+    const user = userEvent.setup()
+    const id = appId("Zambezi Mining Systems")
+    renderApp(`/approvals/${id}`)
+    await user.click(
+      await screen.findByRole("button", { name: "Request changes" })
+    )
+    const form = screen.getByRole("form", { name: "Request changes" })
+    await user.click(
+      within(form).getByRole("button", { name: "Send back for changes" })
+    )
+    expect(await screen.findByText("Say what should change.")).toBeVisible()
+    await user.type(within(form).getByRole("textbox"), "Shorter letter")
+    await user.click(
+      within(form).getByRole("button", { name: "Send back for changes" })
+    )
+    await waitFor(() =>
+      expect(autopilotMock().decisions).toEqual([
+        { id, kind: "changes", text: "Shorter letter" },
+      ])
+    )
+  })
+
+  it("says plainly when no packet has been built", async () => {
+    const id = appId("Kafue Analytics")
+    autopilotMock().packets[id] = []
+    renderApp(`/approvals/${id}`)
+    expect(
+      await screen.findByText(/No packet has been built/i)
+    ).toBeInTheDocument()
+  })
+
   it("approves the exact version shown", async () => {
     const user = userEvent.setup()
     const id = appId("Zambezi Mining Systems")
@@ -148,16 +225,89 @@ describe("approval and packet change", () => {
 })
 
 describe("dispatch: no retry on uncertain", () => {
-  it("maps statuses and only lets a queued send be cancelled", () => {
+  it("maps statuses and only lets a waiting send be cancelled", () => {
     const base = { provider_message_id: null, error: null, send_after: null }
     expect(dispatchView({ ...base, status: "unknown" }).kind).toBe("uncertain")
-    expect(dispatchView({ ...base, status: "sent" }).kind).toBe("uncertain")
+    // The server's uncertain flag wins over any status.
     expect(
-      dispatchView({ ...base, status: "sent", provider_message_id: "<m1>" })
-        .kind
-    ).toBe("sent")
+      dispatchView({ ...base, status: "handed_off", uncertain: true }).kind
+    ).toBe("uncertain")
+    expect(dispatchView({ ...base, status: "sent" }).evidence).toBeNull()
+    expect(
+      dispatchView({
+        ...base,
+        status: "sent",
+        evidence: {
+          kind: "reference",
+          value: "REF-1",
+          screenshot_ref: null,
+          at: null,
+        },
+      }).evidence
+    ).toBe("REF-1")
     expect(canCancel(dispatchView({ ...base, status: "unknown" }))).toBe(false)
     expect(canCancel(dispatchView({ ...base, status: "reserved" }))).toBe(true)
+  })
+
+  it("reads a quiet-hours deferral as postponed, not failed", () => {
+    const d = {
+      id: "d1",
+      status: "reserved" as const,
+      send_after: "2026-11-27T05:00:00Z",
+    }
+    const events = [{ kind: "dispatch_deferred", detail: { attempt_id: "d1" } }]
+    expect(postponedUntil(d, events)).toBe(d.send_after)
+    expect(postponedUntil({ ...d, id: "other" }, events)).toBeNull()
+    expect(postponedUntil({ ...d, status: "cancelled" }, events)).toBeNull()
+    const v = dispatchView(
+      { ...d, provider_message_id: null, error: null },
+      postponedUntil(d, events)
+    )
+    expect(v.kind).toBe("postponed")
+    expect(v.explain).toMatch(/^Postponed until .*\(quiet hours\)/)
+    expect(canCancel(v)).toBe(true)
+  })
+
+  it("shows the postponed send on the Sending tab", async () => {
+    const user = userEvent.setup()
+    renderApp("/autopilot")
+    await user.click(await screen.findByRole("tab", { name: "Sending" }))
+    const card = await screen.findByRole("listitem", {
+      name: /Principal Data Engineer, Nyika Labs/,
+    })
+    expect(
+      await within(card).findByText(/Postponed until .*\(quiet hours\)/)
+    ).toBeInTheDocument()
+    expect(within(card).queryByText("Failed")).toBeNull()
+  })
+
+  it("reconciles one uncertain attempt: check, then record it went out", async () => {
+    const user = userEvent.setup()
+    renderApp("/autopilot")
+    await user.click(await screen.findByRole("tab", { name: "Sending" }))
+    const card = await screen.findByRole("listitem", {
+      name: /Head of Analytics, Kariba Freight/,
+    })
+    const id = appId("Kariba Freight")
+    const attempt = autopilotMock().dispatches[id].find((d) => d.uncertain)!
+    expect(await within(card).findByText(/Checked 2 times/)).toBeInTheDocument()
+    await user.click(
+      await within(card).findByRole("button", { name: "Check again now" })
+    )
+    await waitFor(() => expect(attempt.reconcile_attempts).toBe(3))
+    expect(attempt.uncertain).toBe(true)
+    await user.click(
+      within(card).getByRole("button", { name: /I checked: it arrived/i })
+    )
+    await user.type(
+      within(card).getByLabelText(/Reference or what you saw/),
+      "KF-2291"
+    )
+    await user.click(
+      within(card).getByRole("button", { name: "Record that it arrived" })
+    )
+    await waitFor(() => expect(attempt.status).toBe("sent"))
+    expect(attempt.evidence?.value).toBe("KF-2291")
   })
 
   it("explains uncertain with the reconcile action and offers no retry", async () => {
@@ -219,6 +369,56 @@ describe("master pause", () => {
     ).toBeInTheDocument()
     await user.click(
       within(pause).getByRole("button", { name: "Resume automatic sending" })
+    )
+    expect(
+      await within(pause).findByText("Automatic sending is on")
+    ).toBeInTheDocument()
+  })
+
+  it("records who paused it and why", async () => {
+    const user = userEvent.setup()
+    renderApp("/autopilot")
+    const pause = await screen.findByRole("region", { name: "Master pause" })
+    await user.type(
+      within(pause).getByLabelText(/Reason for pausing/),
+      "On leave this week"
+    )
+    await user.click(
+      within(pause).getByRole("button", { name: "Pause all automatic sending" })
+    )
+    expect(await within(pause).findByText(/Paused by you/)).toBeInTheDocument()
+    expect(within(pause).getByTestId("pause-reason")).toHaveTextContent(
+      "Reason: On leave this week."
+    )
+  })
+
+  it("after a restore, refuses the resume and lists what is outstanding", async () => {
+    const user = userEvent.setup()
+    // Build the Kariba attempts so the uncertain one exists before the restore.
+    const id = appId("Kariba Freight")
+    enterRestoreMock("2026-11-25T06:00:00Z")
+    renderApp("/autopilot")
+    const panel = await screen.findByRole("region", {
+      name: "Paused for a restore",
+    })
+    await waitFor(() =>
+      expect(autopilotMock().dispatches[id]?.length).toBeGreaterThan(0)
+    )
+    // The ordinary resume is refused while paused for a restore.
+    const pause = screen.getByRole("region", { name: "Master pause" })
+    expect(within(pause).getByText(/by the system/)).toBeInTheDocument()
+    await user.click(
+      within(panel).getByRole("button", { name: "Resume after restore" })
+    )
+    const alert = await within(panel).findByRole("alert")
+    expect(alert).toHaveTextContent("Not resumed: 1 send is still outstanding")
+    expect(alert).toHaveTextContent(/Email attempt, packet #/)
+
+    // Settle it (reconcile: it did not go out), then the resume goes through.
+    const attempt = autopilotMock().dispatches[id].find((d) => d.uncertain)!
+    attempt.uncertain = false
+    await user.click(
+      within(panel).getByRole("button", { name: "Resume after restore" })
     )
     expect(
       await within(pause).findByText("Automatic sending is on")
@@ -367,6 +567,66 @@ describe("handoff, pending actions and trusted sites", () => {
         )
       ).toHaveLength(1)
     )
+  })
+
+  it("confirms a submission with a reference", async () => {
+    const user = userEvent.setup()
+    renderApp("/autopilot")
+    await user.click(await screen.findByRole("tab", { name: /Waiting on you/ }))
+    const row = await screen.findByRole("listitem", {
+      name: "Did Kariba Freight receive your application?",
+    })
+    await user.type(
+      within(row).getByLabelText(/Reference or what you saw/),
+      "KF-7"
+    )
+    await user.click(
+      within(row).getByRole("button", { name: "Yes, it arrived" })
+    )
+    await waitFor(() =>
+      expect(
+        applicationsMock().actions.find((a) => a.type === "confirm_submission")!
+          .resolution
+      ).toEqual({ resolution: "confirmed", reference: "KF-7" })
+    )
+  })
+
+  it("asks before applying a stage change proposed from the mailbox", async () => {
+    const user = userEvent.setup()
+    renderApp("/autopilot")
+    await user.click(await screen.findByRole("tab", { name: /Waiting on you/ }))
+    const row = await screen.findByRole("listitem", {
+      name: /sent an interview invitation/,
+    })
+    expect(within(row).getByText("From your mailbox")).toBeInTheDocument()
+    expect(
+      within(row).getByText(/suggests moving this to interview/)
+    ).toBeInTheDocument()
+    const app = applicationsMock().apps.find(
+      (a) => a.employer === "Lusaka Fintech Co"
+    )!
+    expect(app.stage).toBe("submitted")
+    await user.click(
+      within(row).getByRole("button", { name: "Approve the change" })
+    )
+    await waitFor(() => expect(app.stage).toBe("interview"))
+  })
+
+  it("chooses between two roles by job id", () => {
+    expect(
+      roleChoices({
+        kind: "displace_prepared",
+        current: { job_id: "j1", title: "Analyst", score: 80 },
+        challenger: { job_id: "j2", title: "Lead", score: 90 },
+      }).map((c) => c.job_id)
+    ).toEqual(["j1", "j2"])
+    expect(
+      roleChoices({
+        kind: "better_role_after_applying",
+        applied_job_id: "j1",
+        candidate: { job_id: "j3", title: "Head" },
+      }).map((c) => c.job_id)
+    ).toEqual(["j1", "j3"])
   })
 
   it("adds and removes a trusted site, rejecting a malformed domain", async () => {

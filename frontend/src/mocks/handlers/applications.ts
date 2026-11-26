@@ -137,7 +137,17 @@ export const applicationsHandlers = [
       const body = (await request.json()) as ResolveIn
       action.status = body.resolution === "dismissed" ? "dismissed" : "resolved"
       action.updated_at = new Date().toISOString()
+      action.resolution = { ...body }
       const app = state.apps.find((a) => a.id === action.application_id)
+      // An approved mailbox proposal applies its stage change (the real resolver does the same).
+      const proposed = action.detail.proposed_stage
+      if (
+        app &&
+        body.resolution === "approved" &&
+        action.detail.kind === "mail_stage_proposal" &&
+        typeof proposed === "string"
+      )
+        app.stage = proposed as typeof app.stage
       if (app)
         app.open_pending_actions = Math.max(0, app.open_pending_actions - 1)
       return HttpResponse.json(action)

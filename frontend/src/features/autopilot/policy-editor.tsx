@@ -50,7 +50,7 @@ export function PolicyEditor() {
       <section aria-label="Campaign policy" className="grid gap-3">
         <SectionHeader
           title="How far each campaign may go"
-          aside="Starts at Prepare documents. You raise it on purpose."
+          aside="Set on each campaign: its mode and any channel override."
         />
         {list.length > 1 && (
           <label className="grid max-w-xs gap-1 text-sm font-medium">
@@ -122,7 +122,7 @@ function CampaignPolicy({
           <Chip tone="line">
             Now: {MODE_LABEL[mode]}
             {policy.mode === undefined || policy.mode === null
-              ? ` (default: ${MODE_LABEL[defaultMode]})`
+              ? ` (global default: ${MODE_LABEL[defaultMode]})`
               : " (set on this campaign)"}
           </Chip>
         </div>
@@ -276,9 +276,14 @@ function LimitsPanel({
   return (
     <section aria-label="Limits" className="grid gap-3">
       <SectionHeader
-        title="Limits"
-        aside="These apply to every campaign. Each change is recorded in the activity log."
+        title="Limits for every campaign"
+        aside="Global settings, not campaign fields. Each change is recorded in the activity log."
       />
+      <p className="max-w-prose text-sm text-muted-foreground">
+        Caps, score lines and quiet hours have one value shared by all
+        campaigns. A campaign cannot override them. Pausing is not a setting
+        here: use the master pause above.
+      </p>
       {!settings ? (
         <p className="text-sm text-muted-foreground">Loading limits.</p>
       ) : (
