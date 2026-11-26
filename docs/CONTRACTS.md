@@ -705,7 +705,9 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   `held_by_conflict`, `employer_cooldown`, `paused`, `quiet_hours`, `cap_reached`, `budget`, `duplicate`,
   `permit_outstanding`, `posting_changed`, `role_closed`, `deadline_passed`, `email_unconfirmed`,
   `destination_unverified`, `untrusted_site`, `answers_not_automatic`, `already_handed_over`, `already_settled`,
-  `not_uncertain`, `not_started`, `still_queued`, `nothing_to_submit`, `system_channel`; anything else is `refused`.
+  `not_uncertain`, `not_started`, `still_queued`, `nothing_to_submit`, `system_channel`, `unknown_template`,
+  `below_auto_threshold`, `unknown_data`, `pay_not_stated`, `always_ask_first`, `campaign_unconfirmed`; anything else
+  is `refused`.
   A gate refusal takes its first blocking gate's code (`GATE_CODES`). The approve refusal's code was
   `approval_refused` for every case; it is now the specific code (the `gates` list is still attached).
   `DispatchCreateOut.code` and `ApprovalStatusOut.code` carry the same codes for a 200 that did not queue or approve.
@@ -732,3 +734,6 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   against every campaign through `scoring.score_jobs` with an in-process stand-in for the score model (no provider
   call, no spend; `Assessment.model = "demo (no model call)"`), opens a shortlisted application and audits
   `job.demo_created`. Refused (exit 2) when `ENVIRONMENT=production` (or `ENV=production`).
+- **Exit test** (`tests/integration/test_wave2_exit.py`): besides the pipeline path, an API-only path (set and
+  confirm the address, prepare, approve and dispatch through the endpoints; one email in the fake mailbox) and a test
+  that a posting's unconfirmed address is packed for manual hand-off and never sent automatically.

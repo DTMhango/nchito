@@ -19,7 +19,8 @@ CODES: tuple[str, ...] = (
     "untrusted_site", "answers_not_automatic", "runner_refused", "channel_unavailable", "retry_limit",
     "waiver_reason_required", "note_required", "not_found", "already_handed_over", "already_settled",
     "not_uncertain", "not_started", "still_queued", "nothing_to_submit", "system_channel", "invalid_address",
-    "no_address", "refused",
+    "no_address", "below_auto_threshold", "unknown_data", "pay_not_stated", "always_ask_first",
+    "campaign_unconfirmed", "refused",
 )
 
 GATE_CODES: dict[str, str] = {
@@ -31,6 +32,8 @@ GATE_CODES: dict[str, str] = {
     "posting_changed", "role_open": "role_closed", "deadline": "deadline_passed", "budget": "budget",
     "recipient_confirmed": "email_unconfirmed", "destination_verified": "destination_unverified", "trusted_site":
     "untrusted_site", "answers_auto": "answers_not_automatic", "runner": "runner_refused",
+    "auto_threshold": "below_auto_threshold", "known_data": "unknown_data", "pay_stated": "pay_not_stated",
+    "always_ask_first": "always_ask_first", "campaign_ready": "campaign_unconfirmed",
 }
 
 

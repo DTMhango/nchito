@@ -338,3 +338,93 @@ async def test_a_packet_with_generated_documents_needs_the_checked_spec(session)
     with pytest.raises(packets.PacketError) as err:
         await packets.build(session, app, draft, actor="owner")
     assert err.value.status == 409 and "no tailored spec" in err.value.message
+
+
+async def _swept_and_tailored(world, owner_client, session, *, address_from_posting: str | None = None):
+    """Import, confirm, sweep, then run the tailoring task the sweep queued (the worker's part). Returns the
+    winning job and its application id."""
+    campaign_id = await _import_and_confirm(owner_client, session)
+    world["exp"].update({e.org.split()[0]: str(e.id) for e in (await session.scalars(select(Experience))).all()})
+    run = await _sweep(campaign_id)
+    assert run.status.value == "succeeded", run.error
+    session.expire_all()
+    senior = await session.scalar(select(Job).where(Job.employer == "ExampleCo (fictional)",
+                                                    Job.title == "Senior Data Analyst"))
+    app_id = (await session.scalar(select(Application).where(Application.job_id == senior.id))).id
+    if address_from_posting:  # what extraction would have found in the posting text
+        senior.apply_email = address_from_posting
+        await session.commit()
+    request = next(r for r in world["queued"] if r.application_id == app_id)
+    async with get_sessionmaker()() as s:
+        status = await tailoring.process(s, LedgeredFake(world["fake"], run.id), request.id)
+        await s.commit()
+        assert status.value == "done", (await s.get(TailoringRequest, request.id)).error
+    return senior, app_id
+
+
+async def test_api_only_path_from_a_confirmed_address_to_one_sent_email(world, owner_client, session):
+    """Every owner step through the API: set and confirm the address, prepare, approve, dispatch."""
+    senior, app_id = await _swept_and_tailored(world, owner_client, session)
+    r = await owner_client.put(f"/api/jobs/{senior.id}/apply-email", json={"address": APPLY_TO, "confirmed": True})
+    assert r.status_code == 200, r.text
+    detail = r.json()
+    assert detail["apply_email"]["usable"] and detail["apply_email"]["found_in"] == "owner"
+    assert next(c for c in detail["apply_channel_candidates"] if c["channel"] == "email")["available"]
+
+    state = (await owner_client.get(f"/api/applications/{app_id}/spec")).json()
+    assert state["checked"] and state["status"] != "block", state["stale_reasons"]
+    templates = (await owner_client.get("/api/document-templates", params={"application_id": str(app_id)})).json()
+    r = await owner_client.post(f"/api/applications/{app_id}/packet/prepare",
+                                json={"cv_template": templates["defaults"]["cv"]["key"]})
+    assert r.status_code == 200, r.text
+    prepared = r.json()
+    packet = prepared["packet"]
+    assert prepared["channel"] == "email" and packet["contents"]["email"]["to"] == [APPLY_TO]
+    assert prepared["approval"]["status"] == "wait_for_owner"  # ask_then_apply: the owner approves
+
+    r = await owner_client.post(f"/api/applications/{app_id}/approve", json={
+        "packet_version": packet["version"], "packet_hash": packet["content_hash"], "channel": "email"})
+    assert r.status_code == 200, r.text
+    r = await owner_client.post(f"/api/applications/{app_id}/dispatches", json={})
+    assert r.status_code == 200 and r.json()["status"] == "queued", r.text
+    queued = r.json()["dispatch"]
+    assert queued["status"] == "reserved" and queued["deferred_reason"] is None
+
+    later = datetime.fromisoformat(queued["send_after"]) + timedelta(minutes=1)
+    async with get_sessionmaker()() as s:  # the worker's apply tick, once the send delay has passed
+        assert await dispatch.run(s, uuid.UUID(queued["id"]), now=later) == DispatchStatus.sent
+    assert len(world["box"].sent) == 1 and list(world["box"].sent[0].to) == [APPLY_TO]
+    sent = (await owner_client.get(f"/api/applications/{app_id}/dispatches")).json()
+    assert [d["status"] for d in sent] == ["sent"]
+    assert (await owner_client.get(f"/api/applications/{app_id}")).json()["stage"] == "submitted"
+    again = (await owner_client.post(f"/api/applications/{app_id}/dispatches", json={})).json()
+    assert again["status"] == "denied" and again["code"], again  # nothing approved is waiting: refused with a code
+    assert len(world["box"].sent) == 1
+
+
+async def test_an_unconfirmed_address_from_the_posting_is_never_sent_automatically(world, owner_client, session):
+    senior, app_id = await _swept_and_tailored(world, owner_client, session, address_from_posting=APPLY_TO)
+    campaign = await session.scalar(select(Campaign))
+    campaign.automation = AutomationPolicy(mode="auto_apply", per_channel={})
+    await session.commit()
+    email = (await owner_client.get(f"/api/jobs/{senior.id}")).json()["apply_email"]
+    assert email["address"] == APPLY_TO and not email["confirmed"] and not email["usable"]
+
+    async with get_sessionmaker()() as s:  # the pipeline's own prepare, as after tailoring
+        prepared = await advance.after_tailored(s, app_id, store=world["store"])
+        await s.commit()
+    assert prepared is not None and prepared.built
+    session.expire_all()
+    assert (await packets.current(session, app_id)).contents.channel == "manual"  # handed to the owner
+
+    # Even an email packet built by hand to that address waits for the owner in auto_apply mode.
+    r = await owner_client.post(f"/api/applications/{app_id}/packet", json={
+        "channel": "email", "sending_identity": ME,
+        "email": {"to": [APPLY_TO], "subject": "Application", "body": "Dear team"}})
+    assert r.status_code == 200, r.text
+    approval_out = r.json()["approval"]
+    assert not approval_out["approved"] and approval_out["status"] == "wait_for_owner", approval_out
+    assert "recipient_confirmed" in approval_out["reason"] and approval_out["code"], approval_out
+    async with get_sessionmaker()() as s:
+        await dispatch.tick(s, now=datetime.now(UTC) + timedelta(hours=1))
+    assert world["box"].sent == []
