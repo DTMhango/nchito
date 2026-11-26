@@ -44,18 +44,9 @@ import { OverviewTab } from "./tabs/overview-tab"
 import { PeopleTab } from "./tabs/people-tab"
 import { PostingTab } from "./tabs/posting-tab"
 
-export const JOB_TABS = [
-  "overview",
-  "posting",
-  "fit",
-  "documents",
-  "application",
-  "messages",
-  "people",
-  "interview",
-  "activity",
-] as const
-export type JobTab = (typeof JOB_TABS)[number]
+import { JOB_TABS, type JobTab } from "./job-tabs"
+
+export { JOB_TABS, type JobTab }
 
 const TAB_META: Record<JobTab, { label: string; icon: LucideIcon }> = {
   overview: { label: "Overview", icon: BriefcaseBusiness },

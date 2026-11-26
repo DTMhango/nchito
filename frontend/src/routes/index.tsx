@@ -22,6 +22,7 @@ import {
   Outlet,
   redirect,
 } from "@tanstack/react-router"
+import { lazy, type ComponentType } from "react"
 import { z } from "zod"
 import {
   requireNoOwner,
@@ -32,34 +33,107 @@ import {
 import { AppShell } from "@/app/shell/app-shell"
 import { SetupPage } from "@/features/auth/setup-page"
 import { SignInPage } from "@/features/auth/sign-in-page"
-import { TodayPage } from "@/features/today/today-page"
-import { MatchesPage } from "@/features/matches/matches-page"
 import { matchesSearchSchema } from "@/features/matches/filters"
-import { ApplicationsPage } from "@/features/applications/applications-page"
-import { JOB_TABS, JobPage } from "@/features/jobs/job-page"
-import { StudioPage } from "@/features/studio/studio-page"
-import { AutopilotPage } from "@/features/autopilot/autopilot-page"
-import { KitLayout, KitSection } from "@/features/kit/kit-pages"
-import { CampaignsPage } from "@/features/campaigns/campaigns-page"
-import { CampaignEditorPage } from "@/features/campaigns/campaign-editor-page"
-import { SourcesPage } from "@/features/sources/sources-page"
-import { RunsPage } from "@/features/sources/runs/runs-page"
-import { RunDetailPage } from "@/features/sources/runs/run-detail-page"
-import { InsightsPage } from "@/features/insights/insights-page"
-import {
-  SettingsLayout,
-  SettingsSection,
-} from "@/features/settings/settings-pages"
-import { AppearancePage } from "@/features/settings/appearance-page"
-import { AiSettingsPage } from "@/features/settings/ai/ai-page"
-import {
-  SettingsGroupPage,
-  type SettingsPageKey,
-} from "@/features/settings/settings-group-page"
-import { ActivityPage } from "@/features/settings/activity-page"
-import { HistoryPage } from "@/features/settings/history-page"
-import { SecurityPage } from "@/features/settings/security-page"
+import { JOB_TABS } from "@/features/jobs/job-tabs"
+import type { SettingsPageKey } from "@/features/settings/settings-group-page"
 import { OnboardingPage } from "@/features/onboarding/onboarding-page"
+
+/**
+ * Screens load on demand, one chunk per area (the shell, sign-in and set-up stay in the main
+ * bundle). The router shows RoutePending (app/router.tsx) while a chunk loads.
+ */
+function lazyPage<
+  K extends string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  M extends Record<K, ComponentType<any>>,
+>(load: () => Promise<M>, name: K) {
+  return lazy(async () => ({ default: (await load())[name] }))
+}
+const TodayPage = lazyPage(
+  () => import("@/features/today/today-page"),
+  "TodayPage"
+)
+const MatchesPage = lazyPage(
+  () => import("@/features/matches/matches-page"),
+  "MatchesPage"
+)
+const ApplicationsPage = lazyPage(
+  () => import("@/features/applications/applications-page"),
+  "ApplicationsPage"
+)
+const JobPage = lazyPage(() => import("@/features/jobs/job-page"), "JobPage")
+const StudioPage = lazyPage(
+  () => import("@/features/studio/studio-page"),
+  "StudioPage"
+)
+const AutopilotPage = lazyPage(
+  () => import("@/features/autopilot/autopilot-page"),
+  "AutopilotPage"
+)
+const KitLayout = lazyPage(
+  () => import("@/features/kit/kit-pages"),
+  "KitLayout"
+)
+const KitSection = lazyPage(
+  () => import("@/features/kit/kit-pages"),
+  "KitSection"
+)
+const CampaignsPage = lazyPage(
+  () => import("@/features/campaigns/campaigns-page"),
+  "CampaignsPage"
+)
+const CampaignEditorPage = lazyPage(
+  () => import("@/features/campaigns/campaign-editor-page"),
+  "CampaignEditorPage"
+)
+const SourcesPage = lazyPage(
+  () => import("@/features/sources/sources-page"),
+  "SourcesPage"
+)
+const RunsPage = lazyPage(
+  () => import("@/features/sources/runs/runs-page"),
+  "RunsPage"
+)
+const RunDetailPage = lazyPage(
+  () => import("@/features/sources/runs/run-detail-page"),
+  "RunDetailPage"
+)
+const InsightsPage = lazyPage(
+  () => import("@/features/insights/insights-page"),
+  "InsightsPage"
+)
+const SettingsLayout = lazyPage(
+  () => import("@/features/settings/settings-pages"),
+  "SettingsLayout"
+)
+const SettingsSection = lazyPage(
+  () => import("@/features/settings/settings-pages"),
+  "SettingsSection"
+)
+const AppearancePage = lazyPage(
+  () => import("@/features/settings/appearance-page"),
+  "AppearancePage"
+)
+const AiSettingsPage = lazyPage(
+  () => import("@/features/settings/ai/ai-page"),
+  "AiSettingsPage"
+)
+const SettingsGroupPage = lazyPage(
+  () => import("@/features/settings/settings-group-page"),
+  "SettingsGroupPage"
+)
+const ActivityPage = lazyPage(
+  () => import("@/features/settings/activity-page"),
+  "ActivityPage"
+)
+const HistoryPage = lazyPage(
+  () => import("@/features/settings/history-page"),
+  "HistoryPage"
+)
+const SecurityPage = lazyPage(
+  () => import("@/features/settings/security-page"),
+  "SecurityPage"
+)
 
 declare module "@tanstack/react-router" {
   interface StaticDataRouteOption {
@@ -133,13 +207,13 @@ const indexRoute = createRoute({
 const page = <P extends string>(
   path: P,
   title: string,
-  component: () => React.ReactNode
+  Component: ComponentType
 ) =>
   createRoute({
     getParentRoute: () => shellRoute,
     path,
     staticData: { title },
-    component,
+    component: () => <Component />,
   })
 
 const todayRoute = page("/today", "Today", TodayPage)
@@ -275,8 +349,13 @@ const groupRoutes = [
 ] as const
 const ownRoute = (
   path: "security" | "activity" | "history",
-  C: () => React.ReactNode
-) => createRoute({ getParentRoute: () => settingsRoute, path, component: C })
+  C: ComponentType
+) =>
+  createRoute({
+    getParentRoute: () => settingsRoute,
+    path,
+    component: () => <C />,
+  })
 const ownRoutes = [
   ownRoute("security", SecurityPage),
   ownRoute("activity", ActivityPage),

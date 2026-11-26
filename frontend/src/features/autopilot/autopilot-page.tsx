@@ -7,6 +7,8 @@ import {
   ShieldQuestion,
   SlidersHorizontal,
 } from "lucide-react"
+import { Link } from "@tanstack/react-router"
+import { Button } from "@/components/ui/button"
 import { ScreenEmpty } from "@/components/empty-state"
 import { View } from "@/components/view"
 import { useAutopilot } from "@/app/shell/autopilot-switch"
@@ -16,6 +18,14 @@ export function AutopilotPage() {
   const { state } = useAutopilot()
   return (
     <View>
+      <div className="mb-3 flex justify-end">
+        <Button asChild variant="outline" size="sm">
+          <Link to="/autopilot/runs">
+            <History aria-hidden="true" />
+            Run history
+          </Link>
+        </Button>
+      </div>
       <ScreenEmpty
         icon={Gauge}
         title="Autopilot"

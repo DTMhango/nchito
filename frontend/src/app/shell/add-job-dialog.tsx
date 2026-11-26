@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useMutation } from "@tanstack/react-query"
 import { Link2, TextQuote } from "lucide-react"
+import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
 import {
   Dialog,
@@ -60,6 +61,7 @@ export function AddJobDialog({
   open: boolean
   onOpenChange: (o: boolean) => void
 }) {
+  const navigate = useNavigate()
   const [mode, setMode] = useState<Mode>("link")
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -71,17 +73,23 @@ export function AddJobDialog({
       captureJob(
         v.mode === "link" ? { url: v.url.trim() } : { text: v.text.trim() }
       ),
-    onSuccess: () => {
-      toast.success(
-        "Reading the posting. It will appear under Matches in about a minute."
-      )
+    onSuccess: (r) => {
+      // The capture endpoint queues the posting (normalise, dedupe, score) and returns its id.
+      toast.success("Queued: reading the posting", {
+        description: "It is scored and filed under Matches in about a minute.",
+        action: {
+          label: "Open",
+          onClick: () =>
+            void navigate({ to: "/jobs/$id", params: { id: r.id } }),
+        },
+      })
       form.reset({ mode, url: "", text: "" })
       onOpenChange(false)
     },
     onError: (e) => {
       if (isApiError(e, 404))
         toast.error(
-          "Adding jobs by hand isn't switched on in this backend yet."
+          "Adding jobs by hand isn't available on this server."
         )
       else
         toast.error(
