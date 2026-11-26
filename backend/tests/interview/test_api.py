@@ -117,3 +117,39 @@ async def test_unknown_section_is_refused(owner_client, queued, fake_llm):
     w = await seeded()
     r = await owner_client.post(f"/api/jobs/{w.job.id}/interview-pack", json={"sections": ["company_news"]})
     assert r.status_code == 422 and r.json()["detail"]["code"] == "unknown_section" and queued == []
+
+
+async def test_practice_endpoint_and_retry_after_a_budget_pause(owner_client, app):
+    """``POST .../practice`` stores a budget refusal as ``paused``; ``POST /api/interview-practice/{id}/retry``
+    asks again on the same row (it used to return before retrying), and a done answer is not asked twice."""
+    from app.llm.client import BudgetExhausted
+
+    w = await seeded()
+    base = f"/api/jobs/{w.job.id}/interview-pack"
+    refusal = BudgetExhausted("monthly", needed_micros=5, available_micros=0, currency="USD")
+    app.dependency_overrides[llm_service] = lambda: fake(PracticeFeedback=refusal)
+    try:
+        r = await owner_client.post(f"{base}/practice", json={"question": "Why this role?",
+                                                              "draft_answer": "I like reporting.",
+                                                              "category": "motivation"})
+        assert r.status_code == 201 and r.json()["status"] == "paused" and r.json()["feedback"] is None
+        paused_id = r.json()["id"]
+        still = await owner_client.post(f"/api/interview-practice/{paused_id}/retry")
+        assert still.status_code == 200 and still.json()["status"] == "paused"  # the budget still refuses
+
+        working = fake()
+        app.dependency_overrides[llm_service] = lambda: working
+        retried = await owner_client.post(f"/api/interview-practice/{paused_id}/retry")
+        assert retried.status_code == 200, retried.text
+        out = retried.json()
+        assert out["id"] == paused_id and out["status"] == "done" and out["feedback"]["feedback"]
+        assert out["question"] == "Why this role?" and out["draft_answer"] == "I like reporting."
+        assert len(working.calls) == 1
+
+        again = await owner_client.post(f"/api/interview-practice/{paused_id}/retry")
+        assert again.status_code == 200 and again.json()["status"] == "done" and len(working.calls) == 1
+        listed = (await owner_client.get(f"{base}/practice")).json()
+        assert [p["id"] for p in listed] == [paused_id]  # retried in place, not a second row
+        assert (await owner_client.post(f"/api/interview-practice/{uuid.uuid4()}/retry")).status_code == 404
+    finally:
+        app.dependency_overrides.pop(llm_service, None)
