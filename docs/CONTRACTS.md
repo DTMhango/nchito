@@ -718,3 +718,8 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   `answers_waiting`, `no_destination`, `no_identity`, `unknown_template`, `illegal_stage`, or a packet code); the
   reason is audited `packet.not_built` with the code. The Studio's "Send for approval" calls this, not
   `POST .../packet`.
+- **Templates** `GET /api/document-templates?application_id=` -> `DocumentTemplatesOut {templates: [{key, kind: cv |
+  letter, name, builtin, overridden, section_order, limits}], defaults: {cv, letter: {key, source: track | setting}}}`:
+  built-ins in shipped order, then the owner's Kit templates (a Kit row with a built-in key overrides it), limits
+  as a render applies them (the template's, else `documents.*`). The Studio picker reads this; the frontend keeps no
+  list of its own.

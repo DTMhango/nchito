@@ -18,6 +18,7 @@ from app.docs.layouts import DocKind, Fmt
 from app.docs.model import RenderWarning
 from app.models.applications import Application
 from app.models.documents import ApplicationDocument
+from app.schemas.json_types import TemplateLimits
 
 router = APIRouter()
 
@@ -46,6 +47,27 @@ class RenderIn(ApiModel):
 class RenderOut(ApiModel):
     documents: list[DocumentOut]
     warnings: list[RenderWarning] = Field(description="Page limit, overflow and omission notices for the Studio")
+
+
+class TemplateOptionOut(ApiModel):
+    key: str
+    kind: Literal["cv", "letter"]
+    name: str
+    builtin: bool = Field(description="Ships with the app (classic, compact, modern, letter-plain)")
+    overridden: bool = Field(description="A Kit template row with this built-in key changes it")
+    section_order: list[str]
+    limits: TemplateLimits = Field(description="Effective limits: the template's own, else the documents settings")
+
+
+class TemplateDefaultOut(ApiModel):
+    key: str
+    source: Literal["track", "setting"] = Field(description="track: the role's track picks it; setting: "
+                                                            "documents.cv_template / documents.letter_template")
+
+
+class DocumentTemplatesOut(ApiModel):
+    templates: list[TemplateOptionOut]
+    defaults: dict[Literal["cv", "letter"], TemplateDefaultOut]
 
 
 async def _load(session: SessionDep, application_id: uuid.UUID) -> Application:
@@ -77,6 +99,21 @@ async def render_documents(application_id: uuid.UUID, body: RenderIn, principal:
     except service.DocumentFileMissing as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return RenderOut(documents=[DocumentOut.model_validate(r.document) for r in results], warnings=warnings)
+
+
+@router.get("/document-templates", response_model=DocumentTemplatesOut, name="document_templates_list")
+async def document_templates(session: SessionDep, application_id: uuid.UUID | None = None) -> DocumentTemplatesOut:
+    """The cv and letter templates a render can use (built-ins, then the owner's Kit templates; a Kit row with a
+    built-in key overrides it), with effective limits, and the default per kind (for ``application_id``, the
+    track's choice wins over the documents setting)."""
+    app = await _load(session, application_id) if application_id else None
+    return DocumentTemplatesOut(
+        templates=[TemplateOptionOut(key=c.template.key, kind=c.template.kind, name=c.template.name,
+                                     builtin=c.template.builtin, overridden=c.overridden,
+                                     section_order=list(c.template.section_order), limits=c.template.limits)
+                   for c in await service.list_templates(session)],
+        defaults={k: TemplateDefaultOut(key=d.key, source=d.source)  # type: ignore[arg-type]
+                  for k, d in (await service.default_templates(session, app)).items()})
 
 
 def _file_response(data: bytes, doc: ApplicationDocument, filename: str) -> Response:

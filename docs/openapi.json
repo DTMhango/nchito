@@ -10452,6 +10452,67 @@
         }
       }
     },
+    "/api/document-templates": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Document Templates List",
+        "description": "The cv and letter templates a render can use (built-ins, then the owner's Kit templates; a Kit row with a\nbuilt-in key overrides it), with effective limits, and the default per kind (for ``application_id``, the\ntrack's choice wins over the documents setting).",
+        "operationId": "document_templates_list",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentTemplatesOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/{application_id}/documents/{kind}": {
       "get": {
         "tags": [
@@ -19895,6 +19956,36 @@
           "warnings"
         ],
         "title": "DocumentOut"
+      },
+      "DocumentTemplatesOut": {
+        "properties": {
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateOptionOut"
+            },
+            "type": "array",
+            "title": "Templates"
+          },
+          "defaults": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TemplateDefaultOut"
+            },
+            "propertyNames": {
+              "enum": [
+                "cv",
+                "letter"
+              ]
+            },
+            "type": "object",
+            "title": "Defaults"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templates",
+          "defaults"
+        ],
+        "title": "DocumentTemplatesOut"
       },
       "DraftAnswer": {
         "properties": {
@@ -30631,6 +30722,29 @@
         ],
         "title": "TailorOut"
       },
+      "TemplateDefaultOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "track",
+              "setting"
+            ],
+            "title": "Source",
+            "description": "track: the role's track picks it; setting: documents.cv_template / documents.letter_template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "source"
+        ],
+        "title": "TemplateDefaultOut"
+      },
       "TemplateIn": {
         "properties": {
           "key": {
@@ -30734,6 +30848,58 @@
         "additionalProperties": false,
         "type": "object",
         "title": "TemplateLimits"
+      },
+      "TemplateOptionOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cv",
+              "letter"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin",
+            "description": "Ships with the app (classic, compact, modern, letter-plain)"
+          },
+          "overridden": {
+            "type": "boolean",
+            "title": "Overridden",
+            "description": "A Kit template row with this built-in key changes it"
+          },
+          "section_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Section Order"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/TemplateLimits",
+            "description": "Effective limits: the template's own, else the documents settings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "name",
+          "builtin",
+          "overridden",
+          "section_order",
+          "limits"
+        ],
+        "title": "TemplateOptionOut"
       },
       "TemplateOut": {
         "properties": {

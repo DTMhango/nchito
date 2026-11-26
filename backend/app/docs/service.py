@@ -26,7 +26,7 @@ from app.docs.emit_docx import to_docx
 from app.docs.emit_html import to_html
 from app.docs.emit_pdf import needs_fallback_font, to_pdf
 from app.docs.emit_text import to_text
-from app.docs.layouts import DocKind, Fmt, TemplateDef, resolve_template
+from app.docs.layouts import DocKind, Fmt, TemplateDef, builtin_keys, resolve_template
 from app.docs.model import (
     DocModel,
     ExperienceView,
@@ -111,6 +111,45 @@ async def _template(session: AsyncSession, kind: DocKind, key: str, values: dict
         "paragraphs": resolved.limits.paragraphs or (values["documents.letter_paragraphs"] if kind == "letter"
                                                       else None)})
     return resolved.model_copy(update={"limits": limits})
+
+
+@dataclass
+class TemplateChoice:
+    template: TemplateDef
+    overridden: bool  # a Kit row with a built-in key changes it
+
+
+@dataclass
+class TemplateDefault:
+    key: str
+    source: str  # track | setting
+
+
+async def list_templates(session: AsyncSession) -> list[TemplateChoice]:
+    """Every cv and letter template: built-ins in shipped order, then the owner's own, each merged with its
+    Kit row and with the documents.* limits filled in, exactly as a render would see it."""
+    values = await settings_service.values(session)
+    rows = {r.key: r for r in (await session.scalars(select(Template).order_by(Template.name))).all()}
+    out: list[TemplateChoice] = []
+    for kind in ("cv", "letter"):
+        keys = builtin_keys(kind) + [k for k, r in rows.items() if r.kind.value == kind and k not in builtin_keys()]
+        for key in keys:
+            if resolve_template(key, kind, rows.get(key)) is None:  # type: ignore[arg-type]
+                continue
+            out.append(TemplateChoice(await _template(session, kind, key, values),  # type: ignore[arg-type]
+                                      overridden=key in rows and key in builtin_keys()))
+    return out
+
+
+async def default_templates(session: AsyncSession, app: Application | None) -> dict[str, TemplateDefault]:
+    """The template each kind renders with when none is picked: the track's, else the documents setting."""
+    values = await settings_service.values(session)
+    out = {}
+    for kind in ("cv", "letter"):
+        track = await _track_template_key(session, app, kind) if app is not None else None
+        out[kind] = TemplateDefault(track, "track") if track else TemplateDefault(
+            _default_template_key(kind, values), "setting")
+    return out
 
 
 async def _person(session: AsyncSession) -> PersonView:
