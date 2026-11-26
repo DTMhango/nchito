@@ -161,3 +161,14 @@ def test_imminent_deadline_overrides_snooze_at_the_configured_distance() -> None
     assert stages.is_snoozed(until, now, deadlines=[far], imminent_days=3)
     assert not stages.is_snoozed(until, now, deadlines=[far], imminent_days=7)
     assert stages.is_snoozed(until, now, deadlines=[None], imminent_days=7)
+
+
+async def test_events_keep_order_when_the_clock_does_not_tick(session, monkeypatch) -> None:
+    frozen = datetime(2026, 11, 26, 9, 0, tzinfo=UTC)
+    monkeypatch.setattr(stages, "utcnow", lambda: frozen)
+    app = await make_app(session, await make_job(session))
+    for i in range(6):
+        await stages.add_event(session, app.id, "edit", "owner", {"n": i})
+    events = list(await session.scalars(select(ApplicationEvent).where(ApplicationEvent.application_id == app.id)
+                                        .order_by(ApplicationEvent.created_at, ApplicationEvent.id)))
+    assert [e.detail["n"] for e in events] == list(range(6))
