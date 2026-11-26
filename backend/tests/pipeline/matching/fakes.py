@@ -1,7 +1,8 @@
 """Test doubles and database builders for the matching tests.
 
-``FakeLLMClient`` is a local stand-in with the same name as the LLM stream's ``app/llm/fake.py``;
-swap to that one at merge.
+``FakeLLMClient`` is a thin adapter over ``app.llm.fake.FakeLLMClient``: replies come from a
+responder ``(stage, messages, model) -> dict``, and ``budget_calls`` makes calls after the first N
+hit the budget.
 """
 
 from __future__ import annotations
@@ -12,10 +13,10 @@ from collections.abc import Callable, Sequence
 from datetime import date, datetime
 from typing import Any
 
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.llm.client import BudgetExceeded, DataBlock, Message, Stage, TextPart, Usage
+from app.llm import fake
+from app.llm.client import BudgetExhausted, DataBlock, Message, Stage, TextPart
 from app.models.kit import Fact, FactKind, FactStatus
 from app.models.search import (
     Availability,
@@ -31,32 +32,24 @@ from tests.pipeline.matching.helpers import NOW
 Responder = Callable[[Stage, Sequence[Message], str | None], dict[str, Any]]
 
 
-class FakeLLMClient:
-    """Answers from a responder function; records every call; raises ``BudgetExceeded`` on cue."""
-
+class FakeLLMClient(fake.FakeLLMClient):
     def __init__(self, responder: Responder, *, cost: int = 7, budget_calls: int | None = None) -> None:
+        super().__init__(cost_minor=cost, estimate_minor=cost, default=self._reply)
         self.responder = responder
-        self.cost = cost
         self.budget_calls = budget_calls
-        self.calls: list[tuple[Stage, Sequence[Message], str | None]] = []
 
-    async def complete(self, stage, messages, schema: type[BaseModel], *, max_cost_minor: int, model=None):
-        if self.budget_calls is not None and len(self.calls) >= self.budget_calls:
-            raise BudgetExceeded("monthly cap reached")
-        assert max_cost_minor >= self.cost
-        self.calls.append((stage, messages, model))
-        result = schema.model_validate(self.responder(stage, messages, model))
-        return result, Usage("fake", model or "fake-model", 100, 50, self.cost, "USD", True)
-
-    async def estimate_cost_minor(self, stage, messages, *, model=None) -> int:
-        return self.cost
+    def _reply(self, call: fake.FakeCall) -> Any:
+        if self.budget_calls is not None and len(self.calls) > self.budget_calls:
+            self.calls.pop()  # a refused call never reached the model
+            return BudgetExhausted("monthly", needed_minor=self.cost_minor, available_minor=0, currency=self.currency)
+        return self.responder(call.stage, call.messages, call.model)  # type: ignore[arg-type]
 
     def text_sent(self, index: int = -1) -> str:
         return "\n".join(p.text if isinstance(p, TextPart) else f"<<{p.label}>>{p.content}"
-                         for m in self.calls[index][1] for p in m.parts)
+                         for m in self.calls[index].messages for p in m.parts)
 
     def data_blocks(self, index: int = -1) -> list[DataBlock]:
-        return [p for m in self.calls[index][1] for p in m.parts if isinstance(p, DataBlock)]
+        return [p for m in self.calls[index].messages for p in m.parts if isinstance(p, DataBlock)]
 
 
 def ratings(values: dict[str, int], evidence: dict[str, list[str]] | None = None, gaps: list[str] | None = None

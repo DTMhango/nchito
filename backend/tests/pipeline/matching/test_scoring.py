@@ -85,7 +85,7 @@ async def test_posting_text_only_travels_as_untrusted_data(session):
     await scoring.score_jobs(session, None, [job.id], client=client, now=NOW)
     blocks = client.data_blocks(0)
     assert len(blocks) == 1 and injection in blocks[0].content and blocks[0].label == "job posting"
-    texts = [p.text for m in client.calls[0][1] for p in m.parts if not hasattr(p, "label")]
+    texts = [p.text for m in client.calls[0].messages for p in m.parts if not hasattr(p, "label")]
     assert all(injection not in t for t in texts)
 
 
@@ -96,7 +96,7 @@ async def test_escalates_near_a_threshold(session):
     client = FakeLLMClient(ratings({"skills": 3, "domain": 3}))  # 60 = shortlist threshold
     summary = await scoring.score_jobs(session, None, [job.id], client=client, now=NOW)
     a = await _assessment(session, job, campaign)
-    assert [c[2] for c in client.calls] == ["claude-haiku-5-5", "claude-sonnet-5-5"]
+    assert [c.model for c in client.calls] == ["claude-haiku-5-5", "claude-sonnet-5-5"]
     assert a.model == "claude-sonnet-5-5" and a.cost_minor == 14 and summary.escalated == 1
 
 

@@ -1,48 +1,36 @@
 """Test doubles for the intake pipeline.
 
-SHIM: ``FakeLLMClient`` here is a local stand-in. Another stream writes ``app/llm/fake.py`` with
-the real ``FakeLLMClient``; the coordinator swaps the import at merge.
+``FakeLLMClient`` is a thin adapter over ``app.llm.fake.FakeLLMClient``: the reply is a dict or
+a callable taking the posting text, and ``raise_budget`` makes every call hit the budget.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel
-
-from app.llm.client import BudgetExceeded, DataBlock, Message, Stage, Usage
+from app.llm import fake
+from app.llm.client import BudgetExhausted, DataBlock
 from app.models.search import Campaign, CampaignStatus, Source, SourceAccess
 from app.schemas.json_types import CampaignCriteria
 from app.sources.base import Availability, RawJob, SearchContext
 
 
-class FakeLLMClient:
-    """Returns canned structured output; records every call. ``respond`` may be a dict or a callable
-    taking the posting text."""
-
+class FakeLLMClient(fake.FakeLLMClient):
     def __init__(self, respond: dict[str, Any] | Callable[[str], dict[str, Any]] | None = None,
                  cost_minor: int = 3) -> None:
+        super().__init__(cost_minor=cost_minor, estimate_minor=10, default=self._reply)
         self.respond = respond or {}
-        self.cost_minor = cost_minor
-        self.calls: list[tuple[Stage, Sequence[Message]]] = []
         self.raise_budget = False
 
-    async def estimate_cost_minor(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None) -> int:
-        return 10
-
-    async def complete(self, stage: Stage, messages: Sequence[Message], schema: type[BaseModel], *,
-                       max_cost_minor: int, model: str | None = None) -> tuple[Any, Usage]:
-        self.calls.append((stage, messages))
+    def _reply(self, call: fake.FakeCall) -> Any:
         if self.raise_budget:
-            raise BudgetExceeded("cap reached")
-        text = "\n".join(p.content for m in messages for p in m.parts if isinstance(p, DataBlock))
-        data = self.respond(text) if callable(self.respond) else self.respond
-        usage = Usage(provider="fake", model="fake-model", input_tokens=10, output_tokens=5,
-                      cost_minor=self.cost_minor, currency="USD", billed=True)
-        return schema.model_validate(data), usage
+            return BudgetExhausted("monthly", needed_minor=self.estimate_minor, available_minor=0,
+                                   currency=self.currency)
+        text = "\n".join(p.content for m in call.messages for p in m.parts if isinstance(p, DataBlock))
+        return self.respond(text) if callable(self.respond) else self.respond
 
 
 class ScriptedConnector:

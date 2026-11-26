@@ -32,7 +32,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.clock import utcnow
 from app.core.conditions import evaluate
 from app.core.settings import service as settings_service
-from app.llm.client import BudgetExceeded, DataBlock, LLMClient, Message, TextPart
+from app.llm.client import BudgetExceeded, LLMClient, Message, TextPart
+from app.llm.untrusted import data_block
 from app.models.kit import Fact, FactStatus, Prompt
 from app.models.search import (
     Assessment,
@@ -50,14 +51,6 @@ from app.pipeline import runs as run_registry
 from app.pipeline.decisions import Decision, DecisionInput, decide
 from app.pipeline.filters import campaign_record, filter_results, hard_failed, load_records
 from app.schemas.json_types import CriterionRating, RubricBody
-
-try:  # The LLM stream provides the real wrapper; this shim keeps the same name and meaning.
-    from app.llm.untrusted import wrap_untrusted  # type: ignore[import-not-found]
-except ImportError:  # pragma: no cover - replaced at merge
-    def wrap_untrusted(text: str, label: str) -> DataBlock:
-        """Untrusted content travels only as a labelled ``DataBlock`` (never as instructions)."""
-        return DataBlock(label=label, content=text)
-
 
 # A rating without verified evidence cannot exceed this. An invariant of the rubric method (7).
 EVIDENCE_CAP = 3
@@ -189,7 +182,7 @@ def build_messages(prompt: str, body: RubricBody, kit: KitSnapshot, job: Job) ->
         Message(role="system", parts=[TextPart(prompt)]),
         Message(role="user", parts=[TextPart(f"Rubric criteria:\n{criteria}"),
                                     TextPart(f"The person's facts:\n{facts}"),
-                                    wrap_untrusted(posting, "job posting")]),
+                                    data_block(posting, "job posting")]),
     ]
 
 

@@ -6,7 +6,7 @@ date, deadline state, apply URL, apply method and ATS type, requisition id, cont
 ``extract`` makes the single model call (stage ``extract``) that fills the rest and every
 facet of section 6.1, each with its supporting quote. Rules:
 
-- Job text reaches the model only inside an untrusted-content block (``wrap_untrusted``).
+- Job text reaches the model only inside an untrusted-content block (``app.llm.untrusted.data_block``).
 - Unknown stays unknown: a yes/no or choice facet without a quote that really appears in the
   posting becomes ``not_stated``; nothing is guessed.
 - Skills are canonicalised through the ``SkillAlias`` table.
@@ -30,7 +30,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import conditions
 from app.core.settings import service as settings_service
-from app.llm.client import BudgetExceeded, DataBlock, LLMClient, Message, TextPart, Usage
+from app.llm.client import BudgetExceeded, LLMClient, Message, TextPart, Usage
+from app.llm.untrusted import data_block
 from app.models.search import (
     Availability,
     DeadlineState,
@@ -56,23 +57,6 @@ from app.sources.page import UNKNOWN_EMPLOYER
 PROMPT_VERSION = "extract-v1"
 EXTRACT_MAX_CHARS = 24_000  # technical bound on what one posting may cost; not a business value
 PENDING_TAG = "extraction_pending"
-
-# --- SHIM -------------------------------------------------------------------------------------
-# ``app.llm.untrusted.wrap_untrusted`` is written by the LLM stream. Until that branch merges this
-# local stand-in returns the same kind of object (a labelled ``DataBlock``); adapters delimit it
-# and never treat it as instructions. The coordinator removes the fallback at merge.
-try:  # pragma: no cover - exercised only after merge
-    from app.llm.untrusted import wrap_untrusted as _wrap_untrusted
-except ImportError:  # pragma: no cover
-    _wrap_untrusted = None
-
-
-def wrap_untrusted(text: str, label: str) -> DataBlock:
-    if _wrap_untrusted is not None:  # pragma: no cover
-        wrapped = _wrap_untrusted(text, label)
-        return wrapped if isinstance(wrapped, DataBlock) else DataBlock(label=label, content=str(wrapped))
-    return DataBlock(label=label, content=text)
-
 
 # --- deterministic parsing --------------------------------------------------------------------
 
@@ -404,7 +388,7 @@ def build_messages(norm: NormalisedJob) -> list[Message]:
     return [
         Message("system", [TextPart(INSTRUCTIONS)]),
         Message("user", [TextPart("Extract the facts from this posting. " + labels),
-                         wrap_untrusted(text, "job_posting")]),
+                         data_block(text, "job_posting")]),
     ]
 
 
