@@ -1001,3 +1001,49 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
   The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
   skill asks for it.
+
+## Wave 4 themes additions
+
+Theme studio (DESIGN 10.4). Code: `backend/app/themes/` (`tokens.py`, `colour.py`, `service.py`), router
+`app/api/routers/themes.py`; screen `frontend/src/features/theme-studio/`.
+
+- **Token spec.** `frontend/src/themes/token-spec.json` (copied verbatim to `backend/app/themes/token_spec.json`,
+  tested equal) gives every token its group, value type, label and contrast use, the bundled Fontsource families and
+  the WCAG levels. Required tokens are the `required` entries (same list as section 6).
+- **Strict values (replaces the "values may not contain" rule of section 6).** Per type: `colour` = `#rgb[a]`,
+  `#rrggbb[aa]`, `rgb()/rgba()`, `hsl()/hsla()`, `oklch()`, `transparent`, or `var(--t-<colour token>)` with no
+  fallback (must resolve in the mode map); `shadow` = `none` or 1-4 layers of `[inset] <2-4 lengths> <colour>`;
+  `weight` 100-900; `track` `<n>em` in range; `factor` number in range; `length` `<n>px` in range; `enum` listed
+  words. Unknown token names accept a colour or a plain length only. `chart` and `score` are literal colours; fonts
+  must be bundled families; `name`/`description` reject control characters. Values are at most 160 characters,
+  at most 80 tokens per mode. Anything else is 422.
+- **Contrast.** Pairs derive from the spec: a token with `use` is checked against each token in its `on` list
+  (`@ground` = `bg, bg-sunken, surface, surface-2`), composited over the page. Levels: `body` (AA 4.5, AAA 7,
+  **blocking**: `text`, `text-muted`), `text` (4.5/7, warning), `ui` and `graphic` (3, warning). Create, update and
+  import refuse a theme with a blocking pair: 422 `{"detail": {"code": "theme_low_contrast", "reason", "pairs":
+  [{mode, fg, bg, ratio}]}}` unless `accept_low_contrast` is true (body field on `ThemeIn`, query param on import);
+  the acceptance is stored as `ThemeOut.contrast_waiver {pairs, accepted_at, accepted_by}` and audited
+  (`theme.contrast_accepted`). Kit import does not check (restoring the owner's own data).
+  `POST /api/themes/contrast` (`ThemeBody`) -> `ContrastPairOut[] {mode, fg, bg, use, ratio, aa, aaa, blocking}`.
+- **`ThemeOut` gains** `is_default`, `revision`, `can_undo`, `can_redo`, `contrast_waiver`. `ThemeIn` rejects them
+  (extra fields forbidden): send the `ThemeBody` fields.
+- **Revisions.** Every create/update/duplicate/import of an owner theme records a `theme_revision` (`number`,
+  `parent` = the revision it was edited from, `body`, `note`, `actor`); `theme.current_revision` points at the live
+  one. `GET /api/themes/{id}/revisions` -> `ThemeRevisionOut[]` newest first; `POST /{id}/undo` (to the parent),
+  `POST /{id}/redo` (to the newest child), `POST /{id}/revisions/{n}/restore` -> `ThemeOut`; 409 when there is
+  nothing to move to, 403 for built-ins. History keeps `themes.revisions_kept` per theme.
+- **Duplicate.** `POST /api/themes/{id}/duplicate` (`{name?}`) -> 201 `ThemeOut`, any theme including built-ins;
+  default name `<name> copy`, then `(2)`, `(3)`.
+- **Default and delete.** `PUT /api/themes/{id}/default` sets `themes.default_theme_id` (the generic settings PUT
+  refuses that key with 409). **`DELETE` now returns 409 for the active theme (`appearance.theme_id`) and for the
+  default theme** (was: deleting the active theme reset it). The frontend falls back to the default theme when the
+  active one cannot be found.
+- **Files.** `GET /api/themes/{id}/export` -> `ThemeExport {format: "nchito-theme", version: 1, theme: ThemeBody}`
+  (`<name>.theme.json`). `POST /api/themes/import` (raw JSON body; `?accept_low_contrast=`) accepts a
+  `ThemeExport` or a bare theme object (`ThemeOut`-only keys ignored); larger than `themes.import_max_bytes` is 413;
+  invalid is 422 `{"code": "invalid_theme_file", "reason"}`; the imported name is made unique. Themes travel in the
+  share-setup kit as before (round trip tested).
+- **Settings** (group `themes`): `themes.default_theme_id` (copperbelt), `themes.import_max_bytes` (65536),
+  `themes.revisions_kept` (50), `themes.status_min_distance` (0.02, OKLab distance the studio requires between
+  status colours, also under protanopia/deuteranopia/tritanopia simulation; a warning, not a block).
+- **Migration** `0019_themes`: `theme.current_revision`, `theme.contrast_waiver`, table `theme_revision`.

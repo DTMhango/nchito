@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "fonts": {
+    "Bricolage Grotesque": "sans",
+    "Figtree": "sans",
+    "IBM Plex Sans": "sans",
+    "IBM Plex Mono": "mono",
+    "Fraunces": "serif",
+    "Nunito Sans": "sans",
+    "Newsreader": "serif",
+    "Inter": "sans",
+    "Space Grotesk": "sans",
+    "JetBrains Mono": "mono"
+  },
+  "groups": [
+    { "key": "surfaces", "label": "Surfaces" },
+    { "key": "text", "label": "Text" },
+    { "key": "accent", "label": "Accent" },
+    { "key": "status", "label": "Status" },
+    { "key": "borders", "label": "Borders" },
+    { "key": "shadows", "label": "Shadows" },
+    { "key": "typography", "label": "Typography" },
+    { "key": "density", "label": "Density" },
+    { "key": "chart", "label": "Chart and score" }
+  ],
+  "levels": {
+    "body": { "label": "Body text", "aa": 4.5, "aaa": 7, "blocking": true },
+    "text": { "label": "Text", "aa": 4.5, "aaa": 7, "blocking": false },
+    "ui": { "label": "Interface", "aa": 3, "aaa": null, "blocking": false },
+    "graphic": { "label": "Graphic", "aa": 3, "aaa": null, "blocking": false }
+  },
+  "tokens": {
+    "bg": { "group": "surfaces", "type": "colour", "label": "Page", "required": true, "ground": true },
+    "bg-sunken": { "group": "surfaces", "type": "colour", "label": "Sunken", "required": true, "ground": true },
+    "surface": { "group": "surfaces", "type": "colour", "label": "Surface", "required": true, "ground": true },
+    "surface-2": { "group": "surfaces", "type": "colour", "label": "Raised surface", "required": true, "ground": true },
+    "overlay": { "group": "surfaces", "type": "colour", "label": "Overlay", "required": true },
+
+    "text": { "group": "text", "type": "colour", "label": "Text", "required": true, "use": "body", "on": ["@ground"] },
+    "text-muted": { "group": "text", "type": "colour", "label": "Muted text", "required": true, "use": "body", "on": ["@ground"] },
+    "text-faint": { "group": "text", "type": "colour", "label": "Faint text", "required": true, "use": "text", "on": ["@ground"] },
+
+    "primary": { "group": "accent", "type": "colour", "label": "Primary", "required": true, "use": "ui", "on": ["@ground"] },
+    "primary-ink": { "group": "accent", "type": "colour", "label": "Primary as text", "required": true, "use": "text", "on": ["@ground", "primary-soft"] },
+    "primary-fg": { "group": "accent", "type": "colour", "label": "Text on primary", "required": true, "use": "text", "on": ["primary"] },
+    "primary-soft": { "group": "accent", "type": "colour", "label": "Primary tint", "required": true },
+    "accent": { "group": "accent", "type": "colour", "label": "Accent", "required": true, "use": "ui", "on": ["@ground"] },
+    "accent-ink": { "group": "accent", "type": "colour", "label": "Accent as text", "required": true, "use": "text", "on": ["@ground", "accent-soft"] },
+    "accent-soft": { "group": "accent", "type": "colour", "label": "Accent tint", "required": true },
+    "ring": { "group": "accent", "type": "colour", "label": "Focus ring", "required": true },
+
+    "good": { "group": "status", "type": "colour", "label": "Good", "required": true, "use": "text", "on": ["@ground", "good-soft"], "status": true },
+    "good-soft": { "group": "status", "type": "colour", "label": "Good tint", "required": true },
+    "warn": { "group": "status", "type": "colour", "label": "Warning", "required": true, "use": "text", "on": ["@ground", "warn-soft"], "status": true },
+    "warn-soft": { "group": "status", "type": "colour", "label": "Warning tint", "required": true },
+    "danger": { "group": "status", "type": "colour", "label": "Danger", "required": true, "use": "text", "on": ["@ground", "danger-soft"], "status": true },
+    "danger-soft": { "group": "status", "type": "colour", "label": "Danger tint", "required": true },
+    "info": { "group": "status", "type": "colour", "label": "Info", "required": true, "use": "text", "on": ["@ground", "info-soft"], "status": true },
+    "info-soft": { "group": "status", "type": "colour", "label": "Info tint", "required": true },
+
+    "border": { "group": "borders", "type": "colour", "label": "Hairline", "required": true },
+    "border-strong": { "group": "borders", "type": "colour", "label": "Strong border", "required": true },
+    "panel-border": { "group": "borders", "type": "colour", "label": "Panel border" },
+    "elev-top-color": { "group": "borders", "type": "colour", "label": "Raised top rule colour" },
+    "elev-top": { "group": "borders", "type": "length", "label": "Raised top rule", "min": 0, "max": 8 },
+
+    "shadow-sm": { "group": "shadows", "type": "shadow", "label": "Small shadow" },
+    "shadow": { "group": "shadows", "type": "shadow", "label": "Shadow" },
+    "shadow-pop": { "group": "shadows", "type": "shadow", "label": "Popover shadow" },
+
+    "display-weight": { "group": "typography", "type": "weight", "label": "Heading weight", "min": 100, "max": 900 },
+    "display-track": { "group": "typography", "type": "track", "label": "Heading tracking", "min": -0.1, "max": 0.2 },
+    "label-case": { "group": "typography", "type": "enum", "label": "Label case", "values": ["uppercase", "none"] },
+    "label-track": { "group": "typography", "type": "track", "label": "Label tracking", "min": -0.1, "max": 0.2 },
+    "data-font": { "group": "typography", "type": "enum", "label": "Figures font", "values": ["body", "mono"] },
+    "label-font": { "group": "typography", "type": "enum", "label": "Label font", "values": ["body", "mono"] },
+
+    "space-k": { "group": "density", "type": "factor", "label": "Row spacing", "min": 0.5, "max": 2 },
+
+    "chart-1": { "group": "chart", "type": "colour", "label": "Series 1", "use": "graphic", "on": ["surface"] },
+    "chart-2": { "group": "chart", "type": "colour", "label": "Series 2", "use": "graphic", "on": ["surface"] },
+    "chart-3": { "group": "chart", "type": "colour", "label": "Series 3", "use": "graphic", "on": ["surface"] },
+    "chart-4": { "group": "chart", "type": "colour", "label": "Series 4", "use": "graphic", "on": ["surface"] },
+    "chart-5": { "group": "chart", "type": "colour", "label": "Series 5", "use": "graphic", "on": ["surface"] },
+    "score-low": { "group": "chart", "type": "colour", "label": "Score low" },
+    "score-mid": { "group": "chart", "type": "colour", "label": "Score mid", "use": "graphic", "on": ["surface"] },
+    "score-high": { "group": "chart", "type": "colour", "label": "Score high", "use": "graphic", "on": ["surface"] }
+  },
+  "limits": { "tokens_per_mode": 80, "value_length": 160, "chart_colours": 12 }
+}

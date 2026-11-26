@@ -9,6 +9,10 @@
    "label": "Appearance"
   },
   {
+   "key": "themes",
+   "label": "Theme studio"
+  },
+  {
    "key": "schedule",
    "label": "Schedule"
   },
@@ -229,6 +233,58 @@
    "choices": null,
    "minimum": null,
    "maximum": null,
+   "unit": null
+  },
+  {
+   "key": "themes.default_theme_id",
+   "group": "themes",
+   "label": "Default theme",
+   "description": "The theme the app falls back to when the active one is unavailable. Set it from the theme studio.",
+   "kind": "string",
+   "default": "copperbelt",
+   "nullable": false,
+   "choices": null,
+   "minimum": null,
+   "maximum": null,
+   "unit": null
+  },
+  {
+   "key": "themes.import_max_bytes",
+   "group": "themes",
+   "label": "Theme file size limit",
+   "description": "Largest theme file accepted on import.",
+   "kind": "int",
+   "default": 65536,
+   "nullable": false,
+   "choices": null,
+   "minimum": 4096,
+   "maximum": 1048576,
+   "unit": "bytes"
+  },
+  {
+   "key": "themes.revisions_kept",
+   "group": "themes",
+   "label": "Theme revisions kept",
+   "description": "Saved states kept per theme for undo; older ones are pruned.",
+   "kind": "int",
+   "default": 50,
+   "nullable": false,
+   "choices": null,
+   "minimum": 5,
+   "maximum": 500,
+   "unit": null
+  },
+  {
+   "key": "themes.status_min_distance",
+   "group": "themes",
+   "label": "Status colour separation",
+   "description": "Smallest colour difference (OKLab) between good, warning, danger and info, also under colour-blind simulation (protanopia, deuteranopia, tritanopia), before the studio warns.",
+   "kind": "float",
+   "default": 0.02,
+   "nullable": false,
+   "choices": null,
+   "minimum": 0.005,
+   "maximum": 0.3,
    "unit": null
   },
   {

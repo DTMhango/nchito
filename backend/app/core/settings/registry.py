@@ -40,6 +40,7 @@ from app.core.settings.types import (
 GROUPS: dict[str, str] = {
     "general": "General",
     "appearance": "Appearance",
+    "themes": "Theme studio",
     "schedule": "Schedule",
     "scoring": "Scoring",
     "matching": "Matching",
@@ -196,6 +197,20 @@ _add("appearance.accent_override", "string", "Accent override",
      None, "cobalt", str | None, nullable=True, validators=(_accent_check,),
      invalid_example="not a colour!", has_invalid_example=True)
 _bool("appearance.reduced_motion", "Reduce motion", "Turn off non-essential animation.", False)
+
+# Theme studio (wave 4)
+_add("themes.default_theme_id", "string", "Default theme",
+     "The theme the app falls back to when the active one is unavailable. Set it from the theme studio.",
+     "copperbelt", "paper", str, validators=(_theme_id_check,), invalid_example="Not A Theme!",
+     has_invalid_example=True)
+_int("themes.import_max_bytes", "Theme file size limit", "Largest theme file accepted on import.",
+     65536, 32768, 4096, 1048576, unit="bytes")
+_int("themes.revisions_kept", "Theme revisions kept", "Saved states kept per theme for undo; older ones are pruned.",
+     50, 100, 5, 500)
+_add("themes.status_min_distance", "float", "Status colour separation",
+     "Smallest colour difference (OKLab) between good, warning, danger and info, also under colour-blind "
+     "simulation (protanopia, deuteranopia, tritanopia), before the studio warns.",
+     0.02, 0.05, float, minimum=0.005, maximum=0.3, invalid_example=1.0, has_invalid_example=True)
 
 # Schedule
 _cron("schedule.sweep_cron", "Sweep schedule", "Default schedule for new campaign sweeps (cron, owner's time zone).",

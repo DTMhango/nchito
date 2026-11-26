@@ -635,6 +635,95 @@
             }
           },
           "422": {
+            "description": "Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast"
+          }
+        }
+      }
+    },
+    "/api/themes/import": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Import Theme",
+        "operationId": "themes_import",
+        "parameters": [
+          {
+            "name": "accept_low_contrast",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Accept Low Contrast"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeOut"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Larger than themes.import_max_bytes"
+          },
+          "422": {
+            "description": "Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "A theme file: ThemeExport, or a bare theme object (ThemeBody; id and builtin are ignored). Size-limited by themes.import_max_bytes.",
+                "type": "object"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes/contrast": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Contrast Report",
+        "description": "Every text/surface pair the app uses (derived from the token spec), with its WCAG ratio and result.\nThe studio computes the same live; this is the server's view, which decides the save block.",
+        "operationId": "themes_contrast",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemeBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ContrastPairOut"
+                  },
+                  "type": "array",
+                  "title": "Response Themes Contrast"
+                }
+              }
+            }
+          },
+          "422": {
             "description": "Validation Error",
             "content": {
               "application/json": {
@@ -730,14 +819,7 @@
             "description": "Built-in themes are read-only"
           },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast"
           }
         }
       },
@@ -764,6 +846,344 @@
           },
           "403": {
             "description": "Built-in themes cannot be deleted"
+          },
+          "409": {
+            "description": "The active or the default theme cannot be deleted"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes/{theme_id}/duplicate": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Duplicate Theme",
+        "operationId": "themes_duplicate",
+        "parameters": [
+          {
+            "name": "theme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Theme Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ThemeDuplicateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes/{theme_id}/default": {
+      "put": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Set Default",
+        "operationId": "themes_set_default",
+        "parameters": [
+          {
+            "name": "theme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Theme Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes/{theme_id}/export": {
+      "get": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Export Theme",
+        "operationId": "themes_export",
+        "parameters": [
+          {
+            "name": "theme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Theme Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeExport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes/{theme_id}/revisions": {
+      "get": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "List Revisions",
+        "operationId": "themes_revisions",
+        "parameters": [
+          {
+            "name": "theme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Theme Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ThemeRevisionOut"
+                  },
+                  "title": "Response Themes Revisions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes/{theme_id}/undo": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Undo",
+        "operationId": "themes_undo",
+        "parameters": [
+          {
+            "name": "theme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Theme Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Built-in themes have no revisions"
+          },
+          "409": {
+            "description": "Nothing to move to"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes/{theme_id}/redo": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Redo",
+        "operationId": "themes_redo",
+        "parameters": [
+          {
+            "name": "theme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Theme Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Built-in themes have no revisions"
+          },
+          "409": {
+            "description": "Nothing to move to"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/themes/{theme_id}/revisions/{number}/restore": {
+      "post": {
+        "tags": [
+          "themes"
+        ],
+        "summary": "Restore",
+        "operationId": "themes_restore",
+        "parameters": [
+          {
+            "name": "theme_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Theme Id"
+            }
+          },
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ThemeOut"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Built-in themes have no revisions"
+          },
+          "409": {
+            "description": "Nothing to move to"
           },
           "422": {
             "description": "Validation Error",
@@ -20802,6 +21222,132 @@
         ],
         "title": "ContactOut"
       },
+      "ContrastPairOut": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "title": "Mode"
+          },
+          "fg": {
+            "type": "string",
+            "title": "Fg"
+          },
+          "bg": {
+            "type": "string",
+            "title": "Bg"
+          },
+          "use": {
+            "type": "string",
+            "enum": [
+              "body",
+              "text",
+              "ui",
+              "graphic"
+            ],
+            "title": "Use"
+          },
+          "ratio": {
+            "type": "number",
+            "title": "Ratio"
+          },
+          "aa": {
+            "type": "boolean",
+            "title": "Aa"
+          },
+          "aaa": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Aaa"
+          },
+          "blocking": {
+            "type": "boolean",
+            "title": "Blocking"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode",
+          "fg",
+          "bg",
+          "use",
+          "ratio",
+          "aa",
+          "aaa",
+          "blocking"
+        ],
+        "title": "ContrastPairOut"
+      },
+      "ContrastWaiver": {
+        "properties": {
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/ContrastWaiverPair"
+            },
+            "type": "array",
+            "title": "Pairs"
+          },
+          "accepted_at": {
+            "type": "string",
+            "title": "Accepted At"
+          },
+          "accepted_by": {
+            "type": "string",
+            "title": "Accepted By"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pairs",
+          "accepted_at",
+          "accepted_by"
+        ],
+        "title": "ContrastWaiver",
+        "description": "The owner accepted body text below WCAG AA on a personal theme (recorded, also in the audit)."
+      },
+      "ContrastWaiverPair": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "light",
+              "dark"
+            ],
+            "title": "Mode"
+          },
+          "fg": {
+            "type": "string",
+            "title": "Fg"
+          },
+          "bg": {
+            "type": "string",
+            "title": "Bg"
+          },
+          "ratio": {
+            "type": "number",
+            "title": "Ratio"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mode",
+          "fg",
+          "bg",
+          "ratio"
+        ],
+        "title": "ContrastWaiverPair"
+      },
       "CriterionRating": {
         "properties": {
           "criterion": {
@@ -34228,6 +34774,134 @@
         "title": "TextFilter",
         "description": "Case-insensitive substring search over the named fields (all words must appear)."
       },
+      "ThemeBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "fonts": {
+            "$ref": "#/components/schemas/ThemeFonts"
+          },
+          "radius": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 0.0,
+            "title": "Radius",
+            "description": "Base radius in px; small/large derive from it"
+          },
+          "density": {
+            "type": "string",
+            "enum": [
+              "comfortable",
+              "compact"
+            ],
+            "title": "Density"
+          },
+          "light": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Light"
+          },
+          "dark": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Dark"
+          },
+          "chart": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 1,
+            "title": "Chart",
+            "description": "Light-mode palette; fallback for chart-n"
+          },
+          "score": {
+            "$ref": "#/components/schemas/ScoreRamp",
+            "description": "Light-mode ramp; fallback for score-*"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "fonts",
+          "radius",
+          "density",
+          "light",
+          "dark",
+          "chart",
+          "score"
+        ],
+        "title": "ThemeBody"
+      },
+      "ThemeDuplicateIn": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Name of the copy; default '<name> copy'"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ThemeDuplicateIn"
+      },
+      "ThemeExport": {
+        "properties": {
+          "format": {
+            "type": "string",
+            "const": "nchito-theme",
+            "title": "Format",
+            "default": "nchito-theme"
+          },
+          "version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Version",
+            "default": 1
+          },
+          "theme": {
+            "$ref": "#/components/schemas/ThemeBody"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "theme"
+        ],
+        "title": "ThemeExport",
+        "description": "The theme file (``<name>.theme.json``). Import accepts this or a bare theme object."
+      },
       "ThemeFonts": {
         "properties": {
           "display": {
@@ -34351,6 +35025,12 @@
               }
             ],
             "title": "Id"
+          },
+          "accept_low_contrast": {
+            "type": "boolean",
+            "title": "Accept Low Contrast",
+            "description": "Save even though body text is below WCAG AA; recorded on the theme and audited",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -34442,6 +35122,44 @@
           "builtin": {
             "type": "boolean",
             "title": "Builtin"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "description": "The default theme (setting themes.default_theme_id)",
+            "default": false
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision",
+            "description": "Current revision number (owner themes)"
+          },
+          "can_undo": {
+            "type": "boolean",
+            "title": "Can Undo",
+            "default": false
+          },
+          "can_redo": {
+            "type": "boolean",
+            "title": "Can Redo",
+            "default": false
+          },
+          "contrast_waiver": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContrastWaiver"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -34459,6 +35177,56 @@
           "builtin"
         ],
         "title": "ThemeOut"
+      },
+      "ThemeRevisionOut": {
+        "properties": {
+          "number": {
+            "type": "integer",
+            "title": "Number"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current"
+          },
+          "body": {
+            "$ref": "#/components/schemas/ThemeBody"
+          }
+        },
+        "type": "object",
+        "required": [
+          "number",
+          "parent",
+          "note",
+          "actor",
+          "created_at",
+          "current",
+          "body"
+        ],
+        "title": "ThemeRevisionOut"
       },
       "TimelineEvent": {
         "properties": {

@@ -20,8 +20,21 @@ export type MockDb = {
   session: boolean
   appearance: Appearance
   customThemes: Theme[]
+  /** Theme studio: revisions per owner theme, the current one, and the default theme id. */
+  themeRevisions: Record<string, MockThemeRevision[]>
+  themeCurrent: Record<string, number>
+  defaultThemeId: string
   autopilot: AutopilotState
   captured: { id: string; url?: string | null; text?: string | null }[]
+}
+
+export type MockThemeRevision = {
+  number: number
+  parent: number | null
+  note: string
+  actor: string
+  created_at: string
+  body: Omit<Theme, "id" | "builtin">
 }
 
 export const DEMO_OWNER: OwnerCreate = {
@@ -41,6 +54,9 @@ function seed(
     session: kind === "signed-in",
     appearance: { ...DEFAULT_APPEARANCE },
     customThemes: [],
+    themeRevisions: {},
+    themeCurrent: {},
+    defaultThemeId: DEFAULT_APPEARANCE.theme_id,
     autopilot: {
       paused: false,
       paused_at: null,

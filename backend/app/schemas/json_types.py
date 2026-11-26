@@ -461,6 +461,24 @@ class ScoreRamp(Shape):
     high: str
 
 
+ThemeModeName = Literal["light", "dark"]
+
+
+class ContrastWaiverPair(Shape):
+    mode: ThemeModeName
+    fg: str
+    bg: str
+    ratio: float
+
+
+class ContrastWaiver(Shape):
+    """The owner accepted body text below WCAG AA on a personal theme (recorded, also in the audit)."""
+
+    pairs: list[ContrastWaiverPair]
+    accepted_at: str
+    accepted_by: str
+
+
 class AgentTaskState(Shape):
     """Checkpoint saved by a runner. Free-form fields go in ``data``."""
 

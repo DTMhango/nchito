@@ -139,6 +139,7 @@ async def get_setting(key: str, _: PrincipalDep, session: SessionDep) -> Setting
 # pause effects): an invariant, not a setting.
 OWN_ENDPOINT = {
     "automation.paused": "use PUT /api/autopilot (and POST /api/autopilot/resume-after-restore after a restore)",
+    "themes.default_theme_id": "use PUT /api/themes/{id}/default",
 }
 
 

@@ -308,6 +308,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/themes/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Theme */
+        post: operations["themes_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/contrast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Contrast Report
+         * @description Every text/surface pair the app uses (derived from the token spec), with its WCAG ratio and result.
+         *     The studio computes the same live; this is the server's view, which decides the save block.
+         */
+        post: operations["themes_contrast"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/themes/{theme_id}": {
         parameters: {
             query?: never;
@@ -322,6 +360,125 @@ export interface paths {
         post?: never;
         /** Delete Theme */
         delete: operations["themes_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Theme */
+        post: operations["themes_duplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Default */
+        put: operations["themes_set_default"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Theme */
+        get: operations["themes_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Revisions */
+        get: operations["themes_revisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo */
+        post: operations["themes_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Redo */
+        post: operations["themes_redo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/revisions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore */
+        post: operations["themes_restore"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -5707,6 +5864,57 @@ export interface components {
             /** Origin */
             origin: string;
         };
+        /** ContrastPairOut */
+        ContrastPairOut: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "light" | "dark";
+            /** Fg */
+            fg: string;
+            /** Bg */
+            bg: string;
+            /**
+             * Use
+             * @enum {string}
+             */
+            use: "body" | "text" | "ui" | "graphic";
+            /** Ratio */
+            ratio: number;
+            /** Aa */
+            aa: boolean;
+            /** Aaa */
+            aaa: boolean | null;
+            /** Blocking */
+            blocking: boolean;
+        };
+        /**
+         * ContrastWaiver
+         * @description The owner accepted body text below WCAG AA on a personal theme (recorded, also in the audit).
+         */
+        ContrastWaiver: {
+            /** Pairs */
+            pairs: components["schemas"]["ContrastWaiverPair"][];
+            /** Accepted At */
+            accepted_at: string;
+            /** Accepted By */
+            accepted_by: string;
+        };
+        /** ContrastWaiverPair */
+        ContrastWaiverPair: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "light" | "dark";
+            /** Fg */
+            fg: string;
+            /** Bg */
+            bg: string;
+            /** Ratio */
+            ratio: number;
+        };
         /** CriterionRating */
         CriterionRating: {
             /** Criterion */
@@ -10650,6 +10858,66 @@ export interface components {
             /** Fields */
             fields?: string[];
         };
+        /** ThemeBody */
+        ThemeBody: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            fonts: components["schemas"]["ThemeFonts"];
+            /**
+             * Radius
+             * @description Base radius in px; small/large derive from it
+             */
+            radius: number;
+            /**
+             * Density
+             * @enum {string}
+             */
+            density: "comfortable" | "compact";
+            /** Light */
+            light: {
+                [key: string]: string;
+            };
+            /** Dark */
+            dark: {
+                [key: string]: string;
+            };
+            /**
+             * Chart
+             * @description Light-mode palette; fallback for chart-n
+             */
+            chart: string[];
+            /** @description Light-mode ramp; fallback for score-* */
+            score: components["schemas"]["ScoreRamp"];
+        };
+        /** ThemeDuplicateIn */
+        ThemeDuplicateIn: {
+            /**
+             * Name
+             * @description Name of the copy; default '<name> copy'
+             */
+            name?: string | null;
+        };
+        /**
+         * ThemeExport
+         * @description The theme file (``<name>.theme.json``). Import accepts this or a bare theme object.
+         */
+        ThemeExport: {
+            /**
+             * Format
+             * @default nchito-theme
+             * @constant
+             */
+            format: "nchito-theme";
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            theme: components["schemas"]["ThemeBody"];
+        };
         /** ThemeFonts */
         ThemeFonts: {
             /** Display */
@@ -10700,6 +10968,12 @@ export interface components {
             score: components["schemas"]["ScoreRamp"];
             /** Id */
             id?: string | null;
+            /**
+             * Accept Low Contrast
+             * @description Save even though body text is below WCAG AA; recorded on the theme and audited
+             * @default false
+             */
+            accept_low_contrast?: boolean;
         };
         /** ThemeOut */
         ThemeOut: {
@@ -10740,6 +11014,47 @@ export interface components {
             id: string;
             /** Builtin */
             builtin: boolean;
+            /**
+             * Is Default
+             * @description The default theme (setting themes.default_theme_id)
+             * @default false
+             */
+            is_default: boolean;
+            /**
+             * Revision
+             * @description Current revision number (owner themes)
+             */
+            revision: number | null;
+            /**
+             * Can Undo
+             * @default false
+             */
+            can_undo: boolean;
+            /**
+             * Can Redo
+             * @default false
+             */
+            can_redo: boolean;
+            contrast_waiver: components["schemas"]["ContrastWaiver"] | null;
+        };
+        /** ThemeRevisionOut */
+        ThemeRevisionOut: {
+            /** Number */
+            number: number;
+            /** Parent */
+            parent: number | null;
+            /** Note */
+            note: string;
+            /** Actor */
+            actor: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current */
+            current: boolean;
+            body: components["schemas"]["ThemeBody"];
         };
         /** TimelineEvent */
         TimelineEvent: {
@@ -12046,6 +12361,77 @@ export interface operations {
                     "application/json": components["schemas"]["ThemeOut"];
                 };
             };
+            /** @description Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    themes_import: {
+        parameters: {
+            query?: {
+                accept_low_contrast?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Larger than themes.import_max_bytes */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    themes_contrast: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContrastPairOut"][];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -12119,14 +12505,12 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
         };
     };
@@ -12150,6 +12534,277 @@ export interface operations {
             };
             /** @description Built-in themes cannot be deleted */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The active or the default theme cannot be deleted */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_duplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeDuplicateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_set_default: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeExport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_revisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeRevisionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Built-in themes have no revisions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Nothing to move to */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_redo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Built-in themes have no revisions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Nothing to move to */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Built-in themes have no revisions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Nothing to move to */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
