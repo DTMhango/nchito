@@ -8,6 +8,7 @@ import logging
 import signal
 
 from app.core.db import dispose_engine
+from app.worker import tracking_tasks  # noqa: F401  (registers the periodic tracking reminders)
 from app.worker.heartbeat import heartbeat_loop
 from app.worker.queue import RUNS_QUEUE, SYSTEM_QUEUE, queue_app
 

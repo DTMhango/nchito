@@ -1,0 +1,7 @@
+id,company,role,location,track,fit_1to5,link,source,date_found,closes,status,date_tailored,date_applied,claimed_by,next_step,next_step_due,last_update,notes
+H001,Zambezi Analytics Ltd,Data Analyst,"Lusaka, Zambia",data,4,https://jobs.example.com/zambezi/101,Example Board,2026-09-01,2026-09-30,applied,2026-09-03,2026-09-05,owner,Chase the recruiter,2026-09-20,2026-09-05,"Referred by a friend; ""strong fit"""
+H002,Kafue Works,Site Engineer,"Kitwe, Zambia",engineering,3,https://jobs.example.com/kafue/55,Example Board,2026-09-02,,interview,2026-09-04,2026-09-06,owner,Prepare for panel,2026-10-02,2026-09-28,Panel of three
+H003,Luangwa Foods,Operations Lead,"Ndola, Zambia",ops,5,https://jobs.example.com/luangwa/9,Direct,2026-09-10,,shortlisted,,,,Tailor the CV,,2026-09-10,
+H004,Chambeshi Trust,Programme Officer,"Lusaka, Zambia",ngo,2,https://jobs.example.com/chambeshi/3,Example Board,2026-09-12,2026-10-01,tailored,2026-09-14,,,Send before closing,2026-09-30,2026-09-14,Letter drafted
+H005,Mulungushi Bank,Credit Analyst,"Lusaka, Zambia",data,3,,Example Board,2026-08-20,,rejected,2026-08-22,2026-08-25,owner,,,2026-09-15,Rejected after screening call
+H006,Kariba Lodge,Front Office Manager,"Siavonga, Zambia",hospitality,1,https://jobs.example.com/kariba/12,Direct,2026-08-01,,skipped,,,,,,2026-08-02,Too far from home

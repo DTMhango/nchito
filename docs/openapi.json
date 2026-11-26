@@ -2798,7 +2798,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnswerIn"
+                "$ref": "#/components/schemas/app__api__routers__kit__AnswerIn"
               }
             }
           }
@@ -2912,7 +2912,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AnswerIn"
+                "$ref": "#/components/schemas/app__api__routers__kit__AnswerIn"
               }
             }
           }
@@ -6687,258 +6687,6 @@
         }
       }
     },
-    "/api/jobs/{job_id}/applied-myself": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Applied Myself",
-        "operationId": "jobs_applied_myself",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AppliedMyselfIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Ok"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/merge": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Merge",
-        "operationId": "jobs_merge",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/MergeIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/split": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Split",
-        "operationId": "jobs_split",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SplitIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/employer": {
-      "post": {
-        "tags": [
-          "jobs"
-        ],
-        "summary": "Jobs Fix Employer",
-        "operationId": "jobs_fix_employer",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/EmployerFixIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/jobs/{job_id}/release": {
       "post": {
         "tags": [
@@ -8173,6 +7921,264 @@
         }
       }
     },
+    "/api/jobs/{job_id}/applied-myself": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Applied Myself",
+        "operationId": "jobs_applied_myself",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppliedMyselfIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already applied to this job"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/merge": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Merge",
+        "description": "Merge duplicates into this job. Sightings, tags, contacts and application history are kept.",
+        "operationId": "jobs_merge",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/split": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Split",
+        "description": "Move wrongly merged sightings into their own job (or back to the job they were merged away from).\nAnswers with the new job.",
+        "operationId": "jobs_split",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SplitIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/employer": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Fix Employer",
+        "description": "Set the right canonical employer (for every job posted under the same name), optionally remembering\nit as an alias, then re-evaluate the conflict groups involved.",
+        "operationId": "jobs_fix_employer",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmployerFixIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/assessments": {
       "get": {
         "tags": [
@@ -8501,6 +8507,27 @@
             }
           },
           {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "email",
+                    "browser",
+                    "manual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -8514,6 +8541,32 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "name": "pinned",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Pinned"
+            }
+          },
+          {
+            "name": "hide_snoozed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Hide Snoozed"
             }
           },
           {
@@ -8538,6 +8591,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
               "default": 100,
               "title": "Limit"
             }
@@ -8612,6 +8667,291 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The job already has an application"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/board": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Board",
+        "description": "Applications grouped by stage, every stage present (empty columns included).",
+        "operationId": "applications_board",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "channel",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "email",
+                    "browser",
+                    "manual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Channel"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "hide_snoozed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Hide Snoozed"
+            }
+          },
+          {
+            "name": "per_column",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Per Column"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/applied-myself": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Applied Myself",
+        "description": "'I applied myself': counts at once for duplicates, employer limits and follow-ups. Creates no\nevidence; the application is marked owner-attested.",
+        "operationId": "applications_applied_myself",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AppliedMyselfCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already applied to this job"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/import/preview": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Import Preview",
+        "description": "Upload an application-history CSV and see what it would change. Writes nothing.",
+        "operationId": "applications_import_preview",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_applications_import_preview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/app__api__routers__applications__ImportPreviewOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/import/confirm": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Import Confirm",
+        "description": "Apply the previewed file in one transaction. Importing the same file again changes nothing.",
+        "operationId": "applications_import_confirm",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_applications_import_confirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResultOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The file differs from the one previewed"
           },
           "422": {
             "description": "Validation Error",
@@ -8776,6 +9116,132 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That move is not allowed"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/files": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Attach Files",
+        "description": "Keep the files the owner sent (use after 'I applied myself'). Stored under FILES_DIR and shown on the\ntimeline; they are the owner's own record, not submission evidence.",
+        "operationId": "applications_attach_files",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_applications_attach_files"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttachedFile"
+                  },
+                  "title": "Response Applications Attach Files"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Files",
+        "operationId": "applications_files",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AttachedFile"
+                  },
+                  "title": "Response Applications Files"
                 }
               }
             }
@@ -9594,6 +10060,23 @@
         "operationId": "contacts_list",
         "parameters": [
           {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          },
+          {
             "name": "cursor",
             "in": "query",
             "required": false,
@@ -9615,6 +10098,8 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
               "default": 50,
               "title": "Limit"
             }
@@ -10315,6 +10800,7 @@
           "pending_actions"
         ],
         "summary": "Pending Actions List",
+        "description": "Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back.",
         "operationId": "pending_actions_list",
         "parameters": [
           {
@@ -10351,7 +10837,8 @@
                     "confirm_submission",
                     "review_import",
                     "conflict_choice",
-                    "answer_review_due"
+                    "answer_review_due",
+                    "follow_up"
                   ],
                   "type": "string"
                 },
@@ -10360,6 +10847,16 @@
                 }
               ],
               "title": "Type"
+            }
+          },
+          {
+            "name": "include_snoozed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Snoozed"
             }
           },
           {
@@ -10376,6 +10873,18 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
             }
           }
         ],
@@ -10501,13 +11010,208 @@
         }
       }
     },
+    "/api/pending-actions/{action_id}/dismiss": {
+      "post": {
+        "tags": [
+          "pending_actions"
+        ],
+        "summary": "Pending Actions Dismiss",
+        "operationId": "pending_actions_dismiss",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingActionOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pending-actions/{action_id}/snooze": {
+      "post": {
+        "tags": [
+          "pending_actions"
+        ],
+        "summary": "Pending Actions Snooze",
+        "description": "Hide until ``until``; it returns on schedule, and sooner if its deadline becomes imminent.",
+        "operationId": "pending_actions_snooze",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnoozeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PendingActionOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pending-actions/{action_id}/answer": {
+      "post": {
+        "tags": [
+          "pending_actions"
+        ],
+        "summary": "Pending Actions Answer",
+        "description": "Answer an unknown form question: saves it to the answer bank with the chosen scope and settles every\nother open question in the group that the scope covers. Returns the actions that closed.",
+        "operationId": "pending_actions_answer",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__routers__pending_actions__AnswerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PendingActionOut"
+                  },
+                  "title": "Response Pending Actions Answer"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pending-actions/{action_id}/resolve": {
       "post": {
         "tags": [
           "pending_actions"
         ],
         "summary": "Pending Actions Resolve",
-        "description": "'I've signed in, continue' returns the task to the same runner (8.4).",
+        "description": "'I've signed in, continue' returns the task to the same runner (8.4). Wave 2 (apply) handles the\ntypes that need a runner; dismissing and answering an unknown question work now.",
         "operationId": "pending_actions_resolve",
         "parameters": [
           {
@@ -11717,7 +12421,34 @@
           "insights"
         ],
         "summary": "Today Summary",
+        "description": "Decisions first (shared blockers grouped), then the last sweep, best new matches, what is coming\nup, the funnel, source health and spend.",
         "operationId": "today_summary",
+        "parameters": [
+          {
+            "name": "top",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 20,
+              "minimum": 1,
+              "default": 5,
+              "title": "Top"
+            }
+          },
+          {
+            "name": "horizon_days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 90,
+              "minimum": 1,
+              "default": 14,
+              "title": "Horizon Days"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -11735,6 +12466,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -11945,7 +12686,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ImportPreviewOut"
+                  "$ref": "#/components/schemas/app__api__routers__data__ImportPreviewOut"
                 }
               }
             }
@@ -12384,111 +13125,6 @@
           "canonical"
         ],
         "title": "AliasOut"
-      },
-      "AnswerIn": {
-        "properties": {
-          "patterns": {
-            "$ref": "#/components/schemas/AnswerPatterns"
-          },
-          "value": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Value"
-          },
-          "value_type": {
-            "type": "string",
-            "enum": [
-              "text",
-              "number",
-              "boolean",
-              "choice",
-              "date",
-              "money"
-            ],
-            "title": "Value Type",
-            "default": "text"
-          },
-          "conditions": {
-            "$ref": "#/components/schemas/ConditionSet-Input"
-          },
-          "answer_class": {
-            "type": "string",
-            "enum": [
-              "auto",
-              "ask_first",
-              "never",
-              "owner_only"
-            ],
-            "title": "Answer Class",
-            "default": "ask_first"
-          },
-          "material": {
-            "type": "boolean",
-            "title": "Material",
-            "default": false
-          },
-          "settled": {
-            "type": "boolean",
-            "title": "Settled",
-            "default": false
-          },
-          "scope": {
-            "type": "string",
-            "enum": [
-              "this_application",
-              "this_employer",
-              "this_country",
-              "all_matching"
-            ],
-            "title": "Scope",
-            "default": "all_matching"
-          },
-          "scope_ref": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Scope Ref"
-          },
-          "forced_choice": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Forced Choice"
-          },
-          "review_after": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Review After"
-          }
-        },
-        "type": "object",
-        "required": [
-          "patterns"
-        ],
-        "title": "AnswerIn"
       },
       "AnswerMatchIn": {
         "properties": {
@@ -13000,6 +13636,67 @@
             ],
             "title": "Applied At"
           },
+          "snoozed_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snoozed Until"
+          },
+          "snoozed": {
+            "type": "boolean",
+            "title": "Snoozed",
+            "description": "Snoozed right now (an imminent deadline overrides a snooze)",
+            "default": false
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline",
+            "description": "The job's closing date, when dated"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "system",
+              "owner",
+              "import"
+            ],
+            "title": "Origin",
+            "default": "system"
+          },
+          "owner_attested": {
+            "type": "boolean",
+            "title": "Owner Attested",
+            "description": "Applied outside Nchito, on the owner's word",
+            "default": false
+          },
+          "legacy_fit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Fit",
+            "description": "Imported 1-5 fit; not a rubric score"
+          },
           "spec": {
             "$ref": "#/components/schemas/ApplicationSpec"
           },
@@ -13042,6 +13739,75 @@
           "applied_outside": {
             "type": "boolean",
             "title": "Applied Outside"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "apply_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apply Url"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "allowed_next": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "shortlisted",
+                "tailoring",
+                "ready",
+                "applying",
+                "submitted_unconfirmed",
+                "submitted",
+                "screening",
+                "interview",
+                "offer",
+                "accepted",
+                "rejected",
+                "withdrawn",
+                "closed",
+                "skipped"
+              ]
+            },
+            "type": "array",
+            "title": "Allowed Next",
+            "description": "Stages the owner can move it to now"
           }
         },
         "type": "object",
@@ -13075,7 +13841,8 @@
           "next_step": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 300
               },
               {
                 "type": "null"
@@ -13133,10 +13900,22 @@
               }
             ],
             "title": "Channel"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
           }
         },
         "type": "object",
-        "title": "ApplicationPatch"
+        "title": "ApplicationPatch",
+        "description": "Only the fields sent change; send null to clear a date or the snooze."
       },
       "ApplicationSpec": {
         "properties": {
@@ -13331,6 +14110,67 @@
               }
             ],
             "title": "Applied At"
+          },
+          "snoozed_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snoozed Until"
+          },
+          "snoozed": {
+            "type": "boolean",
+            "title": "Snoozed",
+            "description": "Snoozed right now (an imminent deadline overrides a snooze)",
+            "default": false
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline",
+            "description": "The job's closing date, when dated"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "system",
+              "owner",
+              "import"
+            ],
+            "title": "Origin",
+            "default": "system"
+          },
+          "owner_attested": {
+            "type": "boolean",
+            "title": "Owner Attested",
+            "description": "Applied outside Nchito, on the owner's word",
+            "default": false
+          },
+          "legacy_fit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 5.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Legacy Fit",
+            "description": "Imported 1-5 fit; not a rubric score"
           }
         },
         "type": "object",
@@ -13353,12 +14193,68 @@
         ],
         "title": "ApplicationSummary"
       },
-      "AppliedMyselfIn": {
+      "AppliedMyselfCreate": {
         "properties": {
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "employer": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer"
+          },
           "applied_on": {
-            "type": "string",
-            "format": "date",
-            "title": "Applied On"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied On",
+            "description": "Defaults to today"
           },
           "channel": {
             "type": "string",
@@ -13373,7 +14269,8 @@
           "reference": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 200
               },
               {
                 "type": "null"
@@ -13391,14 +14288,92 @@
               }
             ],
             "title": "Note"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Names of the files sent, for the record"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
           }
         },
         "type": "object",
-        "required": [
-          "applied_on"
-        ],
+        "title": "AppliedMyselfCreate",
+        "description": "Log an application made outside Nchito, for an existing job or one created from what is known."
+      },
+      "AppliedMyselfIn": {
+        "properties": {
+          "applied_on": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied On",
+            "description": "Defaults to today"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "browser",
+              "manual"
+            ],
+            "title": "Channel",
+            "default": "manual"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "Names of the files sent, for the record"
+          }
+        },
+        "type": "object",
         "title": "AppliedMyselfIn",
-        "description": "\"I applied myself\": counts at once for duplicates, employer limits and follow-ups."
+        "description": "\"I applied myself\": counts at once for duplicates, employer limits and follow-ups. No evidence is\ncreated; the application is marked owner-attested."
       },
       "ApproveIn": {
         "properties": {
@@ -13622,6 +14597,46 @@
           "when"
         ],
         "title": "AttachPolicy"
+      },
+      "AttachedFile": {
+        "properties": {
+          "file_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "File Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file_id",
+          "name",
+          "sha256",
+          "size_bytes"
+        ],
+        "title": "AttachedFile"
       },
       "AuditEventOut": {
         "properties": {
@@ -14014,6 +15029,114 @@
           "encrypted"
         ],
         "title": "BackupOut"
+      },
+      "BoardColumn": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "shortlisted",
+              "tailoring",
+              "ready",
+              "applying",
+              "submitted_unconfirmed",
+              "submitted",
+              "screening",
+              "interview",
+              "offer",
+              "accepted",
+              "rejected",
+              "withdrawn",
+              "closed",
+              "skipped"
+            ],
+            "title": "Stage"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ApplicationSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "count",
+          "items"
+        ],
+        "title": "BoardColumn"
+      },
+      "BoardOut": {
+        "properties": {
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/BoardColumn"
+            },
+            "type": "array",
+            "title": "Columns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "columns"
+        ],
+        "title": "BoardOut"
+      },
+      "Body_applications_attach_files": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string",
+              "contentMediaType": "application/octet-stream"
+            },
+            "type": "array",
+            "title": "Files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "files"
+        ],
+        "title": "Body_applications_attach_files"
+      },
+      "Body_applications_import_confirm": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file",
+          "content_hash"
+        ],
+        "title": "Body_applications_import_confirm"
+      },
+      "Body_applications_import_preview": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_applications_import_preview"
       },
       "Body_data_import_preview": {
         "properties": {
@@ -15771,6 +16894,23 @@
         ],
         "title": "DetectOut"
       },
+      "DismissIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "DismissIn"
+      },
       "DispatchOut": {
         "properties": {
           "id": {
@@ -15932,6 +17072,8 @@
         "properties": {
           "canonical_employer": {
             "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
             "title": "Canonical Employer"
           },
           "remember_alias": {
@@ -17541,47 +18683,203 @@
         ],
         "title": "ImportDiffItem"
       },
-      "ImportPreviewOut": {
+      "ImportErrorOut": {
         "properties": {
-          "import_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Import Id"
+          "line": {
+            "type": "integer",
+            "title": "Line"
           },
-          "source": {
-            "type": "string",
-            "enum": [
-              "kit_file",
-              "old_kit_zip",
-              "history_csv",
-              "free_form"
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Source"
+            "title": "Id"
           },
-          "diff": {
-            "items": {
-              "$ref": "#/components/schemas/ImportDiffItem"
-            },
-            "type": "array",
-            "title": "Diff"
-          },
-          "notices": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Notices",
-            "description": "e.g. 'free-form text will be sent to <provider>'"
+          "message": {
+            "type": "string",
+            "title": "Message"
           }
         },
         "type": "object",
         "required": [
-          "import_id",
-          "source",
-          "diff",
-          "notices"
+          "line",
+          "id",
+          "message"
         ],
-        "title": "ImportPreviewOut"
+        "title": "ImportErrorOut"
+      },
+      "ImportFieldChange": {
+        "properties": {
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "before": {
+            "title": "Before"
+          },
+          "after": {
+            "title": "After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "field",
+          "before",
+          "after"
+        ],
+        "title": "ImportFieldChange"
+      },
+      "ImportResultOut": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "skipped": {
+            "type": "integer",
+            "title": "Skipped"
+          },
+          "errors": {
+            "type": "integer",
+            "title": "Errors"
+          },
+          "application_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Application Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "updated",
+          "unchanged",
+          "skipped",
+          "errors",
+          "application_ids"
+        ],
+        "title": "ImportResultOut"
+      },
+      "ImportRowOut": {
+        "properties": {
+          "line": {
+            "type": "integer",
+            "title": "Line"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "company": {
+            "type": "string",
+            "title": "Company"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "shortlisted",
+              "tailoring",
+              "ready",
+              "applying",
+              "submitted_unconfirmed",
+              "submitted",
+              "screening",
+              "interview",
+              "offer",
+              "accepted",
+              "rejected",
+              "withdrawn",
+              "closed",
+              "skipped"
+            ],
+            "title": "Stage"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "create",
+              "update",
+              "unchanged",
+              "skip",
+              "error"
+            ],
+            "title": "Action"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "new",
+                  "existing"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ImportFieldChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "messages": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "line",
+          "key",
+          "company",
+          "role",
+          "stage",
+          "action",
+          "job",
+          "changes",
+          "messages"
+        ],
+        "title": "ImportRowOut"
       },
       "InsightsOut": {
         "properties": {
@@ -18611,6 +19909,64 @@
           "pinned"
         ],
         "title": "JobSummary"
+      },
+      "LastSweep": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Run Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "cost_minor": {
+            "type": "integer",
+            "title": "Cost Minor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "run_id",
+          "status",
+          "started_at",
+          "finished_at",
+          "counts",
+          "cost_minor"
+        ],
+        "title": "LastSweep"
       },
       "LimitRule": {
         "properties": {
@@ -20832,7 +22188,8 @@
               "confirm_submission",
               "review_import",
               "conflict_choice",
-              "answer_review_due"
+              "answer_review_due",
+              "follow_up"
             ],
             "title": "Type"
           },
@@ -20911,6 +22268,58 @@
               "expired"
             ],
             "title": "Status"
+          },
+          "snoozed_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snoozed Until"
+          },
+          "snoozed": {
+            "type": "boolean",
+            "title": "Snoozed",
+            "description": "Hidden until snoozed_until, unless its deadline is imminent",
+            "default": false
+          },
+          "employer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
           }
         },
         "type": "object",
@@ -23522,6 +24931,21 @@
         ],
         "title": "SkillOut"
       },
+      "SnoozeIn": {
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until",
+            "description": "The action comes back at this time"
+          }
+        },
+        "type": "object",
+        "required": [
+          "until"
+        ],
+        "title": "SnoozeIn"
+      },
       "SortSpec": {
         "properties": {
           "field": {
@@ -24801,7 +26225,16 @@
         "properties": {
           "needs_you": {
             "type": "integer",
-            "title": "Needs You"
+            "title": "Needs You",
+            "description": "Decisions waiting on the owner (a shared blocker counts once)"
+          },
+          "needs_you_groups": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionGroup"
+            },
+            "type": "array",
+            "title": "Needs You Groups",
+            "description": "Soonest deadline and biggest consequence first"
           },
           "last_sweep_run_id": {
             "anyOf": [
@@ -24814,6 +26247,16 @@
               }
             ],
             "title": "Last Sweep Run Id"
+          },
+          "last_sweep": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastSweep"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "funnel": {
             "items": {
@@ -24836,6 +26279,13 @@
             },
             "type": "array",
             "title": "Top Match Ids"
+          },
+          "top_matches": {
+            "items": {
+              "$ref": "#/components/schemas/TopMatch"
+            },
+            "type": "array",
+            "title": "Top Matches"
           },
           "upcoming": {
             "items": {
@@ -25110,6 +26560,42 @@
           "suspended_reason"
         ],
         "title": "TokenOut"
+      },
+      "TopMatch": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "title",
+          "employer",
+          "score"
+        ],
+        "title": "TopMatch"
       },
       "TotpCode": {
         "properties": {
@@ -26060,6 +27546,247 @@
           "ok"
         ],
         "title": "WorkerHealth"
+      },
+      "app__api__routers__applications__ImportPreviewOut": {
+        "properties": {
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash",
+            "description": "Pass back when confirming, to be sure the same file is applied"
+          },
+          "create": {
+            "type": "integer",
+            "title": "Create"
+          },
+          "update": {
+            "type": "integer",
+            "title": "Update"
+          },
+          "unchanged": {
+            "type": "integer",
+            "title": "Unchanged"
+          },
+          "skip": {
+            "type": "integer",
+            "title": "Skip"
+          },
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ImportErrorOut"
+            },
+            "type": "array",
+            "title": "Errors"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content_hash",
+          "create",
+          "update",
+          "unchanged",
+          "skip",
+          "errors",
+          "rows"
+        ],
+        "title": "ImportPreviewOut",
+        "description": "What importing this file would change. Nothing is written until it is confirmed."
+      },
+      "app__api__routers__data__ImportPreviewOut": {
+        "properties": {
+          "import_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Import Id"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "kit_file",
+              "old_kit_zip",
+              "history_csv",
+              "free_form"
+            ],
+            "title": "Source"
+          },
+          "diff": {
+            "items": {
+              "$ref": "#/components/schemas/ImportDiffItem"
+            },
+            "type": "array",
+            "title": "Diff"
+          },
+          "notices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notices",
+            "description": "e.g. 'free-form text will be sent to <provider>'"
+          }
+        },
+        "type": "object",
+        "required": [
+          "import_id",
+          "source",
+          "diff",
+          "notices"
+        ],
+        "title": "ImportPreviewOut"
+      },
+      "app__api__routers__kit__AnswerIn": {
+        "properties": {
+          "patterns": {
+            "$ref": "#/components/schemas/AnswerPatterns"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "number",
+              "boolean",
+              "choice",
+              "date",
+              "money"
+            ],
+            "title": "Value Type",
+            "default": "text"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Input"
+          },
+          "answer_class": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "ask_first",
+              "never",
+              "owner_only"
+            ],
+            "title": "Answer Class",
+            "default": "ask_first"
+          },
+          "material": {
+            "type": "boolean",
+            "title": "Material",
+            "default": false
+          },
+          "settled": {
+            "type": "boolean",
+            "title": "Settled",
+            "default": false
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "this_application",
+              "this_employer",
+              "this_country",
+              "all_matching"
+            ],
+            "title": "Scope",
+            "default": "all_matching"
+          },
+          "scope_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Ref"
+          },
+          "forced_choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forced Choice"
+          },
+          "review_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review After"
+          }
+        },
+        "type": "object",
+        "required": [
+          "patterns"
+        ],
+        "title": "AnswerIn"
+      },
+      "app__api__routers__pending_actions__AnswerIn": {
+        "properties": {
+          "answer_value": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Answer Value"
+          },
+          "answer_scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "this_application",
+                  "this_employer",
+                  "this_country",
+                  "all_matching"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Scope",
+            "description": "Default from answers.routine_default_scope / material_default_scope"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "answer_value"
+        ],
+        "title": "AnswerIn"
       }
     }
   }

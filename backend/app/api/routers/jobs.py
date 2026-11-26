@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Page, Timestamps, not_implemented
 from app.api.crud import add_crud
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.core import audit
