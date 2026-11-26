@@ -12,6 +12,7 @@ from app.api.deps import PrincipalDep, SessionDep
 from app.core.settings import service
 from app.core.settings.registry import GROUPS, REGISTRY
 from app.core.settings.types import SettingValueError
+from app.ops.config_rollback import OWN_ENDPOINT
 from app.themes.service import get_theme
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -135,11 +136,7 @@ async def get_setting(key: str, _: PrincipalDep, session: SessionDep) -> Setting
     return _out((await service.get_all(session))[key])
 
 
-# Settings with their own endpoint, which enforces what the generic write cannot (the restore lock and the
-# pause effects): an invariant, not a setting.
-OWN_ENDPOINT = {
-    "automation.paused": "use PUT /api/autopilot (and POST /api/autopilot/resume-after-restore after a restore)",
-}
+# Settings with their own endpoint (see ``config_rollback.OWN_ENDPOINT``): an invariant, not a setting.
 
 
 @router.put("/{key}", response_model=SettingOut, operation_id="settings_put",

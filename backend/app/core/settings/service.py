@@ -6,6 +6,7 @@ appends a ``SettingRevision`` (append-only) and an audit event in the same trans
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -80,10 +81,11 @@ _CAP_PAIRS_REV = {v: k for k, v in _CAP_PAIRS.items()}
 
 async def set_value(
     session: AsyncSession, key: str, raw: Any, *, actor: str, reason: str | None = None,
-    check_combination: bool = True,
+    check_combination: bool = True, rollback_of: uuid.UUID | None = None,
 ) -> SettingState:
     """Validate and store a value, keeping a cap's minor and micros forms in step."""
-    state = await _set_one(session, key, raw, actor=actor, reason=reason, check_combination=check_combination)
+    state = await _set_one(session, key, raw, actor=actor, reason=reason, check_combination=check_combination,
+                           rollback_of=rollback_of)
     if key in _CAP_PAIRS:
         await _set_one(session, _CAP_PAIRS[key], None, actor=actor, reason=reason, check_combination=False)
     elif key in _CAP_PAIRS_REV:
@@ -96,7 +98,7 @@ async def set_value(
 
 async def _set_one(
     session: AsyncSession, key: str, raw: Any, *, actor: str, reason: str | None = None,
-    check_combination: bool = True,
+    check_combination: bool = True, rollback_of: uuid.UUID | None = None,
 ) -> SettingState:
     """Validate and store a value. Raises ``SettingValueError`` (and changes nothing) if invalid."""
     definition = get_def(key)
@@ -118,7 +120,7 @@ async def _set_one(
         row.version += 1
         row.updated_by = actor
     session.add(SettingRevision(key=key, version=row.version, old_value=old_value, new_value=value,
-                                changed_by=actor, reason=reason))
+                                changed_by=actor, reason=reason, rollback_of=rollback_of))
     await audit.record(session, actor=actor, action="setting.changed", subject_type="setting", subject_id=key,
                        detail={"old": old_value, "new": value, "version": row.version, "reason": reason})
     await publish(session, "settings.changed", {"key": key, "version": row.version})

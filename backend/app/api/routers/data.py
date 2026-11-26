@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, Ok, Page, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, Ok, Page
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.core import audit
 from app.core.clock import utcnow
@@ -27,6 +27,7 @@ from app.llm.deps import llm_service
 from app.models.kit import Fact
 from app.models.platform import ConfigKind, ConfigRevision, SettingRevision
 from app.ops import backup as ops_backup
+from app.ops import config_rollback as rollback_lib
 from app.ops import jobs as ops_jobs
 from app.ops import retention as ops_retention
 
@@ -359,7 +360,7 @@ async def config_history(session: SessionDep, kind: str | None = None, subject_i
             items.append((r.created_at, r.id, ConfigRevisionOut(
                 id=r.id, kind=SETTING_KIND, subject_id=None, version=r.version, author=r.changed_by,
                 created_at=r.created_at, diff={"key": r.key, "old": r.old_value, "new": r.new_value},
-                rollback_of=None, note=r.reason)))
+                rollback_of=r.rollback_of, note=r.reason)))
     if kind != SETTING_KIND:
         cq = select(ConfigRevision).order_by(ConfigRevision.created_at.desc(), ConfigRevision.id.desc())
         if kind is not None:
@@ -383,8 +384,52 @@ async def config_history(session: SessionDep, kind: str | None = None, subject_i
                                    next_cursor=_cursor_of(page[-1][0], page[-1][1]) if more and page else None)
 
 
+async def _revision_out(session: SessionDep, done: rollback_lib.RolledBack) -> ConfigRevisionOut:
+    if done.kind == SETTING_KIND:
+        r = await session.get(SettingRevision, done.new_id)
+        assert r is not None
+        return ConfigRevisionOut(
+            id=r.id, kind=SETTING_KIND, subject_id=None, version=r.version, author=r.changed_by,
+            created_at=r.created_at, diff={"key": r.key, "old": r.old_value, "new": r.new_value},
+            rollback_of=r.rollback_of, note=r.reason)
+    c = await session.get(ConfigRevision, done.new_id)
+    assert c is not None
+    return ConfigRevisionOut(id=c.id, kind=c.kind.value, subject_id=c.subject_id, version=c.version,
+                             author=c.author, created_at=c.created_at, diff=c.diff, rollback_of=c.rollback_of,
+                             note=c.note)
+
+
 @router.post("/config-history/{revision_id}/rollback", response_model=ConfigRevisionOut,
              name="data_config_rollback")
-async def rollback(revision_id: uuid.UUID, body: RollbackIn) -> ConfigRevisionOut:
-    """Rollback affects future work only."""
-    not_implemented(1, "config")
+async def rollback(revision_id: uuid.UUID, body: RollbackIn, principal: PrincipalDep,
+                   session: SessionDep) -> ConfigRevisionOut:
+    """Restore a revision's value as a NEW revision (history is never edited). Settings go through the settings
+    validators; a setting with its own endpoint (the global pause) and a model route that has not passed a recent
+    test are refused. Rollback affects future work only."""
+    from app.llm import api as llm_api
+
+    async def activate_route(snapshot: dict[str, Any], note: str | None) -> None:
+        values = await settings_service.values(session)
+        if snapshot.get("provider") != values["ai.provider"]:
+            raise rollback_lib.RollbackError(409, "that route belongs to a different provider than the current one")
+        try:
+            await llm_api.activate_route(
+                llm_api.RouteActivateIn(stage=str(snapshot["stage"]), model=str(snapshot["model"]),
+                                        reason=note or "restored an earlier route"), session, principal)
+        except HTTPException as exc:
+            raise rollback_lib.RollbackError(exc.status_code, str(exc.detail)) from exc
+
+    try:
+        srev = await session.get(SettingRevision, revision_id)
+        if srev is not None:
+            done = await rollback_lib.rollback_setting(session, srev, actor=principal.actor, note=body.note)
+        else:
+            crev = await session.get(ConfigRevision, revision_id)
+            if crev is None:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no such revision")
+            done = await rollback_lib.rollback_config(session, crev, actor=principal.actor, note=body.note,
+                                                      route_activator=activate_route)
+    except rollback_lib.RollbackError as exc:
+        await session.rollback()
+        raise HTTPException(exc.status, detail=exc.detail) from exc
+    return await _revision_out(session, done)
