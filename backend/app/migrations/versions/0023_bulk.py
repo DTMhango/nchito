@@ -1,7 +1,7 @@
 """bulk operations and employer policies
 
-Revision ID: 0019_bulk
-Revises: 0018_blocker_kind
+Revision ID: 0023_bulk
+Revises: 0022_feedback
 Create Date: 2026-11-26 19:09:24.115007
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = '0019_bulk'
-down_revision: str | None = '0018_blocker_kind'
+revision: str = '0023_bulk'
+down_revision: str | None = '0022_feedback'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

@@ -1,7 +1,7 @@
 """preference feedback and rubric suggestions (wave 4 feedback stream)
 
-Revision ID: 0019_feedback
-Revises: 0018_blocker_kind
+Revision ID: 0022_feedback
+Revises: 0021_calendar
 Create Date: 2026-11-26 19:09:45.145608
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = '0019_feedback'
-down_revision: str | None = '0018_blocker_kind'
+revision: str = '0022_feedback'
+down_revision: str | None = '0021_calendar'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

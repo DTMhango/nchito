@@ -1,7 +1,7 @@
 """theme studio: theme revisions (undo/redo), current revision and recorded contrast waiver on theme
 
-Revision ID: 0019_themes
-Revises: 0006_micros (the coordinator chains wave 4 migrations)
+Revision ID: 0020_themes
+Revises: 0019_hardening
 Create Date: 2026-11-26 20:00:00
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = '0019_themes'
-down_revision: str | None = '0006_micros'
+revision: str = '0020_themes'
+down_revision: str | None = '0019_hardening'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

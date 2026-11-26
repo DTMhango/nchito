@@ -1,7 +1,7 @@
 """follow-ups: outbound messages, follow-up due list, wind-down
 
-Revision ID: 0019_followups
-Revises: 0018_blocker_kind
+Revision ID: 0024_followups
+Revises: 0023_bulk
 Create Date: 2026-11-26 18:00:00
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = '0019_followups'
-down_revision: str | None = '0018_blocker_kind'
+revision: str = '0024_followups'
+down_revision: str | None = '0023_bulk'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

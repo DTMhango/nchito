@@ -1,7 +1,7 @@
 """mock interview sessions and turns; interview round kind and focus
 
-Revision ID: 0019_mock_interview
-Revises: 0018_blocker_kind
+Revision ID: 0025_mock_interview
+Revises: 0024_followups
 Create Date: 2026-11-26 19:08:10.046951
 
 Wave 4 stream mock-interview. The coordinator re-chains ``down_revision``.
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = '0019_mock_interview'
-down_revision: str | None = '0018_blocker_kind'
+revision: str = '0025_mock_interview'
+down_revision: str | None = '0024_followups'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

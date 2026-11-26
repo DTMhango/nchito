@@ -1,7 +1,7 @@
 """calendar: interview events, the feed token, a Google Calendar connection provider
 
-Revision ID: 0019_calendar
-Revises: 0018_blocker_kind
+Revision ID: 0021_calendar
+Revises: 0020_themes
 Create Date: 2026-11-27 09:00:00
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = '0019_calendar'
-down_revision: str | None = '0018_blocker_kind'
+revision: str = '0021_calendar'
+down_revision: str | None = '0020_themes'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
