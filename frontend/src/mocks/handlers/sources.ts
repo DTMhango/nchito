@@ -107,13 +107,25 @@ function checkSource(body: SourceInput): string | null {
     }
   }
   if (body.connector === "web_search") {
-    if (!httpUrl(c.endpoint))
-      return `'${String(c.endpoint ?? "")}' is not an http(s) URL`
-    if (c.key_header && c.key_param)
-      return "give the key as a header or a query parameter, not both"
+    // The provider keys belong to the Search API connection: validate_config drops them.
+    for (const k of SEARCH_PROVIDER_KEYS) delete c[k]
+    if (c.connection_id != null && typeof c.connection_id !== "string")
+      return "connection_id must be a connection id"
   }
   return null
 }
+
+/** search_api `CONFIG_KEYS`: never kept on a web search source. */
+const SEARCH_PROVIDER_KEYS = [
+  "endpoint",
+  "query_param",
+  "limit_param",
+  "key_header",
+  "key_param",
+  "result_path",
+  "url_field",
+  "title_field",
+] as const
 
 /** The search API key a web search source would get (its connection, else the first enabled one). */
 function hasSearchKey(config: Record<string, unknown>): boolean {

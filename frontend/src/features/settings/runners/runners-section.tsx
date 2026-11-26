@@ -18,6 +18,7 @@ import {
 } from "./api"
 import {
   canUnpause,
+  currentTaskText,
   KIND_LABEL,
   reinstateErrorText,
   RUNNER_LIMIT_KEYS,
@@ -92,9 +93,7 @@ function RunnerCard({ row }: { row: RunnerRow }) {
         </span>
       </div>
       <p className="text-sm text-muted-foreground">
-        {s.current_task_id
-          ? "Working on a task now."
-          : "Not working on anything right now."}
+        {currentTaskText(s)}
         {row.stale &&
           !row.paused &&
           " It has stopped checking in. Is Claude Code or the container still running?"}

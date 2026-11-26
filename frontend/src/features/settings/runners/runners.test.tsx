@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { renderApp } from "@/test/render"
+import { renderApp, setupUser } from "@/test/render"
 import { runnersMock } from "@/mocks/handlers/runners"
-import { canUnpause, reinstateErrorText, runnerRows, seenText } from "./logic"
+import { ACTION, PC_ID, runnerTask } from "@/mocks/dataset/runners"
+import {
+  canUnpause,
+  currentTaskText,
+  reinstateErrorText,
+  runnerRows,
+  seenText,
+} from "./logic"
 
 /** A runner's card: the Tokens list has a row with the same name, so look in the Runners list. */
 const runnerCard = async (name: string) => {
@@ -144,8 +151,29 @@ describe("page content", () => {
     expect(within(settings).getAllByRole("listitem").length).toBeGreaterThan(5)
   })
 
-  it("builds activity from the current task, the blockers it raised and what it was given", async () => {
-    const user = userEvent.setup()
+  it("shows the current task's title and type on the card", async () => {
+    renderApp("/settings/runners")
+    const card = await runnerCard("Office PC")
+    expect(
+      within(card).getByText(
+        "Applying: Grid Data Analyst at Copperline Energy."
+      )
+    ).toBeInTheDocument()
+    const idle = await runnerCard("Home server")
+    expect(
+      within(idle).getByText(/Not working on anything right now/)
+    ).toBeInTheDocument()
+    expect(
+      currentTaskText({
+        current_task_id: "t",
+        current_task_title: "careers.example.com",
+        current_task_type: "sweep_site",
+      })
+    ).toBe("Sweeping a site: careers.example.com.")
+  })
+
+  it("shows the runner's real tasks: checkpoint, blockers, permit decisions, result and evidence", async () => {
+    const user = setupUser()
     renderApp("/settings/runners")
     const card = await runnerCard("Office PC")
     await user.click(
@@ -154,21 +182,80 @@ describe("page content", () => {
     const activity = await within(card).findByRole("region", {
       name: "Recent activity of Office PC",
     })
+    const tasks = await within(activity).findByRole("list", { name: "Tasks" })
+    const rows = within(tasks).getAllByRole("listitem", {
+      name: /at |careers/,
+    })
+    expect(rows.map((r) => r.getAttribute("aria-label"))).toEqual([
+      "Grid Data Analyst at Copperline Energy",
+      "Credit Analyst at Luangwa Re",
+      "careers.example.com",
+    ])
+    const current = rows[0]
     expect(
-      await within(activity).findByText(/current task is waiting on you/)
+      within(current).getByText(/filled the contact page · 3 fields filled/)
+    ).toBeInTheDocument()
+    expect(within(current).getByText("CAPTCHA")).toBeInTheDocument()
+    expect(within(current).getByRole("link", { name: "Open" })).toHaveAttribute(
+      "href",
+      `/accounts/handoff/${ACTION.captcha}`
+    )
+    expect(within(current).getByText("Waiting for you")).toBeInTheDocument()
+    expect(
+      within(current).getByText(/cover letter changed since you approved it/)
     ).toBeInTheDocument()
     expect(
-      await within(activity).findByText(/Solve the CAPTCHA for/)
+      within(current).getByText("Changed since approval: cover_letter")
     ).toBeInTheDocument()
-    expect(within(activity).getByText("Verification code")).toBeInTheDocument()
-    const opens = within(activity).getAllByRole("link", { name: "Open" })
-    expect(opens.length).toBeGreaterThanOrEqual(4)
+    const done = rows[1]
+    expect(within(done).getByText("Permit granted")).toBeInTheDocument()
     expect(
-      await within(activity).findByText(
-        /asked for a submit permit with 1 answer/
+      within(done).getByText(
+        /submitted · Confirmation page shown · reference LR-2041/
       )
     ).toBeInTheDocument()
-  }, 20_000)
+    expect(within(done).getByText(/confirm\.png/)).toBeInTheDocument()
+    expect(within(rows[2]).getByText("Sweeping a site")).toBeInTheDocument()
+    // No more pages: no "older" button.
+    expect(
+      within(activity).queryByRole("button", { name: "Show older tasks" })
+    ).toBeNull()
+  })
+
+  it("pages older tasks with the server's cursor", async () => {
+    const m = runnersMock()
+    m.tasks[PC_ID] = Array.from({ length: 25 }, (_, i) =>
+      runnerTask(i + 1, { title: `Task number ${i + 1}` })
+    )
+    const user = setupUser()
+    renderApp("/settings/runners")
+    const card = await runnerCard("Office PC")
+    await user.click(
+      within(card).getByRole("button", { name: "Show activity" })
+    )
+    const tasks = await within(card).findByRole("list", { name: "Tasks" })
+    await waitFor(() =>
+      expect(within(tasks).getAllByRole("listitem")).toHaveLength(20)
+    )
+    await user.click(
+      within(card).getByRole("button", { name: "Show older tasks" })
+    )
+    await waitFor(() =>
+      expect(within(tasks).getAllByRole("listitem")).toHaveLength(25)
+    )
+    expect(within(tasks).getByText("Task number 25")).toBeInTheDocument()
+    expect(
+      within(card).queryByRole("button", { name: "Show older tasks" })
+    ).toBeNull()
+  })
+
+  it("answers 404 for an unknown token", async () => {
+    const res = await fetch(
+      "/api/tokens/00000000-0000-4000-8000-000000000000/tasks",
+      { credentials: "include" }
+    )
+    expect(res.status).toBe(404)
+  })
 })
 
 describe("un-pause refusals", () => {

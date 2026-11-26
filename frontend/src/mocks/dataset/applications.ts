@@ -218,6 +218,9 @@ export function seedApplications(): MockApplications {
     job_title: app?.title ?? null,
     resolution: null,
     kind: typeof detail.kind === "string" ? detail.kind : null,
+    reminders_sent: null,
+    next_reminder_at: null,
+    choices: [],
   })
 
   const workRights = [

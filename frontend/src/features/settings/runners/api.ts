@@ -12,10 +12,25 @@ export type Scope = NonNullable<TokenCreate["scopes"]>[number]
 export type RunnerKind = TokenCreate["runner_kind"] & string
 export type ReinstateIn = S["ReinstateIn"]
 
+export type RunnerTask = S["RunnerTaskOut"]
+export type RunnerTaskPage = S["Page_RunnerTaskOut_"]
+
 export const tokenKeys = {
   tokens: ["tokens"] as const,
   runners: ["autopilot", "runners"] as const,
+  tasks: (id: string) => ["tokens", "tasks", id] as const,
 }
+
+/** One page (the server's page size) of the tasks a runner claimed, most recent claim first. */
+export const runnerTasks = (tokenId: string, cursor: string | null) =>
+  unwrap(
+    api.GET("/api/tokens/{token_id}/tasks", {
+      params: {
+        path: { token_id: tokenId },
+        query: cursor ? { cursor } : {},
+      },
+    })
+  )
 
 export const tokensQuery = () =>
   queryOptions({

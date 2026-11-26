@@ -30,6 +30,29 @@ export const scopeLabel = (s: string) =>
 
 export const KIND_LABEL = { pc: "Your PC", server: "Server" } as const
 
+/** Agent task types (`RunnerStatus.current_task_type`, `RunnerTaskOut.type`). */
+export const TASK_TYPE_LABEL: Record<string, string> = {
+  apply: "Applying",
+  check_posting: "Checking a posting",
+  sweep_site: "Sweeping a site",
+}
+
+/** "Applying: Data Analyst at Example Co." or "Not working on anything right now." */
+export function currentTaskText(
+  s: Pick<
+    RunnerStatus,
+    "current_task_id" | "current_task_title" | "current_task_type"
+  >
+): string {
+  if (!s.current_task_id) return "Not working on anything right now."
+  const type = s.current_task_type
+    ? (TASK_TYPE_LABEL[s.current_task_type] ?? s.current_task_type)
+    : "Working on"
+  return s.current_task_title
+    ? `${type}: ${s.current_task_title}.`
+    : "Working on a task now."
+}
+
 /** What the owner sees when a runner is not online: how long since it was last seen. */
 export function seenText(iso: string | null, now = Date.now()): string {
   if (!iso) return "never seen"

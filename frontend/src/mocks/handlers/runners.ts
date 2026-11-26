@@ -52,19 +52,11 @@ export const resetRunnersMock = () => {
 const findAction = (id: unknown) =>
   applicationsMock().actions.find((a) => a.id === String(id))
 
-/** `owner_actions.CONTINUABLE`; the account kinds `give_up` accepts. */
-const CONTINUABLE = ["sign_in", "create_account", "captcha"]
-const ACCOUNT_KINDS = [
-  "sign_in",
-  "create_account",
-  "verification_code",
-  "captcha",
-  "assessment",
-  "declaration",
-  "unsupported_form",
-]
-const isAccountAction = (a: PendingAction) =>
-  ACCOUNT_KINDS.includes(String(a.detail.kind))
+/** A blocker's owner choices (`accounts.CHOICES`, listed on the action). */
+const continuable = (a: PendingAction) =>
+  a.choices.includes("continue") || a.choices.includes("continue_acknowledged")
+const givesUp = (a: PendingAction) =>
+  a.choices.includes("manual_handoff") || a.choices.includes("skipped")
 
 /** The type/resolution pairs `pending_actions.resolve` accepts (anything else is a 422). */
 function accepts(a: PendingAction, r: ResolveIn["resolution"]): boolean {
@@ -72,7 +64,7 @@ function accepts(a: PendingAction, r: ResolveIn["resolution"]): boolean {
     case "dismissed":
       return true
     case "continue":
-      return CONTINUABLE.includes(a.type)
+      return continuable(a)
     case "answered":
       return a.type === "unknown_question"
     case "approved":
@@ -93,6 +85,7 @@ const close = (a: PendingAction, resolution: Record<string, unknown>) => {
   a.status = resolution.resolution === "dismissed" ? "dismissed" : "resolved"
   a.updated_at = new Date().toISOString()
   a.resolution = resolution
+  a.choices = [] // listed for an open blocker only
 }
 
 export const runnersHandlers = [
@@ -100,6 +93,18 @@ export const runnersHandlers = [
   http.get("*/api/tokens/runners", () => {
     if (!db.get().session) return unauthorized()
     return HttpResponse.json(state.statuses)
+  }),
+  http.get("*/api/tokens/:id/tasks", ({ params, request }) => {
+    if (!db.get().session) return unauthorized()
+    const id = String(params.id)
+    if (!state.tokens.some((t) => t.id === id)) return notFound("Token")
+    const q = new URL(request.url).searchParams
+    const limit = Math.min(Number(q.get("limit") ?? 20) || 20, 100)
+    const start = Number(q.get("cursor") ?? 0) || 0
+    const all = state.tasks[id] ?? []
+    const items = all.slice(start, start + limit)
+    const next = start + limit < all.length ? String(start + limit) : null
+    return HttpResponse.json({ items, total: null, next_cursor: next })
   }),
   http.get("*/api/tokens", () => {
     if (!db.get().session) return unauthorized()
@@ -172,11 +177,15 @@ export const runnersHandlers = [
       const a = findAction(params.id)
       if (!a) return notFound("pending action")
       const body = (await request.json()) as GiveUpIn
-      if (a.status !== "open" || !isAccountAction(a))
-        return refuse(409, "this is not an open sign-in request")
-      const entries = (a.detail.applications ?? []) as {
+      if (a.status !== "open" || !givesUp(a))
+        return refuse(409, "this is not an open blocker")
+      const listed = (a.detail.applications ?? []) as {
         application_id: string
       }[]
+      const entries =
+        listed.length || !a.application_id
+          ? listed
+          : [{ application_id: a.application_id }]
       const ids = entries.map((e) => e.application_id)
       const wanted = body.application_ids?.length ? body.application_ids : ids
       if (wanted.some((w) => !ids.includes(w)))
@@ -297,21 +306,33 @@ export const runnersHandlers = [
       if (!accepts(a, body.resolution))
         return refuse(
           422,
-          `'${body.resolution}' does not resolve a ${a.type} action`
+          body.resolution === "continue" && a.choices.length
+            ? {
+                code: "not_continuable",
+                reason: "this blocker cannot continue",
+              }
+            : `'${body.resolution}' does not resolve a ${a.type} action`
         )
       if (body.resolution !== "continue") return undefined // the applications handler records it
       if (a.status !== "open") return refuse(409, "already handled")
+      // A suspicious page continues only when the owner says they checked it.
+      if (!a.choices.includes("continue") && !body.acknowledged)
+        return refuse(422, {
+          code: "acknowledgement_required",
+          reason: "confirm you checked the page and it is safe to continue",
+        })
       // continue: the tasks go back to the same runner; the group's other continuable actions close too.
       const group = applicationsMock().actions.filter(
         (x) =>
           x.status === "open" &&
-          CONTINUABLE.includes(x.type) &&
+          continuable(x) &&
           (x.id === a.id || (!!a.group_key && x.group_key === a.group_key))
       )
       for (const x of group) {
         const tasks = (x.detail.tasks ?? []) as { task_id: string }[]
         close(x, {
           resolution: "continue",
+          acknowledged: body.acknowledged ?? false,
           note: body.note ?? null,
           via: x === a ? null : a.id,
           runner: x.detail.runner_kind ?? "pc",

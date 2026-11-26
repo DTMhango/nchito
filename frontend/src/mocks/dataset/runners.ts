@@ -9,7 +9,11 @@ import type {
   ReleaseRecord,
 } from "@/features/accounts/api"
 import type { ApplicationSummary } from "@/features/applications/api"
-import type { RunnerStatus, Token } from "@/features/settings/runners/api"
+import type {
+  RunnerStatus,
+  RunnerTask,
+  Token,
+} from "@/features/settings/runners/api"
 
 const HOUR = 3_600_000
 const ago = (hours: number) => new Date(Date.now() - hours * HOUR).toISOString()
@@ -31,6 +35,7 @@ export const TASK = {
   mulungushi: uuid("e", 21),
   luangwa: uuid("e", 22),
   kafue: uuid("e", 23),
+  kariba: uuid("e", 24),
 } as const
 
 /** Pending action ids of the blockers (the tenant sign-in keeps the seeded id `d...10`). */
@@ -42,6 +47,7 @@ export const ACTION = {
   offDomain: uuid("f", 4),
   pageAsked: uuid("f", 5),
   changed: uuid("f", 6),
+  mismatch: uuid("f", 7),
 } as const
 
 const token = (n: number, over: Partial<Token>): Token => ({
@@ -65,6 +71,101 @@ export type MockRunners = {
   accounts: PortalAccount[]
   /** `GET /api/applications/{id}/releases`, per application id. */
   releases: Record<string, ReleaseRecord[]>
+  /** `GET /api/tokens/{id}/tasks`, per token id, most recent claim first. */
+  tasks: Record<string, RunnerTask[]>
+}
+
+/** A task the runner claimed, as `app/gateway/history.py` reports it. */
+export const runnerTask = (
+  n: number,
+  over: Partial<RunnerTask> = {}
+): RunnerTask => ({
+  task_id: uuid("9", n),
+  type: "apply",
+  status: "done",
+  title: `Role ${n} at Example Co`,
+  application_id: null,
+  claimed_at: ago(n),
+  steps_used: 4,
+  attempts: 1,
+  dry_run: false,
+  checkpoint: null,
+  blockers: [],
+  permit_decisions: [],
+  result: null,
+  evidence_refs: [],
+  ...over,
+})
+
+function seedTasks(): RunnerTask[] {
+  return [
+    runnerTask(1, {
+      task_id: TASK.copperline,
+      status: "claimed",
+      title: "Grid Data Analyst at Copperline Energy",
+      claimed_at: ago(0.5),
+      steps_used: 12,
+      checkpoint: {
+        step: "filled the contact page",
+        fields_filled: ["full_name", "email", "phone"],
+        screenshot_ref: null,
+        url: "https://jobs.copperline.example/apply",
+        data: {},
+      },
+      blockers: [
+        {
+          pending_action_id: ACTION.captcha,
+          kind: "captcha",
+          title: "Solve the CAPTCHA for Grid Data Analyst at Copperline Energy",
+          status: "open",
+          raised_at: ago(0.4),
+          resolution: null,
+        },
+      ],
+      permit_decisions: [
+        {
+          at: ago(0.3),
+          decision: "wait_for_owner",
+          reason: "the cover letter changed since you approved it",
+          changes: ["cover_letter"],
+          permit_id: null,
+        },
+      ],
+    }),
+    runnerTask(2, {
+      title: "Credit Analyst at Luangwa Re",
+      steps_used: 18,
+      permit_decisions: [
+        {
+          at: ago(2.5),
+          decision: "granted",
+          reason: null,
+          changes: [],
+          permit_id: uuid("8", 1),
+        },
+      ],
+      result: {
+        outcome: "submitted",
+        detail: "Confirmation page shown",
+        reference: "LR-2041",
+        confirmation_text: "Thank you for applying",
+        at: ago(2.4),
+      },
+      evidence_refs: [`evidence:${uuid("9", 2)}/confirm.png`],
+    }),
+    runnerTask(3, {
+      type: "sweep_site",
+      title: "careers.example.com",
+      steps_used: 6,
+      result: {
+        outcome: "swept",
+        detail: "4 postings found",
+        reference: null,
+        confirmation_text: null,
+        at: ago(5),
+      },
+    }),
+  ]
 }
 
 const account = (
@@ -125,6 +226,8 @@ export function seedRunners(): MockRunners {
         last_seen_at: ago(0.01),
         online: true,
         current_task_id: TASK.copperline,
+        current_task_title: "Grid Data Analyst at Copperline Energy",
+        current_task_type: "apply",
       },
       {
         token_id: SERVER_ID,
@@ -133,6 +236,8 @@ export function seedRunners(): MockRunners {
         last_seen_at: ago(2),
         online: false,
         current_task_id: null,
+        current_task_title: null,
+        current_task_type: null,
       },
       {
         token_id: PAUSED_ID,
@@ -141,8 +246,11 @@ export function seedRunners(): MockRunners {
         last_seen_at: ago(5),
         online: false,
         current_task_id: null,
+        current_task_title: null,
+        current_task_type: null,
       },
     ],
+    tasks: { [PC_ID]: seedTasks() },
     accounts: [
       account(1, {
         portal: "workday",
@@ -186,6 +294,29 @@ const entry = (a: ApplicationSummary): Entry => ({
   deadline: null,
 })
 
+/** `accounts.CHOICES`: the owner's choices per blocker kind (an invariant on the server). */
+const CARRY_ON: PendingAction["choices"] = [
+  "continue",
+  "manual_handoff",
+  "skipped",
+]
+export const BLOCKER_CHOICES: Record<string, PendingAction["choices"]> = {
+  sign_in: CARRY_ON,
+  create_account: CARRY_ON,
+  verification_code: CARRY_ON,
+  captcha: CARRY_ON,
+  assessment: CARRY_ON,
+  declaration: CARRY_ON,
+  unsupported_form: ["manual_handoff", "skipped"],
+  redirect_off_domain: ["manual_handoff", "skipped", "continue_acknowledged"],
+  page_instruction: ["manual_handoff", "skipped", "continue_acknowledged"],
+  field_mismatch: CARRY_ON,
+}
+/** The choices of an open blocker of this kind; none for any other action. */
+export const choicesFor = (kind: unknown): PendingAction["choices"] => [
+  ...(BLOCKER_CHOICES[String(kind)] ?? []),
+]
+
 const pending = (
   id: string,
   type: PendingAction["type"],
@@ -208,6 +339,9 @@ const pending = (
   resolution: null,
   kind:
     typeof over.detail.kind === "string" ? (over.detail.kind as string) : null,
+  reminders_sent: BLOCKER_CHOICES[String(over.detail.kind)] ? 0 : null,
+  next_reminder_at: null,
+  choices: choicesFor(over.detail.kind),
   ...over,
 })
 
@@ -240,6 +374,7 @@ export function blockerActions(apps: ApplicationSummary[]): PendingAction[] {
   const mulungushi = by("Mulungushi Digital")
   const luangwa = by("Luangwa Re")
   const kafue = by("Kafue Analytics")
+  const kariba = by("Kariba Freight")
   const runner = (task: string) => ({
     runner_id: PC_ID,
     runner_kind: "pc",
@@ -281,6 +416,8 @@ export function blockerActions(apps: ApplicationSummary[]): PendingAction[] {
       agent_task_id: TASK.zambezi,
       group_key: "portal:workday:careers.zambezi-mining.example",
       deadline: ahead(36),
+      reminders_sent: 1,
+      next_reminder_at: ahead(12),
       detail: {
         kind: "sign_in",
         portal_key: "workday:careers.zambezi-mining.example",
@@ -325,6 +462,15 @@ export function blockerActions(apps: ApplicationSummary[]): PendingAction[] {
       `Fill in the form by hand for ${mulungushi.title} at ${mulungushi.employer}`,
       { note: "The form is a scanned PDF to print and sign." }
     ),
+    perTask(
+      ACTION.mismatch,
+      "unsupported_form",
+      "field_mismatch",
+      kariba,
+      TASK.kariba,
+      `Check the details entered for ${kariba.title} at ${kariba.employer}`,
+      { keys: ["full_name", "phone"] }
+    ),
     pending(ACTION.offDomain, "redirect_off_domain", {
       title: "The form left jobs.luangwa.example",
       application_id: luangwa.id,
@@ -332,8 +478,7 @@ export function blockerActions(apps: ApplicationSummary[]): PendingAction[] {
       employer: luangwa.employer,
       job_title: luangwa.title,
       detail: {
-        kind: "blocker",
-        blocker: "redirect_off_domain",
+        kind: "redirect_off_domain",
         url: "https://forms.unrelated.example/step2",
         url_domain: "forms.unrelated.example",
         runner: "Office PC",
@@ -351,8 +496,7 @@ export function blockerActions(apps: ApplicationSummary[]): PendingAction[] {
       employer: kafue.employer,
       job_title: kafue.title,
       detail: {
-        kind: "blocker",
-        blocker: "page_instruction",
+        kind: "page_instruction",
         url: "https://jobs.kafue.example/apply",
         runner: "Office PC",
         runner_kind: "pc",

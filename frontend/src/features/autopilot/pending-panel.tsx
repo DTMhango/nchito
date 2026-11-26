@@ -17,7 +17,20 @@ import {
   type PendingAction,
   type ResolveIn,
 } from "./api"
-import { isHandoff } from "@/features/accounts/logic"
+import {
+  BlockerChoices,
+  type ChoiceResult,
+} from "@/features/accounts/blocker-choices"
+import {
+  BLOCKER_KINDS,
+  BLOCKER_TITLE,
+  STOP_TEXT,
+  blockerKind,
+  isHandoff,
+  mismatchKeys,
+  reminderText,
+  type BlockerKind,
+} from "@/features/accounts/logic"
 import { answerOptions, pendingInfo, roleChoices } from "./logic"
 
 type Scope = NonNullable<ResolveIn["answer_scope"]>
@@ -28,9 +41,14 @@ const SCOPES: { value: Scope; label: string }[] = [
   { value: "all_matching", label: "Every matching question" },
 ]
 
+/** A runner blocker with its own owner choices (a question is answered in its row instead). */
+const isBlocker = (a: PendingAction) =>
+  a.type !== "unknown_question" && isHandoff(a)
+
 /** Everything waiting on the owner, each type with the choices it really has (DESIGN 8.4). */
 export function PendingPanel() {
-  const q = useQuery(pendingQuery())
+  const [kind, setKind] = useState<BlockerKind | null>(null)
+  const q = useQuery(pendingQuery(kind))
   const items = q.data ?? []
   return (
     <section aria-label="Waiting on you" className="grid gap-3">
@@ -38,18 +56,101 @@ export function PendingPanel() {
         title="Waiting on you"
         aside="Each one says what the system is waiting for."
       />
+      <label className="flex max-w-sm items-center gap-2 text-sm">
+        Show
+        <NativeSelect
+          aria-label="Show what is waiting"
+          value={kind ?? ""}
+          onChange={(e) =>
+            setKind((e.target.value || null) as BlockerKind | null)
+          }
+        >
+          <option value="">Everything</option>
+          {BLOCKER_KINDS.map((k) => (
+            <option key={k} value={k}>
+              {BLOCKER_TITLE[k]}
+            </option>
+          ))}
+        </NativeSelect>
+      </label>
       {q.isSuccess && items.length === 0 && (
         <EmptyState
-          title="Nothing is waiting on you"
+          title={
+            kind ? "None of these is waiting" : "Nothing is waiting on you"
+          }
           description="Approvals, sign-ins and new questions show up here."
         />
       )}
-      <ul className="grid gap-2.5">
-        {items.map((a) => (
-          <PendingRow key={a.id} action={a} />
-        ))}
+      <ul aria-label="Waiting items" className="grid gap-2.5">
+        {items.map((a) =>
+          isBlocker(a) ? (
+            <BlockerRow key={a.id} action={a} />
+          ) : (
+            <PendingRow key={a.id} action={a} />
+          )
+        )}
       </ul>
     </section>
+  )
+}
+
+/** A runner blocker: the server's choices as buttons, its reminders and any differing fields. */
+function BlockerRow({ action }: { action: PendingAction }) {
+  const qc = useQueryClient()
+  const kind = blockerKind(action)
+  const info = pendingInfo(action)
+  const reminders = reminderText(action)
+  const keys = mismatchKeys(action)
+  const done = (r: ChoiceResult) => {
+    toast.success(
+      r.choice === "continue" || r.choice === "continue_acknowledged"
+        ? "Thank you. The agent is carrying on."
+        : "Done."
+    )
+    for (const k of [
+      ["pending-actions"],
+      ["applications"],
+      ["autopilot"],
+      ["today"],
+    ])
+      void qc.invalidateQueries({ queryKey: k })
+  }
+  return (
+    <li
+      aria-label={action.title}
+      className="grid gap-2 rounded-lg border border-border bg-surface p-3.5"
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <Chip tone="info">{kind ? BLOCKER_TITLE[kind] : info.label}</Chip>
+        <h4 className="text-md">{action.title}</h4>
+        {action.employer && (
+          <span className="text-sm text-faint">{action.employer}</span>
+        )}
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {(kind && STOP_TEXT[kind]) ?? info.waiting}
+      </p>
+      {keys.length > 0 && (
+        <p className="text-sm">
+          <span className="text-faint">Fields that differ: </span>
+          {keys.join(", ")}
+        </p>
+      )}
+      {reminders && (
+        <p className="text-sm text-faint">Reminders: {reminders}.</p>
+      )}
+      <div className="flex flex-wrap items-start gap-2">
+        <BlockerChoices action={action} onDone={done} />
+        <Button asChild type="button" variant="outline">
+          <Link
+            to="/accounts/handoff/$actionId"
+            params={{ actionId: action.id }}
+          >
+            Details and other choices
+          </Link>
+        </Button>
+      </div>
+    </li>
   )
 }
 

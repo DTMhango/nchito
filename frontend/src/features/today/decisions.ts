@@ -3,6 +3,19 @@ import type {
   AnswerScope,
   ResolveIn,
 } from "@/features/applications/api"
+import {
+  blockerKind,
+  choicesOf,
+  continueRule,
+  isHandoff,
+  type BlockerKind,
+} from "@/features/accounts/logic"
+
+/** The handoff link of a blocker whose choices are on its handoff page, worded by kind. */
+const HANDOFF_LABEL: Partial<Record<BlockerKind, string>> = {
+  redirect_off_domain: "See where it went",
+  page_instruction: "See what the page asked",
+}
 
 export const SCOPE_OPTIONS: {
   value: AnswerScope
@@ -89,8 +102,9 @@ export type ActionKit = {
 
 /**
  * Primary and secondary action for a group, from its first action. Only resolutions the backend
- * accepts for that type are offered: `continue` for sign_in / create_account / captcha,
- * `answered` for questions, `confirmed` for confirm_submission, `dismissed` for everything else.
+ * accepts are offered: for a runner blocker, `continue` when its `choices` list it (other choices
+ * are on the handoff page); `answered` for questions, `confirmed` for confirm_submission,
+ * `dismissed` for everything else.
  */
 export function actionKit(action: PendingAction, count: number): ActionKit {
   const these = count > 1 ? "these roles" : "this role"
@@ -104,50 +118,30 @@ export function actionKit(action: PendingAction, count: number): ActionKit {
       },
       secondary: { label: "Dismiss", resolution: "dismissed" },
     }
-  const kind = action.kind ?? (action.detail as Record<string, unknown>).kind
+  // A runner blocker: the buttons follow the server's choices (`choices`), never the type.
+  if (action.type !== "unknown_question" && isHandoff(action)) {
+    const rule = continueRule(action)
+    if (rule)
+      return {
+        primary: { label: rule.label, resolution: "continue" },
+        secondary: { label: "Open portal", resolution: "link" },
+      }
+    const kind = blockerKind(action)
+    return {
+      primary: {
+        label:
+          (kind && HANDOFF_LABEL[kind]) ??
+          (choicesOf(action).length ? "Choose what to do" : "See the details"),
+        resolution: "handoff",
+      },
+      secondary: null,
+    }
+  }
   switch (action.type) {
     case "unknown_question":
       return {
         primary: { label: "Answer", resolution: "answer" },
         secondary: { label: `Skip ${these}`, resolution: "dismissed" },
-      }
-    case "sign_in":
-      return {
-        primary: {
-          label:
-            kind === "verification_code"
-              ? "I entered the code"
-              : "I've signed in",
-          resolution: "continue",
-        },
-        secondary: { label: "Open portal", resolution: "link" },
-      }
-    case "create_account":
-      return {
-        primary: { label: "I created the account", resolution: "continue" },
-        secondary: { label: "Open portal", resolution: "link" },
-      }
-    case "captcha":
-      return {
-        primary: { label: "I solved it", resolution: "continue" },
-        secondary: { label: "Open portal", resolution: "link" },
-      }
-    case "assessment":
-    case "declaration":
-    case "unsupported_form":
-      return {
-        primary: { label: "Choose what to do", resolution: "handoff" },
-        secondary: null,
-      }
-    case "redirect_off_domain":
-      return {
-        primary: { label: "See where it went", resolution: "handoff" },
-        secondary: { label: "Close it", resolution: "dismissed" },
-      }
-    case "page_instruction":
-      return {
-        primary: { label: "See what the page asked", resolution: "handoff" },
-        secondary: { label: "Close it", resolution: "dismissed" },
       }
     case "approve":
       return {

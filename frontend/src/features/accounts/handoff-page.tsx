@@ -19,22 +19,23 @@ import {
 import { deadlineText } from "@/features/today/decisions"
 import {
   accountKeys,
-  giveUp,
   pendingActionQuery,
   resolvePendingAction,
   type GiveUpOut,
   type PendingAction,
 } from "./api"
+import { BlockerChoices, type ChoiceResult } from "./blocker-choices"
 import {
   BLOCKER_TITLE,
   STOP_TEXT,
   canGiveUp,
-  continueBody,
+  choicesOf,
   continueOutcome,
   continueRule,
   dateText,
-  giveUpBody,
+  mismatchKeys,
   readBlocker,
+  reminderText,
   roleText,
   waitingOn,
   waitingText,
@@ -91,6 +92,9 @@ export function HandoffDetail({ action }: { action: PendingAction }) {
   const d = readBlocker(action)
   const rule = continueRule(action)
   const givesUp = canGiveUp(action)
+  const hasChoices = choicesOf(action).length > 0
+  const mismatched = mismatchKeys(action)
+  const reminders = reminderText(action)
   const waiting = waitingOn(action)
   const runners = useQuery(runnersQuery())
   const settings = useQuery(settingsQuery())
@@ -124,40 +128,42 @@ export function HandoffDetail({ action }: { action: PendingAction }) {
       void qc.invalidateQueries({ queryKey: k })
   }
 
-  const act = useMutation({
-    mutationFn: async (choice: HandoffChoice) => {
-      if (choice === "continue") {
-        if (!rule) throw new Error("This one cannot be continued.")
-        setClosed(await resolvePendingAction(action.id, continueBody(rule)))
-      } else if (choice === "close") {
-        setClosed(
-          await resolvePendingAction(action.id, {
-            resolution: "dismissed",
-            note: "reviewed",
-          })
-        )
-      } else {
-        const all = chosen.length === waiting.length
-        setGaveUp(
-          await giveUp(action.id, giveUpBody(choice, all ? null : chosen))
-        )
-      }
-      return choice
-    },
-    onSuccess: (choice) => {
-      setDone(choice)
-      setError(null)
-      toast.success(
-        choice === "continue" ? "Thank you. The agent is carrying on." : "Done."
-      )
-      refresh()
+  const finish = (choice: HandoffChoice) => {
+    setDone(choice)
+    setError(null)
+    toast.success(
+      choice === "continue" || choice === "continue_acknowledged"
+        ? "Thank you. The agent is carrying on."
+        : "Done."
+    )
+    refresh()
+  }
+  const onChoice = (r: ChoiceResult) => {
+    if ("gaveUp" in r) {
+      setGaveUp(r.gaveUp)
+      finish(r.choice === "manual_handoff" ? "apply_myself" : "skip")
+    } else {
+      setClosed(r.action)
+      finish(r.choice)
+    }
+  }
+  // No server choices (not a runner blocker any more): the owner can only close it.
+  const close = useMutation({
+    mutationFn: () =>
+      resolvePendingAction(action.id, {
+        resolution: "dismissed",
+        note: "reviewed",
+      }),
+    onSuccess: (a) => {
+      setClosed(a)
+      finish("close")
     },
     onError: (e) => setError(errorText(e)),
   })
 
   const label = d.kind ? BLOCKER_TITLE[d.kind] : "Blocked"
-  const busy = act.isPending
   const pickNone = givesUp && waiting.length > 1 && chosen.length === 0
+  const all = chosen.length === waiting.length
 
   return (
     <section aria-label="Sign-in handoff" className="grid gap-4 panel p-4">
@@ -207,7 +213,7 @@ export function HandoffDetail({ action }: { action: PendingAction }) {
         <dt className="text-faint">Waiting</dt>
         <dd>
           <p className="font-medium">{waitingText(waiting.length)}</p>
-          {givesUp && waiting.length > 1 && open && !done ? (
+          {givesUp && waiting.length > 1 && !done ? (
             <fieldset className="mt-1 grid gap-1">
               <legend className="sr-only">Applications this covers</legend>
               {waiting.map((w) => (
@@ -244,9 +250,31 @@ export function HandoffDetail({ action }: { action: PendingAction }) {
               {Array.isArray(offsets) && offsets.length > 0
                 ? `You are reminded ${offsets.join(", ")} hours before the nearest deadline.`
                 : "You are reminded as the deadline gets close."}
+              {reminders && (
+                <span className="block text-muted-foreground">
+                  {reminders}.
+                </span>
+              )}
             </dd>
           </>
         ) : null}
+        {mismatched.length > 0 && (
+          <>
+            <dt className="text-faint">Fields that differ</dt>
+            <dd>
+              <ul
+                aria-label="Fields that differ"
+                className="flex flex-wrap gap-1"
+              >
+                {mismatched.map((k) => (
+                  <li key={k}>
+                    <code className="rounded bg-sunken px-1">{k}</code>
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </>
+        )}
         {d.note && (
           <>
             <dt className="text-faint">The runner reported</dt>
@@ -295,42 +323,28 @@ export function HandoffDetail({ action }: { action: PendingAction }) {
         </p>
       )}
 
-      {open && !done && (
+      {open && !done && hasChoices && (
+        <BlockerChoices
+          action={action}
+          applicationIds={all ? null : chosen}
+          disabled={pickNone}
+          onDone={onChoice}
+        />
+      )}
+      {open && !done && !hasChoices && (
         <div className="flex flex-wrap gap-2">
-          {rule && (
-            <Button disabled={busy} onClick={() => act.mutate("continue")}>
-              {rule.label}
-            </Button>
-          )}
-          {givesUp ? (
-            <>
-              <Button
-                variant="outline"
-                disabled={busy || pickNone}
-                onClick={() => act.mutate("apply_myself")}
-              >
-                Apply myself instead
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={busy || pickNone}
-                onClick={() => act.mutate("skip")}
-              >
-                Skip
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="outline"
-              disabled={busy}
-              onClick={() => act.mutate("close")}
-            >
-              I've looked at it, close it
-            </Button>
-          )}
+          <Button
+            variant="outline"
+            disabled={close.isPending}
+            onClick={() => close.mutate()}
+          >
+            I've looked at it, close it
+          </Button>
         </div>
       )}
-      {done === "continue" && closed && <Resuming action={closed} detail={d} />}
+      {(done === "continue" || done === "continue_acknowledged") && closed && (
+        <Resuming action={closed} detail={d} />
+      )}
       {done === "apply_myself" && gaveUp && (
         <p role="status" className="text-sm text-muted-foreground">
           {gaveUp.handled.length} application

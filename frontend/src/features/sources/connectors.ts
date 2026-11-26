@@ -86,7 +86,11 @@ export const OVERRIDES: Record<NewConnector, readonly string[]> = {
 export const settingKey = (kind: NewConnector, name: string) =>
   `${SETTING_PREFIX[kind]}${name}`
 
-/** The provider fields a web search source carries (search_api `CONFIG_KEYS`). */
+/**
+ * The provider fields of a Search API connection (search_api `CONFIG_KEYS`). They live on the
+ * connection only: a web search source never carries them (the server drops them), so a form
+ * removes any an older source still has.
+ */
 export const SEARCH_SHAPE_KEYS = [
   "endpoint",
   "query_param",
@@ -289,11 +293,8 @@ export function buildConfig(
           ? "That Search API connection is paused or gone. Choose another."
           : "Add a Search API connection first (Settings, Connections).",
       }
-    for (const k of SEARCH_SHAPE_KEYS) {
-      const v = conn.config[k]
-      if (v != null && v !== "") config[k] = v
-      else delete config[k]
-    }
+    // The endpoint, response shape and key belong to the connection only; never to the source.
+    for (const k of SEARCH_SHAPE_KEYS) delete config[k]
     if (draft.connectionId) config.connection_id = draft.connectionId
     else delete config.connection_id
   }

@@ -173,7 +173,32 @@ describe("Web search", () => {
     ).toHaveAttribute("href", "/settings/connections")
   })
 
-  it("uses the first enabled connection and copies its shape, not its key", async () => {
+  it("has no endpoint or response-shape fields: they belong to the connection", async () => {
+    searchConn()
+    const { user, dialog } = await openAdd()
+    await pick(user, dialog, /Web search/)
+    expect(
+      await within(dialog).findByLabelText("Search API connection")
+    ).toBeInTheDocument()
+    for (const label of [
+      /search address/i,
+      /endpoint/i,
+      /key header/i,
+      /key parameter/i,
+      /result list path/i,
+      /link field/i,
+      /title field/i,
+      /search phrase parameter/i,
+      /result count parameter/i,
+    ])
+      expect(within(dialog).queryByLabelText(label)).toBeNull()
+    // Its own fields stay: the query template and limits.
+    expect(
+      await within(dialog).findByLabelText(/Web search phrase/)
+    ).toBeInTheDocument()
+  })
+
+  it("uses the first enabled connection and stores no provider keys", async () => {
     searchConn()
     const { user, dialog } = await openAdd()
     await pick(user, dialog, /Web search/)
@@ -186,11 +211,9 @@ describe("Web search", () => {
     )
     const s = store.sources.find((x) => x.connector === "web_search")!
     expect(s.access).toBe("api")
-    expect(s.config).toEqual({
-      endpoint: "https://search.example.com/v1",
-      result_path: "data",
-    })
+    expect(s.config).toEqual({})
     expect(JSON.stringify(s.config)).not.toContain("wxyz")
+    expect(JSON.stringify(s.config)).not.toContain("search.example.com")
   })
 
   it("names a chosen connection with connection_id", async () => {

@@ -111,16 +111,31 @@ describe("buildConfig", () => {
     })
   })
 
-  it("copies the provider shape from the connection, never its key", () => {
+  it("keeps the provider's endpoint, shape and key on the connection, never on the source", () => {
     const r = buildConfig("web_search", emptyDraft(), [], [conn({})])
-    expect(r).toEqual({
-      ok: true,
-      config: {
-        endpoint: "https://search.example.com/api",
-        result_path: "data",
-      },
-    })
+    expect(r).toEqual({ ok: true, config: {} })
     expect(JSON.stringify(r)).not.toContain("abcd")
+    // An older source that still carries provider keys loses them; its own keys stay.
+    const d = { ...emptyDraft(), connectionId: "c1" }
+    d.overrides = { query_template: "{title} jobs" }
+    const s = setting({
+      key: "sources.search.query_template",
+      kind: "string",
+    })
+    const old = {
+      endpoint: "https://old.example.com",
+      query_param: "q",
+      limit_param: "n",
+      key_header: "X-Key",
+      key_param: "k",
+      result_path: "items",
+      url_field: "link",
+      title_field: "name",
+    }
+    expect(buildConfig("web_search", d, [s], [conn({})], old)).toEqual({
+      ok: true,
+      config: { connection_id: "c1", query_template: "{title} jobs" },
+    })
   })
 
   it("refuses web search with no usable connection", () => {

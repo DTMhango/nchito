@@ -1,10 +1,11 @@
 /** Blocker rules, handoff wording and account status text (DESIGN 8.3, 8.4). No I/O. */
+import { isApiError } from "@/lib/api/client"
 import type { GiveUpIn, PendingAction, PortalAccount, ResolveIn } from "./api"
 
 /**
- * Blocker kinds `app.apply.accounts` registers (`detail.kind`). Sign-in and create-account are one
- * action per portal tenant; the others are one action per task and kind, so a CAPTCHA and a
- * verification code on the same task are two separate actions.
+ * Blocker kinds a runner raises (`detail.kind`, the exact kind; `?kind=` filters on it). Sign-in
+ * and create-account are one action per site; the others are one action per task and kind, so a
+ * CAPTCHA and a verification code on the same task are two separate actions.
  */
 export const ACCOUNT_KINDS = [
   "sign_in",
@@ -15,27 +16,90 @@ export const ACCOUNT_KINDS = [
   "declaration",
   "unsupported_form",
 ] as const
-/** Gateway blockers that are not account actions (`detail.kind = "blocker"`, `detail.blocker`). */
-export const GATEWAY_KINDS = [
+/** Suspicious pages: the runner stopped because the page itself looked wrong. */
+export const SUSPICIOUS_KINDS = [
   "redirect_off_domain",
   "page_instruction",
 ] as const
+/** Entered personal fields that differ from the packet (`detail.keys`). */
+export const MISMATCH_KIND = "field_mismatch" as const
 
 export type AccountKind = (typeof ACCOUNT_KINDS)[number]
-export type BlockerKind = AccountKind | (typeof GATEWAY_KINDS)[number]
+export type BlockerKind =
+  AccountKind | (typeof SUSPICIOUS_KINDS)[number] | typeof MISMATCH_KIND
 
-const ALL_KINDS: readonly string[] = [...ACCOUNT_KINDS, ...GATEWAY_KINDS]
-const isKind = (v: unknown): v is BlockerKind =>
-  typeof v === "string" && ALL_KINDS.includes(v)
-const isAccountKind = (v: unknown): v is AccountKind =>
-  typeof v === "string" && (ACCOUNT_KINDS as readonly string[]).includes(v)
-
-/** Pending action types the resolve endpoint continues (`owner_actions.CONTINUABLE`). */
-const CONTINUABLE: readonly PendingAction["type"][] = [
-  "sign_in",
-  "create_account",
-  "captcha",
+/** Every blocker kind, in the order the kind filter lists them. */
+export const BLOCKER_KINDS: readonly BlockerKind[] = [
+  ...ACCOUNT_KINDS,
+  ...SUSPICIOUS_KINDS,
+  MISMATCH_KIND,
 ]
+const isKind = (v: unknown): v is BlockerKind =>
+  typeof v === "string" && (BLOCKER_KINDS as readonly string[]).includes(v)
+
+/** What the owner may do with an open blocker (`PendingActionOut.choices`, from the server). */
+export type OwnerChoice = PendingAction["choices"][number]
+/** The order the buttons appear in: carry on first, the acknowledged continue last. */
+export const CHOICE_ORDER: readonly OwnerChoice[] = [
+  "continue",
+  "manual_handoff",
+  "skipped",
+  "continue_acknowledged",
+]
+/** The server's choices for an open action, in button order. */
+export const choicesOf = (action: PendingAction): OwnerChoice[] =>
+  action.status === "open"
+    ? CHOICE_ORDER.filter((c) => (action.choices ?? []).includes(c))
+    : []
+
+export const CHOICE_LABEL: Record<Exclude<OwnerChoice, "continue">, string> = {
+  manual_handoff: "Apply myself instead",
+  skipped: "Skip",
+  continue_acknowledged: "It's fine, continue",
+}
+export const ACKNOWLEDGE_TEXT = "I checked this page and it is safe to continue"
+
+/** The resolve body of "It's fine, continue" on a suspicious page. */
+export const acknowledgedBody = (note: string): ResolveIn => ({
+  resolution: "continue",
+  acknowledged: true,
+  note: note.trim() || null,
+})
+
+/** A 422 `{detail: {code}}` from the resolve endpoint, or null. */
+export function refusalCode(e: unknown): string | null {
+  if (!isApiError(e, 422)) return null
+  const d = e.body?.detail
+  return d && !Array.isArray(d) && typeof d === "object" && "code" in d
+    ? String(d.code)
+    : null
+}
+
+/** Plain words for a refused continue. */
+export function continueErrorText(e: unknown, fallback: string): string {
+  const code = refusalCode(e)
+  if (code === "acknowledgement_required")
+    return "Tick the box to say you checked the page before it carries on."
+  if (code === "not_continuable")
+    return "This one cannot be continued. Apply yourself or skip it."
+  return fallback
+}
+
+/** The differing field keys of a `field_mismatch` blocker (`detail.keys`). */
+export const mismatchKeys = (action: PendingAction): string[] =>
+  strings((action.detail as Record<string, unknown>).keys)
+
+/** "1 reminder sent, next on 3 Dec 14:00": blocker actions only (both fields null otherwise). */
+export function reminderText(action: PendingAction): string | null {
+  const sent = action.reminders_sent
+  const next = action.next_reminder_at
+  if (sent == null && next == null) return null
+  const parts = [
+    `${sent ?? 0} reminder${sent === 1 ? "" : "s"} sent`,
+    next ? `next ${dateText(next)}` : "no more reminders before the deadline",
+  ]
+  return parts.join(", ")
+}
 
 export type WaitingApplication = {
   application_id: string
@@ -157,13 +221,15 @@ export function readBlocker(action: PendingAction): BlockerDetail {
 export const isHandoff = (action: PendingAction): boolean =>
   blockerKind(action) !== null
 
-/** The resolve endpoint continues only sign_in (incl. verification code), create_account and captcha. */
+/** The server offers `continue` for this open action. */
 export const canContinue = (action: PendingAction): boolean =>
-  CONTINUABLE.includes(action.type)
+  choicesOf(action).includes("continue")
 
-/** "Apply myself" and "Skip" go through the portal-accounts give-up endpoint: account actions only. */
-export const canGiveUp = (action: PendingAction): boolean =>
-  isAccountKind((action.detail as Record<string, unknown>).kind)
+/** "Apply myself" and "Skip" (the give-up endpoint) are among the server's choices. */
+export const canGiveUp = (action: PendingAction): boolean => {
+  const c = choicesOf(action)
+  return c.includes("manual_handoff") || c.includes("skipped")
+}
 
 export type ContinueRule = {
   /** The button label. */
@@ -199,13 +265,27 @@ export const CONTINUE_RULES: Partial<Record<BlockerKind, ContinueRule>> = {
     instruction:
       "Enter the verification code from your email or phone in the open tab of the runner's browser, then come back here.",
   },
+  field_mismatch: {
+    label: "I've done it, continue",
+    note: "fields_checked",
+    instruction:
+      "The runner entered details that differ from your application packet. Correct them in the open tab of the runner's browser, then come back here.",
+  },
 }
 
-/** The continue rule for an action, or null when the backend does not continue its type. */
+/** Any other continuable kind. */
+export const GENERIC_CONTINUE: ContinueRule = {
+  label: "I've done it, continue",
+  note: "done",
+  instruction:
+    "Do this part yourself in the open tab of the runner's browser, then come back here.",
+}
+
+/** The continue rule for an action, or null when the server does not offer `continue`. */
 export function continueRule(action: PendingAction): ContinueRule | null {
   if (!canContinue(action)) return null
   const kind = blockerKind(action)
-  return (kind && CONTINUE_RULES[kind]) || CONTINUE_RULES.sign_in!
+  return (kind && CONTINUE_RULES[kind]) || GENERIC_CONTINUE
 }
 
 export const BLOCKER_TITLE: Record<BlockerKind, string> = {
@@ -218,6 +298,7 @@ export const BLOCKER_TITLE: Record<BlockerKind, string> = {
   unsupported_form: "Form the agent cannot use",
   redirect_off_domain: "Left the employer's site",
   page_instruction: "The page asked for something else",
+  field_mismatch: "Entered details differ",
 }
 
 /** What the owner can do when the agent cannot carry on. */
@@ -231,9 +312,16 @@ export const STOP_TEXT: Partial<Record<BlockerKind, string>> = {
     "The form sent the runner off the employer's site, so it stopped. Any unused submit permit was withdrawn.",
   page_instruction:
     "The page asked for something outside the application, so the runner stopped. It never acts on what a page asks.",
+  field_mismatch:
+    "The runner entered details that differ from your application packet, so it stopped before submitting.",
 }
 
-export type HandoffChoice = "continue" | "apply_myself" | "skip" | "close"
+/** Suspicious pages: their continue needs the owner to say they checked the page. */
+export const isSuspicious = (kind: BlockerKind | null) =>
+  !!kind && (SUSPICIOUS_KINDS as readonly string[]).includes(kind)
+
+export type HandoffChoice =
+  "continue" | "continue_acknowledged" | "apply_myself" | "skip" | "close"
 
 export const continueBody = (rule: ContinueRule): ResolveIn => ({
   resolution: "continue",

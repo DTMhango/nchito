@@ -21,10 +21,10 @@ describe("Today: Needs you", () => {
         "Signing in to this portal unlocks two applications"
       )
     ).toBeInTheDocument()
-    // 4 questions + 1 tenant sign-in + approve + confirm + mail proposal + 6 wave 3 actions
-    // collapse to 11 decisions.
-    expect(open().length).toBe(14)
-    expect(within(needs).getByText("11")).toBeInTheDocument()
+    // 4 questions + 1 tenant sign-in + approve + confirm + mail proposal + 7 wave 3 actions
+    // collapse to 12 decisions.
+    expect(open().length).toBe(15)
+    expect(within(needs).getByText("12")).toBeInTheDocument()
     expect(within(needs).getAllByText(/paused until you answer/i).length).toBe(
       1
     )
@@ -98,7 +98,7 @@ describe("Today: Needs you", () => {
     const user = userEvent.setup()
     renderApp("/today")
     const bell = await screen.findByRole("button", {
-      name: /notifications, 14 waiting/i,
+      name: /notifications, 15 waiting/i,
     })
     await user.click(bell)
     expect(
@@ -125,8 +125,7 @@ describe("Today: Needs you", () => {
     await waitFor(() => expect(changed.status).toBe("dismissed"))
   })
 
-  it("gives the new blocker types their own labels and only choices the backend accepts", async () => {
-    const user = userEvent.setup()
+  it("gives the blocker kinds their own labels and only the choices the server lists", async () => {
     renderApp("/today")
     const needs = await screen.findByRole("region", { name: "Needs you" })
     expect(
@@ -139,23 +138,16 @@ describe("Today: Needs you", () => {
       within(needs).getByRole("link", { name: "Choose what to do" })
     ).toHaveAttribute("href", `/accounts/handoff/${ACTION.unsupported}`)
     expect(
-      within(needs).getByRole("button", { name: "I entered the code" })
+      within(needs).getByRole("button", {
+        name: "I entered the code, continue",
+      })
     ).toBeInTheDocument()
-    // Closing a redirect is a dismissal; the backend refuses anything else for it.
-    const closeButtons = within(needs).getAllByRole("button", {
-      name: "Close it",
-    })
-    expect(closeButtons).toHaveLength(2)
-    await user.click(closeButtons[0])
-    await waitFor(() =>
-      expect(
-        applicationsMock().actions.filter(
-          (a) =>
-            (a.id === ACTION.offDomain || a.id === ACTION.pageAsked) &&
-            a.status === "dismissed"
-        )
-      ).toHaveLength(1)
-    )
+    // A field mismatch lists continue: carried on from Today with the generic label.
+    expect(
+      within(needs).getByRole("button", { name: "I've done it, continue" })
+    ).toBeInTheDocument()
+    // A suspicious page is never closed or continued from Today: its choices are on the handoff.
+    expect(within(needs).queryByRole("button", { name: "Close it" })).toBeNull()
   })
 
   it("continues a portal sign-in once, for every waiting application", async () => {
@@ -163,7 +155,9 @@ describe("Today: Needs you", () => {
     renderApp("/today")
     const needs = await screen.findByRole("region", { name: "Needs you" })
     await user.click(
-      await within(needs).findByRole("button", { name: "I've signed in" })
+      await within(needs).findByRole("button", {
+        name: "I've signed in, continue",
+      })
     )
     const signIn = applicationsMock().actions.find(
       (a) => a.id === ACTION.signIn
@@ -183,7 +177,7 @@ describe("Today: Needs you", () => {
     const user = userEvent.setup()
     renderApp("/today")
     await user.click(
-      await screen.findByRole("button", { name: /notifications, 14 waiting/i })
+      await screen.findByRole("button", { name: /notifications, 15 waiting/i })
     )
     const links = await screen.findAllByRole("link")
     const hrefs = links.map((l) => l.getAttribute("href") ?? "")

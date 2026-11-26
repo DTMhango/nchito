@@ -305,8 +305,9 @@ function SearchFields({
       </select>
       {used ? (
         <p className="text-xs text-muted-foreground">
-          Searches go to <code>{String(used.config.endpoint ?? "")}</code>. Its
-          key stays in the connection; it is never copied into the source.
+          Searches go to <code>{String(used.config.endpoint ?? "")}</code>. The
+          address, the answer's shape and the key are set on the connection
+          (Settings, Connections), never on the source.
         </p>
       ) : (
         <p role="alert" className="text-xs text-danger">

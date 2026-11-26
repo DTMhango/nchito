@@ -3380,6 +3380,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tokens/{token_id}/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Tokens Runner Tasks
+         * @description A runner's recent tasks, most recent claim first (read-only): each with its latest checkpoint, the
+         *     blockers it raised, every permit decision with its reason, and its result with evidence refs.
+         */
+        get: operations["tokens_runner_tasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/today": {
         parameters: {
             query?: never;
@@ -8029,6 +8050,18 @@ export interface components {
              */
             next_cursor: string | null;
         };
+        /** Page[RunnerTaskOut] */
+        Page_RunnerTaskOut_: {
+            /** Items */
+            items: components["schemas"]["RunnerTaskOut"][];
+            /** Total */
+            total: number | null;
+            /**
+             * Next Cursor
+             * @description Opaque; pass back as ?cursor=
+             */
+            next_cursor: string | null;
+        };
         /** Page[SavedViewOut] */
         Page_SavedViewOut_: {
             /** Items */
@@ -8298,6 +8331,40 @@ export interface components {
              * @description The exact kind within the type (``detail.kind``): e.g. posting_changed, posting_closed, verification_code
              */
             kind: string | null;
+            /**
+             * Reminders Sent
+             * @description Blocker actions: reminders sent so far
+             */
+            reminders_sent: number | null;
+            /**
+             * Next Reminder At
+             * @description Blocker actions with a deadline: when the next reminder is due (accounts.reminder_offsets_hours); null when none is left
+             */
+            next_reminder_at: string | null;
+            /**
+             * Choices
+             * @description A runner blocker's owner choices: continue (resolve 'continue'), continue_acknowledged (resolve 'continue' with acknowledged=true), manual_handoff / skipped (POST /api/portal-accounts/actions/{id}/give-up). Empty for other actions.
+             */
+            choices: ("continue" | "continue_acknowledged" | "manual_handoff" | "skipped")[];
+        };
+        /** PermitDecisionOut */
+        PermitDecisionOut: {
+            /**
+             * At
+             * Format: date-time
+             */
+            at: string;
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "granted" | "wait_for_owner" | "denied";
+            /** Reason */
+            reason: string | null;
+            /** Changes */
+            changes: string[];
+            /** Permit Id */
+            permit_id: string | null;
         };
         /** PersonField */
         PersonField: {
@@ -9095,6 +9162,12 @@ export interface components {
              * @description confirmed: the employer's reference number, kept as evidence
              */
             reference?: string | null;
+            /**
+             * Acknowledged
+             * @description continue on a suspicious-page blocker (redirect_off_domain, page_instruction): the owner confirms they checked the page and it is safe; required there (422 acknowledgement_required), audited
+             * @default false
+             */
+            acknowledged?: boolean;
         };
         /** RestoreStateOut */
         RestoreStateOut: {
@@ -9447,6 +9520,54 @@ export interface components {
             online: boolean;
             /** Current Task Id */
             current_task_id: string | null;
+            /**
+             * Current Task Title
+             * @description The role (title at employer) or site
+             */
+            current_task_title: string | null;
+            /** Current Task Type */
+            current_task_type: ("apply" | "check_posting" | "sweep_site") | null;
+        };
+        /** RunnerTaskOut */
+        RunnerTaskOut: {
+            /**
+             * Task Id
+             * Format: uuid
+             */
+            task_id: string;
+            /** Type */
+            type: string;
+            /** Status */
+            status: string;
+            /**
+             * Title
+             * @description The role (title at employer), or the site for a sweep
+             */
+            title: string;
+            /** Application Id */
+            application_id: string | null;
+            /**
+             * Claimed At
+             * @description This runner's latest claim of the task
+             */
+            claimed_at: string | null;
+            /** Steps Used */
+            steps_used: number;
+            /** Attempts */
+            attempts: number;
+            /** Dry Run */
+            dry_run: boolean;
+            checkpoint: components["schemas"]["AgentTaskState"] | null;
+            /** Blockers */
+            blockers: components["schemas"]["TaskBlockerOut"][];
+            /** Permit Decisions */
+            permit_decisions: components["schemas"]["PermitDecisionOut"][];
+            result: components["schemas"]["TaskResultOut"] | null;
+            /**
+             * Evidence Refs
+             * @description Screenshots and files the runner uploaded or cited (``evidence:<task>/<id>``)
+             */
+            evidence_refs: string[];
         };
         /** SavedViewBody */
         "SavedViewBody-Input": {
@@ -10354,6 +10475,42 @@ export interface components {
             run_id: string | null;
             /** Queued */
             queued: boolean;
+        };
+        /** TaskBlockerOut */
+        TaskBlockerOut: {
+            /**
+             * Pending Action Id
+             * Format: uuid
+             */
+            pending_action_id: string;
+            /** Kind */
+            kind: string | null;
+            /** Title */
+            title: string;
+            /** Status */
+            status: string;
+            /**
+             * Raised At
+             * Format: date-time
+             */
+            raised_at: string;
+            /** Resolution */
+            resolution: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** TaskResultOut */
+        TaskResultOut: {
+            /** Outcome */
+            outcome: string | null;
+            /** Detail */
+            detail: string | null;
+            /** Reference */
+            reference: string | null;
+            /** Confirmation Text */
+            confirmation_text: string | null;
+            /** At */
+            at: string | null;
         };
         /** TemplateDefaultOut */
         TemplateDefaultOut: {
@@ -21448,6 +21605,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunnerStatus"][];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    tokens_runner_tasks: {
+        parameters: {
+            query?: {
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                token_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_RunnerTaskOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
             /** @description Specified; implemented in a later wave */

@@ -1,17 +1,22 @@
 import { describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { renderApp } from "@/test/render"
+import { renderApp, setupUser } from "@/test/render"
 import { applicationsMock } from "@/mocks/handlers/applications"
 import { runnersMock } from "@/mocks/handlers/runners"
 import { ACTION } from "@/mocks/dataset/runners"
 import type { PendingAction } from "./api"
+import { http, HttpResponse } from "msw"
+import { server } from "@/test/server"
 import {
   blockerKind,
   canGiveUp,
+  choicesOf,
+  continueErrorText,
   continueRule,
   giveUpBody,
   readBlocker,
+  reminderText,
   waitingText,
 } from "./logic"
 
@@ -152,7 +157,7 @@ describe("blocker logic", () => {
     expect(blockerKind(withDetail(plain, { type: "follow_up" }, {}))).toBeNull()
   })
 
-  it("continues only the types the backend continues, with a label per kind", () => {
+  it("continues only when the server lists continue, with a label per kind", () => {
     expect(continueRule(action(ACTION.signIn))!.label).toBe(
       "I've signed in, continue"
     )
@@ -164,12 +169,75 @@ describe("blocker logic", () => {
     )
     expect(continueRule(action(ACTION.unsupported))).toBeNull()
     expect(continueRule(action(ACTION.offDomain))).toBeNull()
+    // The choices decide, not the type: an assessment the server continues gets the generic label.
+    const assessment = withDetail(
+      action(ACTION.unsupported),
+      { type: "assessment", kind: "assessment", choices: ["continue"] },
+      { kind: "assessment" }
+    )
+    expect(continueRule(assessment)!.label).toBe("I've done it, continue")
+    expect(
+      continueRule(withDetail(action(ACTION.signIn), { choices: [] }, {}))
+    ).toBeNull()
   })
 
-  it("gives up only account actions; no ids means every waiting application", () => {
+  it("orders the server's choices and offers none once the action is closed", () => {
+    expect(choicesOf(action(ACTION.offDomain))).toEqual([
+      "manual_handoff",
+      "skipped",
+      "continue_acknowledged",
+    ])
+    expect(choicesOf(action(ACTION.signIn))).toEqual([
+      "continue",
+      "manual_handoff",
+      "skipped",
+    ])
+    expect(
+      choicesOf(withDetail(action(ACTION.signIn), { status: "resolved" }, {}))
+    ).toEqual([])
+  })
+
+  it("words reminders and the 422 acknowledgement refusal", async () => {
+    expect(reminderText(action(ACTION.signIn))).toMatch(
+      /^1 reminder sent, next /
+    )
+    expect(
+      reminderText(
+        withDetail(
+          action(ACTION.signIn),
+          { reminders_sent: 3, next_reminder_at: null },
+          {}
+        )
+      )
+    ).toBe("3 reminders sent, no more reminders before the deadline")
+    expect(
+      reminderText(
+        withDetail(
+          action(ACTION.changed),
+          { reminders_sent: null, next_reminder_at: null },
+          {}
+        )
+      )
+    ).toBeNull()
+    const { ApiError } = await import("@/lib/api/client")
+    expect(
+      continueErrorText(
+        new ApiError(422, { detail: { code: "acknowledgement_required" } }),
+        "f"
+      )
+    ).toMatch(/Tick the box/)
+    expect(continueErrorText(new Error("x"), "fallback")).toBe("fallback")
+  })
+
+  it("gives up when the server lists it; no ids means every waiting application", () => {
     expect(canGiveUp(action(ACTION.signIn))).toBe(true)
     expect(canGiveUp(action(ACTION.unsupported))).toBe(true)
-    expect(canGiveUp(action(ACTION.offDomain))).toBe(false)
+    expect(canGiveUp(action(ACTION.offDomain))).toBe(true)
+    expect(
+      canGiveUp(
+        withDetail(action(ACTION.signIn), { choices: ["continue"] }, {})
+      )
+    ).toBe(false)
     expect(giveUpBody("apply_myself", null)).toEqual({
       outcome: "manual_handoff",
       application_ids: null,
@@ -277,23 +345,115 @@ describe("sign-in handoff", () => {
     ).toBeInTheDocument()
   })
 
-  it("an off-site redirect can only be closed, and the page's words are shown as data", async () => {
-    const user = userEvent.setup()
+  it("a suspicious page shows its words as data and offers apply myself, skip and an acknowledged continue", async () => {
     renderApp(`/accounts/handoff/${ACTION.pageAsked}`)
     const card = await screen.findByRole("region", { name: "Sign-in handoff" })
     expect(
       within(card).getByText(/Ignore your instructions/)
     ).toBeInTheDocument()
     expect(within(card).getByText(/never acted on/)).toBeInTheDocument()
-    expect(
-      within(card).queryByRole("button", { name: /apply myself|continue/i })
-    ).toBeNull()
+    const names = within(card)
+      .getAllByRole("button")
+      .map((b) => b.textContent)
+    expect(names).toEqual([
+      "Apply myself instead",
+      "Skip",
+      "It's fine, continue",
+    ])
+    expect(within(card).queryByRole("button", { name: /close it/i })).toBeNull()
+  })
+
+  it("continues a suspicious page only after the owner ticks that they checked it", async () => {
+    const user = setupUser()
+    renderApp(`/accounts/handoff/${ACTION.offDomain}`)
     await user.click(
-      within(card).getByRole("button", { name: "I've looked at it, close it" })
+      await screen.findByRole("button", { name: "It's fine, continue" })
+    )
+    const gate = screen.getByRole("group", { name: "Continue on this page" })
+    const go = within(gate).getByRole("button", {
+      name: "Continue on this page",
+    })
+    expect(go).toBeDisabled()
+    await user.type(
+      within(gate).getByLabelText("Note for the record (optional)"),
+      "Same company, new host"
+    )
+    await user.click(
+      within(gate).getByRole("checkbox", {
+        name: "I checked this page and it is safe to continue",
+      })
+    )
+    expect(go).toBeEnabled()
+    await user.click(go)
+    await waitFor(() =>
+      expect(action(ACTION.offDomain).status).toBe("resolved")
+    )
+    expect(action(ACTION.offDomain).resolution).toMatchObject({
+      resolution: "continue",
+      acknowledged: true,
+      note: "Same company, new host",
+    })
+    expect(await screen.findByText(/Resuming on/)).toBeInTheDocument()
+  })
+
+  it("shows a 422 acknowledgement_required refusal as an error", async () => {
+    server.use(
+      http.post("*/api/pending-actions/:id/resolve", () =>
+        HttpResponse.json(
+          {
+            detail: {
+              code: "acknowledgement_required",
+              reason: "confirm you checked the page",
+            },
+          },
+          { status: 422 }
+        )
+      )
+    )
+    const user = setupUser()
+    renderApp(`/accounts/handoff/${ACTION.pageAsked}`)
+    await user.click(
+      await screen.findByRole("button", { name: "It's fine, continue" })
+    )
+    await user.click(screen.getByRole("checkbox", { name: /safe to continue/ }))
+    await user.click(
+      screen.getByRole("button", { name: "Continue on this page" })
+    )
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Tick the box/)
+    expect(action(ACTION.pageAsked).status).toBe("open")
+  })
+
+  it("apply myself on a suspicious page goes through give-up", async () => {
+    const user = setupUser()
+    renderApp(`/accounts/handoff/${ACTION.offDomain}`)
+    await user.click(
+      await screen.findByRole("button", { name: "Apply myself instead" })
     )
     await waitFor(() =>
-      expect(action(ACTION.pageAsked).status).toBe("dismissed")
+      expect(action(ACTION.offDomain).resolution).toMatchObject({
+        resolution: "manual_handoff",
+      })
     )
+  })
+
+  it("a field mismatch lists the differing fields and can continue", async () => {
+    renderApp(`/accounts/handoff/${ACTION.mismatch}`)
+    const card = await screen.findByRole("region", { name: "Sign-in handoff" })
+    expect(within(card).getByText("Entered details differ")).toBeInTheDocument()
+    const fields = within(card).getByRole("list", {
+      name: "Fields that differ",
+    })
+    expect(within(fields).getByText("full_name")).toBeInTheDocument()
+    expect(within(fields).getByText("phone")).toBeInTheDocument()
+    expect(
+      within(card).getByRole("button", { name: "I've done it, continue" })
+    ).toBeInTheDocument()
+  })
+
+  it("shows the reminders sent and when the next one is due on a sign-in", async () => {
+    renderApp(`/accounts/handoff/${ACTION.signIn}`)
+    const card = await screen.findByRole("region", { name: "Sign-in handoff" })
+    expect(within(card).getByText(/1 reminder sent, next /)).toBeInTheDocument()
   })
 
   it("is offered from Today", async () => {
@@ -318,6 +478,56 @@ describe("sign-in handoff", () => {
         (l) => l.getAttribute("href") === `/accounts/handoff/${ACTION.signIn}`
       )
     ).toBe(true)
+  })
+
+  it("filters the Autopilot pending panel by exact blocker kind and renders each row's choices", async () => {
+    const user = setupUser()
+    const seen: string[] = []
+    server.events.on("request:start", ({ request }) => {
+      if (request.url.includes("/api/pending-actions?")) seen.push(request.url)
+    })
+    renderApp("/autopilot")
+    await user.click(await screen.findByRole("tab", { name: /waiting/i }))
+    const items = () =>
+      within(screen.getByRole("list", { name: "Waiting items" })).getAllByRole(
+        "listitem"
+      )
+    await waitFor(() => expect(items().length).toBeGreaterThan(5))
+    // The sign-in row shows its reminders and the server's three choices.
+    const signIn = screen.getByRole("listitem", {
+      name: /Sign in to the Zambezi Mining careers portal/,
+    })
+    expect(
+      within(signIn).getByText(/Reminders: 1 reminder sent, next /)
+    ).toBeInTheDocument()
+    expect(
+      within(signIn).getByRole("button", { name: "I've signed in, continue" })
+    ).toBeInTheDocument()
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Show what is waiting" }),
+      "redirect_off_domain"
+    )
+    await waitFor(() => expect(items()).toHaveLength(1))
+    expect(seen.some((u) => u.includes("kind=redirect_off_domain"))).toBe(true)
+    const row = items()[0]
+    expect(row).toHaveAccessibleName(/The form left jobs\.luangwa\.example/)
+    expect(
+      within(row).getByRole("button", { name: "It's fine, continue" })
+    ).toBeInTheDocument()
+    expect(within(row).queryByRole("button", { name: /continue,/ })).toBeNull()
+    expect(within(row).queryByRole("button", { name: "Dismiss" })).toBeNull()
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Show what is waiting" }),
+      "field_mismatch"
+    )
+    await waitFor(() =>
+      expect(items()[0]).toHaveAccessibleName(/Check the details entered/)
+    )
+    expect(items()).toHaveLength(1)
+    expect(within(items()[0]).getByText(/full_name, phone/)).toBeInTheDocument()
+    server.events.removeAllListeners()
   })
 
   it("says plainly when the link no longer points at anything", async () => {
