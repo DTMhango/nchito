@@ -320,3 +320,45 @@ async def test_no_secret_appears_in_errors_or_logs(caplog):
         await box2.send(mail())
     text = f"{e1.value} {e2.value} {caplog.text}"
     assert not any(secret in text for secret in (*SECRETS, "revoked"))
+
+
+# ----- replies in a thread and calendar attachments (wave 4 integration) --------------------------
+
+
+async def test_a_mail_with_a_thread_is_drafted_as_a_reply_to_the_newest_message_of_that_conversation():
+    box, g, _ = outlook()
+    g.inbox += [inbox_item(1), {**inbox_item(2), "conversationId": "conv-1"}]
+    sent_id = await box.send(mail(thread_id="conv-1"))
+    assert g.replied_to == ["AAMk-in-2"] and sent_id == message_id_for(KEY, OWNER)
+    draft = g.drafts["AAMk-draft-1"]
+    assert draft["internetMessageHeaders"] == [{"name": IDEMPOTENCY_HEADER, "value": KEY}]
+    assert len(g.sent) == 1 and g.urls("POST")[-1].endswith("/send")
+
+
+async def test_a_thread_given_as_a_message_id_is_found_too_and_an_unknown_thread_sends_a_new_mail():
+    box, g, _ = outlook()
+    g.inbox.append(inbox_item(3))
+    await box.send(mail(thread_id="<in-3@mail.example.com>"))
+    assert g.replied_to == ["AAMk-in-3"]
+    box2, g2, _ = outlook()
+    await box2.send(mail(thread_id="conv-nowhere"))
+    assert g2.replied_to == [] and len(g2.sent) == 1
+
+
+async def test_calendar_attachments_become_calendar_parts_and_others_are_ignored():
+    box, g, _ = outlook()
+    ics = b"BEGIN:VCALENDAR\r\nEND:VCALENDAR\r\n"
+    g.inbox += [{**inbox_item(1), "hasAttachments": True}, inbox_item(2)]
+    g.attachments["AAMk-in-1"] = [
+        {"@odata.type": "#microsoft.graph.fileAttachment", "name": "invite.ics", "contentType": "text/calendar",
+         "size": len(ics), "contentBytes": base64.b64encode(ics).decode()},
+        {"@odata.type": "#microsoft.graph.fileAttachment", "name": "cv.pdf", "contentType": "application/pdf",
+         "size": 4, "contentBytes": base64.b64encode(b"%PDF").decode()},
+        {"@odata.type": "#microsoft.graph.itemAttachment", "name": "event.ics", "contentType": "text/calendar"},
+        {"@odata.type": "#microsoft.graph.fileAttachment", "name": "broken.ics", "contentType": "text/calendar",
+         "size": 3, "contentBytes": "!!not base64!!"},
+    ]
+    one, two = await box.list_messages(datetime(2026, 11, 1, tzinfo=UTC))
+    assert one.calendars == (ics,) and two.calendars == ()
+    assert [u for u in g.urls("GET") if u.endswith("/attachments")] == [
+        "https://graph.microsoft.com/v1.0/me/messages/AAMk-in-1/attachments"]  # only for mail with attachments

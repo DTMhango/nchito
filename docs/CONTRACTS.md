@@ -1071,6 +1071,10 @@ Theme studio (DESIGN 10.4). Code: `backend/app/themes/` (`tokens.py`, `colour.py
 - `msgraph` is a mailbox provider (same `Mailbox` contract and email channel as Gmail). Its non-secret config is
   `from_address` (set at sign-in) and `read_folder` (a well-known name such as `inbox`, or a folder name; empty
   means nothing is read). Secrets (access/refresh token, expiry) are encrypted and masked.
+- Integration: `msgraph` honours `OutgoingMail.thread_id` (a follow-up message's `thread_ref`: a conversation id,
+  or the application's Message-ID): the draft is made with `createReply` on the newest message of that thread
+  (a new mail when none is found), then sent once as before. `list_messages` fills `MailMessage.calendars` from
+  `.ics` / `text/calendar` file attachments of mail with attachments (same caps as the other mailboxes).
 - `onedrive` is a `FileStore` (`kind = "onedrive"`, scope `Files.ReadWrite.AppFolder`). Secrets are `{"tokens"}`.
   Only its label and `enabled` change through `PUT`.
 - `BackupOut.target` and the setting `backups.target` gain `onedrive`.

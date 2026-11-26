@@ -31,6 +31,8 @@ from app.connect.gmail import MemoryTokenStore, TokenStore
 from app.connect.mail_common import (
     IDEMPOTENCY_HEADER,
     KEPT_HEADERS,
+    MAX_CALENDAR_PART_BYTES,
+    MAX_CALENDAR_PARTS,
     HttpResult,
     HttpTransport,
     TransportTimeout,
@@ -51,7 +53,7 @@ DEFAULT_RETRY_WAIT_SECONDS = 2.0
 WELL_KNOWN = {"inbox": "inbox", "archive": "archive", "junkemail": "junkemail", "junk": "junkemail",
               "drafts": "drafts", "sent items": "sentitems", "sentitems": "sentitems"}
 SELECT = ("id,conversationId,subject,from,toRecipients,receivedDateTime,sentDateTime,body,internetMessageId,"
-          "internetMessageHeaders")
+          "internetMessageHeaders,hasAttachments")
 _FRACTION = re.compile(r"(\.\d{6})\d+")
 
 Sleep = Callable[[float], Awaitable[None]]
@@ -203,9 +205,19 @@ class MsGraphMailbox:
             await self._access_token()  # a token problem is a refusal, not an unknown outcome
         except TransportTimeout as exc:
             raise MailSendError("could not reach Microsoft to refresh the sign-in") from exc
-        # Step 1: a draft. Nothing leaves the mailbox yet, so every failure here is a clean refusal.
+        # Step 1: a draft (a reply in the thread when there is one). Nothing leaves the mailbox yet, so every
+        # failure here is a clean refusal.
         try:
-            draft = await self._call("POST", "/me/messages", json_body=self._draft(mail, message_id))
+            reply_to = await self._reply_target(mail.thread_id) if mail.thread_id else None
+            if reply_to is not None:
+                draft = await self._call("POST", f"/me/messages/{reply_to}/createReply",
+                                         json_body={"message": self._draft(mail, message_id)})
+            else:
+                draft = await self._call("POST", "/me/messages", json_body=self._draft(mail, message_id))
+        except (MailAuthError, MailSendError):
+            raise
+        except MailError as exc:
+            raise MailSendError(f"could not prepare the message in Outlook ({exc}); nothing was sent") from exc
         except TransportTimeout as exc:
             raise MailSendError("Outlook did not answer while preparing the message; nothing was sent") from exc
         data = draft.data if isinstance(draft.data, dict) else {}
@@ -236,7 +248,11 @@ class MsGraphMailbox:
             "$top": min(limit, PAGE), "$select": SELECT}
         while next_path and len(found) < limit:
             data = self._ok(await self._call("GET", next_path, params=params), "list messages")
-            found.extend(to_message(item) for item in data.get("value", []))
+            for item in data.get("value", []):
+                message = to_message(item)
+                if item.get("hasAttachments") and item.get("id"):
+                    message = replace(message, calendars=await self._calendar_parts(str(item["id"])))
+                found.append(message)
             next_path, params = data.get("@odata.nextLink"), None  # the link carries its own query
         return sorted(found[:limit], key=lambda m: m.received_at)
 
@@ -289,6 +305,51 @@ class MsGraphMailbox:
                                     "contentType": a.mime_type,
                                     "contentBytes": base64.b64encode(a.content).decode()} for a in mail.attachments]
         return body
+
+    async def _reply_target(self, thread_ref: str) -> str | None:
+        """The newest message of the thread to reply to: ``thread_ref`` is a Graph conversation id, or the
+        Message-ID the application went out with. None when the mailbox holds no such message."""
+        if "@" in thread_ref:
+            mid = thread_ref.strip().strip("<>")
+            where = f"internetMessageId eq '<{_odata(mid)}>'"
+        else:
+            where = f"conversationId eq '{_odata(thread_ref)}'"
+        data = self._ok(await self._call("GET", "/me/messages", params={
+            "$filter": where, "$top": 10, "$select": "id,receivedDateTime,sentDateTime"}), "find the thread")
+        items = [i for i in data.get("value", []) if i.get("id")]
+        if not items:
+            return None
+        newest = max(items, key=lambda i: _when(i.get("receivedDateTime")) or _when(i.get("sentDateTime"))
+                     or datetime.min.replace(tzinfo=UTC))
+        return str(newest["id"])
+
+    async def _calendar_parts(self, message_id: str) -> tuple[bytes, ...]:
+        """Calendar attachments (``text/calendar`` or ``.ics``) of one message, size-capped, as the other
+        mailboxes give them. Untrusted bytes, read only by the calendar. A listing failure drops them only."""
+        try:
+            data = self._ok(await self._call("GET", f"/me/messages/{message_id}/attachments",
+                                             params={"$top": 20}), "list attachments")
+        except (MailError, TransportTimeout):
+            return ()
+        out: list[bytes] = []
+        for att in data.get("value", []):
+            kind = str(att.get("contentType") or "").lower()
+            name = str(att.get("name") or "").lower()
+            if att.get("@odata.type") != "#microsoft.graph.fileAttachment":
+                continue
+            if not (kind.startswith("text/calendar") or kind == "application/ics" or name.endswith(".ics")):
+                continue
+            if int(att.get("size") or 0) > MAX_CALENDAR_PART_BYTES * 2:
+                continue  # base64 and headers aside, far too big: not fetched into memory twice
+            try:
+                raw = base64.b64decode(str(att.get("contentBytes") or ""), validate=True)
+            except ValueError:
+                continue
+            if 0 < len(raw) <= MAX_CALENDAR_PART_BYTES:
+                out.append(raw)
+            if len(out) >= MAX_CALENDAR_PARTS:
+                break
+        return tuple(out)
 
     async def _discard(self, draft_id: str) -> None:
         with contextlib.suppress(MailError, TransportTimeout):  # an orphan draft is harmless

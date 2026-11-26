@@ -44,6 +44,8 @@ class FakeGraph:
         self.deleted: list[str] = []
         self.inbox: list[dict[str, Any]] = []
         self.folders = {"Jobs": "AAMk-jobs"}
+        self.attachments: dict[str, list[dict[str, Any]]] = {}  # message id -> Graph attachment resources
+        self.replied_to: list[str] = []  # message ids a reply draft was created for
         self.page = 2
         self.since = ""
 
@@ -84,6 +86,15 @@ class FakeGraph:
             return 200, {"mail": OWNER}
         if key == "POST /me/messages":
             return self._draft(json)
+        if key == "GET /me/messages":
+            return self._search(params)
+        m = re.fullmatch(r"POST /me/messages/([^/]+)/createReply", key)
+        if m:
+            self.replied_to.append(m.group(1))
+            return self._draft(json["message"])
+        m = re.fullmatch(r"GET /me/messages/([^/]+)/attachments", key)
+        if m:
+            return 200, {"value": self.attachments.get(m.group(1), [])}
         m = re.fullmatch(r"POST /me/messages/([^/]+)/send", key)
         if m:
             return self._send(m.group(1))
@@ -127,6 +138,17 @@ class FakeGraph:
         if self.send_mode == "timeout_after_accept":
             raise TransportTimeout("ReadTimeout")  # Graph took it, the answer was lost
         return 202, None
+
+    def _search(self, params: Mapping[str, Any]):
+        """All folders, by conversation id or Message-ID (the reply target lookup)."""
+        where = params.get("$filter", "")
+        conv = re.search(r"conversationId eq '(.*)'", where)
+        mid = re.search(r"internetMessageId eq '(.*)'", where)
+        rows = [i for i in [*self.inbox, *self.sent]
+                if (conv and i.get("conversationId") == conv.group(1))
+                or (mid and i.get("internetMessageId") == mid.group(1))]
+        return 200, {"value": [{"id": i["id"], "receivedDateTime": i.get("receivedDateTime"),
+                                "sentDateTime": i.get("sentDateTime")} for i in rows]}
 
     def _sent_items(self, params: Mapping[str, Any]):
         wanted = re.search(r"internetMessageId eq '(.*)'", params.get("$filter", ""))
