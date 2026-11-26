@@ -112,6 +112,6 @@ async def test_a_web_search_source_uses_the_search_connection_it_names(owner_cli
     named = await search_api.connection_for(session, source("web_search", connection_id=ids[1]))
     assert named is not None and named.endpoint == "https://api.other.example.com/search"
     assert named.api_key == "key-Second"
-    await owner_client.patch(f"/api/connections/{ids[1]}", json={"enabled": False})
+    await owner_client.put(f"/api/connections/{ids[1]}", json={"enabled": False})
     session.expire_all()
     assert await search_api.connection_for(session, source("web_search", connection_id=ids[1])) is None
