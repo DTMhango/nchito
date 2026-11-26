@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+import uuid
+from datetime import datetime, timedelta
 from functools import lru_cache
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import OWNER_ACTOR, PrincipalDep, SessionDep
@@ -213,8 +214,9 @@ async def change_password(body: PasswordChange, principal: PrincipalDep, request
         raise HTTPException(status.HTTP_403_FORBIDDEN, detail="current password is wrong")
     owner.password_hash = hash_password(body.new_password)
     owner.password_changed_at = utcnow()
+    revoked = await _revoke(session, owner.id, keep=principal.session_id)
     await audit.record(session, actor=principal.actor, action="auth.password_changed", subject_type="owner",
-                       subject_id=owner.id, ip=client_ip(request))
+                       subject_id=owner.id, ip=client_ip(request), detail={"sessions_revoked": revoked})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -254,4 +256,59 @@ async def totp_disable(body: TotpDisable, principal: PrincipalDep, session: Sess
     owner.totp_secret_enc = None
     await audit.record(session, actor=principal.actor, action="auth.totp_disabled", subject_type="owner",
                        subject_id=owner.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+class SessionOut(BaseModel):
+    id: uuid.UUID
+    created_at: datetime
+    last_seen_at: datetime
+    user_agent: str | None = None
+    ip: str | None = None
+    current: bool = False
+
+
+async def _revoke(session: SessionDep, owner_id: uuid.UUID, keep: uuid.UUID | None = None,
+                  only: uuid.UUID | None = None) -> int:
+    stmt = update(AuthSession).where(AuthSession.owner_id == owner_id, AuthSession.revoked_at.is_(None))
+    if keep is not None:
+        stmt = stmt.where(AuthSession.id != keep)
+    if only is not None:
+        stmt = stmt.where(AuthSession.id == only)
+    result = await session.execute(stmt.values(revoked_at=utcnow()))
+    return result.rowcount or 0  # type: ignore[attr-defined]
+
+
+@router.get("/sessions", response_model=list[SessionOut], operation_id="auth_sessions_list")
+async def sessions_list(principal: PrincipalDep, session: SessionDep) -> list[SessionOut]:
+    """Active (not revoked, not expired) sessions of the owner, newest first."""
+    rows = (await session.scalars(
+        select(AuthSession).where(AuthSession.owner_id == principal.owner.id,
+                                  AuthSession.revoked_at.is_(None), AuthSession.expires_at > utcnow())
+        .order_by(AuthSession.created_at.desc())
+    )).all()
+    return [SessionOut(id=r.id, created_at=r.created_at, last_seen_at=r.last_seen_at,
+                       user_agent=r.user_agent, ip=str(r.ip) if r.ip else None,
+                       current=r.id == principal.session_id) for r in rows]
+
+
+@router.post("/sessions/revoke-others", operation_id="auth_sessions_revoke_others")
+async def sessions_revoke_others(principal: PrincipalDep, request: Request, session: SessionDep) -> dict[str, int]:
+    count = await _revoke(session, principal.owner.id, keep=principal.session_id)
+    await audit.record(session, actor=principal.actor, action="auth.sessions_revoked_others",
+                       subject_type="owner", subject_id=principal.owner.id, ip=client_ip(request),
+                       detail={"revoked": count})
+    return {"revoked": count}
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT,
+               operation_id="auth_sessions_revoke", responses={404: {"description": "No such active session"}})
+async def sessions_revoke(session_id: uuid.UUID, principal: PrincipalDep, request: Request,
+                          session: SessionDep) -> Response:
+    count = await _revoke(session, principal.owner.id, only=session_id)
+    if not count:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no such active session")
+    await audit.record(session, actor=principal.actor, action="auth.session_revoked", subject_type="auth_session",
+                       subject_id=session_id, ip=client_ip(request),
+                       detail={"was_current": session_id == principal.session_id})
     return Response(status_code=status.HTTP_204_NO_CONTENT)
