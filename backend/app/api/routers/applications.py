@@ -66,6 +66,7 @@ from app.schemas.json_types import (
     PacketContents,
     PacketEmail,
     PacketFile,
+    RecordOrigin,
     SubmittedSnapshot,
 )
 
@@ -95,7 +96,7 @@ class ApplicationSummary(Timestamps):
     snoozed_until: datetime | None = None
     snoozed: bool = Field(default=False, description="Snoozed right now (an imminent deadline overrides a snooze)")
     deadline: date | None = Field(default=None, description="The job's closing date, when dated")
-    origin: Literal["system", "owner", "import"] = "system"
+    origin: RecordOrigin = "system"
     owner_attested: bool = Field(default=False, description="Applied outside Nchito, on the owner's word")
     legacy_fit: int | None = Field(default=None, ge=1, le=5, description="Imported 1-5 fit; not a rubric score")
 

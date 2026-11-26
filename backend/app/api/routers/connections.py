@@ -27,7 +27,7 @@ from app.llm.deps import llm_service
 from app.llm.money import micros_to_minor
 from app.llm.service import LLMService
 from app.models.platform import ApiToken, Connection
-from app.schemas.json_types import AgentTaskTypeName
+from app.schemas.json_types import AgentTaskTypeName, OAuthProviderName
 
 connections_router = APIRouter(prefix="/api/connections", tags=["connections"], dependencies=[RequireOwner],
                                responses=NOT_IMPLEMENTED_RESPONSES)
@@ -278,7 +278,7 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
 
 
 @connections_router.post("/oauth/{provider}/start", response_model=OAuthStartOut, name="connections_oauth_start")
-async def oauth_start(provider: Literal["gmail", "gdrive", "gcalendar", "msgraph", "onedrive"]) -> OAuthStartOut:
+async def oauth_start(provider: OAuthProviderName) -> OAuthStartOut:
     try:
         if provider == "gcalendar":
             return OAuthStartOut(authorize_url=calendar_records.oauth_start_url())
@@ -297,7 +297,7 @@ async def oauth_start(provider: Literal["gmail", "gdrive", "gcalendar", "msgraph
 
 @connections_router.get("/oauth/{provider}/callback", name="connections_oauth_callback",
                         responses={307: {"description": "Back to the Connections screen"}})
-async def oauth_callback(provider: Literal["gmail", "gdrive", "gcalendar", "msgraph", "onedrive"], code: str,
+async def oauth_callback(provider: OAuthProviderName, code: str,
                          state: str, session: SessionDep, principal: PrincipalDep) -> Response:
     if provider == "gcalendar":
         if not calendar_records.check_state(state):

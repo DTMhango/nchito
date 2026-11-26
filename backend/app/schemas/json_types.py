@@ -21,6 +21,12 @@ MoneyPeriod = Literal["year", "month", "week", "day", "hour"]
 UnknownPolicy = Literal["review", "pass_with_penalty", "pass_blocks_auto", "fail"]
 AutomationMode = Literal["save_only", "prepare", "ask_then_apply", "auto_apply"]
 ChannelName = Literal["email", "browser", "manual"]
+# Where a backup or exported file is stored (local disk, S3-compatible, Google Drive, OneDrive).
+BackupTargetName = Literal["local", "s3", "gdrive", "onedrive"]
+# Connections that sign in with OAuth (start/callback endpoints).
+OAuthProviderName = Literal["gmail", "gdrive", "gcalendar", "msgraph", "onedrive"]
+# Who created a record: the system, the owner, or an import.
+RecordOrigin = Literal["system", "owner", "import"]
 # Wave 4 followups: outbound messages about an existing application.
 MessageKind = Literal["follow_up", "thank_you", "info_reply", "slot_accept", "slot_decline", "withdraw",
                       "offer_decline"]

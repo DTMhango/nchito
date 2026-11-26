@@ -25,6 +25,7 @@ from urllib.parse import urlencode
 from app.connect.filestore import StoredFile
 from app.connect.http_transport import HttpResponse, HttpTransport
 from app.connect.local_store import check_key
+from app.schemas.json_types import BackupTargetName
 
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -100,7 +101,7 @@ def _q(value: str) -> str:
 
 
 class GoogleDriveStore:
-    kind: Literal["local", "gdrive", "onedrive", "s3"] = "gdrive"
+    kind: BackupTargetName = "gdrive"
 
     def __init__(
         self,

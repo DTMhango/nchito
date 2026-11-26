@@ -14,6 +14,7 @@ from typing import Literal
 
 from app.connect.filestore import FileStore, StoredFile
 from app.core.config import get_config
+from app.schemas.json_types import BackupTargetName
 
 
 class LocalStoreError(ValueError):
@@ -30,7 +31,7 @@ def check_key(key: str) -> str:
 
 
 class LocalFileStore:
-    kind: Literal["local", "gdrive", "onedrive", "s3"] = "local"
+    kind: BackupTargetName = "local"
 
     def __init__(self, root: Path) -> None:
         self._root = root

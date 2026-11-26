@@ -30,6 +30,7 @@ from app.connect.filestore import StoredFile
 from app.connect.gdrive import ShareRecord
 from app.connect.http_transport import HttpResponse, HttpTransport
 from app.connect.local_store import check_key
+from app.schemas.json_types import BackupTargetName
 
 APPROOT = f"{msgraph_auth.GRAPH}/me/drive/special/approot"
 SIMPLE_UPLOAD_LIMIT = 4_000_000  # Graph's single-request upload ceiling is 4 MB
@@ -106,7 +107,7 @@ def _item(key: str) -> str:
 
 
 class OneDriveStore:
-    kind: Literal["local", "gdrive", "onedrive", "s3"] = "onedrive"
+    kind: BackupTargetName = "onedrive"
 
     def __init__(self, transport: HttpTransport, tokens: OneDriveTokens, *, client_id: str, client_secret: str,
                  tenant: str = "common",

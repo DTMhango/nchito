@@ -46,6 +46,7 @@ from app.schemas.json_types import (
     CheckResult,
     GuardrailParams,
     PersonField,
+    RecordOrigin,
     TemplateLimits,
     TitleSpan,
 )
@@ -56,7 +57,7 @@ WAVE, AREA = 1, "kit"
 CODE_ENFORCED = frozenset({"never_mention", "never_together", "require_wording", "omit_field", "format", "limit"})
 
 ReviewStateT = Literal["needs_review", "confirmed"]
-OriginT = Literal["import", "owner", "system"]
+OriginT = RecordOrigin
 
 
 class KitMeta(Timestamps):

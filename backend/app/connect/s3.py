@@ -15,6 +15,7 @@ from collections.abc import Callable
 from typing import Any, Literal
 
 from app.connect.filestore import StoredFile
+from app.schemas.json_types import BackupTargetName
 
 
 class S3Error(RuntimeError):
@@ -56,7 +57,7 @@ def _code(exc: Exception) -> str:
 
 
 class S3Store:
-    kind: Literal["local", "gdrive", "onedrive", "s3"] = "s3"
+    kind: BackupTargetName = "s3"
 
     def __init__(self, client: Any, bucket: str, prefix: str = "") -> None:
         self._client = client

@@ -30,6 +30,7 @@ from app.ops import backup as ops_backup
 from app.ops import config_rollback as rollback_lib
 from app.ops import jobs as ops_jobs
 from app.ops import retention as ops_retention
+from app.schemas.json_types import BackupTargetName
 
 router = APIRouter(prefix="/api/data", tags=["data"], dependencies=[RequireOwner],
                    responses=NOT_IMPLEMENTED_RESPONSES)
@@ -92,7 +93,7 @@ class BackupOut(BaseModel):
     id: str
     created_at: datetime
     size_bytes: int
-    target: Literal["local", "s3", "gdrive", "onedrive"]
+    target: BackupTargetName
     encrypted: bool
 
 
