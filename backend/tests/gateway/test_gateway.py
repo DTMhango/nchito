@@ -484,3 +484,27 @@ async def test_pending_action_kind_is_the_exact_blocker_kind_and_filters(owner_c
         assert len(items) == 1 and items[0]["kind"] == kind == items[0]["detail"]["kind"], (kind, items)
     r = await owner_client.get("/api/pending-actions", params={"kind": "blocker"})
     assert r.json()["items"] == []
+
+
+async def test_sign_in_action_and_its_notification_count_every_application_waiting():
+    from app.core.settings import service as settings_service
+    from app.models.platform import Notification
+
+    async with maker()() as s:
+        await settings_service.set_many(s, {"notifications.channels": ["telegram"]}, actor="test")
+        await s.commit()
+    runner, _ = await make_token("pc-sign-in")
+    ids = []
+    for employer in ("Arch Example", "Beta Example", "Gamma Example"):
+        await approved_app(employer=employer)
+        task_id = await claim(runner)
+        out = await call(runner, "raise_blocker", task_id=task_id, type="sign_in", detail="login wall", url=URL)
+        ids.append(out["pending_action_id"])
+    assert len(set(ids)) == 1  # one site, one sign-in: every waiting role joins it
+    async with maker()() as s:
+        action = await s.get(PendingAction, uuid.UUID(ids[0]))
+        assert len(action.detail["applications"]) == 3 and len(action.detail["tasks"]) == 3
+        assert action.title.endswith("3 applications are waiting"), action.title
+        notice = await s.scalar(select(Notification).where(Notification.dedupe_key == f"pending:{action.id}"))
+        assert notice is not None and notice.title == action.title
+        assert notice.body and notice.body.count(" at ") >= 3  # the three roles are listed

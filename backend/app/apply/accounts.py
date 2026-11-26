@@ -53,6 +53,7 @@ from app.models.applications import (
     PortalAccountStatus,
     Stage,
 )
+from app.models.platform import Notification
 from app.models.search import Assessment, Availability, Job
 from app.ops import notifications
 
@@ -135,6 +136,24 @@ def portal_ref(job: Job) -> PortalRef | None:
         if company:
             tenant = f"{host}/{company.lower()}"
     return PortalRef(portal[:60].lower(), tenant[:200].lower(), url)
+
+
+def blocker_ref(job: Job) -> PortalRef | None:
+    """The tenant a runner's sign-in blocker is grouped by: ``portal_ref``, else the apply link's site (an
+    applicant-tracking host adds its first path segment, the employer's board). Every application waiting on one
+    site's sign-in then shares one action, so its count is the number actually waiting."""
+    ref = portal_ref(job)
+    if ref is not None:
+        return ref
+    parts = urlsplit((job.apply_url or "").strip())
+    host = (parts.hostname or "").lower()
+    if parts.scheme not in ("http", "https") or not host:
+        return None
+    portal = _portal_from_url(job.apply_url) or "site"
+    segment = next((p for p in parts.path.split("/") if p), None)
+    tenant = f"{host}/{segment.lower()}" if portal != "site" and segment else host
+    url = f"{parts.scheme}://{host}/{segment}" if portal != "site" and segment else f"{parts.scheme}://{host}"
+    return PortalRef(portal[:60].lower(), tenant[:200], url)
 
 
 def _portal_from_url(url: str | None) -> str | None:
@@ -296,6 +315,18 @@ async def _refresh(session: AsyncSession, action: PendingAction) -> None:
     action.deadline = _nearest(entries)
     action.title = await _title(session, action.detail["kind"], entries)
     await session.flush()
+    await _sync_notice(session, action)
+
+
+async def _sync_notice(session: AsyncSession, action: PendingAction) -> None:
+    """Keep the action's first message in step with who is waiting: a role that joins (or leaves) after the
+    announcement updates the in-app notification, and the outbound one too while it is still undelivered."""
+    notice = await session.scalar(select(Notification).where(Notification.dedupe_key == f"pending:{action.id}"))
+    if notice is None:
+        return
+    notice.title = action.title[:notifications.MAX_TITLE]
+    notice.body = _body(action, utcnow(), reminder=False)
+    await session.flush()
 
 
 async def _announce(session: AsyncSession, action: PendingAction, now: datetime) -> None:
@@ -363,7 +394,7 @@ async def register_blocker(session: AsyncSession, *, kind: str, job: Job, task_i
     task = await session.get(AgentTask, uuid.UUID(str(task_id)))
     if task is None:
         raise AccountError("task not found", 404)
-    ref = portal_ref(job)
+    ref = blocker_ref(job) if kind in TENANT_KINDS else portal_ref(job)
     app_id = task.application_id
     entry = _entry(app_id, job) if app_id else None
     task_entry = {"task_id": str(task.id), "runner_id": str(runner_id) if runner_id else None,

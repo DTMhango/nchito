@@ -959,3 +959,7 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   `declaration`, `unsupported_form`, `redirect_off_domain`, `page_instruction` (also `unknown_question`), whether
   raised by the gateway or by `accounts`; `?kind=` filters on it. Migration `0018_blocker_kind` rewrites old rows whose
   kind was the generic `blocker`.
+- **Waiting count.** A runner's `sign_in` / `create_account` blocker joins its site's one action even when the posting
+  names no known portal (`accounts.blocker_ref`: the apply link's host, plus the board's first path segment on an
+  applicant-tracking host), so the title counts every application waiting. The first notification
+  (`pending:<id>`) is kept in step (title and body) as roles join or leave.
