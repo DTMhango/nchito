@@ -483,3 +483,45 @@ async def test_mark_submitted_without_an_approved_packet_points_to_applied_mysel
         with pytest.raises(handoff.HandoffError, match="applied myself"):
             await handoff.mark_submitted(s, app, reference=None, note=None, actor="owner", now=NOW)
         await s.rollback()
+
+
+# ----- quiet hours are rechecked at send time -----------------------------------------------------
+
+
+async def test_a_permit_granted_before_quiet_hours_does_not_send_inside_them(channel):
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    app_id = await ready_app()
+    async with maker()() as s:
+        zone = ZoneInfo(await settings_service.get_value(s, "general.timezone"))
+    start = (NOW + timedelta(minutes=5)).astimezone(zone)
+    end = (NOW + timedelta(minutes=60)).astimezone(zone)
+    attempt_id = await queued(app_id)  # granted at NOW, outside quiet hours
+    async with maker()() as s:
+        await settings_service.set_value(s, "automation.quiet_hours_start", start.strftime("%H:%M"), actor="owner")
+        await settings_service.set_value(s, "automation.quiet_hours_end", end.strftime("%H:%M"), actor="owner")
+        await s.commit()
+        assert await dispatch.run(s, attempt_id, now=AFTER_DELAY) is None  # due, but inside quiet hours
+    assert not channel.dispatched
+    attempt = await load(DispatchAttempt, attempt_id)
+    resume = datetime.combine(end.date(), end.time().replace(second=0, microsecond=0), tzinfo=zone)
+    assert attempt.status == DispatchStatus.reserved and attempt.started_at is None
+    assert attempt.send_after == resume
+    assert "dispatch.deferred" in await audit_actions("dispatch.")
+    async with maker()() as s:
+        assert await dispatch.run(s, attempt_id, now=resume + timedelta(minutes=1)) == DispatchStatus.sent
+    assert len(channel.dispatched) == 1
+
+
+def test_quiet_hours_end_handles_overnight_windows_and_unknown():
+    from datetime import UTC, datetime
+
+    values = {"automation.quiet_hours_start": "21:00", "automation.quiet_hours_end": "07:00",
+              "general.timezone": "UTC"}
+    assert dispatch.quiet_hours_end(values, datetime(2026, 11, 26, 22, 0, tzinfo=UTC)) == datetime(
+        2026, 11, 27, 7, 0, tzinfo=UTC)
+    assert dispatch.quiet_hours_end(values, datetime(2026, 11, 26, 6, 0, tzinfo=UTC)) == datetime(
+        2026, 11, 26, 7, 0, tzinfo=UTC)
+    assert dispatch.quiet_hours_end(values, datetime(2026, 11, 26, 12, 0, tzinfo=UTC)) is None
+    assert dispatch.quiet_hours_end({**values, "general.timezone": None}, datetime.now(UTC)) == "unknown"

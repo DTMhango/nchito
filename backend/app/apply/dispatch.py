@@ -26,8 +26,9 @@ from __future__ import annotations
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -91,6 +92,26 @@ class QueueResult:
 
 async def is_paused(session: AsyncSession) -> bool:
     return bool(await settings_service.get_value(session, "automation.paused"))
+
+
+def quiet_hours_end(values: dict[str, Any], now: datetime) -> datetime | str | None:
+    """When ``now`` is inside the automation quiet hours, the moment they end (UTC-aware); ``None`` outside
+    them; ``"unknown"`` when quiet hours or the time zone are not set (unknown is not yes)."""
+    start, end, tz = (values.get("automation.quiet_hours_start"), values.get("automation.quiet_hours_end"),
+                      values.get("general.timezone"))
+    if not start or not end or not tz:
+        return "unknown"
+    zone = ZoneInfo(str(tz))
+    local = now.astimezone(zone)
+    s, e = time.fromisoformat(str(start)), time.fromisoformat(str(end))
+    t = local.time()
+    inside = (s <= t or t < e) if s > e else (s <= t < e)
+    if not inside:
+        return None
+    ends = datetime.combine(local.date(), e, tzinfo=zone)
+    if ends <= local:
+        ends = datetime.combine(local.date() + timedelta(days=1), e, tzinfo=zone)
+    return ends
 
 
 async def _refused(session: AsyncSession, app: Application, reason: str, actor: str) -> QueueResult:
@@ -229,6 +250,8 @@ async def recheck(session: AsyncSession, attempt: DispatchAttempt, app: Applicat
         if counts["sent_week"] > int(values["automation.weekly_cap"]):
             fail("weekly_cap", f"{counts['sent_week']} sends this week exceeds the cap "
                                f"{values['automation.weekly_cap']}")
+        if quiet_hours_end(values, now) == "unknown":
+            fail("quiet_hours", "quiet hours or the time zone are not known")
     return failures, changed
 
 
@@ -249,6 +272,14 @@ async def run(session: AsyncSession, attempt_id: uuid.UUID, *, now: datetime | N
     if attempt is None or (attempt.send_after is not None and attempt.send_after > now):
         await session.commit()
         return None
+    if attempt.channel != Channel.manual:
+        resume_at = quiet_hours_end(await settings_service.values(session), now)
+        if isinstance(resume_at, datetime):  # granted before quiet hours, due inside them: wait, do not send
+            attempt.send_after = resume_at
+            await outcomes._log(session, attempt, "dispatch.deferred", "system", reason="quiet hours",
+                                send_after=resume_at.isoformat())
+            await session.commit()
+            return None
     app = await outcomes.lock_application(session, attempt.application_id)
     failures, changed = await recheck(session, attempt, app, now=now)
     if failures:
