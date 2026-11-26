@@ -14,13 +14,15 @@ from app.core.clock import FakeClock
 from app.core.db import get_sessionmaker
 from app.llm.client import BudgetExhausted
 from app.llm.ledger import Ledger
+from app.llm.money import MICROS_PER_MINOR as M
 from app.models.platform import AuditEvent, LedgerEntry, LedgerKind
 from tests.llm.conftest import make_run, set_settings
 
 
 async def reserve(ledger: Ledger, amount: int, *, billed: bool = True, run_id: uuid.UUID | None = None):
+    """``amount`` is in minor units, converted to micros."""
     return await ledger.reserve(stage="score", provider="anthropic", model="claude-haiku-5-5",
-                                amount_minor=amount, billed=billed, run_id=run_id)
+                                amount_micros=amount * M, billed=billed, run_id=run_id)
 
 
 async def test_no_monthly_cap_means_paid_work_stays_off() -> None:
@@ -32,7 +34,7 @@ async def test_no_monthly_cap_means_paid_work_stays_off() -> None:
 async def test_unbilled_calls_need_no_cap_and_never_count_against_it() -> None:
     ledger = Ledger()
     res = await reserve(ledger, 500, billed=False)
-    await ledger.reconcile(res, cost_minor=500, input_tokens=10, output_tokens=10)
+    await ledger.reconcile(res, cost_micros=500 * M, input_tokens=10, output_tokens=10)
     await set_settings(budget__monthly_cap_minor=100)
     await reserve(ledger, 100)  # the full cap is still free
     async with get_sessionmaker()() as s:
@@ -47,8 +49,8 @@ async def test_monthly_cap_counts_spend_plus_open_reservations() -> None:
     first = await reserve(ledger, 60)
     with pytest.raises(BudgetExhausted) as exc:
         await reserve(ledger, 50)
-    assert exc.value.scope == "monthly" and exc.value.available_minor == 40
-    await ledger.reconcile(first, cost_minor=20, input_tokens=100, output_tokens=10)
+    assert exc.value.scope == "monthly" and exc.value.available_micros == 40 * M
+    await ledger.reconcile(first, cost_micros=20 * M, input_tokens=100, output_tokens=10)
     await reserve(ledger, 80)  # 20 spent + 80 = cap exactly
 
 
@@ -70,9 +72,9 @@ async def test_concurrent_reservations_never_overshoot_the_cap() -> None:
     refused = [r for r in results if isinstance(r, BudgetExhausted)]
     assert len(granted) == 14 and len(refused) == 26  # 14 * 7 = 98 <= 100 < 105
     async with get_sessionmaker()() as s:
-        total = await s.scalar(select(func.sum(LedgerEntry.amount_minor)).where(
+        total = await s.scalar(select(func.sum(LedgerEntry.amount_micros)).where(
             LedgerEntry.kind == LedgerKind.reservation))
-    assert total == 98
+    assert total == 98 * M
 
 
 async def test_stale_reservations_expire_charged_at_estimate() -> None:
@@ -105,12 +107,12 @@ async def test_a_reservation_closes_once_and_rows_are_append_only() -> None:
     await set_settings(budget__monthly_cap_minor=100)
     ledger = Ledger()
     res = await reserve(ledger, 10)
-    await ledger.reconcile(res, cost_minor=4, input_tokens=1, output_tokens=1)
+    await ledger.reconcile(res, cost_micros=4 * M, input_tokens=1, output_tokens=1)
     with pytest.raises(IntegrityError):
         await ledger.release(res)
     async with get_sessionmaker()() as s:
         with pytest.raises(DBAPIError, match="append-only"):
-            await s.execute(text("UPDATE ledger_entry SET amount_minor = 0"))
+            await s.execute(text("UPDATE ledger_entry SET amount_micros = 0"))
         await s.rollback()
         with pytest.raises(DBAPIError, match="append-only"):
             await s.execute(text("DELETE FROM ledger_entry"))
@@ -121,7 +123,7 @@ async def test_warning_and_exhaustion_are_told_once_per_month() -> None:
     ledger = Ledger()
     for _ in range(3):
         res = await reserve(ledger, 30)
-        await ledger.reconcile(res, cost_minor=30, input_tokens=1, output_tokens=1)
+        await ledger.reconcile(res, cost_micros=30 * M, input_tokens=1, output_tokens=1)
     for _ in range(2):
         with pytest.raises(BudgetExhausted):
             await reserve(ledger, 30)
@@ -137,8 +139,8 @@ async def test_summary_groups_by_stage_model_run_and_day() -> None:
     ledger = Ledger()
     for stage, model, cost in (("score", "claude-haiku-5-5", 3), ("tailor", "claude-sonnet-5-5", 40),
                                ("score", "claude-haiku-5-5", 2)):
-        res = await ledger.reserve(stage=stage, provider="anthropic", model=model, amount_minor=50, billed=True)
-        await ledger.reconcile(res, cost_minor=cost, input_tokens=1, output_tokens=1)
+        res = await ledger.reserve(stage=stage, provider="anthropic", model=model, amount_micros=50 * M, billed=True)
+        await ledger.reconcile(res, cost_micros=cost * M, input_tokens=1, output_tokens=1)
     async with get_sessionmaker()() as s:
         summary = await ledger.summary(s)
     assert [(b.key, b.billed_minor, b.calls) for b in summary.by_stage] == [("tailor", 40, 1), ("score", 5, 2)]
@@ -150,7 +152,7 @@ async def test_months_reset_in_owner_timezone() -> None:
     await set_settings(budget__monthly_cap_minor=1000, general__timezone="Pacific/Kiritimati")  # UTC+14
     ledger = Ledger()
     res = await reserve(ledger, 5)
-    await ledger.reconcile(res, cost_minor=5, input_tokens=1, output_tokens=1)
+    await ledger.reconcile(res, cost_micros=5 * M, input_tokens=1, output_tokens=1)
     async with get_sessionmaker()() as s:
         now_local = datetime.now(UTC) + timedelta(hours=14)
         summary = await ledger.summary(s)

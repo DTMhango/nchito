@@ -26,6 +26,7 @@ from app.core.conditions import ConditionResult, ConditionSet, Group, ValueFilte
 from app.core.events import publish
 from app.core.settings import service as settings_service
 from app.llm.client import Message, TextPart
+from app.llm.money import micros_to_minor
 from app.models.applications import Application
 from app.models.search import (
     Assessment,
@@ -674,6 +675,6 @@ async def backfill_custom_facet(item_id: uuid.UUID, session: SessionDep, confirm
     for job in jobs:
         messages = [Message(role="system", parts=[TextPart(f"Answer yes, no or not_stated: {facet.question}")]),
                     Message(role="user", parts=[scoring.wrap_untrusted(job.raw_text or job.title, "job posting")])]
-        cost += await client.estimate_cost_minor("custom_facet", messages)
+        cost += await client.estimate_cost_micros("custom_facet", messages)
     currency = await settings_service.get_value(session, "budget.currency")
-    return BackfillEstimate(jobs=len(jobs), estimated_cost_minor=cost, currency=currency)
+    return BackfillEstimate(jobs=len(jobs), estimated_cost_minor=micros_to_minor(cost), currency=currency)

@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import select
 
+from app.llm.money import MICROS_PER_MINOR as M
 from app.models.applications import ApplicationEvent, PendingActionType, PendingStatus, Stage
 from app.models.kit import Answer, AnswerScope
 from app.models.platform import AuditEvent, LedgerEntry, LedgerKind
@@ -231,14 +232,14 @@ async def test_today_summary(owner_client, session) -> None:
 async def test_today_with_nothing_yet_and_spend_from_the_ledger(owner_client, session) -> None:
     empty = (await owner_client.get("/api/today")).json()
     assert empty["needs_you"] == 0 and empty["last_sweep"] is None and empty["top_matches"] == []
-    reservation = LedgerEntry(kind=LedgerKind.reservation, amount_minor=300, currency="USD", stage="tailor")
+    reservation = LedgerEntry(kind=LedgerKind.reservation, amount_micros=300 * M, currency="USD", stage="tailor")
     session.add(reservation)
     await session.flush()
     session.add_all([
-        LedgerEntry(kind=LedgerKind.reservation, amount_minor=500, currency="USD", stage="score"),
-        LedgerEntry(kind=LedgerKind.reconciliation, amount_minor=120, currency="USD", stage="tailor",
+        LedgerEntry(kind=LedgerKind.reservation, amount_micros=500 * M, currency="USD", stage="score"),
+        LedgerEntry(kind=LedgerKind.reconciliation, amount_micros=120 * M, currency="USD", stage="tailor",
                     reservation_id=reservation.id),
-        LedgerEntry(kind=LedgerKind.reconciliation, amount_minor=40, currency="USD", stage="score", billed=False)])
+        LedgerEntry(kind=LedgerKind.reconciliation, amount_micros=40 * M, currency="USD", stage="score", billed=False)])
     await session.commit()
     spend = (await owner_client.get("/api/today")).json()["spend"]
     assert spend["month_to_date_minor"] == 120 and spend["reserved_minor"] == 500

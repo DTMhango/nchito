@@ -12,6 +12,9 @@ Rows are append-only (a database trigger rejects UPDATE and DELETE). A paid call
 3. A reservation still open after ``budget.reservation_stale_minutes`` is closed by a
    reconciliation charged at its full estimate (the call's real cost is unknown, so the bound holds).
 
+Amounts are integer micros (``app.llm.money``); the owner's caps are entered in minor units and
+converted to micros for every comparison, and the spend summary converts back only for display.
+
 Billed spend and estimated subscription (CLI) spend are kept apart: unbilled rows never count
 against a cap and are reported separately. Months run in the owner's time zone
 (``general.timezone``).
@@ -36,6 +39,7 @@ from app.core.db import get_sessionmaker
 from app.core.events import publish
 from app.core.settings import service as settings_service
 from app.llm.client import BudgetExhausted
+from app.llm.money import micros_to_minor, minor_to_micros
 from app.models.platform import AuditEvent, LedgerEntry, LedgerKind
 
 LEDGER_LOCK_KEY = 0x4E43_4C44  # "NCLD": one advisory lock for every reservation
@@ -45,7 +49,7 @@ SYSTEM_ACTOR = "system"
 @dataclass(frozen=True)
 class Reservation:
     id: uuid.UUID
-    amount_minor: int
+    amount_micros: int
     currency: str
     billed: bool
     stage: str
@@ -117,9 +121,9 @@ class Ledger:
 
     # ----- reserve --------------------------------------------------------------------------
 
-    async def reserve(self, *, stage: str, provider: str, model: str, amount_minor: int, billed: bool,
+    async def reserve(self, *, stage: str, provider: str, model: str, amount_micros: int, billed: bool,
                       run_id: uuid.UUID | None = None, agent_task_id: uuid.UUID | None = None) -> Reservation:
-        if amount_minor < 0:
+        if amount_micros < 0:
             raise ValueError("a reservation cannot be negative")
         refusal: BudgetExhausted | None = None
         async with self.sessionmaker() as session, session.begin():
@@ -129,15 +133,15 @@ class Ledger:
             await self._expire_stale(session, now, values["budget.reservation_stale_minutes"])
             currency = values["budget.currency"]
             if billed:
-                refusal = await self._check_caps(session, values, now, amount_minor, run_id)
+                refusal = await self._check_caps(session, values, now, amount_micros, run_id)
             if refusal is None:
-                row = LedgerEntry(kind=LedgerKind.reservation, amount_minor=amount_minor, currency=currency,
+                row = LedgerEntry(kind=LedgerKind.reservation, amount_micros=amount_micros, currency=currency,
                                   billed=billed, stage=stage, provider=provider, model=model, run_id=run_id,
                                   agent_task_id=agent_task_id)
                 session.add(row)
                 await session.flush()
                 await publish(session, "spend.updated", {"stage": stage})
-                return Reservation(id=row.id, amount_minor=amount_minor, currency=currency, billed=billed,
+                return Reservation(id=row.id, amount_micros=amount_micros, currency=currency, billed=billed,
                                    stage=stage, provider=provider, model=model, run_id=run_id)
         await self._tell_owner_once(refusal)
         raise refusal
@@ -145,38 +149,40 @@ class Ledger:
     async def _check_caps(self, session: AsyncSession, values: dict, now: datetime, amount: int,
                           run_id: uuid.UUID | None) -> BudgetExhausted | None:
         currency = values["budget.currency"]
-        cap = values["budget.monthly_cap_minor"]
-        if cap is None:
-            return BudgetExhausted("no_cap", needed_minor=amount, available_minor=None, currency=currency)
+        cap_minor = values["budget.monthly_cap_minor"]
+        if cap_minor is None:
+            return BudgetExhausted("no_cap", needed_micros=amount, available_micros=None, currency=currency)
+        cap = minor_to_micros(cap_minor)
         start, end, _ = month_bounds(now, values["general.timezone"])
         committed = await self._committed(session, start, end)
         if committed + amount > cap:
-            return BudgetExhausted("monthly", needed_minor=amount, available_minor=max(cap - committed, 0),
+            return BudgetExhausted("monthly", needed_micros=amount, available_micros=max(cap - committed, 0),
                                    currency=currency)
-        run_cap = values["budget.per_run_cap_minor"]
-        if run_id is not None and run_cap is not None:
+        run_cap_minor = values["budget.per_run_cap_minor"]
+        if run_id is not None and run_cap_minor is not None:
+            run_cap = minor_to_micros(run_cap_minor)
             used = await self._run_committed(session, run_id)
             if used + amount > run_cap:
-                return BudgetExhausted("per_run", needed_minor=amount, available_minor=max(run_cap - used, 0),
+                return BudgetExhausted("per_run", needed_micros=amount, available_micros=max(run_cap - used, 0),
                                        currency=currency)
         return None
 
     async def _committed(self, session: AsyncSession, start: datetime, end: datetime) -> int:
         spent = await session.scalar(
-            select(func.coalesce(func.sum(LedgerEntry.amount_minor), 0)).where(
+            select(func.coalesce(func.sum(LedgerEntry.amount_micros), 0)).where(
                 LedgerEntry.kind == LedgerKind.reconciliation, LedgerEntry.billed.is_(True),
                 LedgerEntry.created_at >= start, LedgerEntry.created_at < end))
         open_q = _open_reservations_query().where(LedgerEntry.billed.is_(True)).subquery()
-        reserved = await session.scalar(select(func.coalesce(func.sum(open_q.c.amount_minor), 0)))
+        reserved = await session.scalar(select(func.coalesce(func.sum(open_q.c.amount_micros), 0)))
         return int(spent or 0) + int(reserved or 0)
 
     async def _run_committed(self, session: AsyncSession, run_id: uuid.UUID) -> int:
         spent = await session.scalar(
-            select(func.coalesce(func.sum(LedgerEntry.amount_minor), 0)).where(
+            select(func.coalesce(func.sum(LedgerEntry.amount_micros), 0)).where(
                 LedgerEntry.kind == LedgerKind.reconciliation, LedgerEntry.billed.is_(True),
                 LedgerEntry.run_id == run_id))
         open_q = _open_reservations_query().where(LedgerEntry.billed.is_(True), LedgerEntry.run_id == run_id).subquery()
-        reserved = await session.scalar(select(func.coalesce(func.sum(open_q.c.amount_minor), 0)))
+        reserved = await session.scalar(select(func.coalesce(func.sum(open_q.c.amount_micros), 0)))
         return int(spent or 0) + int(reserved or 0)
 
     async def _expire_stale(self, session: AsyncSession, now: datetime, stale_minutes: int) -> int:
@@ -184,7 +190,7 @@ class Ledger:
         stale = (await session.scalars(_open_reservations_query().where(LedgerEntry.created_at < cutoff))).all()
         for res in stale:
             session.add(LedgerEntry(kind=LedgerKind.reconciliation, reservation_id=res.id,
-                                    amount_minor=res.amount_minor, currency=res.currency, billed=res.billed,
+                                    amount_micros=res.amount_micros, currency=res.currency, billed=res.billed,
                                     stage=res.stage, provider=res.provider, model=res.model, run_id=res.run_id,
                                     agent_task_id=res.agent_task_id,
                                     note="expired: charged at the reserved estimate (real cost unknown)"))
@@ -201,9 +207,9 @@ class Ledger:
 
     # ----- close ----------------------------------------------------------------------------
 
-    async def reconcile(self, reservation: Reservation, *, cost_minor: int, input_tokens: int, output_tokens: int,
+    async def reconcile(self, reservation: Reservation, *, cost_micros: int, input_tokens: int, output_tokens: int,
                         note: str | None = None) -> None:
-        await self._close(reservation, LedgerKind.reconciliation, cost_minor, input_tokens, output_tokens, note)
+        await self._close(reservation, LedgerKind.reconciliation, cost_micros, input_tokens, output_tokens, note)
 
     async def release(self, reservation: Reservation, *, note: str | None = None) -> None:
         await self._close(reservation, LedgerKind.release, 0, None, None, note)
@@ -211,7 +217,7 @@ class Ledger:
     async def _close(self, res: Reservation, kind: LedgerKind, amount: int, input_tokens: int | None,
                      output_tokens: int | None, note: str | None) -> None:
         async with self.sessionmaker() as session, session.begin():
-            session.add(LedgerEntry(kind=kind, reservation_id=res.id, amount_minor=max(amount, 0),
+            session.add(LedgerEntry(kind=kind, reservation_id=res.id, amount_micros=max(amount, 0),
                                     currency=res.currency, billed=res.billed, stage=res.stage,
                                     provider=res.provider, model=res.model, run_id=res.run_id,
                                     input_tokens=input_tokens, output_tokens=output_tokens, note=note))
@@ -228,15 +234,17 @@ class Ledger:
 
     async def _warn_once(self, session: AsyncSession) -> None:
         values = await settings_service.values(session)
-        cap = values["budget.monthly_cap_minor"]
-        if not cap:
+        cap_minor = values["budget.monthly_cap_minor"]
+        if not cap_minor:
             return
+        cap = minor_to_micros(cap_minor)
         start, end, month = month_bounds(self.clock.now(), values["general.timezone"])
         spent = await self._spent(session, start, end)
         if spent * 100 < values["budget.warning_percent"] * cap or await self._already_told(
                 session, "budget.warning", start):
             return
-        detail = {"month": month, "spent_minor": spent, "cap_minor": cap, "percent": values["budget.warning_percent"]}
+        detail = {"month": month, "spent_minor": micros_to_minor(spent), "cap_minor": cap_minor,
+                  "percent": values["budget.warning_percent"]}
         await audit.record(session, actor=SYSTEM_ACTOR, action="budget.warning", subject_type="budget",
                            subject_id=month, detail=detail)
         await publish(session, "budget.warning", detail)
@@ -257,7 +265,7 @@ class Ledger:
     # ----- reporting ------------------------------------------------------------------------
 
     async def _spent(self, session: AsyncSession, start: datetime, end: datetime) -> int:
-        return int(await session.scalar(select(func.coalesce(func.sum(LedgerEntry.amount_minor), 0)).where(
+        return int(await session.scalar(select(func.coalesce(func.sum(LedgerEntry.amount_micros), 0)).where(
             LedgerEntry.kind == LedgerKind.reconciliation, LedgerEntry.billed.is_(True),
             LedgerEntry.created_at >= start, LedgerEntry.created_at < end)) or 0)
 
@@ -281,30 +289,36 @@ class Ledger:
                 bucket = table.setdefault(key, SpendBucket(key=key))
                 bucket.calls += 1
                 if row.billed:
-                    bucket.billed_minor += row.amount_minor
+                    bucket.billed_minor += row.amount_micros
                 else:
-                    bucket.unbilled_minor += row.amount_minor
+                    bucket.unbilled_minor += row.amount_micros
             day = row.created_at.astimezone(tz).date()
             entry = daily[day]
             entry.day = day
             if row.billed:
-                entry.billed_minor += row.amount_minor
-                billed_total += row.amount_minor
+                entry.billed_minor += row.amount_micros
+                billed_total += row.amount_micros
             else:
-                entry.unbilled_minor += row.amount_minor
-                unbilled_total += row.amount_minor
-        reserved = sum(r.amount_minor for r in open_rows if r.billed)
-        cap = values["budget.monthly_cap_minor"]
+                entry.unbilled_minor += row.amount_micros
+                unbilled_total += row.amount_micros
+        reserved = sum(r.amount_micros for r in open_rows if r.billed)
+        cap_minor = values["budget.monthly_cap_minor"]
+        cap = None if cap_minor is None else minor_to_micros(cap_minor)
+        # Buckets were summed in micros; convert once, for display.
+        for item in [*stage.values(), *model.values(), *run.values(), *daily.values()]:
+            item.billed_minor, item.unbilled_minor = micros_to_minor(item.billed_minor), micros_to_minor(
+                item.unbilled_minor)
 
         def ordered(table: dict[str, SpendBucket]) -> list[SpendBucket]:
             return sorted(table.values(), key=lambda b: (-(b.billed_minor + b.unbilled_minor), b.key))
 
         return SpendSummary(
-            month=label, timezone=tz_name, currency=values["budget.currency"], cap_minor=cap,
+            month=label, timezone=tz_name, currency=values["budget.currency"], cap_minor=cap_minor,
             per_run_cap_minor=values["budget.per_run_cap_minor"], warning_percent=values["budget.warning_percent"],
-            month_to_date_minor=billed_total, reserved_minor=reserved, estimated_unbilled_minor=unbilled_total,
-            remaining_minor=None if cap is None else max(cap - billed_total - reserved, 0),
-            warning_reached=bool(cap) and billed_total * 100 >= values["budget.warning_percent"] * cap,
+            month_to_date_minor=micros_to_minor(billed_total), reserved_minor=micros_to_minor(reserved),
+            estimated_unbilled_minor=micros_to_minor(unbilled_total),
+            remaining_minor=None if cap is None else micros_to_minor(max(cap - billed_total - reserved, 0)),
+            warning_reached=bool(cap) and billed_total * 100 >= values["budget.warning_percent"] * (cap or 0),
             by_stage=ordered(stage), by_model=ordered(model), by_run=ordered(run)[:50],
             daily=sorted(daily.values(), key=lambda d: d.day),
         )

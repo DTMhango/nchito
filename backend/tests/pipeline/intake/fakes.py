@@ -20,14 +20,14 @@ from app.sources.base import Availability, RawJob, SearchContext
 
 class FakeLLMClient(fake.FakeLLMClient):
     def __init__(self, respond: dict[str, Any] | Callable[[str], dict[str, Any]] | None = None,
-                 cost_minor: int = 3) -> None:
-        super().__init__(cost_minor=cost_minor, estimate_minor=10, default=self._reply)
+                 cost_micros: int = 3) -> None:
+        super().__init__(cost_micros=cost_micros, estimate_micros=10, default=self._reply)
         self.respond = respond or {}
         self.raise_budget = False
 
     def _reply(self, call: fake.FakeCall) -> Any:
         if self.raise_budget:
-            return BudgetExhausted("monthly", needed_minor=self.estimate_minor, available_minor=0,
+            return BudgetExhausted("monthly", needed_micros=self.estimate_micros, available_micros=0,
                                    currency=self.currency)
         text = "\n".join(p.content for m in call.messages for p in m.parts if isinstance(p, DataBlock))
         return self.respond(text) if callable(self.respond) else self.respond

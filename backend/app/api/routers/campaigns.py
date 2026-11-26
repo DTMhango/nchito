@@ -17,6 +17,7 @@ from app.core import audit
 from app.core.clock import utcnow
 from app.core.conditions import CampaignRule, ConditionSet
 from app.core.settings.types import SettingValueError, cron_expr
+from app.llm.money import micros_to_minor
 from app.models.base import ReviewState
 from app.models.search import (
     Assessment,
@@ -529,7 +530,8 @@ async def backtest_estimate(body: BacktestIn, session: SessionDep) -> BacktestEs
     """Step one: how many roles and what the backtest would cost. Spends nothing."""
     result = await _backtest(session, body, estimate_only=True)
     return BacktestEstimateOut(jobs=len(result.rows), to_score=result.to_score,
-                               estimated_cost_minor=result.estimated_cost_minor, cost_currency=result.currency)
+                               estimated_cost_minor=micros_to_minor(result.estimated_cost_micros),
+                               cost_currency=result.currency)
 
 
 @router.post("/rubrics/backtest", response_model=BacktestOut, name="rubrics_backtest")
@@ -540,6 +542,7 @@ async def backtest(body: BacktestIn, session: SessionDep, principal: PrincipalDe
     await audit.record(session, actor=principal.actor, action="rubric.backtested", subject_type="rubric",
                        subject_id=body.rubric_id,
                        detail={"jobs": len(result.rows), "campaign_id": str(body.campaign_id),
-                               "estimated_cost_minor": result.estimated_cost_minor})
+                               "estimated_cost_minor": micros_to_minor(result.estimated_cost_micros)})
     return BacktestOut(rows=[BacktestRow.model_validate(r) for r in result.rows],
-                       estimated_cost_minor=result.estimated_cost_minor, cost_currency=result.currency)
+                       estimated_cost_minor=micros_to_minor(result.estimated_cost_micros),
+                               cost_currency=result.currency)

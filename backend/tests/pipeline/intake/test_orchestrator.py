@@ -43,7 +43,7 @@ async def test_sweep_ingests_extracts_and_hands_ids_to_scoring(session, rig):
     for key in ("passed_filters", "above_threshold", "tailored", "applied"):
         assert run.counts[key] == 0
     assert run.source_results[0].status == "ok" and run.source_results[0].new == 2
-    assert run.cost_minor == 6 and run.config_versions["prompt_extract"] == normalise.PROMPT_VERSION
+    assert run.cost_micros == 6 and run.config_versions["prompt_extract"] == normalise.PROMPT_VERSION
     jobs = (await session.scalars(select(Job))).all()
     assert {j.facets.work_model.value for j in jobs} == {"remote"} and jobs[0].availability == Availability.unknown
     (hooked_run, ids), = rig.scored

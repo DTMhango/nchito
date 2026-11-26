@@ -46,7 +46,7 @@ class CallPlan:
     price: LlmPrice
     currency: str
     request: ProviderRequest
-    estimate_minor: int
+    estimate_micros: int
     retries: int
 
 
@@ -103,21 +103,21 @@ class LLMService:
                                   max_output_tokens=out_tokens,
                                   timeout_seconds=float(values["ai.request_timeout_seconds"]))
         input_tokens = pricing.estimate_input_tokens(prompt.all_text + system, messages=len(prompt.turns) + 1)
-        estimate = pricing.max_cost_minor(price, input_tokens, out_tokens)
+        estimate = pricing.max_cost_micros(price, input_tokens, out_tokens)
         return CallPlan(route=route, credentials=credentials, price=price, currency=currency, request=request,
-                        estimate_minor=estimate, retries=values["ai.max_retries"])
+                        estimate_micros=estimate, retries=values["ai.max_retries"])
 
-    async def estimate_cost_minor(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None) -> int:
-        return (await self.plan(stage, messages, None, model)).estimate_minor
+    async def estimate_cost_micros(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None) -> int:
+        return (await self.plan(stage, messages, None, model)).estimate_micros
 
     async def complete(self, stage: Stage, messages: Sequence[Message], schema: type[ResultT], *,
-                       max_cost_minor: int, model: str | None = None) -> tuple[ResultT, Usage]:
+                       max_cost_micros: int, model: str | None = None) -> tuple[ResultT, Usage]:
         return await self.run_plan(await self.plan(stage, messages, schema, model), schema,
-                                   max_cost_minor=max_cost_minor)
+                                   max_cost_micros=max_cost_micros)
 
-    async def run_plan(self, plan: CallPlan, schema: type[ResultT], *, max_cost_minor: int) -> tuple[ResultT, Usage]:
-        if plan.estimate_minor > max_cost_minor:
-            raise BudgetExhausted("call", needed_minor=plan.estimate_minor, available_minor=max_cost_minor,
+    async def run_plan(self, plan: CallPlan, schema: type[ResultT], *, max_cost_micros: int) -> tuple[ResultT, Usage]:
+        if plan.estimate_micros > max_cost_micros:
+            raise BudgetExhausted("call", needed_micros=plan.estimate_micros, available_micros=max_cost_micros,
                                   currency=plan.currency)
         adapter = self._adapters.get(plan.route.provider)
         if adapter is None:
@@ -129,7 +129,7 @@ class LLMService:
                 await self._sleep(self._backoff * 2 ** (attempt - 1) * (1 + random.random() / 4))  # noqa: S311
             reservation = await self.ledger.reserve(
                 stage=plan.route.stage, provider=plan.route.provider, model=plan.route.model,
-                amount_minor=plan.estimate_minor, billed=adapter.billed, run_id=self.run_id,
+                amount_micros=plan.estimate_micros, billed=adapter.billed, run_id=self.run_id,
                 agent_task_id=self.agent_task_id)
             try:
                 reply = await asyncio.wait_for(adapter.call(plan.request, plan.credentials),
@@ -143,13 +143,13 @@ class LLMService:
                     raise LLMError(f"{plan.route.stage}: {error}") from error
                 continue
             except BaseException:
-                await self.ledger.reconcile(reservation, cost_minor=reservation.amount_minor, input_tokens=0,
+                await self.ledger.reconcile(reservation, cost_micros=reservation.amount_micros, input_tokens=0,
                                             output_tokens=0, note="unexpected failure: charged at estimate")
                 raise
-            cost = pricing.cost_minor(plan.price, input_tokens=reply.input_tokens, output_tokens=reply.output_tokens,
+            cost = pricing.cost_micros(plan.price, input_tokens=reply.input_tokens, output_tokens=reply.output_tokens,
                                       cache_write_tokens=reply.cache_write_tokens,
                                       cache_read_tokens=reply.cache_read_tokens)
-            await self.ledger.reconcile(reservation, cost_minor=cost, input_tokens=self._in_tokens(reply),
+            await self.ledger.reconcile(reservation, cost_micros=cost, input_tokens=self._in_tokens(reply),
                                         output_tokens=reply.output_tokens)
             total_cost += cost
             try:
@@ -159,7 +159,7 @@ class LLMService:
                 continue
             return result, Usage(provider=plan.route.provider, model=plan.route.model,
                                  input_tokens=self._in_tokens(reply), output_tokens=reply.output_tokens,
-                                 cost_minor=total_cost, currency=plan.currency, billed=adapter.billed)
+                                 cost_micros=total_cost, currency=plan.currency, billed=adapter.billed)
         raise LLMError(f"{plan.route.stage}: no valid reply after {plan.retries + 1} attempts") from last_error
 
     @staticmethod
@@ -169,16 +169,16 @@ class LLMService:
 
     async def _close_failed(self, reservation: Reservation, error: ProviderCallError, plan: CallPlan) -> int:
         if error.usage is not None:
-            cost = pricing.cost_minor(plan.price, input_tokens=error.usage.input_tokens,
+            cost = pricing.cost_micros(plan.price, input_tokens=error.usage.input_tokens,
                                       output_tokens=error.usage.output_tokens,
                                       cache_write_tokens=error.usage.cache_write_tokens,
                                       cache_read_tokens=error.usage.cache_read_tokens)
-            await self.ledger.reconcile(reservation, cost_minor=cost, input_tokens=self._in_tokens(error.usage),
+            await self.ledger.reconcile(reservation, cost_micros=cost, input_tokens=self._in_tokens(error.usage),
                                         output_tokens=error.usage.output_tokens, note=str(error))
             return cost
         if error.may_have_billed:
-            await self.ledger.reconcile(reservation, cost_minor=reservation.amount_minor, input_tokens=0,
+            await self.ledger.reconcile(reservation, cost_micros=reservation.amount_micros, input_tokens=0,
                                         output_tokens=0, note=f"{error}: charged at estimate")
-            return reservation.amount_minor
+            return reservation.amount_micros
         await self.ledger.release(reservation, note=str(error))
         return 0

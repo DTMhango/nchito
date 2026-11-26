@@ -12,6 +12,7 @@ from app.core.settings.registry import REGISTRY
 from app.llm import pricing
 from app.llm.client import DataBlock, LLMConfigError, Message, TextPart
 from app.llm.ledger import month_bounds
+from app.llm.money import MICROS_PER_MINOR
 from app.llm.providers import ClaudeCliAdapter, ProviderRequest
 from app.llm.render import SecretInPrompt, json_schema_for, parse_json_text, render
 from app.llm.routing import STAGE_SETTING, STAGES, escalation_model, resolve_route, within_margin
@@ -79,22 +80,23 @@ def test_estimate_is_an_upper_bound_of_the_real_cost() -> None:
     text = "word " * 4000  # ~20k chars -> ~5k real tokens
     tokens = pricing.estimate_input_tokens(text)
     assert tokens >= len(text) / 4
-    bound = pricing.max_cost_minor(price, tokens, 1000)
-    real = pricing.cost_minor(price, input_tokens=len(text) // 4, output_tokens=1000)
+    bound = pricing.max_cost_micros(price, tokens, 1000)
+    real = pricing.cost_micros(price, input_tokens=len(text) // 4, output_tokens=1000)
     assert bound >= real
 
 
 def test_long_context_rates_apply_above_threshold() -> None:
     price = _price(long_context_threshold=1000, long_input_per_mtok=Decimal(1000), long_output_per_mtok=Decimal(500))
-    assert pricing.max_cost_minor(price, 2000, 0) == 2  # 2000 * 1000 / 1e6
-    assert pricing.max_cost_minor(price, 900, 0) == 1  # minimum one minor unit
+    assert pricing.max_cost_micros(price, 2000, 0) == 20_000  # 2000 * 1000 / 1e6 cents = 2 cents
+    assert pricing.max_cost_micros(price, 900, 0) == 900  # 900 * 100 / 1e6 cents, no rounding to a cent
+    assert pricing.max_cost_micros(price, 0, 0) == 1  # a reservation is never zero
 
 
 def test_cost_counts_cache_tokens_at_their_rates() -> None:
     price = _price(cache_write_per_mtok=Decimal(125), cache_read_per_mtok=Decimal(10))
-    cost = pricing.cost_minor(price, input_tokens=1_000_000, output_tokens=0, cache_read_tokens=1_000_000,
+    cost = pricing.cost_micros(price, input_tokens=1_000_000, output_tokens=0, cache_read_tokens=1_000_000,
                               cache_write_tokens=1_000_000)
-    assert cost == 100 + 10 + 125
+    assert cost == (100 + 10 + 125) * MICROS_PER_MINOR
 
 
 def test_default_price_table_is_dated_and_covers_default_models() -> None:

@@ -223,7 +223,7 @@ class ModelScore:
     gaps: list[str]
     score: int  # weighted, after rubric penalties
     model: str
-    cost_minor: int
+    cost_micros: int
     currency: str | None
     cache_key: str
     cached: bool = False
@@ -251,10 +251,10 @@ async def model_score(session: AsyncSession, client: LLMClient, job: Job, record
             ratings, gaps = list(hit.ratings), list(hit.gaps)
             cached = True
         else:
-            limit = await client.estimate_cost_minor(STAGE, messages, model=model)
-            out, usage = await client.complete(STAGE, messages, ScoreOut, max_cost_minor=limit, model=model)
+            limit = await client.estimate_cost_micros(STAGE, messages, model=model)
+            out, usage = await client.complete(STAGE, messages, ScoreOut, max_cost_micros=limit, model=model)
             ratings, gaps = verify_ratings(rubric.body, out, kit), list(out.gaps)
-            cost += usage.cost_minor
+            cost += usage.cost_micros
             currency = usage.currency
             cached = False
         score, notes = apply_penalties(rubric.body, weighted_score(rubric.body, ratings), record)
@@ -313,7 +313,7 @@ class ScoreSummary:
     parked: int = 0
     no_rubric: int = 0
     escalated: int = 0
-    cost_minor: int = 0
+    cost_micros: int = 0
     employers: set[str] = field(default_factory=set)
 
     def counts(self) -> dict[str, int]:
@@ -384,11 +384,11 @@ async def score_jobs(session: AsyncSession, run: Run | None, job_ids: Sequence[u
             assessment.ratings, assessment.gaps = result.ratings, result.gaps
             assessment.rubric_id, assessment.rubric_version = rubric.id, rubric.version
             assessment.model, assessment.cache_key = result.model, result.cache_key
-            assessment.cost_minor = result.cost_minor
+            assessment.cost_micros = result.cost_micros
             assessment.cost_currency = result.currency
             assessment.base_score = result.score
             assessment.state = AssessmentState.scored
-            summary.cost_minor += result.cost_minor
+            summary.cost_micros += result.cost_micros
             summary.cached += int(result.cached)
             summary.scored += int(not result.cached)
             summary.escalated += int(result.model == settings.get("ai.model_score_escalation"))
@@ -403,7 +403,7 @@ async def score_jobs(session: AsyncSession, run: Run | None, job_ids: Sequence[u
     await conflicts.resolve_employers(session, summary.employers, now=now)
     if run is not None:
         run.counts = {**run.counts, **summary.counts()}
-        run.cost_minor = (run.cost_minor or 0) + summary.cost_minor
+        run.cost_micros = (run.cost_micros or 0) + summary.cost_micros
     return summary
 
 
@@ -427,7 +427,7 @@ if run_registry.handler_for(RunKind.rescore) is None:
 @dataclass
 class BacktestResult:
     rows: list[dict[str, Any]]
-    estimated_cost_minor: int
+    estimated_cost_micros: int
     currency: str
     to_score: int = 0
 
@@ -490,7 +490,7 @@ async def backtest(session: AsyncSession, draft: Rubric, campaign: Campaign, job
         cached = await session.scalar(select(Assessment.id).where(Assessment.cache_key == key).limit(1))
         to_score += int(cached is None)
         if cached is None and client is not None:
-            estimate += await client.estimate_cost_minor(STAGE, build_messages(prompt, draft.body, kit, job),
+            estimate += await client.estimate_cost_micros(STAGE, build_messages(prompt, draft.body, kit, job),
                                                          model=model)
         if estimate_only or client is None:
             new_scores[job.id] = None
@@ -509,7 +509,7 @@ async def backtest(session: AsyncSession, draft: Rubric, campaign: Campaign, job
              "crossed": _crossings(old_scores.get(job.id), new_scores.get(job.id), old_t, new_t)}
             for job, _ in records]
     rows.sort(key=lambda r: (r["new_rank"] is None, r["new_rank"] or 0, r["old_rank"] or 0))
-    return BacktestResult(rows=rows, estimated_cost_minor=estimate, currency=currency, to_score=to_score)
+    return BacktestResult(rows=rows, estimated_cost_micros=estimate, currency=currency, to_score=to_score)
 
 
 # ----- overrides --------------------------------------------------------------------------

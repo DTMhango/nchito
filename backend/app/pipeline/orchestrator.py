@@ -289,7 +289,7 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
                         normalise.apply_extraction(job, extraction.out, aliases)
                         counts["extract_cached" if extraction.cached else "extracted"] += 1
                         if extraction.usage:
-                            cost += extraction.usage.cost_minor
+                            cost += extraction.usage.cost_micros
                 counts["tagged"] += len(normalise.apply_tag_rules(job, tag_rules))
             if needs_model or result.outcome == dedupe.Outcome.new:
                 handoff.append(job.id)
@@ -300,7 +300,7 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
         if not run.dry_run:
             _record_health(source, item, started)
         run.source_results = list(results)
-        run.cost_minor = cost
+        run.cost_micros = cost
         await _progress(session, run, f"source:{source.name}", counts)
         if await _cancelled(session, run):
             return RunStatus.cancelled
@@ -308,7 +308,7 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
     failed = sum(r.status == "failed" for r in results)
     status = RunStatus.failed if failed == len(results) else RunStatus.partial if failed else RunStatus.succeeded
     run.source_results = results
-    run.cost_minor = cost
+    run.cost_micros = cost
     counts["handed_to_scoring"] = 0 if run.dry_run else len(handoff)
     run.counts = dict(counts)
     if run.dry_run:

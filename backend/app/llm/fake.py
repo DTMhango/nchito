@@ -6,7 +6,7 @@ Script replies per stage (or for any stage) and inspect ``calls`` afterwards::
     fake.script("score", {"score": 72, "reasons": []})          # dict, model instance,
     fake.script("score", lambda call: {...})                     # callable(FakeCall) -> reply,
     fake.script("extract", BudgetExhausted("monthly", ...))      # or an exception to raise
-    result, usage = await fake.complete("score", messages, ScoreOut, max_cost_minor=10)
+    result, usage = await fake.complete("score", messages, ScoreOut, max_cost_micros=10)
     assert fake.calls[0].stage == "score"
 
 Replies are consumed in order; ``default`` (if set) answers when a stage's queue is empty;
@@ -35,15 +35,15 @@ class FakeCall:
     stage: str
     messages: Sequence[Message]
     schema: type[BaseModel]
-    max_cost_minor: int
+    max_cost_micros: int
     model: str | None
     prompt: RenderedPrompt
 
 
 @dataclass
 class FakeLLMClient:
-    cost_minor: int = 0
-    estimate_minor: int = 0
+    cost_micros: int = 0
+    estimate_micros: int = 0
     currency: str = "USD"
     billed: bool = True
     provider: str = "fake"
@@ -59,17 +59,17 @@ class FakeLLMClient:
     def calls_for(self, stage: str) -> list[FakeCall]:
         return [c for c in self.calls if c.stage == stage]
 
-    async def estimate_cost_minor(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None) -> int:
+    async def estimate_cost_micros(self, stage: Stage, messages: Sequence[Message], *, model: str | None = None) -> int:
         render(messages)
-        return self.estimate_minor
+        return self.estimate_micros
 
     async def complete(self, stage: Stage, messages: Sequence[Message], schema: type[ResultT], *,
-                       max_cost_minor: int, model: str | None = None) -> tuple[ResultT, Usage]:
-        call = FakeCall(stage=stage, messages=messages, schema=schema, max_cost_minor=max_cost_minor, model=model,
+                       max_cost_micros: int, model: str | None = None) -> tuple[ResultT, Usage]:
+        call = FakeCall(stage=stage, messages=messages, schema=schema, max_cost_micros=max_cost_micros, model=model,
                         prompt=render(messages))
         self.calls.append(call)
-        if self.estimate_minor > max_cost_minor:
-            raise BudgetExhausted("call", needed_minor=self.estimate_minor, available_minor=max_cost_minor,
+        if self.estimate_micros > max_cost_micros:
+            raise BudgetExhausted("call", needed_micros=self.estimate_micros, available_micros=max_cost_micros,
                                   currency=self.currency)
         reply = self._next(stage)
         if callable(reply) and not isinstance(reply, BaseModel | Exception):
@@ -79,7 +79,7 @@ class FakeLLMClient:
         data = reply.model_dump() if isinstance(reply, BaseModel) else reply
         return schema.model_validate(data), Usage(provider=self.provider, model=model or self.default_model,
                                                   input_tokens=len(call.prompt.all_text) // 4, output_tokens=0,
-                                                  cost_minor=self.cost_minor, currency=self.currency,
+                                                  cost_micros=self.cost_micros, currency=self.currency,
                                                   billed=self.billed)
 
     def _next(self, stage: str) -> Reply:

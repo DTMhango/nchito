@@ -34,14 +34,15 @@ Responder = Callable[[Stage, Sequence[Message], str | None], dict[str, Any]]
 
 class FakeLLMClient(fake.FakeLLMClient):
     def __init__(self, responder: Responder, *, cost: int = 7, budget_calls: int | None = None) -> None:
-        super().__init__(cost_minor=cost, estimate_minor=cost, default=self._reply)
+        super().__init__(cost_micros=cost, estimate_micros=cost, default=self._reply)
         self.responder = responder
         self.budget_calls = budget_calls
 
     def _reply(self, call: fake.FakeCall) -> Any:
         if self.budget_calls is not None and len(self.calls) > self.budget_calls:
             self.calls.pop()  # a refused call never reached the model
-            return BudgetExhausted("monthly", needed_minor=self.cost_minor, available_minor=0, currency=self.currency)
+            return BudgetExhausted("monthly", needed_micros=self.cost_micros, available_micros=0,
+                                   currency=self.currency)
         return self.responder(call.stage, call.messages, call.model)  # type: ignore[arg-type]
 
     def text_sent(self, index: int = -1) -> str:

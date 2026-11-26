@@ -24,6 +24,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.conditions import ConditionSet
+from app.llm.money import micros_to_minor
 from app.models.base import Base, Entity, Origin, PydanticJSON, ReviewState, str_enum
 from app.schemas.json_types import (
     AutomationPolicy,
@@ -80,6 +81,9 @@ class Campaign(Base, Entity):
         ARRAY(String(40)), nullable=False, default=list,
         doc="Criteria groups still to confirm (pay_floors, locations, ...); confirmed only when empty")
     last_sweep_checkpoint: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    source_checkpoints: Mapped[dict[str, datetime]] = mapped_column(
+        PydanticJSON(dict[str, datetime]), nullable=False, default=dict,
+        doc="source id -> start of that source's last successful sweep (each source keeps its own window)")
 
 
 class RubricStatus(enum.StrEnum):
@@ -298,7 +302,7 @@ class ExtractionCache(Base, Entity):
     prompt_version: Mapped[str] = mapped_column(String(40), nullable=False)
     model: Mapped[str] = mapped_column(String(128), nullable=False)
     result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    cost_minor: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     cost_currency: Mapped[str | None] = mapped_column(String(3))
 
 
@@ -340,12 +344,17 @@ class Assessment(Base, Entity):
     score: Mapped[int | None] = mapped_column(Integer)
     gaps: Mapped[list[str]] = mapped_column(ARRAY(Text), nullable=False, default=list)
     model: Mapped[str | None] = mapped_column(String(128))
-    cost_minor: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     cost_currency: Mapped[str | None] = mapped_column(String(3))
     override: Mapped[Override | None] = mapped_column(PydanticJSON(Override))
     cache_key: Mapped[str | None] = mapped_column(String(128), index=True,
                                                   doc="hash(job, kit version, rubric version, prompt version, model)")
     is_conflict_winner: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    @property
+    def cost_minor(self) -> int:
+        """Display only: the integer-micros cost in minor units."""
+        return micros_to_minor(self.cost_micros)
 
 
 class RunKind(enum.StrEnum):
@@ -365,6 +374,7 @@ class RunStatus(enum.StrEnum):
     partial = "partial"
     cancelled = "cancelled"
     skipped = "skipped"
+    paused = "paused"  # paid stages stopped at the budget; resumes when the cap allows
 
 
 class Run(Base, Entity):
@@ -380,12 +390,17 @@ class Run(Base, Entity):
     counts: Mapped[dict[str, int]] = mapped_column(PydanticJSON(dict[str, int]), nullable=False, default=dict)
     source_results: Mapped[list[SourceRunResult]] = mapped_column(PydanticJSON(list[SourceRunResult]),
                                                                   nullable=False, default=list)
-    cost_minor: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     config_versions: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     status: Mapped[RunStatus] = mapped_column(str_enum(RunStatus), nullable=False, default=RunStatus.queued)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error: Mapped[str | None] = mapped_column(Text)
+
+    @property
+    def cost_minor(self) -> int:
+        """Display only: the integer-micros cost in minor units."""
+        return micros_to_minor(self.cost_micros)
 
 
 class Schedule(Base, Entity):

@@ -154,7 +154,7 @@ class LedgerEntry(Base, Entity):
 
     kind: Mapped[LedgerKind] = mapped_column(str_enum(LedgerKind), nullable=False)
     reservation_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("ledger_entry.id"))
-    amount_minor: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    amount_micros: Mapped[int] = mapped_column(BigInteger, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     billed: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     stage: Mapped[str] = mapped_column(String(60), nullable=False)

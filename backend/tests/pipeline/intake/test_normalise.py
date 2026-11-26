@@ -118,7 +118,7 @@ async def test_extract_fills_facets_with_evidence_and_canonical_skills(session):
     assert f.min_education.value.level == "masters" and f.min_education.value.required is False
     assert f.required_skills == ["Power BI", "Python"] and f.preferred_skills == ["Power BI"]
     assert job.function == "Analytics" and job.level == "Senior"
-    assert extraction.usage.cost_minor == 3 and not extraction.cached
+    assert extraction.usage.cost_micros == 3 and not extraction.cached
 
 
 async def test_a_claim_without_a_real_quote_becomes_not_stated(session):

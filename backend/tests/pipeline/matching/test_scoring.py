@@ -44,7 +44,7 @@ async def test_scores_with_verified_evidence(session):
     summary = await scoring.score_jobs(session, None, [job.id], client=client, now=NOW)
     a = await _assessment(session, job, campaign)
     assert summary.scored == 1 and a.state == AssessmentState.scored
-    assert a.base_score == 92 and a.rubric_version == 1 and a.cost_minor == 7
+    assert a.base_score == 92 and a.rubric_version == 1 and a.cost_micros == 7
     assert [r.evidence_fact_ids for r in a.ratings] == [["F-1"], ["F-2"]]
     assert a.filter_results and all(f.reason for f in a.filter_results)
 
@@ -97,7 +97,7 @@ async def test_escalates_near_a_threshold(session):
     summary = await scoring.score_jobs(session, None, [job.id], client=client, now=NOW)
     a = await _assessment(session, job, campaign)
     assert [c.model for c in client.calls] == ["claude-haiku-5-5", "claude-sonnet-5-5"]
-    assert a.model == "claude-sonnet-5-5" and a.cost_minor == 14 and summary.escalated == 1
+    assert a.model == "claude-sonnet-5-5" and a.cost_micros == 14 and summary.escalated == 1
 
 
 async def test_cache_reuses_a_score_and_rescore_does_not_duplicate(session):
@@ -159,7 +159,7 @@ async def test_backtest_estimates_first_then_reports_crossings_and_ranks(session
     client = FakeLLMClient(lambda s, m, model: ratings(
         {"skills": 5 if "Junior" in m[1].parts[2].content else 1})(s, m, model))
     estimate = await scoring.backtest(session, draft, campaign, [low.id, high.id], client=client, now=NOW)
-    assert client.calls == [] and estimate.estimated_cost_minor == 14
+    assert client.calls == [] and estimate.estimated_cost_micros == 14
     assert all(r["new_score"] is None for r in estimate.rows)
     result = await scoring.backtest(session, draft, campaign, [low.id, high.id], client=client, now=NOW,
                                     estimate_only=False)

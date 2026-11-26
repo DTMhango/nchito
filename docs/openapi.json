@@ -24885,9 +24885,9 @@
             ],
             "title": "Detail"
           },
-          "cost_minor": {
+          "cost_micros": {
             "type": "integer",
-            "title": "Cost Minor",
+            "title": "Cost Micros",
             "default": 0
           },
           "currency": {

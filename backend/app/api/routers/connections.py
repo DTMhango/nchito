@@ -17,6 +17,7 @@ from app.core import audit
 from app.core.clock import utcnow
 from app.llm import checks, provider_records
 from app.llm.deps import llm_service
+from app.llm.money import micros_to_minor
 from app.llm.service import LLMService
 from app.models.platform import Connection
 
@@ -168,7 +169,7 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
     await checks.record(session, result, actor=principal.actor)
     conn.health = "ok" if result.ok else "failing"
     conn.last_checked_at = utcnow()
-    return ConnectionTestOut(ok=result.ok, detail=result.detail, cost_minor=result.cost_minor)
+    return ConnectionTestOut(ok=result.ok, detail=result.detail, cost_minor=micros_to_minor(result.cost_micros))
 
 
 @connections_router.post("/oauth/{provider}/start", response_model=OAuthStartOut, name="connections_oauth_start")

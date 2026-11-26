@@ -17,6 +17,7 @@ from app.api.deps import RequireOwner, SessionDep
 from app.api.routers.pending_actions import DecisionGroup, open_decisions
 from app.core.clock import utcnow
 from app.core.settings import service as settings_service
+from app.llm.money import micros_to_minor
 from app.models.applications import END_STAGES, Application, InterviewRound, Stage
 from app.models.applications import InterviewPack as InterviewPackRow
 from app.models.platform import LedgerEntry, LedgerKind
@@ -110,7 +111,7 @@ async def _spend(session: AsyncSession, now: datetime) -> SpendMeter:
     cap = await settings_service.get_value(session, "budget.monthly_cap_minor")
 
     def total(*conds: object) -> object:
-        return select(func.coalesce(func.sum(LedgerEntry.amount_minor), 0)).where(
+        return select(func.coalesce(func.sum(LedgerEntry.amount_micros), 0)).where(
             LedgerEntry.created_at >= month_start, LedgerEntry.currency == currency, *conds)  # type: ignore[arg-type]
 
     billed = await session.scalar(total(LedgerEntry.kind == LedgerKind.reconciliation,  # type: ignore[arg-type]
@@ -122,9 +123,9 @@ async def _spend(session: AsyncSession, now: datetime) -> SpendMeter:
         LedgerEntry.kind.in_([LedgerKind.reconciliation, LedgerKind.release]))
     reserved = await session.scalar(total(LedgerEntry.kind == LedgerKind.reservation,  # type: ignore[arg-type]
                                           LedgerEntry.id.not_in(closed)))
-    return SpendMeter(month_to_date_minor=int(billed or 0), reserved_minor=int(reserved or 0),
+    return SpendMeter(month_to_date_minor=micros_to_minor(billed or 0), reserved_minor=micros_to_minor(reserved or 0),
                       cap_minor=int(cap) if cap is not None else None, currency=currency,
-                      estimated_unbilled_minor=int(unbilled or 0))
+                      estimated_unbilled_minor=micros_to_minor(unbilled or 0))
 
 
 def _when(item: UpcomingItem) -> datetime:
@@ -176,7 +177,7 @@ async def today(session: SessionDep, top: int = Query(default=5, ge=1, le=20),
     run = await session.scalar(select(Run).where(Run.kind == RunKind.sweep, Run.finished_at.is_not(None))
                                .order_by(Run.finished_at.desc()).limit(1))
     last = LastSweep(run_id=run.id, status=run.status.value, started_at=run.started_at, finished_at=run.finished_at,
-                     counts=run.counts, cost_minor=run.cost_minor) if run else None
+                     counts=run.counts, cost_minor=micros_to_minor(run.cost_micros)) if run else None
 
     counts = dict((await session.execute(select(Application.stage, func.count()).group_by(Application.stage))).all())
     funnel = [FunnelStage(stage=s.value, count=int(counts[s])) for s in STAGE_ORDER if counts.get(s)]

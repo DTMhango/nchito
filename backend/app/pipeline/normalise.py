@@ -413,14 +413,14 @@ async def extract(session: AsyncSession, llm: LLMClient, norm: NormalisedJob) ->
         return Extraction(ExtractionOut.model_validate(hit.result), cached=True)
     messages = build_messages(norm)
     try:
-        ceiling = await llm.estimate_cost_minor("extract", messages)
-        out, usage = await llm.complete("extract", messages, ExtractionOut, max_cost_minor=ceiling)
+        ceiling = await llm.estimate_cost_micros("extract", messages)
+        out, usage = await llm.complete("extract", messages, ExtractionOut, max_cost_micros=ceiling)
     except BudgetExceeded:
         return Extraction(None, skipped="budget")
     except Exception:  # a provider or schema failure must not fail the sweep; the job stays pending
         return Extraction(None, skipped="error")
     session.add(ExtractionCache(cache_key=key, content_hash=norm.content_hash, prompt_version=PROMPT_VERSION,
-                                model=model, result=out.model_dump(), cost_minor=usage.cost_minor,
+                                model=model, result=out.model_dump(), cost_micros=usage.cost_micros,
                                 cost_currency=usage.currency))
     await session.flush()
     return Extraction(out, usage=usage)

@@ -37,7 +37,7 @@ class RouteTestOut(BaseModel):
     provider: str | None = None
     model: str | None = None
     detail: str | None = None
-    cost_minor: int = 0
+    cost_micros: int = 0
     currency: str | None = None
     billed: bool = True
     latency_ms: int | None = None
@@ -55,7 +55,7 @@ async def run_test(service: LLMService, *, stage: str, model: str | None = None,
     out = RouteTestOut(ok=False, stage=stage, provider=plan.route.provider, model=plan.route.model,
                        currency=plan.currency, billed=plan.route.billed)
     try:
-        result, usage = await service.run_plan(plan, Pong, max_cost_minor=plan.estimate_minor)
+        result, usage = await service.run_plan(plan, Pong, max_cost_micros=plan.estimate_micros)
     except BudgetExhausted as exc:
         out.detail = ("Set a monthly cap first: paid calls stay off without one." if exc.scope == "no_cap"
                       else f"Budget refused the test ({exc.scope}).")
@@ -64,7 +64,7 @@ async def run_test(service: LLMService, *, stage: str, model: str | None = None,
         out.detail = str(exc)
         return out
     out.ok = bool(result.ok)
-    out.cost_minor = usage.cost_minor
+    out.cost_micros = usage.cost_micros
     out.latency_ms = int((time.monotonic() - started) * 1000)
     out.detail = "Replied as expected." if out.ok else "Replied, but not as expected."
     return out

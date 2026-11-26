@@ -1,6 +1,7 @@
 """Price table: editable data with a dated default (``prices_default.json``).
 
-Prices are minor currency units per million tokens. Estimates are upper bounds (ledger
+Prices are minor currency units per million tokens; costs come out in integer micros
+(``app.llm.money``), so a small call is not rounded up to a whole minor unit. Estimates are upper bounds (ledger
 integrity): input is counted at no fewer tokens than ``len(text) / CHARS_PER_TOKEN_FLOOR``, at
 the dearer of the plain and cache-write rate, with long-context rates once the estimate passes
 the threshold, and the output at the full token limit.
@@ -19,12 +20,14 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.llm.money import MICROS_PER_MINOR
 from app.models.platform import LlmPrice
 
 DEFAULTS_FILE = Path(__file__).with_name("prices_default.json")
 CHARS_PER_TOKEN_FLOOR = 2  # real text runs at 3-4 characters per token; 2 keeps the estimate an upper bound
 MESSAGE_OVERHEAD_TOKENS = 64
 MILLION = Decimal(1_000_000)
+MICROS = Decimal(MICROS_PER_MINOR)
 
 
 class PriceIn(BaseModel):
@@ -78,14 +81,14 @@ def _rates(price: LlmPrice | PriceIn, input_tokens: int) -> tuple[Decimal, Decim
     return Decimal(inp), Decimal(out)
 
 
-def max_cost_minor(price: LlmPrice | PriceIn, input_tokens: int, max_output_tokens: int) -> int:
+def max_cost_micros(price: LlmPrice | PriceIn, input_tokens: int, max_output_tokens: int) -> int:
     inp, out = _rates(price, input_tokens)
     write = Decimal(price.cache_write_per_mtok) if price.cache_write_per_mtok is not None else inp
-    total = (Decimal(input_tokens) * max(inp, write) + Decimal(max_output_tokens) * out) / MILLION
+    total = (Decimal(input_tokens) * max(inp, write) + Decimal(max_output_tokens) * out) * MICROS / MILLION
     return max(1, math.ceil(total))
 
 
-def cost_minor(price: LlmPrice | PriceIn, *, input_tokens: int, output_tokens: int, cache_write_tokens: int = 0,
+def cost_micros(price: LlmPrice | PriceIn, *, input_tokens: int, output_tokens: int, cache_write_tokens: int = 0,
                cache_read_tokens: int = 0) -> int:
     """Cost of reported usage. ``input_tokens`` excludes cached tokens (Anthropic's convention)."""
     total_in = input_tokens + cache_write_tokens + cache_read_tokens
@@ -93,5 +96,5 @@ def cost_minor(price: LlmPrice | PriceIn, *, input_tokens: int, output_tokens: i
     write = Decimal(price.cache_write_per_mtok) if price.cache_write_per_mtok is not None else inp
     read = Decimal(price.cache_read_per_mtok) if price.cache_read_per_mtok is not None else inp
     total = (Decimal(input_tokens) * inp + Decimal(cache_write_tokens) * write + Decimal(cache_read_tokens) * read
-             + Decimal(output_tokens) * out) / MILLION
+             + Decimal(output_tokens) * out) * MICROS / MILLION
     return math.ceil(total)
