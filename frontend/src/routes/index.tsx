@@ -71,6 +71,14 @@ const AutopilotPage = lazyPage(
   () => import("@/features/autopilot/autopilot-page"),
   "AutopilotPage"
 )
+const ApprovalsPage = lazyPage(
+  () => import("@/features/approvals/approvals-page"),
+  "ApprovalsPage"
+)
+const ApprovalReviewPage = lazyPage(
+  () => import("@/features/approvals/review-page"),
+  "ReviewPage"
+)
 const KitLayout = lazyPage(
   () => import("@/features/kit/kit-pages"),
   "KitLayout"
@@ -258,6 +266,19 @@ const studioRoute = createRoute({
   },
 })
 const autopilotRoute = page("/autopilot", "Autopilot", AutopilotPage)
+const approvalsRoute = page("/approvals", "Approvals", ApprovalsPage)
+const approvalReviewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/approvals/$applicationId",
+  staticData: { title: "Review" },
+  component: function ApprovalReviewRoute() {
+    return (
+      <ApprovalReviewPage
+        applicationId={approvalReviewRoute.useParams().applicationId}
+      />
+    )
+  },
+})
 const runsRoute = page("/autopilot/runs", "Run history", RunsPage)
 const runDetailRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -423,6 +444,8 @@ export const routeTree = rootRoute.addChildren([
       jobRoute,
       studioRoute,
       autopilotRoute,
+      approvalsRoute,
+      approvalReviewRoute,
       runsRoute,
       runDetailRoute,
       kitRoute.addChildren([kitIndex, ...kitChildren]),

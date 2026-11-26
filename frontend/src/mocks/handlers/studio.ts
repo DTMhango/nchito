@@ -243,7 +243,9 @@ export const studioHandlers = [
   }),
   http.get("*/api/applications/:id/packets", ({ params }) => {
     if (!db.get().session) return unauthorized()
-    return HttpResponse.json(state.entries[String(params.id)]?.packets ?? [])
+    const packets = state.entries[String(params.id)]?.packets
+    // No studio packets: fall through to the autopilot handler (see handlers.ts order).
+    return packets?.length ? HttpResponse.json(packets) : undefined
   }),
   http.get("*/api/applications/:id/documents/:kind", ({ request }) => {
     if (!db.get().session) return unauthorized()
