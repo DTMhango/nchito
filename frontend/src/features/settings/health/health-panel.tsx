@@ -2,115 +2,156 @@ import { useQuery } from "@tanstack/react-query"
 import { Chip, type ChipTone } from "@/components/chip"
 import { PageHeader } from "@/components/page-header"
 import { Skeleton } from "@/components/ui/skeleton"
-import { api, unwrap } from "@/lib/api/client"
-import { backupsQuery, healthQuery } from "../data/api"
+import { healthQuery, type HealthComponent } from "../data/api"
+import { SettingsBlock } from "../data/settings-block"
 
-const runsQuery = () => ({
-  queryKey: ["health", "runs"] as const,
-  queryFn: async () =>
-    (await unwrap(api.GET("/api/runs", { params: { query: { limit: 100 } } })))
-      .items,
-  refetchInterval: 30_000,
-})
+type Status = HealthComponent["status"]
 
-const ago = (iso: string | null | undefined) => {
-  if (!iso) return null
-  const mins = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000))
-  if (mins < 1) return "just now"
-  if (mins < 60) return `${mins} min ago`
-  if (mins < 1440) return `${Math.round(mins / 60)} h ago`
-  return `${Math.round(mins / 1440)} d ago`
+/** Status in words. `unknown` is its own state: never shown as working. */
+export const STATUS: Record<Status, { tone: ChipTone; label: string }> = {
+  ok: { tone: "good", label: "OK" },
+  warn: { tone: "warn", label: "Needs a look" },
+  down: { tone: "danger", label: "Down" },
+  unknown: { tone: "neutral", label: "Unknown" },
+}
+/** Any status the server adds later reads as unknown, not as OK. */
+const statusOf = (s: string) => STATUS[s as Status] ?? STATUS.unknown
+
+const NAMES: Record<string, string> = {
+  database: "Database",
+  worker: "Worker",
+  sweep: "Last sweep",
+  backup: "Last backup",
+  disk: "Disk space",
+  connections: "Connections",
 }
 
-type Row = { label: string; tone: ChipTone; status: string; detail: string }
+const age = (seconds: number | null) => {
+  if (seconds === null) return null
+  const mins = Math.round(seconds / 60)
+  if (mins < 1) return "under a minute"
+  if (mins < 60) return `${mins} min`
+  if (mins < 1440) return `${Math.round(mins / 60)} h`
+  return `${Math.round(mins / 1440)} d`
+}
 
-/** Worker, last sweep, last backup and the queue, in plain words. */
+/** Database, worker, sweep, backup, disk and connections, with the queue, from `/api/health/detail`. */
 export function HealthPanel() {
-  const health = useQuery(healthQuery())
-  const runs = useQuery(runsQuery())
-  const backups = useQuery(backupsQuery())
-
-  const loading = health.isPending || runs.isPending || backups.isPending
-  const rows: Row[] = []
-  if (health.data) {
-    const w = health.data.worker
-    rows.push({
-      label: "Worker",
-      tone: w.ok ? "good" : "danger",
-      status: w.ok ? "Running" : "Not running",
-      detail: w.last_beat_at
-        ? `Last heartbeat ${ago(w.last_beat_at)}. Nothing is swept or sent while it is stopped.`
-        : "No heartbeat seen. Nothing is swept or sent while it is stopped.",
-    })
-    rows.push({
-      label: "Database",
-      tone: health.data.db.ok ? "good" : "danger",
-      status: health.data.db.ok ? "Reachable" : "Unreachable",
-      detail: health.data.db.error ?? `Version ${health.data.version}`,
-    })
-  }
-  if (runs.data) {
-    const sweeps = runs.data
-      .filter((r) => r.kind === "sweep" && !r.dry_run)
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    const done = sweeps.find(
-      (r) => r.status === "succeeded" || r.status === "partial"
-    )
-    const failed = sweeps[0] && sweeps[0].status === "failed"
-    rows.push({
-      label: "Last sweep",
-      tone: failed ? "danger" : done ? "good" : "neutral",
-      status: failed ? "Failed" : done ? "OK" : "None yet",
-      detail: done
-        ? `Finished ${ago(done.finished_at ?? done.updated_at)}.`
-        : "No finished sweep yet.",
-    })
-    const waiting = runs.data.filter((r) => r.status === "queued").length
-    const active = runs.data.filter((r) => r.status === "running").length
-    rows.push({
-      label: "Queue",
-      tone: "neutral",
-      status: `${waiting} waiting`,
-      detail: `${active} running now.`,
-    })
-  }
-  if (backups.data) {
-    const last = [...backups.data].sort((a, b) =>
-      b.created_at.localeCompare(a.created_at)
-    )[0]
-    rows.push({
-      label: "Last backup",
-      tone: last ? "good" : "warn",
-      status: last ? "Done" : "None yet",
-      detail: last
-        ? `${ago(last.created_at)}, kept on ${last.target}.`
-        : "Nothing is backed up. Run one under Data.",
-    })
-  }
-
+  const q = useQuery(healthQuery())
+  const h = q.data
   return (
     <div className="grid gap-4">
       <PageHeader
         title="System health"
         description="Whether the parts that work in the background are running. One alert is sent per lasting failure, and one when it recovers."
       />
-      {loading && <Skeleton className="h-40 w-full bg-sunken" />}
-      {(health.isError || runs.isError || backups.isError) && (
+      {q.isPending && <Skeleton className="h-40 w-full bg-sunken" />}
+      {q.isError && (
         <p role="alert" className="text-danger">
-          Some health checks could not be loaded.
+          The health check could not be loaded, so every part is unknown.
         </p>
       )}
-      <ul aria-label="Health checks" className="divide-y divide-border panel">
-        {rows.map((r) => (
-          <li key={r.label} className="flex flex-wrap items-center gap-3 p-3">
-            <span className="w-32 font-semibold">{r.label}</span>
-            <Chip tone={r.tone}>{r.status}</Chip>
-            <span className="min-w-0 flex-1 text-muted-foreground">
-              {r.detail}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {h && (
+        <>
+          <ul
+            aria-label="Health checks"
+            className="divide-y divide-border panel"
+          >
+            {h.components.map((c) => {
+              const st = statusOf(c.status)
+              return (
+                <li
+                  key={c.name}
+                  aria-label={NAMES[c.name] ?? c.name}
+                  className="flex flex-wrap items-center gap-3 p-3"
+                >
+                  <span className="w-32 font-semibold">
+                    {NAMES[c.name] ?? c.name}
+                  </span>
+                  <Chip tone={st.tone}>{st.label}</Chip>
+                  <span className="min-w-0 flex-1 text-muted-foreground">
+                    {c.detail ??
+                      (c.status === "unknown" ? "Not checked yet." : "")}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          <section aria-labelledby="queue-h" className="grid gap-2 panel p-4">
+            <h3 id="queue-h" className="text-md">
+              Queue and workers
+            </h3>
+            <p className="num" data-testid="queue">
+              {h.queue.waiting} waiting, {h.queue.running} running,{" "}
+              {h.queue.failed} failed
+            </p>
+            {h.workers.length === 0 ? (
+              <p className="text-muted-foreground">
+                No worker heartbeat seen. Nothing is swept or sent until a
+                worker runs.
+              </p>
+            ) : (
+              <ul aria-label="Workers" className="grid gap-1">
+                {h.workers.map((w, i) => (
+                  <li key={i} className="flex flex-wrap items-center gap-2">
+                    <Chip tone={w.ok ? "good" : "danger"}>
+                      {w.ok ? "Beating" : "Stale"}
+                    </Chip>
+                    <span className="text-muted-foreground">
+                      {w.age_seconds === null
+                        ? "No heartbeat yet"
+                        : `Last heartbeat ${age(w.age_seconds)} ago`}
+                      {w.workers > 1 ? `, ${w.workers} workers` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+          {h.connections.length > 0 && (
+            <section aria-labelledby="conns-h" className="grid gap-2 panel p-4">
+              <h3 id="conns-h" className="text-md">
+                Each connection
+              </h3>
+              <ul aria-label="Connection health" className="grid gap-1">
+                {h.connections.map((c) => {
+                  const st =
+                    c.health === "failing" ? STATUS.down : statusOf(c.health)
+                  return (
+                    <li
+                      key={c.id}
+                      className="flex flex-wrap items-center gap-2"
+                    >
+                      <span className="font-medium">{c.label}</span>
+                      <Chip tone={c.enabled ? st.tone : "line"}>
+                        {c.enabled ? st.label : "Paused"}
+                      </Chip>
+                      <span className="text-sm text-muted-foreground">
+                        {c.last_checked_at
+                          ? `Checked ${new Date(c.last_checked_at).toLocaleString()}`
+                          : "Never checked"}
+                      </span>
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+      <section aria-labelledby="thresholds-h" className="grid gap-2 panel p-4">
+        <h3 id="thresholds-h" className="text-md">
+          When to warn
+        </h3>
+        <SettingsBlock
+          label="Health thresholds"
+          keys={[
+            "health.sweep_stale_hours",
+            "health.backup_stale_hours",
+            "health.disk_min_free_mb",
+          ]}
+        />
+      </section>
     </div>
   )
 }

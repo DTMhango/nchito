@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/page-header"
 import { Chip } from "@/components/chip"
+import { isApiError } from "@/lib/api/client"
 import { backupsQuery, dataKeys, runBackup, runRetention } from "./api"
 import { ExportSection } from "./export-section"
 import { ImportFlow } from "./import-flow"
@@ -13,6 +14,10 @@ const when = (iso: string) =>
     dateStyle: "medium",
     timeStyle: "short",
   })
+/** The server answers 503 when it cannot run pg_dump. */
+export const NO_PG_DUMP =
+  "Backups need the PostgreSQL tool pg_dump on the server. Install the PostgreSQL client tools there (or set PG_BIN_DIR), then try again."
+
 const mb = (n: number) => `${(n / 1_048_576).toFixed(1)} MB`
 
 export function DataPage() {
@@ -34,6 +39,17 @@ export function DataPage() {
           </p>
         </div>
         <ImportFlow />
+        <SettingsBlock
+          label="Import and export limits"
+          keys={[
+            "data.old_kit_ai_extraction",
+            "data.import_max_zip_mb",
+            "data.import_max_file_mb",
+            "data.import_max_files",
+            "data.import_staging_hours",
+            "data.export_link_minutes",
+          ]}
+        />
       </section>
       <BackupsSection />
       <RetentionSection />
@@ -47,10 +63,9 @@ function BackupsSection() {
   const run = useMutation({
     mutationFn: runBackup,
     onSuccess: () => {
-      toast.success("Backup started")
+      toast.success("Backup written")
       void qc.invalidateQueries({ queryKey: dataKeys.backups })
     },
-    onError: (e) => toast.error(e.message),
   })
   const items = [...(q.data ?? [])].sort((a, b) =>
     b.created_at.localeCompare(a.created_at)
@@ -72,12 +87,27 @@ function BackupsSection() {
           </p>
         </div>
         <Button onClick={() => run.mutate()} disabled={run.isPending}>
-          Back up now
+          {run.isPending ? "Backing up" : "Back up now"}
         </Button>
       </div>
+      {run.isError && (
+        <p role="alert" className="text-sm text-danger">
+          {isApiError(run.error, 503) ? NO_PG_DUMP : run.error.message}
+        </p>
+      )}
+      {q.isError && (
+        <p role="alert" className="text-sm text-danger">
+          {q.error.message}
+        </p>
+      )}
       <SettingsBlock
         label="Backup schedule"
-        keys={["backups.cron", "backups.keep", "backups.target"]}
+        keys={[
+          "backups.cron",
+          "backups.keep",
+          "backups.target",
+          "health.backup_stale_hours",
+        ]}
       />
       {items.length > 0 && (
         <ul aria-label="Backups kept" className="divide-y divide-border">
@@ -119,7 +149,7 @@ function BackupsSection() {
 function RetentionSection() {
   const run = useMutation({
     mutationFn: runRetention,
-    onSuccess: () => toast.success("Clean-up started"),
+    onSuccess: () => toast.success("Clean-up done"),
     onError: (e) => toast.error(e.message),
   })
   return (
@@ -129,16 +159,20 @@ function RetentionSection() {
           Retention
         </h3>
         <p className="text-muted-foreground">
-          How long roles keep their full text. What you have applied to is kept
-          until you delete it, and the record that stops you applying twice is
-          never removed.
+          How long roles keep their full text, and when old notifications and
+          temporary files are removed. What you have applied to is kept until
+          you delete it, and the record that stops you applying twice is never
+          removed.
         </p>
       </div>
       <SettingsBlock
         label="Retention settings"
         keys={[
+          "retention.cron",
           "retention.below_threshold_text_days",
           "retention.unsubmitted_archive_days",
+          "retention.notifications_days",
+          "retention.temp_files_days",
         ]}
       />
       <div>

@@ -17,12 +17,12 @@ describe("Settings > Connections", () => {
       within(form).getByLabelText("IMAP server"),
       "imap.example.com"
     )
-    await user.type(within(form).getByLabelText("IMAP port"), "993")
+    await user.type(within(form).getByLabelText(/IMAP port/), "993")
     await user.type(
       within(form).getByLabelText("SMTP server"),
       "smtp.example.com"
     )
-    await user.type(within(form).getByLabelText("SMTP port"), "587")
+    await user.type(within(form).getByLabelText(/SMTP port/), "587")
     const pw = within(form).getByLabelText("App password")
     expect(pw).toHaveAttribute("type", "password")
     await user.type(pw, "hunter2-secret-9876")
@@ -174,13 +174,14 @@ describe("Settings > Notifications and health", () => {
     ).toBeInTheDocument()
   })
 
-  it("shows worker, sweep, queue and backup", async () => {
+  it("shows each component from the detailed health check", async () => {
     renderApp("/settings/health")
     const list = await screen.findByRole("list", { name: "Health checks" })
-    await waitFor(() =>
-      expect(within(list).getAllByRole("listitem")).toHaveLength(5)
-    )
+    expect(within(list).getAllByRole("listitem")).toHaveLength(6)
     expect(within(list).getByText("Worker")).toBeInTheDocument()
     expect(within(list).getByText("Last backup")).toBeInTheDocument()
+    expect(screen.getByTestId("queue")).toHaveTextContent(
+      "3 waiting, 1 running, 0 failed"
+    )
   })
 })

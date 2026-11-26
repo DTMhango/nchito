@@ -2,9 +2,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query"
 import { api, isApiError, unwrap } from "@/lib/api/client"
 import type { components } from "@/lib/api/types"
-import { connectionsQuery } from "@/features/settings/connections/api"
 import { listQuery, type TrackOut } from "@/features/kit/api"
-import { campaignsQuery } from "@/features/campaigns/api"
 import { sourcesQuery } from "@/features/sources/api"
 
 type S = components["schemas"]
@@ -48,23 +46,45 @@ export const dryRunsQuery = () =>
       ).items.filter((r) => r.dry_run),
   })
 
-/** Which steps are done, from what exists on the server. Never from the browser alone. */
+/** The wizard state the server computes (`GET /api/data/onboarding`). */
+export type Onboarding = S["OnboardingOut"]
+export type OnboardingStep = S["OnboardingStepOut"]
+
+export const onboardingKey = ["onboarding", "state"] as const
+export const onboardingQuery = () =>
+  queryOptions({
+    queryKey: onboardingKey,
+    queryFn: () => unwrap(api.GET("/api/data/onboarding")),
+  })
+
+/** A step is done only when the server says so; a missing or unknown key is not done. */
+export const stepDone = (o: Onboarding | undefined, key: string) =>
+  o?.steps.find((s) => s.key === key)?.done === true
+
+/**
+ * Which guide steps are done. The server's onboarding state answers kit, facts, campaign
+ * criteria and mail; tracks, sources and the dry run are read from what exists on the server.
+ * Never from the browser alone.
+ */
 export function useServerProgress() {
-  const person = useQuery(personQuery())
+  const state = useQuery(onboardingQuery())
   const tracks = useQuery(listQuery<TrackOut>("tracks"))
-  const campaigns = useQuery(campaignsQuery())
   const sources = useQuery(sourcesQuery())
-  const conns = useQuery(connectionsQuery())
   const runs = useQuery(dryRunsQuery())
+  const o = state.data
   return {
-    person: !!person.data?.full_name?.value,
+    state: o,
+    kit: stepDone(o, "kit_present"),
+    facts: stepDone(o, "facts_confirmed"),
     tracks: (tracks.data?.length ?? 0) > 0,
-    campaign: (campaigns.data?.length ?? 0) > 0,
+    criteria:
+      stepDone(o, "campaign_exists") && stepDone(o, "criteria_confirmed"),
     sources: (sources.data ?? []).some((s) => s.enabled),
-    mail: (conns.data ?? []).some(
-      (c) => c.provider === "gmail" || c.provider === "imap_smtp"
-    ),
+    mail: stepDone(o, "mail_connected"),
     dryRun: (runs.data?.length ?? 0) > 0,
-    loading: person.isPending || tracks.isPending || campaigns.isPending,
+    complete: o?.complete === true,
+    next: o?.steps.find((s) => s.key === o.next_step) ?? null,
+    loading: state.isPending,
+    error: state.isError,
   }
 }

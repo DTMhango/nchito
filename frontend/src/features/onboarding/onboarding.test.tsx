@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event"
 import { http } from "msw"
 import { server } from "@/test/server"
 import { renderApp } from "@/test/render"
-import { importCalls, importFallback } from "@/mocks/handlers/data"
+import { dataMock, importCalls, importFallback } from "@/mocks/handlers/data"
+import { settingRow, writeSetting } from "@/mocks/dataset/settings"
 import { isProtectedGroup, groupReview } from "./review-groups"
 import {
   EMPTY_DRAFT,
@@ -278,5 +279,106 @@ describe("Set-up guide: old kit import", () => {
     expect(
       screen.getByRole("region", { name: "Review: countries" })
     ).toBeInTheDocument()
+  })
+})
+
+describe("Set-up guide: progress from the server", () => {
+  const step = (key: string, done: boolean) => ({
+    key,
+    label: `Label ${key}`,
+    done,
+    detail: `Detail ${key}.`,
+  })
+
+  it("ticks steps only from GET /api/data/onboarding and names the next one", async () => {
+    dataMock.onboarding = {
+      steps: [
+        step("kit_present", true),
+        step("facts_confirmed", false),
+        step("campaign_exists", true),
+        step("criteria_confirmed", true),
+        step("mail_connected", false),
+      ],
+      complete: false,
+      next_step: "facts_confirmed",
+    }
+    renderApp("/onboarding?step=1")
+    expect(await screen.findByTestId("next-step")).toHaveTextContent(
+      "Label facts_confirmed. Detail facts_confirmed."
+    )
+    const nav = screen.getByRole("navigation", { name: "Set-up steps" })
+    const buttons = within(nav).getAllByRole("button")
+    // Step 1 (kit) and step 4 (criteria) are done; step 2 (facts) and 6 (mail) are not.
+    expect(within(buttons[0]).queryByLabelText("done")).not.toBeNull()
+    expect(within(buttons[1]).queryByLabelText("done")).toBeNull()
+    expect(within(buttons[3]).queryByLabelText("done")).not.toBeNull()
+    expect(within(buttons[5]).queryByLabelText("done")).toBeNull()
+  })
+
+  it("does not count a skipped mailbox as done", async () => {
+    dataMock.onboarding = {
+      steps: [step("mail_connected", false)],
+      complete: false,
+      next_step: "mail_connected",
+    }
+    const user = userEvent.setup()
+    renderApp("/onboarding?step=6")
+    await user.click(
+      await screen.findByRole("button", { name: "Skip for now" })
+    )
+    const nav = screen.getByRole("navigation", { name: "Set-up steps" })
+    await screen.findByRole("heading", { name: "First dry run" })
+    expect(
+      within(within(nav).getAllByRole("button")[5]).queryByLabelText("done")
+    ).toBeNull()
+  })
+})
+
+describe("Set-up guide: AI notice for an old folder", () => {
+  it("asks for acknowledgement before the upload when AI extraction is on", async () => {
+    const row = settingRow("data.old_kit_ai_extraction")
+    if (row) writeSetting(row, true, null)
+    importFallback.source = "old_kit_zip"
+    importCalls.length = 0
+    const user = userEvent.setup()
+    renderApp("/onboarding?step=1")
+    await user.click(
+      await screen.findByRole("radio", { name: /old job-hunting folder/ })
+    )
+    const form = await screen.findByRole("form", {
+      name: "Choose a file to import",
+    })
+    const notice = await within(form).findByRole("note", {
+      name: "AI provider notice",
+    })
+    expect(notice).toHaveTextContent(/sent to your AI provider/)
+    await user.upload(within(form).getByLabelText("File"), oldKit())
+    const previewBtn = within(form).getByRole("button", {
+      name: "Preview changes",
+    })
+    // Nothing can be sent until the owner has read and ticked the notice.
+    expect(previewBtn).toBeDisabled()
+    expect(importCalls).toEqual([])
+    await user.click(within(notice).getByRole("checkbox"))
+    expect(previewBtn).toBeEnabled()
+    await user.click(previewBtn)
+    await screen.findByRole("region", { name: "Import preview" })
+    expect(importCalls).toEqual(["preview"])
+  })
+
+  it("shows no AI notice while the setting is off", async () => {
+    const user = userEvent.setup()
+    renderApp("/onboarding?step=1")
+    await user.click(
+      await screen.findByRole("radio", { name: /old job-hunting folder/ })
+    )
+    const form = await screen.findByRole("form", {
+      name: "Choose a file to import",
+    })
+    await waitFor(() =>
+      expect(
+        within(form).queryByRole("note", { name: "AI provider notice" })
+      ).toBeNull()
+    )
   })
 })

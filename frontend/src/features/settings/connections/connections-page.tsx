@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
+import { useSearch } from "@tanstack/react-router"
 import { PageHeader } from "@/components/page-header"
 import { Skeleton } from "@/components/ui/skeleton"
 import { connectionsQuery, type ConnectionProvider } from "./api"
@@ -59,14 +60,31 @@ const BLOCKS: Block[] = [
   },
 ]
 
+/** Where Google sends the owner back after consent: `?connected=gmail|gdrive`. */
+const RETURNED: Record<string, string> = {
+  gmail: "Gmail is connected.",
+  gdrive: "Google Drive is connected.",
+}
+
 export function ConnectionsPage() {
   const q = useQuery(connectionsQuery())
+  const search: { connected?: unknown } = useSearch({ strict: false })
+  const returned =
+    typeof search.connected === "string" ? RETURNED[search.connected] : null
   return (
     <div className="grid gap-6">
       <PageHeader
         title="Connections"
         description="Mail, storage and chat accounts. Each shows what you allowed and what the app really reads. Passwords and tokens are encrypted and never shown again."
       />
+      {returned && (
+        <p
+          role="status"
+          className="rounded-sm bg-good-soft px-3 py-2 text-good"
+        >
+          {returned} Test it below to check it works.
+        </p>
+      )}
       {q.isPending && <Skeleton className="h-40 w-full bg-sunken" />}
       {q.isError && (
         <p role="alert" className="text-danger">

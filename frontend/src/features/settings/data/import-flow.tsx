@@ -12,28 +12,42 @@ import {
   type ImportPreview,
   type ImportSource,
 } from "./api"
+import { AiNotice, useSendsToAi } from "./ai-notice"
 
 export const IMPORT_SOURCES: {
   value: ImportSource
   label: string
   hint: string
+  accept: string
 }[] = [
   {
     value: "kit_file",
     label: "A kit file or shareable template (.kit.zip)",
     hint: "A file made by Export here, or a template someone shared.",
+    accept: ".zip",
   },
   {
     value: "old_kit_zip",
     label: "An old job-hunting folder (.zip)",
-    hint: "Known files are read by code, not by an AI model. Everything arrives unconfirmed.",
+    hint: "Known files are read by code. Everything arrives unconfirmed.",
+    accept: ".zip",
   },
   {
     value: "history_csv",
     label: "Application history (.csv)",
     hint: "Past applications, so you are not sent to the same job twice.",
+    accept: ".csv",
+  },
+  {
+    value: "free_form",
+    label: "Notes or a CV as text (.txt, .md, .docx, .xlsx)",
+    hint: "Your AI provider proposes facts from it. Everything arrives unconfirmed.",
+    accept: ".txt,.md,.docx,.xlsx",
   },
 ]
+
+/** The diff key the commit's `exclude_keys` expects. */
+export const diffKey = (d: ImportDiffItem) => `${d.entity}:${d.key}`
 
 /** What a change means in plain words. */
 const CHANGE_LABEL: Record<ImportDiffItem["change"], string> = {
@@ -78,6 +92,8 @@ export function ImportFlow({
   const [preview, setPreview] = useState<ImportPreview | null>(null)
   const [skip, setSkip] = useState<Set<string>>(new Set())
   const [result, setResult] = useState<ImportCommit | null>(null)
+  const [aiOk, setAiOk] = useState(false)
+  const sendsToAi = useSendsToAi(source)
 
   const read = useMutation({
     mutationFn: () => previewImport(file as File, source),
@@ -89,7 +105,7 @@ export function ImportFlow({
         new Set(
           p.diff
             .filter((d) => d.change === "conflict" || d.change === "unchanged")
-            .map((d) => d.key)
+            .map(diffKey)
         )
       )
     },
@@ -102,6 +118,7 @@ export function ImportFlow({
       setPreview(null)
       setFile(null)
       void qc.invalidateQueries({ queryKey: ["kit"] })
+      void qc.invalidateQueries({ queryKey: ["onboarding"] })
       onDone?.(r, source)
     },
   })
@@ -110,8 +127,9 @@ export function ImportFlow({
   const count = (c: ImportDiffItem["change"]) =>
     preview?.diff.filter((d) => d.change === c).length ?? 0
   const included =
-    preview?.diff.filter((d) => !skip.has(d.key) && d.change !== "unchanged")
-      .length ?? 0
+    preview?.diff.filter(
+      (d) => !skip.has(diffKey(d)) && d.change !== "unchanged"
+    ).length ?? 0
 
   return (
     <div className="grid gap-4">
@@ -121,7 +139,7 @@ export function ImportFlow({
           className="grid max-w-[60ch] gap-3"
           onSubmit={(e) => {
             e.preventDefault()
-            if (file) read.mutate()
+            if (file && (!sendsToAi || aiOk)) read.mutate()
           }}
         >
           <fieldset className="grid gap-1.5">
@@ -132,7 +150,10 @@ export function ImportFlow({
                   type="radio"
                   name="import-source"
                   checked={source === s.value}
-                  onChange={() => setSource(s.value)}
+                  onChange={() => {
+                    setSource(s.value)
+                    setAiOk(false)
+                  }}
                   className="mt-1"
                 />
                 <span>{s.label}</span>
@@ -140,6 +161,13 @@ export function ImportFlow({
             ))}
             <p className="text-sm text-muted-foreground">{chosen.hint}</p>
           </fieldset>
+          {sendsToAi && (
+            <AiNotice
+              source={source}
+              acknowledged={aiOk}
+              onAcknowledge={setAiOk}
+            />
+          )}
           <div className="grid gap-1">
             <label htmlFor={fileId} className="font-semibold">
               File
@@ -147,7 +175,7 @@ export function ImportFlow({
             <input
               id={fileId}
               type="file"
-              accept=".zip,.csv"
+              accept={chosen.accept}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
           </div>
@@ -155,7 +183,10 @@ export function ImportFlow({
             Nothing is saved yet. You will see what would change first.
           </p>
           <div>
-            <Button type="submit" disabled={!file || read.isPending}>
+            <Button
+              type="submit"
+              disabled={!file || read.isPending || (sendsToAi && !aiOk)}
+            >
               <FileUp data-icon="inline-start" aria-hidden="true" />
               Preview changes
             </Button>
@@ -176,7 +207,8 @@ export function ImportFlow({
             <Chip tone="warn">{count("conflict")} conflicts</Chip>
             <Chip>{count("unchanged")} unchanged</Chip>
           </div>
-          {preview.source === "old_kit_zip" && (
+          {(preview.source === "old_kit_zip" ||
+            preview.source === "free_form") && (
             <p>
               Everything from an old folder arrives <b>unconfirmed</b> and
               marked <b>may be stale</b>. Nothing imported can switch on
@@ -197,19 +229,19 @@ export function ImportFlow({
             className="divide-y divide-border rounded-md border border-border"
           >
             {preview.diff.map((d) => {
-              const id = `${d.entity}:${d.key}`
+              const id = diffKey(d)
               return (
                 <li key={id} className="grid gap-1 p-2.5">
                   <label className="flex flex-wrap items-center gap-2">
                     <Checkbox
                       aria-label={`Include ${d.entity} ${d.key}`}
                       disabled={d.change === "unchanged"}
-                      checked={!skip.has(d.key) && d.change !== "unchanged"}
+                      checked={!skip.has(id) && d.change !== "unchanged"}
                       onCheckedChange={(v) =>
                         setSkip((s) => {
                           const n = new Set(s)
-                          if (v) n.delete(d.key)
-                          else n.add(d.key)
+                          if (v) n.delete(id)
+                          else n.add(id)
                           return n
                         })
                       }

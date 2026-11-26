@@ -8,6 +8,7 @@ import type { components } from "@/lib/api/types"
 import { db } from "../db"
 import {
   DEMO_BACKUPS,
+  DEMO_HEALTH,
   KIT_FILE_DIFF,
   OLD_KIT_DIFF,
   SHARE_HITS,
@@ -15,6 +16,8 @@ import {
 } from "../dataset/data"
 import { aiMockState } from "./ai"
 import { kitStore } from "./kit"
+import { campaignsMock } from "./campaigns"
+import { settingRow } from "../dataset/settings"
 
 type S = components["schemas"]
 
@@ -24,6 +27,19 @@ let person: S["PersonOut"] | null = null
 /** Every write call the import flow made, so tests can check preview came first. */
 export const importCalls: string[] = []
 export const importFallback = { source: "kit_file" }
+/** Switches tests flip to reach the server's refusals. */
+export const dataMock = {
+  /** False: OAuth start answers 409 (no Google client configured on the server). */
+  googleConfigured: true,
+  /** False: backups answer 503 (pg_dump missing). */
+  pgDump: true,
+  /** True: every export link has expired (download answers 404). */
+  exportsExpired: false,
+  /** Overrides the computed onboarding state when set. */
+  onboarding: null as S["OnboardingOut"] | null,
+  health: structuredClone(DEMO_HEALTH),
+}
+let exportsMade = new Map<string, string>()
 
 export function resetDataMock() {
   backups = structuredClone(DEMO_BACKUPS)
@@ -31,6 +47,103 @@ export function resetDataMock() {
   person = null
   importCalls.length = 0
   importFallback.source = "kit_file"
+  dataMock.googleConfigured = true
+  dataMock.pgDump = true
+  dataMock.exportsExpired = false
+  dataMock.onboarding = null
+  dataMock.health = structuredClone(DEMO_HEALTH)
+  exportsMade = new Map()
+}
+
+/** The wizard state, computed from the mock stores the way the server computes it. */
+function onboardingState(): S["OnboardingOut"] {
+  const facts = (kitStore().facts ?? []).filter((f) => f.status !== "retired")
+  const pending = facts.filter((f) => f.review_state === "needs_review").length
+  const kit = person !== null || facts.length > 0
+  const camps = campaignsMock.get().filter((c) => c.status !== "archived")
+  const campPending = camps.filter(
+    (c) => c.review_state === "needs_review"
+  ).length
+  const mail = aiMockState().connections.some(
+    (c) => (c.provider === "gmail" || c.provider === "imap_smtp") && c.enabled
+  )
+  const steps: S["OnboardingStepOut"][] = [
+    {
+      key: "kit_present",
+      label: "Your kit is loaded",
+      done: kit,
+      detail: kit
+        ? "A profile or facts are in the library."
+        : "Upload your CV, old kit or a kit file.",
+    },
+    {
+      key: "facts_confirmed",
+      label: "Facts confirmed",
+      done: kit && pending === 0 && facts.length > 0,
+      detail: pending
+        ? `${pending} item(s) still need review.`
+        : "Every fact is confirmed.",
+    },
+    {
+      key: "campaign_exists",
+      label: "A campaign exists",
+      done: camps.length > 0,
+      detail: camps.length
+        ? `${camps.length} campaign(s).`
+        : "Create a campaign for the roles you want.",
+    },
+    {
+      key: "criteria_confirmed",
+      label: "Campaign criteria confirmed",
+      done: camps.length > 0 && campPending === 0,
+      detail: campPending
+        ? `${campPending} campaign(s) have criteria to confirm.`
+        : "All campaign criteria are confirmed.",
+    },
+    {
+      key: "mail_connected",
+      label: "A mail connection exists",
+      done: mail,
+      detail: mail
+        ? "Mail is connected."
+        : "Connect the mailbox you use for the search.",
+    },
+  ]
+  const next = steps.find((st) => !st.done)?.key ?? null
+  return { steps, complete: next === null, next_step: next }
+}
+
+/** Server-side checks for the connections this file owns (records.py, mail_connections.py). */
+function checkConnection(
+  provider: string,
+  config: Record<string, unknown>,
+  secrets: Record<string, string>,
+  creating: boolean
+): string | null {
+  if (provider === "telegram") {
+    const chat = String(config.chat_id ?? "")
+    if ((creating || "chat_id" in config) && !/^(-?\d+|@\w+)$/.test(chat))
+      return "chat_id must be a number (or @channelname)"
+    const token = secrets.bot_token ?? ""
+    if ((creating || token) && !/^\d+:[\w-]{20,}$/.test(token))
+      return "bot_token looks wrong; paste the whole token from BotFather"
+  }
+  if (provider === "webhook") {
+    const url = String(config.url ?? "")
+    if ((creating || "url" in config) && !url.startsWith("https://"))
+      return "url must start with https://"
+    const secret = secrets.signing_secret ?? ""
+    if ((creating || secret) && secret.length < 16)
+      return "signing_secret must be at least 16 characters"
+  }
+  if (provider === "imap_smtp" && creating) {
+    const missing = ["from_address", "imap_host", "smtp_host"].filter(
+      (k) => !config[k]
+    )
+    if (missing.length) return `missing: ${missing.join(", ")}`
+    if (!secrets.password) return "the app password is required"
+  }
+  return null
 }
 
 const now = () => new Date().toISOString()
@@ -94,14 +207,45 @@ export const dataHandlers = [
   }),
   http.post("*/api/data/export", async ({ request }) => {
     if (!db.get().session) return unauthorized()
-    const { kind } = (await request.json()) as S["ExportIn"]
+    const body = (await request.json()) as S["ExportIn"]
+    if (body.kind === "share_setup" && !body.acknowledge_personal_details)
+      return HttpResponse.json(
+        {
+          detail: `the preview found ${SHARE_HITS.length} personal detail(s); remove them or export with acknowledge_personal_details`,
+        },
+        { status: 409 }
+      )
+    const id = crypto.randomUUID()
+    const name =
+      body.kind === "share_setup"
+        ? "setup-template.kit.zip"
+        : "personal.kit.zip"
+    exportsMade.set(id, name)
+    const minutes = Number(settingRow("data.export_link_minutes")?.value ?? 0)
     return HttpResponse.json({
-      download_url: "/api/data/export/download/demo",
-      file_name:
-        kind === "share_setup" ? "setup-template.kit.zip" : "personal.kit.zip",
+      download_url: `/api/data/exports/${id}`,
+      file_name: name,
       sha256: "0".repeat(64),
-      expires_at: new Date(Date.now() + 600_000).toISOString(),
+      expires_at: new Date(Date.now() + minutes * 60_000).toISOString(),
     } satisfies S["ExportOut"])
+  }),
+  http.get("*/api/data/exports/:id", ({ params }) => {
+    if (!db.get().session) return unauthorized()
+    const id = String(params.id)
+    if (!exportsMade.has(id) || dataMock.exportsExpired)
+      return HttpResponse.json(
+        { detail: "this export has expired; prepare it again" },
+        { status: 404 }
+      )
+    return new HttpResponse(new Blob(["PK"]), {
+      headers: { "Content-Type": "application/zip" },
+    })
+  }),
+
+  // ---- onboarding ----
+  http.get("*/api/data/onboarding", () => {
+    if (!db.get().session) return unauthorized()
+    return HttpResponse.json(dataMock.onboarding ?? onboardingState())
   }),
 
   // ---- import ----
@@ -113,7 +257,10 @@ export const dataHandlers = [
     let source: string = importFallback.source
     if (import.meta.env.MODE !== "test")
       source = String((await request.formData()).get("source"))
-    const diff = source === "old_kit_zip" ? OLD_KIT_DIFF : KIT_FILE_DIFF
+    const diff =
+      source === "old_kit_zip" || source === "free_form"
+        ? OLD_KIT_DIFF
+        : KIT_FILE_DIFF
     const import_id = crypto.randomUUID()
     previews.set(import_id, { source, diff })
     return HttpResponse.json({
@@ -127,9 +274,15 @@ export const dataHandlers = [
         after: d.after,
       })),
       notices:
-        source === "old_kit_zip"
-          ? ["Known files are read by code. No AI provider sees this folder."]
-          : [],
+        source !== "old_kit_zip"
+          ? []
+          : settingRow("data.old_kit_ai_extraction")?.value === true
+            ? [
+                "Files the built-in reader did not recognise were sent to your AI provider.",
+              ]
+            : [
+                "Known files were read by code. No AI provider saw this folder.",
+              ],
     })
   }),
   http.post("*/api/data/import/commit", async ({ request }) => {
@@ -141,9 +294,9 @@ export const dataHandlers = [
       return HttpResponse.json({ detail: "Unknown import." }, { status: 404 })
     const skip = new Set(body.exclude_keys ?? [])
     const taken = p.diff.filter(
-      (d) => !skip.has(d.key) && d.change !== "unchanged"
+      (d) => !skip.has(`${d.entity}:${d.key}`) && d.change !== "unchanged"
     )
-    if (p.source === "old_kit_zip") {
+    if (p.source === "old_kit_zip" || p.source === "free_form") {
       for (const d of taken)
         kitStore().answers.push({
           id: `answer-${crypto.randomUUID().slice(0, 8)}`,
@@ -171,7 +324,7 @@ export const dataHandlers = [
     return HttpResponse.json({
       created: taken.filter((d) => d.change === "add").length,
       updated: taken.filter((d) => d.change !== "add").length,
-      needs_review: p.source === "old_kit_zip" ? taken.length : 0,
+      needs_review: p.source === "kit_file" ? 0 : taken.length,
     } satisfies S["ImportCommitOut"])
   }),
 
@@ -182,6 +335,11 @@ export const dataHandlers = [
   }),
   http.post("*/api/data/backups", () => {
     if (!db.get().session) return unauthorized()
+    if (!dataMock.pgDump)
+      return HttpResponse.json(
+        { detail: "pg_dump was not found; set PG_BIN_DIR" },
+        { status: 503 }
+      )
     const b: S["BackupOut"] = {
       id: `bk-${backups.length + 1}`,
       created_at: now(),
@@ -198,6 +356,10 @@ export const dataHandlers = [
   }),
 
   // ---- health ----
+  http.get("*/api/health/detail", () => {
+    if (!db.get().session) return unauthorized()
+    return HttpResponse.json({ ...dataMock.health, time: now() })
+  }),
   http.get("*/api/health", () =>
     HttpResponse.json({
       status: "ok",
@@ -216,6 +378,14 @@ export const dataHandlers = [
   // ---- connections other than the AI providers (those fall through to handlers/ai.ts) ----
   http.post("*/api/connections/oauth/:provider/start", ({ params }) => {
     if (!db.get().session) return unauthorized()
+    if (!dataMock.googleConfigured)
+      return HttpResponse.json(
+        {
+          detail:
+            "GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET are not set",
+        },
+        { status: 409 }
+      )
     return HttpResponse.json({
       authorize_url: `https://accounts.example.com/o/oauth2/auth?provider=${String(params.provider)}`,
     } satisfies S["OAuthStartOut"])
@@ -224,6 +394,18 @@ export const dataHandlers = [
     // Clone: an AI provider falls through to the next handler, which reads the body again.
     const body = (await request.clone().json()) as S["ConnectionCreate"]
     if (!OWN.includes(body.provider)) return undefined
+    if (body.provider === "gmail" || body.provider === "gdrive")
+      return HttpResponse.json(
+        { detail: `${body.provider} connects through Google sign-in` },
+        { status: 422 }
+      )
+    const err = checkConnection(
+      body.provider,
+      body.config ?? {},
+      body.secrets ?? {},
+      true
+    )
+    if (err) return HttpResponse.json({ detail: err }, { status: 422 })
     const conn: S["ConnectionOut"] = {
       id: crypto.randomUUID(),
       created_at: now(),
@@ -242,6 +424,26 @@ export const dataHandlers = [
     }
     aiMockState().connections.push(conn)
     return HttpResponse.json(conn, { status: 201 })
+  }),
+  // PUT merges config (the server does too); secrets given replace the saved ones.
+  http.put("*/api/connections/:id", async ({ params, request }) => {
+    const conn = aiMockState().connections.find((c) => c.id === params.id)
+    if (!conn || !OWN.includes(conn.provider)) return undefined
+    const body = (await request.clone().json()) as S["ConnectionUpdate"]
+    const err = checkConnection(
+      conn.provider,
+      body.config ?? {},
+      body.secrets ?? {},
+      false
+    )
+    if (err) return HttpResponse.json({ detail: err }, { status: 422 })
+    if (body.label) conn.label = body.label
+    if (body.enabled != null) conn.enabled = body.enabled
+    conn.config = { ...conn.config, ...(body.config ?? {}) }
+    for (const [k, v] of Object.entries(body.secrets ?? {}))
+      if (v) conn.secrets_masked[k] = mask(v)
+    conn.updated_at = now()
+    return HttpResponse.json(conn)
   }),
   http.post("*/api/connections/:id/test", ({ params }) => {
     const conn = aiMockState().connections.find((c) => c.id === params.id)

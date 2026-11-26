@@ -68,14 +68,6 @@ export const listConfigHistory = (kind: string, cursor?: string) =>
     })
   )
 
-export const rollbackRevision = (id: string, note: string) =>
-  unwrap(
-    gen.POST("/api/data/config-history/{revision_id}/rollback", {
-      params: { path: { revision_id: id } },
-      body: { note: note || null },
-    })
-  )
-
 export const changePassword = (
   current_password: string,
   new_password: string

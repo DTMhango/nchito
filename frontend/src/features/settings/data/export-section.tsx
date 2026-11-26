@@ -3,12 +3,16 @@ import { useMutation } from "@tanstack/react-query"
 import { Download, ShieldAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Checkbox } from "@/components/ui/checkbox"
+import { isApiError } from "@/lib/api/client"
 import {
+  downloadExport,
   exportKit,
   exportPreview,
   type ExportKind,
   type ExportPreview,
   type ExportResult,
+  type PersonalDetailHit,
 } from "./api"
 
 const KINDS: { kind: ExportKind; title: string; plain: string; who: string }[] =
@@ -52,16 +56,31 @@ export function ExportSection() {
 function ExportCard({ kind, title, plain, who }: (typeof KINDS)[number]) {
   const [preview, setPreview] = useState<ExportPreview | null>(null)
   const [file, setFile] = useState<ExportResult | null>(null)
+  const [ack, setAck] = useState(false)
   const check = useMutation({
     mutationFn: () => exportPreview(kind),
-    onSuccess: setPreview,
+    onSuccess: (p) => {
+      setPreview(p)
+      setAck(false)
+    },
   })
   const make = useMutation({
-    mutationFn: () => exportKit(kind),
+    mutationFn: () => exportKit(kind, ack),
     onSuccess: setFile,
+    // The server found personal details the owner has not acknowledged: show them.
+    onError: (e) => {
+      if (isApiError(e, 409)) check.mutate()
+    },
+  })
+  const fetchFile = useMutation({
+    mutationFn: () => downloadExport(file as ExportResult),
+    onError: (e) => {
+      if (isApiError(e, 404)) setFile(null)
+    },
   })
   const hits = preview?.personal_details_found ?? []
   const shared = kind === "share_setup"
+  const blocked = make.isError && isApiError(make.error, 409)
   return (
     <article
       aria-label={title}
@@ -83,23 +102,7 @@ function ExportCard({ kind, title, plain, who }: (typeof KINDS)[number]) {
         </ul>
       )}
       {preview && shared && hits.length > 0 && (
-        <Alert variant="destructive">
-          <ShieldAlert aria-hidden="true" />
-          <AlertTitle>
-            {hits.length} personal detail{hits.length === 1 ? "" : "s"} found
-          </AlertTitle>
-          <AlertDescription>
-            <ul className="mt-1 grid gap-1">
-              {hits.map((h) => (
-                <li key={h.path + h.excerpt}>
-                  <span className="font-medium">{h.kind}</span> in {h.path}:{" "}
-                  {h.excerpt}
-                </li>
-              ))}
-            </ul>
-            Remove these before you share the file.
-          </AlertDescription>
-        </Alert>
+        <PersonalDetails hits={hits} ack={ack} onAck={setAck} />
       )}
       {preview && shared && hits.length === 0 && (
         <p className="text-sm text-good">No personal details found.</p>
@@ -115,26 +118,82 @@ function ExportCard({ kind, title, plain, who }: (typeof KINDS)[number]) {
         </Button>
         <Button
           disabled={!preview || make.isPending}
-          onClick={() => make.mutate()}
+          onClick={() => {
+            setFile(null)
+            make.mutate()
+          }}
         >
           <Download data-icon="inline-start" aria-hidden="true" />
           Create file
         </Button>
         {file && (
-          <a
-            className="font-medium text-primary-ink underline"
-            href={file.download_url}
-            download={file.file_name}
+          <Button
+            variant="link"
+            disabled={fetchFile.isPending}
+            onClick={() => fetchFile.mutate()}
           >
             Download {file.file_name}
-          </a>
+          </Button>
         )}
       </div>
+      {file && (
+        <p className="text-sm text-muted-foreground">
+          The link works until{" "}
+          {new Date(file.expires_at).toLocaleTimeString(undefined, {
+            timeStyle: "short",
+          })}
+          .
+        </p>
+      )}
       {make.isError && (
         <p role="alert" className="text-sm text-danger">
-          {make.error.message}
+          {blocked
+            ? "Personal details were found. Read them below, then remove them or tick the box to include them anyway."
+            : make.error.message}
+        </p>
+      )}
+      {fetchFile.isError && (
+        <p role="alert" className="text-sm text-danger">
+          {fetchFile.error.message}
         </p>
       )}
     </article>
+  )
+}
+
+/** What the scan found, and the owner's explicit choice to share it anyway. */
+function PersonalDetails({
+  hits,
+  ack,
+  onAck,
+}: {
+  hits: PersonalDetailHit[]
+  ack: boolean
+  onAck: (v: boolean) => void
+}) {
+  return (
+    <Alert variant="destructive">
+      <ShieldAlert aria-hidden="true" />
+      <AlertTitle>
+        {hits.length} personal detail{hits.length === 1 ? "" : "s"} found
+      </AlertTitle>
+      <AlertDescription>
+        <ul className="mt-1 grid gap-1">
+          {hits.map((h) => (
+            <li key={h.path + h.excerpt}>
+              <span className="font-medium">{h.kind}</span> in {h.path}:{" "}
+              {h.excerpt}
+            </li>
+          ))}
+        </ul>
+        <p>
+          Remove these before you share the file, or include them knowingly.
+        </p>
+        <label className="mt-2 flex items-center gap-2 font-medium">
+          <Checkbox checked={ack} onCheckedChange={(v) => onAck(v === true)} />I
+          have read these and want to include them
+        </label>
+      </AlertDescription>
+    </Alert>
   )
 }

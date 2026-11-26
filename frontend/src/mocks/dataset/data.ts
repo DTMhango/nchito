@@ -91,3 +91,67 @@ export const SHARE_HITS: S["PersonalDetailHit"][] = [
     excerpt: "chanda@example.com",
   },
 ]
+
+/** `GET /api/health/detail`: one part not yet known, which the screen must not call OK. */
+export const DEMO_HEALTH: S["DetailedHealth"] = {
+  status: "degraded",
+  version: "0.2.0",
+  time: "2026-11-26T09:00:00Z",
+  components: [
+    {
+      name: "database",
+      status: "ok",
+      detail: "Answers in 2 ms.",
+      at: null,
+      value: 2,
+    },
+    {
+      name: "worker",
+      status: "ok",
+      detail: "Heartbeat 20 s ago.",
+      at: null,
+      value: 20,
+    },
+    { name: "sweep", status: "unknown", detail: null, at: null, value: null },
+    {
+      name: "backup",
+      status: "ok",
+      detail: "Last backup 7 h ago.",
+      at: "2026-11-26T02:00:00Z",
+      value: 7,
+    },
+    {
+      name: "disk",
+      status: "warn",
+      detail: "900 MB free.",
+      at: null,
+      value: 900,
+    },
+    {
+      name: "connections",
+      status: "ok",
+      detail: "1 connection working.",
+      at: null,
+      value: 1,
+    },
+  ],
+  queue: { waiting: 3, running: 1, failed: 0 },
+  connections: [
+    {
+      id: "conn-mail",
+      provider: "imap_smtp",
+      label: "Search mailbox",
+      enabled: true,
+      health: "ok",
+      last_checked_at: "2026-11-26T08:30:00Z",
+    },
+  ],
+  workers: [
+    {
+      ok: true,
+      last_beat_at: "2026-11-26T08:59:40Z",
+      age_seconds: 20,
+      workers: 1,
+    },
+  ],
+}

@@ -9,6 +9,8 @@ import {
   type Connection,
   type ConnectionTest,
 } from "./api"
+import { ConnectForm } from "./connect-form"
+import { FORMS } from "./forms"
 
 /** What each permission means, in plain words. Unknown scopes are shown as the server sent them. */
 const SCOPE_WORDS: [RegExp, string][] = [
@@ -46,6 +48,8 @@ export function ConnectionCard({ c }: { c: Connection }) {
   const qc = useQueryClient()
   const [result, setResult] = useState<ConnectionTest | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const editable = c.provider in FORMS
   const refresh = () => qc.invalidateQueries({ queryKey: connectionKeys.all })
   const test = useMutation({
     mutationFn: () => testConnection(c.id),
@@ -111,6 +115,17 @@ export function ConnectionCard({ c }: { c: Connection }) {
         >
           Test
         </Button>
+        {editable && (
+          <Button
+            size="sm"
+            variant="outline"
+            aria-expanded={editing}
+            onClick={() => setEditing((v) => !v)}
+            aria-label={`Change ${c.label}`}
+          >
+            Change
+          </Button>
+        )}
         {!confirming ? (
           <Button
             size="sm"
@@ -140,6 +155,14 @@ export function ConnectionCard({ c }: { c: Connection }) {
           </>
         )}
       </div>
+      {editing && editable && (
+        <ConnectForm
+          provider={c.provider as keyof typeof FORMS}
+          label={c.label}
+          existing={c}
+          onDone={() => setEditing(false)}
+        />
+      )}
       {(test.isError || remove.isError) && (
         <p role="alert" className="text-sm text-danger">
           {(test.error ?? remove.error)?.message}

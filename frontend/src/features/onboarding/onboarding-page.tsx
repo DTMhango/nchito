@@ -1,3 +1,5 @@
+import { useEffect } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { Link, useNavigate } from "@tanstack/react-router"
 import {
   Check,
@@ -16,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { BrandMark } from "@/components/brand-mark"
 import { useAppName } from "@/lib/use-app-name"
 import { cn } from "@/lib/utils"
-import { useServerProgress } from "./api"
+import { onboardingKey, useServerProgress } from "./api"
 import { useLocalOnboarding } from "./state"
 import { StartStep } from "./steps/start-step"
 import { YouStep } from "./steps/you-step"
@@ -88,6 +90,11 @@ export function OnboardingPage({ step }: { step: number }) {
   const appName = useAppName()
   const [local, update] = useLocalOnboarding()
   const server = useServerProgress()
+  const qc = useQueryClient()
+  // Each step can change what exists, so ask the server again whenever the step changes.
+  useEffect(() => {
+    void qc.invalidateQueries({ queryKey: onboardingKey })
+  }, [qc, step])
   const current = STEPS.find((s) => s.n === step) ?? STEPS[0]
   const go = (n: number) => navigate({ to: "/onboarding", search: { step: n } })
   const next = () => go(Math.min(current.n + 1, STEPS.length))
@@ -97,13 +104,14 @@ export function OnboardingPage({ step }: { step: number }) {
     next()
   }
 
+  // Done only when the server says so. A skipped step is not done (unknown is not yes).
   const done: Record<number, boolean> = {
-    1: local.start !== null || server.person || server.tracks,
-    2: server.person,
+    1: server.kit,
+    2: server.facts,
     3: server.tracks,
-    4: server.campaign,
+    4: server.criteria,
     5: server.sources,
-    6: server.mail || local.skipped.includes(6),
+    6: server.mail,
     7: server.dryRun,
     8: local.skipped.includes(8) || step === 8,
   }
@@ -124,7 +132,11 @@ export function OnboardingPage({ step }: { step: number }) {
         >
           {server.loading
             ? "Checking progress"
-            : `${finished} of ${STEPS.length} done`}
+            : server.error
+              ? "Progress unknown"
+              : server.complete
+                ? `Set-up complete, ${finished} of ${STEPS.length} done`
+                : `${finished} of ${STEPS.length} done`}
         </span>
         <Button asChild variant="ghost" size="sm">
           <Link to="/today">
@@ -191,6 +203,15 @@ export function OnboardingPage({ step }: { step: number }) {
             </h1>
             <p className="max-w-[60ch] text-muted-foreground">{current.lead}</p>
           </div>
+          {server.next && (
+            <p
+              data-testid="next-step"
+              className="rounded-sm bg-sunken px-3 py-2 text-sm"
+            >
+              <span className="font-semibold">Still to do: </span>
+              {server.next.label}. {server.next.detail}
+            </p>
+          )}
 
           {current.n === 1 && (
             <StartStep local={local} update={update} next={next} />
