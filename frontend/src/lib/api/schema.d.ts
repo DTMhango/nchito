@@ -308,6 +308,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/themes/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Import Theme */
+        post: operations["themes_import"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/contrast": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Contrast Report
+         * @description Every text/surface pair the app uses (derived from the token spec), with its WCAG ratio and result.
+         *     The studio computes the same live; this is the server's view, which decides the save block.
+         */
+        post: operations["themes_contrast"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/themes/{theme_id}": {
         parameters: {
             query?: never;
@@ -322,6 +360,125 @@ export interface paths {
         post?: never;
         /** Delete Theme */
         delete: operations["themes_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/duplicate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Duplicate Theme */
+        post: operations["themes_duplicate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/default": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Default */
+        put: operations["themes_set_default"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Theme */
+        get: operations["themes_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Revisions */
+        get: operations["themes_revisions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Undo */
+        post: operations["themes_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Redo */
+        post: operations["themes_redo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/themes/{theme_id}/revisions/{number}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore */
+        post: operations["themes_restore"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1642,23 +1799,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/jobs/bulk": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Jobs Bulk */
-        post: operations["jobs_bulk"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/jobs/{job_id}/why": {
         parameters: {
             query?: never;
@@ -2044,6 +2184,292 @@ export interface paths {
          *     it as an alias, then re-evaluate the conflict groups involved.
          */
         post: operations["jobs_fix_employer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bulk Options
+         * @description What the bulk bars may offer, from settings.
+         */
+        get: operations["bulk_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Preview
+         * @description What would happen to each selected item. Nothing changes; the count to confirm is ``selected``.
+         */
+        post: operations["bulk_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk Run
+         * @description Confirm the previewed count and run it in the background. Running a failed or partial operation
+         *     again retries only what failed.
+         */
+        post: operations["bulk_run"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bulk List */
+        get: operations["bulk_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bulk Get */
+        get: operations["bulk_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bulk Items
+         * @description Per-item results (what each did, or why it could not).
+         */
+        get: operations["bulk_items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Undo */
+        post: operations["bulk_undo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bulk/{operation_id}/csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bulk Csv
+         * @description The export action's file: the operation's selection as CSV (read only).
+         */
+        get: operations["bulk_csv"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Employers List */
+        get: operations["employers_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/states": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Employers States
+         * @description The employer chip for each job (Matches and Applications), read only.
+         */
+        post: operations["employers_states"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Employers Get */
+        get: operations["employers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Employers Set Policy
+         * @description Per-employer overrides (audited). 'Never apply' blocks tailoring and sending for every role there.
+         */
+        patch: operations["employers_set_policy"];
+        trace?: never;
+    };
+    "/api/employers/end-cooldown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Employers End Cooldown
+         * @description End the running cooldown early, with a reason (audited).
+         */
+        post: operations["employers_end_cooldown"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Employers Merge
+         * @description Merge this employer into another (every role posted under it moves; the alias can be remembered).
+         */
+        post: operations["employers_merge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/employers/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Employers Split
+         * @description Undo a merge: the name stops being an alias and its roles go back under their own employer.
+         */
+        post: operations["employers_split"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3684,6 +4110,200 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/interview-pack/mock-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Mock List */
+        get: operations["interview_mock_list"];
+        put?: never;
+        /**
+         * Interview Mock Start
+         * @description Start a session and ask the first question. A budget refusal stores it paused (resume it later).
+         */
+        post: operations["interview_mock_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/interview-pack/mock-sessions/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interview Mock Estimate
+         * @description What a session would cost at most, shown before it starts.
+         */
+        get: operations["interview_mock_estimate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/interview-pack/mock-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Mock Progress */
+        get: operations["interview_mock_progress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Mock Get */
+        get: operations["interview_mock_get"];
+        put?: never;
+        post?: never;
+        /** Interview Mock Delete */
+        delete: operations["interview_mock_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Answer
+         * @description Answer (or skip) the open question; the interviewer replies with a probe, the next question or, after the
+         *     last one, the final feedback. 409 not_your_turn when the session is not waiting for an answer.
+         */
+        post: operations["interview_mock_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Finish
+         * @description I'm done: end now and get feedback on what was answered.
+         */
+        post: operations["interview_mock_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Resume
+         * @description Run the step a budget pause or failure left pending; nothing already written is written again.
+         */
+        post: operations["interview_mock_resume"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Mock Export */
+        get: operations["interview_mock_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/turns/{turn_id}/claims/{claim_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Claim
+         * @description Something you said that is not in your Kit: add it as a draft fact (reviewed in the library) or dismiss.
+         */
+        post: operations["interview_mock_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/turns/{turn_id}/story": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Save Story
+         * @description Save an answer, in your words, to the pack's story bank, linked to the facts it rests on (checked).
+         */
+        post: operations["interview_mock_save_story"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/events": {
         parameters: {
             query?: never;
@@ -3880,6 +4500,331 @@ export interface paths {
         post: operations["calendar_feed_rotate"];
         /** Calendar Feed Revoke */
         delete: operations["calendar_feed_revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Messages List
+         * @description The application's mail thread (as far as it is known) and every message drafted for it.
+         */
+        get: operations["messages_list"];
+        put?: never;
+        /**
+         * Messages Create
+         * @description Draft a message from Kit facts and the thread (one budgeted model call, then the checks). Never sent
+         *     from here. A budget refusal returns the message as ``budget_paused``.
+         */
+        post: operations["messages_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Messages Get */
+        get: operations["messages_get"];
+        /**
+         * Messages Update
+         * @description The owner's edit. Withdraws an approval (the old packet and its permits go), clears the automatic
+         *     flag, and re-runs the code checks. New addresses stay unconfirmed unless ``confirm_recipients``.
+         */
+        put: operations["messages_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Regenerate
+         * @description Write the draft again (one budgeted model call).
+         */
+        post: operations["messages_regenerate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Check
+         * @description Run the code checks again, plus the model claim check when ``tailoring.claim_check_enabled``.
+         */
+        post: operations["messages_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Approve
+         * @description The owner's approval: the checks run again, then the message is snapshotted as a hashed packet.
+         *     409 ``check_blocking`` / ``message_questions`` / ``no_recipient`` / ``no_identity`` with the results.
+         */
+        post: operations["messages_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Send
+         * @description Ask for the single-use permit (every message gate) and queue the approved message behind the email
+         *     send delay. ``denied`` carries the first blocking gate's code and every gate.
+         */
+        post: operations["messages_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Messages Cancel
+         * @description Cancel a queued send during the delay. 409 ``already_handed_over`` once the mailbox has it.
+         */
+        post: operations["messages_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/messages/{message_id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Messages Discard */
+        post: operations["messages_discard"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/follow-ups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Followups List
+         * @description Follow-ups due, snoozed or drafted, and those coming up in the next 30 days, soonest first.
+         */
+        get: operations["followups_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/follow-ups/{application_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Followups Draft
+         * @description Draft the follow-up that is due (or the next one, early). For your approval: never sent from here.
+         */
+        post: operations["followups_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/follow-ups/{application_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Followups Snooze */
+        post: operations["followups_snooze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/follow-ups/{application_id}/not-needed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Followups Not Needed */
+        post: operations["followups_not_needed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wind-down": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Winddown Get
+         * @description The latest wind-down with what is still in motion (``status: none`` before the first).
+         */
+        get: operations["winddown_get"];
+        put?: never;
+        /**
+         * Winddown Start
+         * @description "I've accepted an offer": the master pause goes on at once (queued sends cancelled, permits revoked),
+         *     then the view is listed. Sends nothing. Starting again while one is active returns it.
+         */
+        post: operations["winddown_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wind-down/choices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Winddown Choose
+         * @description Keep, pause or withdraw one item. Withdrawing a sent application drafts an email for your approval.
+         */
+        post: operations["winddown_choose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wind-down/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Winddown Reopen
+         * @description "Reopen my search": everything comes back paused, never deleted; the master pause stays on.
+         */
+        post: operations["winddown_reopen"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wind-down/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Winddown Summary
+         * @description The final summary as Markdown (download).
+         */
+        get: operations["winddown_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4087,6 +5032,199 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Feedback For Job */
+        get: operations["feedback_for_job"];
+        /**
+         * Feedback Put
+         * @description Thumbs up or down on a match, with optional reasons. Stored as evidence; no score changes.
+         */
+        put: operations["feedback_put"];
+        post?: never;
+        /** Feedback Withdraw */
+        delete: operations["feedback_withdraw"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Feedback List */
+        get: operations["feedback_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Preferences Summary
+         * @description Counts of the evidence, open suggestions and owner-only notes for one campaign. Reads only.
+         */
+        get: operations["preferences_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/analyse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preferences Analyse
+         * @description Turn the campaign's feedback and outcomes into suggestions now (also runs periodically).
+         */
+        post: operations["preferences_analyse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggestions List */
+        get: operations["suggestions_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/suggestions/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggestions Get */
+        get: operations["suggestions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/suggestions/{item_id}/backtest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggestions Backtest
+         * @description Replay the suggestion (or an edit of it) over recent roles. No model calls; nothing is saved.
+         */
+        post: operations["suggestions_backtest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/suggestions/{item_id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggestions Accept
+         * @description Apply it as suggested or as edited. A rubric change creates a new rubric version. Audited.
+         */
+        post: operations["suggestions_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/preferences/suggestions/{item_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggestions Dismiss
+         * @description Not raised again for the same evidence.
+         */
+        post: operations["suggestions_dismiss"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/campaigns/{campaign_id}/policy-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Campaigns Policy Preview
+         * @description What a policy change would do to recent roles, through the decision table. Writes nothing.
+         */
+        post: operations["campaigns_policy_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/ai/routing": {
         parameters: {
             query?: never;
@@ -4269,6 +5407,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptIn */
+        AcceptIn: {
+            /**
+             * Change
+             * @description The owner's edit; default: as suggested
+             */
+            change?: (components["schemas"]["ReweightChange"] | components["schemas"]["PenaltyChange-Input"] | components["schemas"]["BonusChange-Input"] | components["schemas"]["TagRuleChange-Input"] | components["schemas"]["SavedViewChange-Input"] | components["schemas"]["TightenChange-Input"]) | null;
+            /** Note */
+            note?: string | null;
+        };
         /**
          * AgentTaskState
          * @description Checkpoint saved by a runner. Free-form fields go in ``data``.
@@ -4315,6 +5463,30 @@ export interface components {
             alias: string;
             /** Canonical */
             canonical: string;
+        };
+        /** AnalyseIn */
+        AnalyseIn: {
+            /**
+             * Campaign Id
+             * Format: uuid
+             */
+            campaign_id: string;
+        };
+        /** AnalyseOut */
+        AnalyseOut: {
+            /** Created */
+            created: components["schemas"]["SuggestionOut"][];
+            /**
+             * Kept
+             * @description Suggestions already raised (or dismissed) for the same evidence
+             */
+            kept: number;
+            /** Up */
+            up: number;
+            /** Down */
+            down: number;
+            /** Owner Only */
+            owner_only: components["schemas"]["OwnerOnlyNoteOut"][];
         };
         /** AnswerMatchIn */
         AnswerMatchIn: {
@@ -4375,7 +5547,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             patterns: components["schemas"]["AnswerPatterns"];
@@ -5097,6 +6269,23 @@ export interface components {
              */
             paused_for_budget: string | null;
         };
+        /** BacktestChangeRow */
+        BacktestChangeRow: {
+            /** Job Id */
+            job_id: string;
+            /** Title */
+            title: string;
+            /** Employer */
+            employer: string;
+            /** Old Score */
+            old_score: number | null;
+            /** New Score */
+            new_score: number | null;
+            /** Old Verdict */
+            old_verdict: string;
+            /** New Verdict */
+            new_verdict: string;
+        };
         /** BacktestEstimateOut */
         BacktestEstimateOut: {
             /**
@@ -5267,33 +6456,52 @@ export interface components {
              */
             sensitivity?: "normal" | "on_request" | "after_offer_only";
         };
-        /** BulkActionIn */
-        BulkActionIn: {
-            /** Job Ids */
-            job_ids: string[];
+        /**
+         * BonusChange
+         * @description A campaign bonus rule (raises the effective score of matching roles).
+         */
+        "BonusChange-Input": {
             /**
-             * Action
+             * @description discriminator enum property added by openapi-typescript
              * @enum {string}
              */
-            action: "skip" | "archive" | "shortlist" | "tag" | "untag" | "pin" | "unpin" | "snooze";
-            /** Tag */
-            tag?: string | null;
-            /** Until */
-            until?: string | null;
-            /**
-             * Preview
-             * @default true
-             */
-            preview?: boolean;
+            kind: "add_bonus";
+            /** Reason */
+            reason: string;
+            /** Points */
+            points: number;
+            conditions: components["schemas"]["ConditionSet-Input"];
         };
-        /** BulkActionOut */
-        BulkActionOut: {
-            /** Affected */
-            affected: number;
-            /** Preview */
-            preview: boolean;
-            /** Detail */
-            detail: string[];
+        /**
+         * BonusChange
+         * @description A campaign bonus rule (raises the effective score of matching roles).
+         */
+        "BonusChange-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "add_bonus";
+            /** Reason */
+            reason: string;
+            /** Points */
+            points: number;
+            conditions: components["schemas"]["ConditionSet-Output"];
+        };
+        /** BulkOptionsOut */
+        BulkOptionsOut: {
+            /** Max Selection */
+            max_selection: number;
+            /** Undo Window Minutes */
+            undo_window_minutes: number;
+            /** Approve Reviewed Enabled */
+            approve_reviewed_enabled: boolean;
+            /** Reversible */
+            reversible: ("tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv")[];
+            /** Actions */
+            actions: {
+                [key: string]: ("tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv")[];
+            };
         };
         /** CalendarOut */
         CalendarOut: {
@@ -5574,6 +6782,16 @@ export interface components {
              * @default false
              */
             waived: boolean;
+        };
+        /** ChipOut */
+        ChipOut: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "free" | "role_in_progress" | "cooling_down" | "always_ask_first" | "blocked";
+            /** Text */
+            text: string;
         };
         /** CompareCell */
         CompareCell: {
@@ -5951,6 +7169,111 @@ export interface components {
             /** Origin */
             origin: string;
         };
+        /** ContactRowOut */
+        ContactRowOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Name */
+            name: string;
+            /** Role */
+            role: string | null;
+            /** Email */
+            email: string | null;
+            /** Link */
+            link: string | null;
+        };
+        /** ContrastPairOut */
+        ContrastPairOut: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "light" | "dark";
+            /** Fg */
+            fg: string;
+            /** Bg */
+            bg: string;
+            /**
+             * Use
+             * @enum {string}
+             */
+            use: "body" | "text" | "ui" | "graphic";
+            /** Ratio */
+            ratio: number;
+            /** Aa */
+            aa: boolean;
+            /** Aaa */
+            aaa: boolean | null;
+            /** Blocking */
+            blocking: boolean;
+        };
+        /**
+         * ContrastWaiver
+         * @description The owner accepted body text below WCAG AA on a personal theme (recorded, also in the audit).
+         */
+        ContrastWaiver: {
+            /** Pairs */
+            pairs: components["schemas"]["ContrastWaiverPair"][];
+            /** Accepted At */
+            accepted_at: string;
+            /** Accepted By */
+            accepted_by: string;
+        };
+        /** ContrastWaiverPair */
+        ContrastWaiverPair: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "light" | "dark";
+            /** Fg */
+            fg: string;
+            /** Bg */
+            bg: string;
+            /** Ratio */
+            ratio: number;
+        };
+        /** CooldownOut */
+        CooldownOut: {
+            /**
+             * Kind
+             * @description end_state: from the end state; applied_date: from the applied date, because there has been no reply
+             * @enum {string}
+             */
+            kind: "end_state" | "applied_date";
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Starts On
+             * Format: date
+             */
+            starts_on: string;
+            /** Days */
+            days: number;
+            /**
+             * Ends On
+             * Format: date
+             */
+            ends_on: string;
+            /** Running */
+            running: boolean;
+            /**
+             * Rule
+             * @description The rule in words, with the dates
+             */
+            rule: string;
+        };
         /** CountRow */
         CountRow: {
             /** Key */
@@ -6122,11 +7445,6 @@ export interface components {
             employer_name: string | null;
             /** Confidence */
             confidence: number;
-        };
-        /** DismissIn */
-        DismissIn: {
-            /** Note */
-            note?: string | null;
         };
         /**
          * DispatchCreateIn
@@ -6356,6 +7674,42 @@ export interface components {
              */
             required: boolean;
         };
+        /** EmployerDetailOut */
+        EmployerDetailOut: {
+            employer: components["schemas"]["EmployerRowOut"];
+            cooldown: components["schemas"]["CooldownOut"] | null;
+            /**
+             * Cooldown Days
+             * @description The length in force
+             */
+            cooldown_days: number;
+            /** Cooldown Days Source */
+            cooldown_days_source: string;
+            /** Cooldown Ended Early At */
+            cooldown_ended_early_at: string | null;
+            /** Cooldown Ended Early By */
+            cooldown_ended_early_by: string | null;
+            /** Cooldown Ended Early Reason */
+            cooldown_ended_early_reason: string | null;
+            /** Roles */
+            roles: components["schemas"]["RoleOut"][];
+            /**
+             * Conflict Groups
+             * @description Roles that compete (winner and held)
+             */
+            conflict_groups: components["schemas"]["RoleOut"][][];
+            /** History */
+            history: components["schemas"]["HistoryOut"][];
+            /** Contacts */
+            contacts: components["schemas"]["ContactRowOut"][];
+            /**
+             * Aliases
+             * @description Names merged into this employer
+             */
+            aliases: string[];
+            /** Notes */
+            notes: string | null;
+        };
         /** EmployerFixIn */
         EmployerFixIn: {
             /** Canonical Employer */
@@ -6365,6 +7719,52 @@ export interface components {
              * @default true
              */
             remember_alias?: boolean;
+        };
+        /** EmployerRowOut */
+        EmployerRowOut: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "free" | "role_in_progress" | "cooling_down" | "always_ask_first" | "blocked";
+            /** State Text */
+            state_text: string;
+            /** Applications */
+            applications: number;
+            /** Live */
+            live: number;
+            /** Last Applied At */
+            last_applied_at: string | null;
+            /** Roles Seen */
+            roles_seen: number;
+            /** Held Roles */
+            held_roles: number;
+            /** Cooldown Until */
+            cooldown_until: string | null;
+            /** Always Ask First */
+            always_ask_first: boolean;
+            /** Never Apply */
+            never_apply: boolean;
+            /** Never Reason */
+            never_reason: string | null;
+            /** Watched */
+            watched: boolean;
+            /** Priority */
+            priority: number;
+            /**
+             * Cooldown Days
+             * @description This employer's override; null uses the default
+             */
+            cooldown_days: number | null;
+        };
+        /** EndCooldownIn */
+        EndCooldownIn: {
+            /** Reason */
+            reason: string;
         };
         /** ErrorOut */
         ErrorOut: {
@@ -6732,7 +8132,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             /** Org */
@@ -6882,7 +8282,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             /** Code */
@@ -6931,6 +8331,70 @@ export interface components {
             /** Url */
             url: string;
         };
+        /** FeedbackIn */
+        FeedbackIn: {
+            /**
+             * Campaign Id
+             * @description The match's campaign; default: the campaign that scored the role highest
+             */
+            campaign_id?: string | null;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "up" | "down";
+            /** Reasons */
+            reasons?: ("too_junior" | "too_senior" | "wrong_stack" | "pay" | "location" | "employer_type" | "commute_remote" | "more_like_this")[];
+            /**
+             * Note
+             * @description Free text; kept as evidence, never an instruction
+             */
+            note?: string | null;
+        };
+        /** FeedbackOut */
+        FeedbackOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Campaign Id */
+            campaign_id: string | null;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "up" | "down";
+            /** Reasons */
+            reasons: ("too_junior" | "too_senior" | "wrong_stack" | "pay" | "location" | "employer_type" | "commute_remote" | "more_like_this")[];
+            /** Note */
+            note: string | null;
+            /** Score At */
+            score_at: number | null;
+            /** Rubric Version */
+            rubric_version: number | null;
+            /** Actor */
+            actor: string;
+            /** Job Title */
+            job_title: string | null;
+            /** Employer */
+            employer: string | null;
+        };
         /** FieldChange */
         FieldChange: {
             /**
@@ -6968,6 +8432,53 @@ export interface components {
              * @default true
              */
             mandatory: boolean;
+        };
+        /** FollowupItemOut */
+        FollowupItemOut: {
+            /**
+             * Id
+             * @description The due row; null while only upcoming
+             */
+            id: string | null;
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Title */
+            title: string;
+            /** Employer */
+            employer: string;
+            /** Stage */
+            stage: string;
+            /** Sequence */
+            sequence: number;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "upcoming" | "due" | "snoozed" | "not_needed" | "drafted" | "sent";
+            /** Message Id */
+            message_id: string | null;
+            /** Message State */
+            message_state: ("none" | "queued" | "sending" | "sent" | "uncertain" | "failed" | "cancelled") | null;
+        };
+        /** FollowupListOut */
+        FollowupListOut: {
+            /** Items */
+            items: components["schemas"]["FollowupItemOut"][];
+            /** Auto Send */
+            auto_send: boolean;
         };
         /** FormatRule */
         FormatRule: {
@@ -7190,7 +8701,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             /** Name */
@@ -7239,6 +8750,29 @@ export interface components {
             time: string;
             db: components["schemas"]["DbHealth"];
             worker: components["schemas"]["WorkerHealth"];
+        };
+        /** HistoryOut */
+        HistoryOut: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Title */
+            title: string;
+            /** Stage */
+            stage: string;
+            /** Applied At */
+            applied_at: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** Counts Toward Cooldown */
+            counts_toward_cooldown: boolean;
         };
         /** ImportCommitIn */
         ImportCommitIn: {
@@ -7500,10 +9034,23 @@ export interface components {
             interviewers?: string[];
             /** Checklist */
             checklist?: string[];
-            /** Notes */
+            /**
+             * Notes
+             * @description The owner's notes, including pasted interviewer notes
+             */
             notes?: string | null;
             /** Learnt */
             learnt?: string | null;
+            /**
+             * Kind
+             * @description Screen, technical, panel, final or other
+             */
+            kind?: ("screen" | "technical" | "panel" | "final" | "other") | null;
+            /**
+             * Focus
+             * @description What this round concentrates on
+             */
+            focus?: string[];
         };
         /** InterviewRoundOut */
         InterviewRoundOut: {
@@ -7532,10 +9079,23 @@ export interface components {
             interviewers: string[];
             /** Checklist */
             checklist: string[];
-            /** Notes */
+            /**
+             * Notes
+             * @description The owner's notes, including pasted interviewer notes
+             */
             notes: string | null;
             /** Learnt */
             learnt: string | null;
+            /**
+             * Kind
+             * @description Screen, technical, panel, final or other
+             */
+            kind: ("screen" | "technical" | "panel" | "final" | "other") | null;
+            /**
+             * Focus
+             * @description What this round concentrates on
+             */
+            focus: string[];
             /**
              * Pack Id
              * Format: uuid
@@ -7596,6 +9156,39 @@ export interface components {
             model: string | null;
             /** Created By */
             created_by: string;
+        };
+        /** ItemOut */
+        ItemOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Subject Id
+             * Format: uuid
+             */
+            subject_id: string;
+            /** Label */
+            label: string;
+            /**
+             * Planned
+             * @enum {string}
+             */
+            planned: "change" | "unchanged" | "refused";
+            /** Planned Code */
+            planned_code: string | null;
+            /** Planned Reason */
+            planned_reason: string | null;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "pending" | "changed" | "unchanged" | "refused" | "failed" | "undone" | "undo_skipped";
+            /** Code */
+            code: string | null;
+            /** Reason */
+            reason: string | null;
         };
         /** JobChangeOut */
         JobChangeOut: {
@@ -8066,10 +9659,522 @@ export interface components {
              */
             totp_enabled: boolean;
         };
-        /** MergeIn */
-        MergeIn: {
-            /** Duplicate Ids */
-            duplicate_ids: string[];
+        /** MergeOut */
+        MergeOut: {
+            /** Jobs */
+            jobs: number;
+        };
+        /** MessageCreateIn */
+        MessageCreateIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "follow_up" | "thank_you" | "info_reply" | "slot_accept" | "slot_decline" | "withdraw" | "offer_decline";
+            /**
+             * Note
+             * @description What you want said (your words)
+             */
+            note?: string | null;
+            /**
+             * Slot
+             * @description The interview slot, exactly as it should be written (slot answers)
+             */
+            slot?: string | null;
+            /**
+             * Excerpt
+             * @description The employer's message, pasted (treated as data, never instructions)
+             */
+            excerpt?: string | null;
+        };
+        /** MessageDispatchOut */
+        MessageDispatchOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Status */
+            status: string;
+            /** Send After */
+            send_after: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Outcome At */
+            outcome_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Provider Message Id */
+            provider_message_id: string | null;
+        };
+        /** MessageEditIn */
+        MessageEditIn: {
+            /** To */
+            to?: string[] | null;
+            /** Cc */
+            cc?: string[] | null;
+            /** Subject */
+            subject?: string | null;
+            /** Body */
+            body?: string | null;
+            /**
+             * Confirm Recipients
+             * @description Confirm addresses this application has not used
+             * @default false
+             */
+            confirm_recipients?: boolean;
+        };
+        /** MessageOut */
+        MessageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "follow_up" | "thank_you" | "info_reply" | "slot_accept" | "slot_decline" | "withdraw" | "offer_decline";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "approved" | "discarded" | "budget_paused" | "failed";
+            /**
+             * Send State
+             * @description From the dispatch attempts of the message's packet
+             * @enum {string}
+             */
+            send_state: "none" | "queued" | "sending" | "sent" | "uncertain" | "failed" | "cancelled";
+            /**
+             * Automatic
+             * @description Drafted by the automatic follow-up path; any owner edit clears it
+             */
+            automatic: boolean;
+            /** Thread Id */
+            thread_id: string | null;
+            /**
+             * Thread Ref
+             * @description The mail thread the email replies in, if one is known
+             */
+            thread_ref: string | null;
+            /** To */
+            to: string[];
+            /** Cc */
+            cc: string[];
+            /**
+             * Known Recipients
+             * @description Where the application went and who wrote back
+             */
+            known_recipients: string[];
+            /**
+             * Confirmed Recipients
+             * @description Other addresses the owner confirmed
+             */
+            confirmed_recipients: string[];
+            /**
+             * Unconfirmed Recipients
+             * @description Recipients that still need the owner's confirmation
+             */
+            unconfirmed_recipients: string[];
+            /** Subject */
+            subject: string;
+            /** Body */
+            body: string;
+            /** Paragraphs */
+            paragraphs: components["schemas"]["SpecItem"][];
+            /**
+             * Questions
+             * @description What the owner must decide before this can be approved
+             */
+            questions: string[];
+            /** Check Results */
+            check_results: components["schemas"]["CheckResult"][];
+            /**
+             * Checked
+             * @description The checks ran on exactly this content
+             */
+            checked: boolean;
+            /**
+             * Check Status
+             * @enum {string}
+             */
+            check_status: "pass" | "warn" | "block";
+            /** Note */
+            note: string | null;
+            /** Slot */
+            slot: string | null;
+            /** Excerpt */
+            excerpt: string | null;
+            /** Sequence */
+            sequence: number | null;
+            /** Origin */
+            origin: string;
+            /** Model */
+            model: string | null;
+            /** Cost Micros */
+            cost_micros: number;
+            /** Error */
+            error: string | null;
+            /** Created By */
+            created_by: string;
+            packet: components["schemas"]["MessagePacketOut"] | null;
+            dispatch: components["schemas"]["MessageDispatchOut"] | null;
+        };
+        /** MessagePacketOut */
+        MessagePacketOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Version */
+            version: number;
+            /** Content Hash */
+            content_hash: string;
+            /** Approved At */
+            approved_at: string | null;
+            /** Approved By */
+            approved_by: string | null;
+            /** Invalidated At */
+            invalidated_at: string | null;
+        };
+        /** MessageSendOut */
+        MessageSendOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "denied";
+            /** Reason */
+            reason: string;
+            /** Code */
+            code: string | null;
+            /** Gates */
+            gates: {
+                [key: string]: unknown;
+            }[];
+            message: components["schemas"]["MessageOut"];
+        };
+        /** MessageThreadOut */
+        MessageThreadOut: {
+            /** Thread Id */
+            thread_id: string | null;
+            /** Subject */
+            subject: string | null;
+            /** Sender */
+            sender: string | null;
+            /** Last Message At */
+            last_message_at: string | null;
+            /** Employer Replied */
+            employer_replied: boolean;
+            /** Sent To */
+            sent_to: string[];
+            /** Sending Identity */
+            sending_identity: string | null;
+        };
+        /** MessagesOut */
+        MessagesOut: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            thread: components["schemas"]["MessageThreadOut"];
+            /** Messages */
+            messages: components["schemas"]["MessageOut"][];
+        };
+        /** MockAnswerIn */
+        MockAnswerIn: {
+            /**
+             * Text
+             * @default
+             */
+            text?: string;
+            /**
+             * Skip
+             * @default false
+             */
+            skip?: boolean;
+            /**
+             * Turn Key
+             * @description The session's expects; a repeat is ignored
+             */
+            turn_key?: string | null;
+        };
+        /** MockCategoryOut */
+        MockCategoryOut: {
+            /** Category */
+            category: string;
+            /** Answers */
+            answers: number;
+            /** Average */
+            average: number;
+            /** Weak */
+            weak: boolean;
+        };
+        /** MockClaimIn */
+        MockClaimIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add_draft" | "dismiss";
+            /**
+             * Text
+             * @description Corrected wording for the draft fact
+             */
+            text?: string | null;
+        };
+        /** MockClaimOut */
+        MockClaimOut: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "unverified" | "added" | "dismissed";
+            /** Fact Code */
+            fact_code: string | null;
+        };
+        /** MockEstimateOut */
+        MockEstimateOut: {
+            /**
+             * Parts
+             * @description Upper-bound cost per step kind, micros
+             */
+            parts: {
+                [key: string]: number;
+            };
+            /** Total Micros */
+            total_micros: number;
+            /**
+             * Budget Micros
+             * @description What the session may spend before it pauses and asks
+             */
+            budget_micros: number;
+            /** Currency */
+            currency: string;
+        };
+        /** MockNextOut */
+        MockNextOut: {
+            /** Question */
+            question: string;
+            /** Category */
+            category: string;
+            /** Reason */
+            reason: string;
+        };
+        /** MockProgressOut */
+        MockProgressOut: {
+            /** Sessions */
+            sessions: number;
+            /** Categories */
+            categories: components["schemas"]["MockCategoryOut"][];
+            /** Weak */
+            weak: string[];
+            /** Practise Next */
+            practise_next: components["schemas"]["MockNextOut"][];
+        };
+        /** MockResumeIn */
+        MockResumeIn: {
+            /**
+             * Budget Micros
+             * @description Raise the session cap first
+             */
+            budget_micros?: number | null;
+        };
+        /** MockSessionIn */
+        MockSessionIn: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "behavioural" | "technical" | "role" | "mixed" | "tough";
+            /**
+             * Length
+             * @description Main questions; default interview.mock.default_length
+             */
+            length?: number | null;
+            /**
+             * Use Pack Questions
+             * @description Ask the pack's likely questions first
+             * @default true
+             */
+            use_pack_questions?: boolean;
+            /**
+             * Feedback Each
+             * @description Feedback after each answer as well as at the end
+             */
+            feedback_each?: boolean | null;
+            /**
+             * Timer Seconds
+             * @description Optional answer timer (shown only)
+             */
+            timer_seconds?: number | null;
+            /**
+             * Round Id
+             * @description The round this session targets
+             */
+            round_id?: string | null;
+        };
+        /** MockSessionOut */
+        MockSessionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Pack Id
+             * Format: uuid
+             */
+            pack_id: string;
+            /** Round Id */
+            round_id: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "behavioural" | "technical" | "role" | "mixed" | "tough";
+            /** Length */
+            length: number;
+            /** Use Pack Questions */
+            use_pack_questions: boolean;
+            /** Feedback Each */
+            feedback_each: boolean;
+            /** Timer Seconds */
+            timer_seconds: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "paused" | "failed" | "done";
+            /** Pending Step */
+            pending_step: ("ask" | "reply" | "final") | null;
+            /**
+             * Expects
+             * @description Pass as turn_key with the next answer; null when the session is not waiting for one
+             */
+            expects: string | null;
+            /** Question Index */
+            question_index: number;
+            /** Probes */
+            probes: number;
+            /** Estimate Micros */
+            estimate_micros: number | null;
+            /** Budget Micros */
+            budget_micros: number | null;
+            /** Cost Micros */
+            cost_micros: number;
+            /**
+             * Feedback
+             * @description Final feedback: summary, overall, answers
+             */
+            feedback: {
+                [key: string]: unknown;
+            } | null;
+            /** Scores */
+            scores: {
+                [key: string]: number;
+            };
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Turns */
+            turns: components["schemas"]["MockTurnOut"][];
+            /**
+             * Unverified Prompt
+             * @default
+             */
+            unverified_prompt: string;
+        };
+        /** MockStoryIn */
+        MockStoryIn: {
+            /** Title */
+            title?: string | null;
+            /**
+             * Fact Ids
+             * @description Default: the facts the answer rests on
+             */
+            fact_ids?: string[] | null;
+        };
+        /** MockTurnOut */
+        MockTurnOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Seq */
+            seq: number;
+            /** Step Key */
+            step_key: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "interviewer" | "owner" | "coach";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "question" | "probe" | "answer" | "skip" | "feedback";
+            /** Text */
+            text: string;
+            /** Question Index */
+            question_index: number;
+            /** Category */
+            category: string | null;
+            /**
+             * Feedback
+             * @description Checked feedback: structure, relevance, specificity, strong, tighten, scores, suggested (with sources), removed (flagged)
+             */
+            feedback: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Claims
+             * @description Statements not in your Kit
+             */
+            claims: components["schemas"]["MockClaimOut"][];
+            /** Fact Ids */
+            fact_ids: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** NeverMention */
         NeverMention: {
@@ -8141,6 +10246,69 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** OperationOut */
+        OperationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Subject
+             * @enum {string}
+             */
+            subject: "jobs" | "applications";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "previewed" | "queued" | "running" | "done" | "partial" | "failed" | "undone";
+            /** Selected */
+            selected: number;
+            /** Params */
+            params: {
+                [key: string]: unknown;
+            };
+            /**
+             * Counts
+             * @description Items per outcome
+             */
+            counts: {
+                [key: string]: number;
+            };
+            /**
+             * Done
+             * @description Items finished (any outcome but pending)
+             */
+            done: number;
+            /** Created By */
+            created_by: string;
+            /** Started At */
+            started_at: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Undo Until */
+            undo_until: string | null;
+            /** Can Undo */
+            can_undo: boolean;
+            /** Error */
+            error: string | null;
+        };
         /** Override */
         Override: {
             /** By */
@@ -8175,6 +10343,17 @@ export interface components {
             display_name: string;
             /** Timezone */
             timezone: string;
+        };
+        /** OwnerOnlyNoteOut */
+        OwnerOnlyNoteOut: {
+            /** Area */
+            area: string;
+            /** Down */
+            down: number;
+            /** Feedback Ids */
+            feedback_ids: string[];
+            /** Message */
+            message: string;
         };
         /** PacketAnswer */
         PacketAnswer: {
@@ -8288,6 +10467,11 @@ export interface components {
              * @description Content hash of the job as it was packed
              */
             job_version: string | null;
+            /**
+             * Message Kind
+             * @description Set when the packet is a message about the application
+             */
+            message_kind?: ("follow_up" | "thank_you" | "info_reply" | "slot_accept" | "slot_decline" | "withdraw" | "offer_decline") | null;
         };
         /** PacketDestination */
         PacketDestination: {
@@ -8316,6 +10500,11 @@ export interface components {
             subject: string;
             /** Body */
             body: string;
+            /**
+             * Thread Ref
+             * @description The mail thread a message replies in (provider thread id)
+             */
+            thread_ref?: string | null;
         };
         /** PacketFile */
         PacketFile: {
@@ -8525,6 +10714,18 @@ export interface components {
              */
             next_cursor: string | null;
         };
+        /** Page[FeedbackOut] */
+        Page_FeedbackOut_: {
+            /** Items */
+            items: components["schemas"]["FeedbackOut"][];
+            /** Total */
+            total: number | null;
+            /**
+             * Next Cursor
+             * @description Opaque; pass back as ?cursor=
+             */
+            next_cursor: string | null;
+        };
         /** Page[GuardrailOut] */
         Page_GuardrailOut_: {
             /** Items */
@@ -8537,10 +10738,34 @@ export interface components {
              */
             next_cursor: string | null;
         };
+        /** Page[ItemOut] */
+        Page_ItemOut_: {
+            /** Items */
+            items: components["schemas"]["ItemOut"][];
+            /** Total */
+            total: number | null;
+            /**
+             * Next Cursor
+             * @description Opaque; pass back as ?cursor=
+             */
+            next_cursor: string | null;
+        };
         /** Page[MailThreadOut] */
         Page_MailThreadOut_: {
             /** Items */
             items: components["schemas"]["MailThreadOut"][];
+            /** Total */
+            total: number | null;
+            /**
+             * Next Cursor
+             * @description Opaque; pass back as ?cursor=
+             */
+            next_cursor: string | null;
+        };
+        /** Page[OperationOut] */
+        Page_OperationOut_: {
+            /** Items */
+            items: components["schemas"]["OperationOut"][];
             /** Total */
             total: number | null;
             /**
@@ -8693,6 +10918,18 @@ export interface components {
              */
             next_cursor: string | null;
         };
+        /** Page[SuggestionOut] */
+        Page_SuggestionOut_: {
+            /** Items */
+            items: components["schemas"]["SuggestionOut"][];
+            /** Total */
+            total: number | null;
+            /**
+             * Next Cursor
+             * @description Opaque; pass back as ?cursor=
+             */
+            next_cursor: string | null;
+        };
         /** Page[TagRuleOut] */
         Page_TagRuleOut_: {
             /** Items */
@@ -8764,6 +11001,30 @@ export interface components {
              * @description Opaque; pass back as ?cursor=
              */
             next_cursor: string | null;
+        };
+        /** ParamsIn */
+        ParamsIn: {
+            /** Tag */
+            tag?: string | null;
+            /**
+             * Until
+             * @description Snooze until
+             */
+            until?: string | null;
+            /**
+             * Reason
+             * @description Required to skip
+             */
+            reason?: string | null;
+            /**
+             * Stage
+             * @description Target stage of move_stage
+             */
+            stage?: string | null;
+            /** Campaign Id */
+            campaign_id?: string | null;
+            /** Note */
+            note?: string | null;
         };
         /** PasswordChange */
         PasswordChange: {
@@ -8838,6 +11099,38 @@ export interface components {
             estimate_assumptions: string | null;
             /** Estimated On */
             estimated_on: string | null;
+        };
+        /**
+         * PenaltyChange
+         * @description A rubric penalty (a new rubric version).
+         */
+        "PenaltyChange-Input": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "add_penalty";
+            /** Name */
+            name: string;
+            /** Points */
+            points: number;
+            conditions: components["schemas"]["ConditionSet-Input"];
+        };
+        /**
+         * PenaltyChange
+         * @description A rubric penalty (a new rubric version).
+         */
+        "PenaltyChange-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "add_penalty";
+            /** Name */
+            name: string;
+            /** Points */
+            points: number;
+            conditions: components["schemas"]["ConditionSet-Output"];
         };
         /** PendingActionOut */
         PendingActionOut: {
@@ -8994,7 +11287,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             full_name: components["schemas"]["PersonField"];
@@ -9026,6 +11319,83 @@ export interface components {
             kind: string;
             /** Excerpt */
             excerpt: string;
+        };
+        /**
+         * PolicyIn
+         * @description Only the fields sent change. ``never_apply`` needs ``never_reason``.
+         */
+        PolicyIn: {
+            /**
+             * Cooldown Days
+             * @description null clears the override
+             */
+            cooldown_days?: number | null;
+            /** Always Ask First */
+            always_ask_first?: boolean | null;
+            /** Never Apply */
+            never_apply?: boolean | null;
+            /** Never Reason */
+            never_reason?: string | null;
+            /** Priority */
+            priority?: number | null;
+            /** Watched */
+            watched?: boolean | null;
+            /** Notes */
+            notes?: string | null;
+        };
+        /** PolicyPreviewIn */
+        PolicyPreviewIn: {
+            /**
+             * Days
+             * @description Window of recent roles; default preferences.preview_days
+             */
+            days?: number | null;
+            automation?: components["schemas"]["AutomationPolicy"] | null;
+            /** @description Rubric thresholds to try */
+            thresholds?: components["schemas"]["RubricThresholds"] | null;
+            criteria?: components["schemas"]["CampaignCriteria-Input"] | null;
+            unknown_data_policy?: components["schemas"]["UnknownDataPolicy"] | null;
+            /**
+             * Settings
+             * @description Autopilot limits and global thresholds to try (caps, quiet hours, thresholds)
+             */
+            settings?: {
+                [key: string]: unknown;
+            };
+        };
+        /** PolicyPreviewOut */
+        PolicyPreviewOut: {
+            /**
+             * Campaign Id
+             * Format: uuid
+             */
+            campaign_id: string;
+            /** Window Days */
+            window_days: number;
+            /** Jobs */
+            jobs: number;
+            thresholds: components["schemas"]["PreviewThresholds"];
+            baseline_thresholds: components["schemas"]["PreviewThresholds"];
+            /** Histogram */
+            histogram: components["schemas"]["PreviewBin"][];
+            /** Unscored */
+            unscored: number;
+            line: components["schemas"]["PreviewLine"];
+            baseline_line: components["schemas"]["PreviewLine"];
+            /**
+             * Run Now
+             * @description Dry-run actions for a run right now, by action
+             */
+            run_now: {
+                [key: string]: number;
+            };
+            /** Changes */
+            changes: components["schemas"]["PreviewChange"][];
+            /** Changes Total */
+            changes_total: number;
+            /** Unknowns */
+            unknowns: components["schemas"]["PreviewUnknown"][];
+            caps: components["schemas"]["PreviewCaps"];
         };
         /** PortalAccountOut */
         PortalAccountOut: {
@@ -9180,6 +11550,170 @@ export interface components {
             cost_micros: number;
             /** Error */
             error: string | null;
+        };
+        /** PreferencesSummaryOut */
+        PreferencesSummaryOut: {
+            /**
+             * Campaign Id
+             * Format: uuid
+             */
+            campaign_id: string;
+            /** Up */
+            up: number;
+            /** Down */
+            down: number;
+            /** Open Suggestions */
+            open_suggestions: number;
+            /** Owner Only */
+            owner_only: components["schemas"]["OwnerOnlyNoteOut"][];
+            /** Last Analysed At */
+            last_analysed_at: string | null;
+        };
+        /** PreviewBin */
+        PreviewBin: {
+            /** Start */
+            start: number;
+            /** End */
+            end: number;
+            /** Count */
+            count: number;
+        };
+        /** PreviewCaps */
+        PreviewCaps: {
+            /** Daily Cap */
+            daily_cap: number;
+            /** Weekly Cap */
+            weekly_cap: number;
+            /** Sent Today */
+            sent_today: number;
+            /** Sent Week */
+            sent_week: number;
+            /** Run Now Would Send */
+            run_now_would_send: number;
+            /** Quiet Hours */
+            quiet_hours: string | null;
+            /** Quiet Now */
+            quiet_now: boolean | null;
+            /** Needs Open Check */
+            needs_open_check: number;
+        };
+        /** PreviewChange */
+        PreviewChange: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Title */
+            title: string;
+            /** Employer */
+            employer: string;
+            /** Score */
+            score: number | null;
+            /** Before */
+            before: string;
+            /** After */
+            after: string;
+            /**
+             * Change
+             * @description newly_automatic, newly_blocked or changed
+             */
+            change: string;
+            /** Reasons */
+            reasons: string[];
+        };
+        /** PreviewIn */
+        PreviewIn: {
+            /**
+             * Subject
+             * @enum {string}
+             */
+            subject: "jobs" | "applications";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv";
+            params?: components["schemas"]["ParamsIn"];
+            selection: components["schemas"]["SelectionIn"];
+        };
+        /** PreviewLine */
+        PreviewLine: {
+            /**
+             * Would Apply
+             * @description Roles that would have gone automatically in the window, caps applied
+             */
+            would_apply: number;
+            /** By Channel */
+            by_channel: {
+                [key: string]: number;
+            };
+            /**
+             * Held
+             * @description Runner-ups held by their employer group
+             */
+            held: number;
+            /**
+             * Capped
+             * @description Qualifying roles the daily or weekly cap would have held back
+             */
+            capped: number;
+            /** Qualifying */
+            qualifying: number;
+        };
+        /** PreviewOut */
+        PreviewOut: {
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            /**
+             * Subject
+             * @enum {string}
+             */
+            subject: "jobs" | "applications";
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "tag" | "untag" | "skip" | "snooze" | "move_stage" | "assign_campaign" | "queue_tailoring" | "send_for_approval" | "approve_reviewed" | "archive" | "recheck" | "export_csv";
+            /**
+             * Selected
+             * @description Confirm this count to run
+             */
+            selected: number;
+            /** Will Change */
+            will_change: number;
+            /** @description Already as asked */
+            unchanged: components["schemas"]["ReasonGroupOut"] | null;
+            /**
+             * Refused
+             * @description Cannot be changed, grouped by reason
+             */
+            refused: components["schemas"]["ReasonGroupOut"][];
+            /** Refused Total */
+            refused_total: number;
+            /** Reversible */
+            reversible: boolean;
+        };
+        /** PreviewThresholds */
+        PreviewThresholds: {
+            /** Shortlist */
+            shortlist: number;
+            /** Tailor */
+            tailor: number;
+            /** Auto Apply */
+            auto_apply: number;
+        };
+        /** PreviewUnknown */
+        PreviewUnknown: {
+            /** Gate */
+            gate: string;
+            /** Count */
+            count: number;
+            /** Message */
+            message: string;
         };
         /** PriceIn */
         PriceIn: {
@@ -9415,6 +11949,17 @@ export interface components {
             /** Migrated */
             migrated: boolean;
         };
+        /** ReasonGroupOut */
+        ReasonGroupOut: {
+            /** Code */
+            code: string;
+            /** Title */
+            title: string;
+            /** Count */
+            count: number;
+            /** Samples */
+            samples: components["schemas"]["SampleOut"][];
+        };
         /**
          * ReceiptOut
          * @description The approval receipt (18.2): the one screen the owner approves from.
@@ -9550,7 +12095,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             /** Name */
@@ -9842,6 +12387,45 @@ export interface components {
             /** Conflicts With */
             conflicts_with: string[];
         };
+        /**
+         * ReweightChange
+         * @description New weights for the rubric's criteria (same names, summing to 100): a new rubric version.
+         */
+        ReweightChange: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "reweight_criterion";
+            /** Weights */
+            weights: {
+                [key: string]: number;
+            };
+        };
+        /** RoleOut */
+        RoleOut: {
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Title */
+            title: string;
+            /** Triage */
+            triage: string;
+            /** Conflict State */
+            conflict_state: string;
+            /** Conflict Note */
+            conflict_note: string | null;
+            /** Score */
+            score: number | null;
+            /** Application Id */
+            application_id: string | null;
+            /** Stage */
+            stage: string | null;
+            /** Posted At */
+            posted_at: string | null;
+        };
         /** RollbackIn */
         RollbackIn: {
             /** Note */
@@ -10051,6 +12635,14 @@ export interface components {
              */
             dry_run?: boolean;
         };
+        /** RunIn */
+        RunIn: {
+            /**
+             * Confirm Count
+             * @description Must equal the previewed count
+             */
+            confirm_count?: number | null;
+        };
         /** RunOut */
         RunOut: {
             /**
@@ -10189,6 +12781,18 @@ export interface components {
              */
             evidence_refs: string[];
         };
+        /** SampleOut */
+        SampleOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Label */
+            label: string;
+            /** Reason */
+            reason: string;
+        };
         /** SavedViewBody */
         "SavedViewBody-Input": {
             conditions?: components["schemas"]["ConditionSet-Input"];
@@ -10216,6 +12820,28 @@ export interface components {
              * @enum {string}
              */
             scope: "matches" | "applications";
+        };
+        /** SavedViewChange */
+        "SavedViewChange-Input": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "add_saved_view";
+            /** Name */
+            name: string;
+            conditions: components["schemas"]["ConditionSet-Input"];
+        };
+        /** SavedViewChange */
+        "SavedViewChange-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "add_saved_view";
+            /** Name */
+            name: string;
+            conditions: components["schemas"]["ConditionSet-Output"];
         };
         /** SavedViewIn */
         SavedViewIn: {
@@ -10362,6 +12988,16 @@ export interface components {
             mid: string;
             /** High */
             high: string;
+        };
+        /** SelectionIn */
+        SelectionIn: {
+            /**
+             * Ids
+             * @description The ticked rows
+             */
+            ids?: string[] | null;
+            /** @description Or everything matching this view */
+            view?: components["schemas"]["ViewSelectionIn"] | null;
         };
         /** SessionOut */
         SessionOut: {
@@ -10561,7 +13197,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             /** Name */
@@ -10578,15 +13214,6 @@ export interface components {
             claim: "yes" | "no" | "never";
             /** Note */
             note: string | null;
-        };
-        /** SnoozeIn */
-        SnoozeIn: {
-            /**
-             * Until
-             * Format: date-time
-             * @description The action comes back at this time
-             */
-            until: string;
         };
         /** SortSpec */
         SortSpec: {
@@ -11032,14 +13659,6 @@ export interface components {
             /** Daily */
             daily: components["schemas"]["SpendDay"][];
         };
-        /** SplitIn */
-        SplitIn: {
-            /**
-             * Sighting Urls
-             * @description Sightings to move to a new job
-             */
-            sighting_urls: string[];
-        };
         /**
          * StageChangeIn
          * @description Dragging to `submitted` never creates evidence: use 'I applied myself' instead.
@@ -11052,6 +13671,21 @@ export interface components {
             stage: "shortlisted" | "tailoring" | "ready" | "applying" | "submitted_unconfirmed" | "submitted" | "screening" | "interview" | "offer" | "accepted" | "rejected" | "withdrawn" | "closed" | "skipped";
             /** Note */
             note?: string | null;
+        };
+        /** StatesIn */
+        StatesIn: {
+            /** Job Ids */
+            job_ids: string[];
+        };
+        /** StatesOut */
+        StatesOut: {
+            /**
+             * States
+             * @description By job id
+             */
+            states: {
+                [key: string]: components["schemas"]["ChipOut"];
+            };
         };
         /**
          * StoryEditIn
@@ -11094,6 +13728,147 @@ export interface components {
             answers: components["schemas"]["PacketAnswer"][];
             /** Submitted At */
             submitted_at: string;
+        };
+        /**
+         * SuggestionBacktest
+         * @description The change replayed over recent roles with the decision table (no model calls).
+         */
+        SuggestionBacktest: {
+            /** Window Days */
+            window_days: number;
+            /** Jobs */
+            jobs: number;
+            /**
+             * Matched
+             * @description Recent roles the change's conditions match
+             * @default 0
+             */
+            matched: number;
+            /** Newly Pass */
+            newly_pass: components["schemas"]["BacktestChangeRow"][];
+            /** Newly Drop */
+            newly_drop: components["schemas"]["BacktestChangeRow"][];
+            /** Excluded Past Applications */
+            excluded_past_applications: components["schemas"]["BacktestChangeRow"][];
+            /**
+             * Score Changed
+             * @default 0
+             */
+            score_changed: number;
+        };
+        /** SuggestionEditIn */
+        SuggestionEditIn: {
+            /**
+             * Change
+             * @description The owner's edit; default: as suggested
+             */
+            change?: (components["schemas"]["ReweightChange"] | components["schemas"]["PenaltyChange-Input"] | components["schemas"]["BonusChange-Input"] | components["schemas"]["TagRuleChange-Input"] | components["schemas"]["SavedViewChange-Input"] | components["schemas"]["TightenChange-Input"]) | null;
+        };
+        /**
+         * SuggestionEvidence
+         * @description What a suggestion rests on: owner feedback and real outcomes, counted and listed.
+         */
+        SuggestionEvidence: {
+            /**
+             * Up
+             * @default 0
+             */
+            up: number;
+            /**
+             * Down
+             * @default 0
+             */
+            down: number;
+            /** Feedback Ids */
+            feedback_ids: string[];
+            /** Application Ids */
+            application_ids: string[];
+            /** Reasons */
+            reasons: {
+                [key: string]: number;
+            };
+            /** Notes */
+            notes: string[];
+            /**
+             * Summary
+             * @default
+             */
+            summary: string;
+        };
+        /** SuggestionOut */
+        SuggestionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Campaign Id
+             * Format: uuid
+             */
+            campaign_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "reweight_criterion" | "add_penalty" | "add_bonus" | "add_tag_rule" | "add_saved_view" | "tighten_filter";
+            /** Target */
+            target: string;
+            /** Title */
+            title: string;
+            /** Change */
+            change: components["schemas"]["ReweightChange"] | components["schemas"]["PenaltyChange-Output"] | components["schemas"]["BonusChange-Output"] | components["schemas"]["TagRuleChange-Output"] | components["schemas"]["SavedViewChange-Output"] | components["schemas"]["TightenChange-Output"];
+            evidence: components["schemas"]["SuggestionEvidence"];
+            backtest: components["schemas"]["SuggestionBacktest"] | null;
+            /** Rubric Id */
+            rubric_id: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "open" | "accepted" | "dismissed" | "superseded";
+            /** Decided By */
+            decided_by: string | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Decision Note */
+            decision_note: string | null;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+        };
+        /** TagRuleChange */
+        "TagRuleChange-Input": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "add_tag_rule";
+            /** Tag */
+            tag: string;
+            conditions: components["schemas"]["ConditionSet-Input"];
+        };
+        /** TagRuleChange */
+        "TagRuleChange-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "add_tag_rule";
+            /** Tag */
+            tag: string;
+            conditions: components["schemas"]["ConditionSet-Output"];
         };
         /** TagRuleIn */
         TagRuleIn: {
@@ -11271,7 +14046,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             /** Key */
@@ -11312,6 +14087,66 @@ export interface components {
             query: string;
             /** Fields */
             fields?: string[];
+        };
+        /** ThemeBody */
+        ThemeBody: {
+            /** Name */
+            name: string;
+            /** Description */
+            description?: string | null;
+            fonts: components["schemas"]["ThemeFonts"];
+            /**
+             * Radius
+             * @description Base radius in px; small/large derive from it
+             */
+            radius: number;
+            /**
+             * Density
+             * @enum {string}
+             */
+            density: "comfortable" | "compact";
+            /** Light */
+            light: {
+                [key: string]: string;
+            };
+            /** Dark */
+            dark: {
+                [key: string]: string;
+            };
+            /**
+             * Chart
+             * @description Light-mode palette; fallback for chart-n
+             */
+            chart: string[];
+            /** @description Light-mode ramp; fallback for score-* */
+            score: components["schemas"]["ScoreRamp"];
+        };
+        /** ThemeDuplicateIn */
+        ThemeDuplicateIn: {
+            /**
+             * Name
+             * @description Name of the copy; default '<name> copy'
+             */
+            name?: string | null;
+        };
+        /**
+         * ThemeExport
+         * @description The theme file (``<name>.theme.json``). Import accepts this or a bare theme object.
+         */
+        ThemeExport: {
+            /**
+             * Format
+             * @default nchito-theme
+             * @constant
+             */
+            format: "nchito-theme";
+            /**
+             * Version
+             * @default 1
+             * @constant
+             */
+            version: 1;
+            theme: components["schemas"]["ThemeBody"];
         };
         /** ThemeFonts */
         ThemeFonts: {
@@ -11363,6 +14198,12 @@ export interface components {
             score: components["schemas"]["ScoreRamp"];
             /** Id */
             id?: string | null;
+            /**
+             * Accept Low Contrast
+             * @description Save even though body text is below WCAG AA; recorded on the theme and audited
+             * @default false
+             */
+            accept_low_contrast?: boolean;
         };
         /** ThemeOut */
         ThemeOut: {
@@ -11403,6 +14244,75 @@ export interface components {
             id: string;
             /** Builtin */
             builtin: boolean;
+            /**
+             * Is Default
+             * @description The default theme (setting themes.default_theme_id)
+             * @default false
+             */
+            is_default: boolean;
+            /**
+             * Revision
+             * @description Current revision number (owner themes)
+             */
+            revision: number | null;
+            /**
+             * Can Undo
+             * @default false
+             */
+            can_undo: boolean;
+            /**
+             * Can Redo
+             * @default false
+             */
+            can_redo: boolean;
+            contrast_waiver: components["schemas"]["ContrastWaiver"] | null;
+        };
+        /** ThemeRevisionOut */
+        ThemeRevisionOut: {
+            /** Number */
+            number: number;
+            /** Parent */
+            parent: number | null;
+            /** Note */
+            note: string;
+            /** Actor */
+            actor: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Current */
+            current: boolean;
+            body: components["schemas"]["ThemeBody"];
+        };
+        /**
+         * TightenChange
+         * @description A campaign exclusion rule: only ever narrows what the campaign matches.
+         */
+        "TightenChange-Input": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "tighten_filter";
+            /** Reason */
+            reason: string;
+            conditions: components["schemas"]["ConditionSet-Input"];
+        };
+        /**
+         * TightenChange
+         * @description A campaign exclusion rule: only ever narrows what the campaign matches.
+         */
+        "TightenChange-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "tighten_filter";
+            /** Reason */
+            reason: string;
+            conditions: components["schemas"]["ConditionSet-Output"];
         };
         /** TimeInStage */
         TimeInStage: {
@@ -11655,7 +14565,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             /** Key */
@@ -11807,7 +14717,7 @@ export interface components {
              * Origin
              * @enum {string}
              */
-            origin: "import" | "owner" | "system";
+            origin: "system" | "owner" | "import";
             /** Confirmed At */
             confirmed_at: string | null;
             /** Doc Type */
@@ -11842,6 +14752,40 @@ export interface components {
              * @enum {string}
              */
             sensitivity: "normal" | "on_request" | "after_offer_only";
+        };
+        /**
+         * ViewSelectionIn
+         * @description Everything matching a view, resolved on the server (the same filter as the list).
+         */
+        ViewSelectionIn: {
+            /** View Id */
+            view_id?: string | null;
+            /**
+             * Conditions
+             * @description JSON ConditionSet, as in the Matches list
+             */
+            conditions?: string | null;
+            /** Q */
+            q?: string | null;
+            /**
+             * Triage
+             * @description Matches only: new, shortlisted, ...
+             */
+            triage?: string | null;
+            /**
+             * Stage
+             * @description Applications only
+             */
+            stage?: string | null;
+            /** Campaign Id */
+            campaign_id?: string | null;
+            /**
+             * Channel
+             * @description Applications only
+             */
+            channel?: string | null;
+            /** Pinned */
+            pinned?: boolean | null;
         };
         /** WaiverIn */
         WaiverIn: {
@@ -12031,6 +14975,79 @@ export interface components {
             /** Would Change If */
             would_change_if: string | null;
         };
+        /** WindDownChoiceIn */
+        WindDownChoiceIn: {
+            /** Key */
+            key: string;
+            /**
+             * Choice
+             * @enum {string}
+             */
+            choice: "keep" | "pause" | "withdraw";
+        };
+        /** WindDownItemOut */
+        WindDownItemOut: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "queued_send" | "approved" | "message" | "application" | "interview" | "pending_action" | "campaign";
+            /** Label */
+            label: string;
+            /** Detail */
+            detail: string;
+            /** Choices */
+            choices: ("keep" | "pause" | "withdraw")[];
+            /** Choice */
+            choice: ("keep" | "pause" | "withdraw") | null;
+            /** Effect */
+            effect: string | null;
+            /** Application Id */
+            application_id: string | null;
+        };
+        /** WindDownOut */
+        WindDownOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "none" | "active" | "reopened";
+            /** Id */
+            id: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Started At */
+            started_at: string | null;
+            /** Started By */
+            started_by: string | null;
+            /** Reopened At */
+            reopened_at: string | null;
+            /** Autopilot Paused */
+            autopilot_paused: boolean;
+            /** Queued Sends */
+            queued_sends: components["schemas"]["WindDownItemOut"][];
+            /** Approved Unsent */
+            approved_unsent: components["schemas"]["WindDownItemOut"][];
+            /** Live Applications */
+            live_applications: {
+                [key: string]: components["schemas"]["WindDownItemOut"][];
+            };
+            /** Interviews */
+            interviews: components["schemas"]["WindDownItemOut"][];
+            /** Pending Actions */
+            pending_actions: components["schemas"]["WindDownItemOut"][];
+            /** Campaigns */
+            campaigns: components["schemas"]["WindDownItemOut"][];
+        };
+        /** WindDownStartIn */
+        WindDownStartIn: {
+            /** Reason */
+            reason?: string | null;
+            /** Accepted Application Id */
+            accepted_application_id?: string | null;
+        };
         /** WorkerHealth */
         WorkerHealth: {
             /** Ok */
@@ -12088,6 +15105,27 @@ export interface components {
              */
             notices: string[];
         };
+        /** MergeIn */
+        app__api__routers__employers__MergeIn: {
+            /**
+             * Into
+             * @description The canonical employer to merge this one into
+             */
+            into: string;
+            /**
+             * Remember Alias
+             * @default true
+             */
+            remember_alias?: boolean;
+        };
+        /** SplitIn */
+        app__api__routers__employers__SplitIn: {
+            /**
+             * Alias
+             * @description A name that was merged into another employer
+             */
+            alias: string;
+        };
         /** ConflictOut */
         app__api__routers__events__ConflictOut: {
             /**
@@ -12106,6 +15144,14 @@ export interface components {
             starts_at: string;
             /** Ends At */
             ends_at: string | null;
+        };
+        /** SnoozeIn */
+        app__api__routers__followups__SnoozeIn: {
+            /**
+             * Until
+             * @description Default: followups.snooze_days from now
+             */
+            until?: string | null;
         };
         /**
          * ConflictOut
@@ -12132,6 +15178,19 @@ export interface components {
              * @description outranked: a higher role won; applied: the employer is locked after applying
              */
             reason: ("outranked" | "applied") | null;
+        };
+        /** MergeIn */
+        app__api__routers__jobs_corrections__MergeIn: {
+            /** Duplicate Ids */
+            duplicate_ids: string[];
+        };
+        /** SplitIn */
+        app__api__routers__jobs_corrections__SplitIn: {
+            /**
+             * Sighting Urls
+             * @description Sightings to move to a new job
+             */
+            sighting_urls: string[];
         };
         /** AnswerIn */
         app__api__routers__kit__AnswerIn: {
@@ -12183,6 +15242,20 @@ export interface components {
              * @description Default from answers.routine_default_scope / material_default_scope
              */
             answer_scope?: ("this_application" | "this_employer" | "this_country" | "all_matching") | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** SnoozeIn */
+        app__api__routers__pending_actions__SnoozeIn: {
+            /**
+             * Until
+             * Format: date-time
+             * @description The action comes back at this time
+             */
+            until: string;
+        };
+        /** DismissIn */
+        app__api__routers__preferences__DismissIn: {
             /** Note */
             note?: string | null;
         };
@@ -12760,6 +15833,77 @@ export interface operations {
                     "application/json": components["schemas"]["ThemeOut"];
                 };
             };
+            /** @description Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    themes_import: {
+        parameters: {
+            query?: {
+                accept_low_contrast?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": Record<string, never>;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Larger than themes.import_max_bytes */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    themes_contrast: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ContrastPairOut"][];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -12833,14 +15977,12 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Validation Error */
+            /** @description Invalid theme, or body text below WCAG AA (code theme_low_contrast) without accept_low_contrast */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
         };
     };
@@ -12864,6 +16006,277 @@ export interface operations {
             };
             /** @description Built-in themes cannot be deleted */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The active or the default theme cannot be deleted */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_duplicate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ThemeDuplicateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_set_default: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeExport"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_revisions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeRevisionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Built-in themes have no revisions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Nothing to move to */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_redo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Built-in themes have no revisions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Nothing to move to */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    themes_restore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                theme_id: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ThemeOut"];
+                };
+            };
+            /** @description Built-in themes have no revisions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Nothing to move to */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -17449,48 +20862,6 @@ export interface operations {
             };
         };
     };
-    jobs_bulk: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["BulkActionIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BulkActionOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-            /** @description Specified; implemented in a later wave */
-            501: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorOut"];
-                };
-            };
-        };
-    };
     jobs_why: {
         parameters: {
             query?: {
@@ -18665,7 +22036,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["MergeIn"];
+                "application/json": components["schemas"]["app__api__routers__jobs_corrections__MergeIn"];
             };
         };
         responses: {
@@ -18709,7 +22080,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SplitIn"];
+                "application/json": components["schemas"]["app__api__routers__jobs_corrections__SplitIn"];
             };
         };
         responses: {
@@ -18782,6 +22153,508 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    bulk_options: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkOptionsOut"];
+                };
+            };
+        };
+    };
+    bulk_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewOut"];
+                };
+            };
+            /** @description Bad selection or parameters, or over the size cap ({code, reason}) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bulk_run: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Count does not match, or already run ({code, reason}) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_list: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_OperationOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_items: {
+        parameters: {
+            query?: {
+                outcome?: ("pending" | "changed" | "unchanged" | "refused" | "failed" | "undone" | "undo_skipped") | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_ItemOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Cannot be undone, or the window has passed ({code, reason}) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_csv: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_list: {
+        parameters: {
+            query?: {
+                state?: ("free" | "role_in_progress" | "cooling_down" | "always_ask_first" | "blocked") | null;
+                q?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerRowOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_states: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StatesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_get: {
+        parameters: {
+            query: {
+                /** @description The employer key (casefolded canonical name) */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_set_policy: {
+        parameters: {
+            query: {
+                /** @description The employer key (casefolded canonical name) */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerRowOut"];
+                };
+            };
+            /** @description A reason is required to never apply ({code, reason}) */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    employers_end_cooldown: {
+        parameters: {
+            query: {
+                /** @description The employer key (casefolded canonical name) */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndCooldownIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerRowOut"];
+                };
+            };
+            /** @description No cooldown is running ({code, reason}) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_merge: {
+        parameters: {
+            query: {
+                /** @description The employer key (casefolded canonical name) */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routers__employers__MergeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    employers_split: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routers__employers__SplitIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -21106,7 +24979,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["DismissIn"];
+                "application/json": components["schemas"]["app__api__routers__preferences__DismissIn"];
             };
         };
         responses: {
@@ -21150,7 +25023,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SnoozeIn"];
+                "application/json": components["schemas"]["app__api__routers__pending_actions__SnoozeIn"];
             };
         };
         responses: {
@@ -23004,6 +26877,413 @@ export interface operations {
             };
         };
     };
+    interview_mock_list: {
+        parameters: {
+            query?: {
+                round_id?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MockSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_estimate: {
+        parameters: {
+            query: {
+                mode: "behavioural" | "technical" | "role" | "mixed" | "tough";
+                length?: number | null;
+                use_pack_questions?: boolean;
+                round_id?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockEstimateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_progress: {
+        parameters: {
+            query?: {
+                round_id?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockProgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_answer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MockAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_resume: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MockResumeIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_export: {
+        parameters: {
+            query?: {
+                fmt?: "pdf" | "docx" | "txt";
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/pdf": unknown;
+                    "text/plain; charset=utf-8": unknown;
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_claim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                turn_id: string;
+                claim_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MockClaimIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_save_story: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MockStoryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewSectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     job_events_list: {
         parameters: {
             query?: never;
@@ -23389,6 +27669,568 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    messages_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessagesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_regenerate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_check: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageSendOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_discard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                message_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    followups_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupListOut"];
+                };
+            };
+        };
+    };
+    followups_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    followups_snooze: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routers__followups__SnoozeIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    followups_not_needed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowupItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    winddown_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindDownOut"];
+                };
+            };
+        };
+    };
+    winddown_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindDownStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindDownOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    winddown_choose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WindDownChoiceIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindDownOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    winddown_reopen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WindDownOut"];
+                };
+            };
+        };
+    };
+    winddown_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                    "text/markdown": unknown;
+                };
             };
         };
     };
@@ -23820,6 +28662,418 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    feedback_for_job: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedbackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_withdraw: {
+        parameters: {
+            query?: {
+                campaign_id?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    feedback_list: {
+        parameters: {
+            query?: {
+                campaign_id?: string | null;
+                verdict?: ("up" | "down") | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_FeedbackOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preferences_summary: {
+        parameters: {
+            query: {
+                campaign_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreferencesSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preferences_analyse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AnalyseIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggestions_list: {
+        parameters: {
+            query?: {
+                campaign_id?: string | null;
+                status?: ("open" | "accepted" | "dismissed" | "superseded") | null;
+                cursor?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_SuggestionOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggestions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggestions_backtest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SuggestionEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionBacktest"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggestions_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"];
+                };
+            };
+            /** @description Already decided, or the rubric moved on */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The (edited) change is owner-only ground */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    suggestions_dismiss: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__api__routers__preferences__DismissIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuggestionOut"];
+                };
+            };
+            /** @description Already decided */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    campaigns_policy_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                campaign_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
