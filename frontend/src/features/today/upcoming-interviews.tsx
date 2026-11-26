@@ -16,7 +16,11 @@ export function UpcomingInterviews() {
   const q = useQuery(upcomingEventsQuery())
   const items = q.data ?? []
   return (
-    <section aria-labelledby="interviews-title">
+    <section
+      id="upcoming"
+      aria-labelledby="interviews-title"
+      className="scroll-mt-4"
+    >
       <SectionHeader
         title={<span id="interviews-title">Upcoming interviews</span>}
       />
@@ -31,7 +35,7 @@ export function UpcomingInterviews() {
           <EmptyState
             icon={CalendarClock}
             title="No interviews coming up"
-            description="Confirmed and proposed interviews show here, in their time zone and yours."
+            description="Confirmed and proposed interviews show here, in their time zone and yours, with a link to prepare and practise in a mock interview."
             className="py-6"
           />
         ) : (
@@ -59,6 +63,14 @@ export function UpcomingInterviews() {
                     </Chip>
                   )}
                   <ConflictBadge event={e} />
+                  <Link
+                    to="/jobs/$id"
+                    params={{ id: e.job_id }}
+                    search={{ tab: "interview" }}
+                    className="ml-auto text-sm text-primary-ink underline-offset-2 hover:underline"
+                  >
+                    Prepare and practise
+                  </Link>
                 </div>
                 {e.status === "proposed" && e.candidates.length > 0 ? (
                   <p className="text-sm text-muted-foreground">

@@ -3,7 +3,10 @@ import type { SettingOut } from "./api"
 
 export type Draft = string | boolean | string[]
 
-/** A list setting with fixed choices shows checkboxes; one without shows a comma list. */
+/**
+ * A list setting with fixed choices shows checkboxes; one without shows one item per line (items
+ * such as phrases and patterns may themselves hold commas).
+ */
 export const isChoiceList = (s: SettingOut) =>
   s.kind === "list" && !!s.choices?.length
 
@@ -11,7 +14,7 @@ export function toDraft(s: SettingOut, value: unknown = s.value): Draft {
   if (s.kind === "bool") return value === true
   if (s.kind === "list") {
     const items = Array.isArray(value) ? value.map(String) : []
-    return isChoiceList(s) ? items : items.join(", ")
+    return isChoiceList(s) ? items : items.join("\n")
   }
   return value === null || value === undefined ? "" : String(value)
 }
@@ -27,7 +30,7 @@ export function parseDraft(s: SettingOut, draft: Draft): Parsed {
     const items = Array.isArray(draft)
       ? draft
       : String(draft)
-          .split(",")
+          .split(/\r?\n/)
           .map((x) => x.trim())
           .filter(Boolean)
     const bad = s.choices?.length

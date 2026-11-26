@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { ChevronDown, TriangleAlert } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -61,9 +61,12 @@ export function nowIn(timezone: string | undefined, d = new Date()) {
  */
 export function TodayPage({
   focusAction,
+  show: showSection,
 }: {
   /** A pending action to open in "Needs you" (a deep link from the Studio). */
   focusAction?: string
+  /** Open the rest of the page at this section (the command palette's Upcoming). */
+  show?: "upcoming"
 } = {}) {
   const me = useQuery(meQuery())
   const today = useQuery(todayQuery())
@@ -71,9 +74,16 @@ export function TodayPage({
   const tz = me.data?.timezone
   const { hour, line } = nowIn(tz)
   const failed = today.data ? sweepFailed(today.data) : false
-  const [more, setMore] = useState(false)
+  const [more, setMore] = useState(showSection === "upcoming")
   const show = more || failed
   const hideOnPhone = show ? undefined : "max-md:hidden"
+  const ready = !!today.data
+  useEffect(() => {
+    if (showSection !== "upcoming" || !ready) return
+    document
+      .getElementById("upcoming")
+      ?.scrollIntoView?.({ block: "start", behavior: "smooth" })
+  }, [showSection, ready])
 
   return (
     <View>

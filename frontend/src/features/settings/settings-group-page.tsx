@@ -62,6 +62,46 @@ export const SETTINGS_PAGES = {
     lead: "Limits for JobSpy, careers pages and web search sources.",
     groups: ["sources"],
   },
+  tailoring: {
+    title: "Tailoring and checks",
+    lead: "How drafts are checked against your library: claim wording, qualifications, and which tools a sentence may name.",
+    groups: ["tailoring"],
+  },
+  mail: {
+    title: "Mail",
+    lead: "Which mailbox sends, how often mail is checked, and the phrases that recognise replies.",
+    groups: ["mail"],
+  },
+  followups: {
+    title: "Follow-ups and wind-down",
+    lead: "When a follow-up falls due, how many go per application, and what an automatic one may do. Messages you approve during a wind-down still send.",
+    groups: ["followups"],
+  },
+  calendar: {
+    title: "Calendar",
+    lead: "Interview reminders, prep nudges, the calendar feed and how much of a role it shows.",
+    groups: ["calendar"],
+  },
+  insights: {
+    title: "Insights",
+    lead: "The default date range, the smallest sample a rate is shown for, and the first day of the week.",
+    groups: ["insights"],
+  },
+  preferences: {
+    title: "Preference learning",
+    lead: "How much evidence a suggested change needs, how far it moves a score, and what a policy preview replays.",
+    groups: ["preferences"],
+  },
+  bulk: {
+    title: "Bulk actions",
+    lead: "How many items one action may take, how long it can be undone, and whether reviewed packets can be approved together.",
+    groups: ["bulk"],
+  },
+  themes: {
+    title: "Theme studio",
+    lead: "The default theme, import size, revisions kept and how far apart status colours must stay.",
+    groups: ["themes"],
+  },
   notifications: {
     title: "Notifications",
     lead: "What reaches you and where. Nothing goes out until a channel is connected.",

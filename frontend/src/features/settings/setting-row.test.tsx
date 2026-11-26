@@ -192,3 +192,64 @@ describe("renderer by value type", () => {
     expect(group.querySelectorAll("[role=checkbox]")).toHaveLength(3)
   })
 })
+
+describe("wave 4 settings render sensibly", () => {
+  it("free lists are one item per line, so an item may hold a comma", () => {
+    const s = make({ kind: "list", choices: null, value: ["a, b", "c"] })
+    expect(toDraft(s)).toBe("a, b\nc")
+    expect(parseDraft(s, "a, b\n\n c \r\nd")).toEqual({
+      ok: true,
+      value: ["a, b", "c", "d"],
+    })
+  })
+
+  it("shows the tailoring tool-check lists as editable lines", async () => {
+    renderWithTheme(<SettingsGroupPage page="tailoring" />)
+    const terms = await screen.findByLabelText("Tool and technology names")
+    expect(terms.tagName).toBe("TEXTAREA")
+    expect((terms as HTMLTextAreaElement).value.split("\n")).toContain("Python")
+    expect(
+      screen.getByLabelText("Wording that names a tool without claiming it")
+        .tagName
+    ).toBe("TEXTAREA")
+    expect(
+      screen.getByRole("switch", { name: "Catch unknown technical names" })
+    ).toBeInTheDocument()
+  })
+
+  it("picks the default mailbox from connected mailboxes, not a text box", async () => {
+    renderWithTheme(<SettingsGroupPage page="mail" />)
+    const pick = await screen.findByLabelText("Default mailbox")
+    expect(pick.tagName).toBe("SELECT")
+    expect(
+      screen.getByRole("option", { name: "The first mailbox connected" })
+    ).toBeInTheDocument()
+  })
+
+  it.each([
+    ["insights", "Insights"],
+    ["themes", "Theme studio"],
+    ["calendar", "Calendar"],
+    ["preferences", "Preference learning"],
+    ["bulk", "Bulk actions"],
+    ["followups", "Follow-ups and wind-down"],
+  ] as const)("has a %s page with its settings", async (page, title) => {
+    renderWithTheme(<SettingsGroupPage page={page} />)
+    expect(
+      await screen.findByRole("heading", { name: title })
+    ).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: /^Save / }).length).toBe(
+        screen.getAllByRole("listitem").length
+      )
+    )
+    expect(screen.getAllByRole("listitem").length).toBeGreaterThan(2)
+  })
+
+  it("shows the mock interview settings on the Interview page", async () => {
+    renderWithTheme(<SettingsGroupPage page="interview" />)
+    expect(
+      await screen.findByLabelText("Mock interview rubric")
+    ).toBeInTheDocument()
+  })
+})

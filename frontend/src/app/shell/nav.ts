@@ -1,6 +1,8 @@
 import {
   BarChart3,
   Bot,
+  CalendarClock,
+  MessagesSquare,
   Briefcase,
   Building2,
   Columns3,
@@ -140,6 +142,28 @@ export const NAV_SETUP: NavItem[] = [
   },
 ]
 
+/**
+ * Places that live inside a screen rather than in the sidebar, for the command palette. Upcoming
+ * interviews and deadlines sit on Today; a mock interview is on each role's Interview tab, opened
+ * from Today's upcoming interviews.
+ */
+export const PALETTE_PLACES: (NavItem & { search: { show: "upcoming" } })[] = [
+  {
+    to: "/today",
+    search: { show: "upcoming" },
+    label: "Upcoming interviews and deadlines",
+    icon: CalendarClock,
+    keywords: ["calendar", "schedule", "interviews", "deadlines", "coming up"],
+  },
+  {
+    to: "/today",
+    search: { show: "upcoming" },
+    label: "Mock interview",
+    icon: MessagesSquare,
+    keywords: ["practice", "practise", "rehearse", "interview prep"],
+  },
+]
+
 export const NAV_FOOT: NavItem[] = [
   {
     to: "/settings",
@@ -169,6 +193,14 @@ export const SETTINGS_SECTIONS = [
   { to: "/settings/reconcile", label: "Reconcile" },
   { to: "/settings/tracking", label: "Tracking" },
   { to: "/settings/interview", label: "Interview" },
+  { to: "/settings/tailoring", label: "Tailoring and checks" },
+  { to: "/settings/mail", label: "Mail" },
+  { to: "/settings/followups", label: "Follow-ups and wind-down" },
+  { to: "/settings/calendar", label: "Calendar" },
+  { to: "/settings/insights", label: "Insights" },
+  { to: "/settings/preferences", label: "Preference learning" },
+  { to: "/settings/bulk", label: "Bulk actions" },
+  { to: "/settings/themes", label: "Theme studio" },
   { to: "/settings/sources", label: "Discovery" },
   { to: "/settings/accounts", label: "Portal accounts" },
   { to: "/settings/ai", label: "AI" },

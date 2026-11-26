@@ -277,15 +277,20 @@ const page = <P extends string>(
   })
 
 /** `?action=<pending action id>`: Today opens that decision (the Studio's question links). */
-const todaySearch = z.object({ action: z.string().optional().catch(undefined) })
+const todaySearch = z.object({
+  action: z.string().optional().catch(undefined),
+  /** `?show=upcoming`: open the rest of Today at upcoming interviews (command palette). */
+  show: z.enum(["upcoming"]).optional().catch(undefined),
+})
 const todayRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/today",
   staticData: { title: "Today" },
   validateSearch: todaySearch,
   component: function TodayRoute() {
-    const { action } = todayRoute.useSearch()
-    return <TodayPage focusAction={action} />
+    const { action, show } = todayRoute.useSearch()
+    // Keyed by `show`, so the palette's Upcoming opens the rest of Today even from Today.
+    return <TodayPage key={show} focusAction={action} show={show} />
   },
 })
 const matchesRoute = createRoute({
@@ -523,6 +528,14 @@ const groupRoutes = [
   groupRoute("interview"),
   groupRoute("accounts"),
   groupRoute("sources"),
+  groupRoute("tailoring"),
+  groupRoute("mail"),
+  groupRoute("followups"),
+  groupRoute("calendar"),
+  groupRoute("insights"),
+  groupRoute("preferences"),
+  groupRoute("bulk"),
+  groupRoute("themes"),
 ] as const
 const ownRoute = (
   path:

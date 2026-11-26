@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { Chip } from "@/components/chip"
 import { cn } from "@/lib/utils"
 import {
@@ -22,6 +23,7 @@ import {
   toDraft,
   type Draft,
 } from "./setting-value"
+import { REFERENCE_PICKERS } from "./reference-pickers"
 
 const SELECT_CLASS =
   "h-8 w-full min-w-0 rounded-md border field-focus border-input bg-surface px-2 text-base text-foreground outline-none"
@@ -71,7 +73,18 @@ export function SettingRow({ setting: s }: { setting: SettingOut }) {
   }
 
   let control
-  if (s.kind === "bool") {
+  const Picker = REFERENCE_PICKERS[s.key]
+  if (Picker) {
+    control = (
+      <Picker
+        {...common}
+        className={SELECT_CLASS}
+        value={String(draft)}
+        nullable={s.nullable}
+        onChange={setDraft}
+      />
+    )
+  } else if (s.kind === "bool") {
     control = (
       <Switch
         {...common}
@@ -111,6 +124,21 @@ export function SettingRow({ setting: s }: { setting: SettingOut }) {
             {c}
           </label>
         ))}
+      </div>
+    )
+  } else if (s.kind === "list") {
+    const lines = String(draft).split("\n").length
+    control = (
+      <div className="grid gap-1">
+        <Textarea
+          {...common}
+          rows={Math.min(8, Math.max(3, lines))}
+          className="min-h-0 text-sm"
+          value={String(draft)}
+          placeholder="Nothing listed"
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <span className="text-xs text-faint">One per line</span>
       </div>
     )
   } else {
