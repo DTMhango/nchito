@@ -1,6 +1,8 @@
 import { BellRing, Globe, Hand, Mail, Pin, type LucideIcon } from "lucide-react"
 import { KanbanCard } from "@/components/kanban-board"
 import { ScoreRing } from "@/components/score-ring"
+import { EmployerChip } from "@/features/employers/employer-chip"
+import type { EmployerChip as ChipData } from "@/features/employers/api"
 import { cn } from "@/lib/utils"
 import type { ApplicationSummary, Channel } from "./api"
 import { daysSince, daysUntil, dueLabel, shortDate } from "./format"
@@ -69,14 +71,34 @@ export function NextStep({
 export function ApplicationCard({
   app,
   timeZone,
+  chip,
+  checked,
+  onToggle,
 }: {
   app: ApplicationSummary
   timeZone?: string
+  /** The employer state; "role in progress" is left out because the card is that role. */
+  chip?: ChipData
+  /** Selection for bulk actions; leave both out to hide the checkbox. */
+  checked?: boolean
+  onToggle?: () => void
 }) {
   const days = daysSince(app.updated_at)
   return (
     <KanbanCard className="gap-1.5">
       <div className="flex items-start gap-2">
+        {onToggle && (
+          <input
+            type="checkbox"
+            aria-label={`Select ${app.employer}, ${app.title}`}
+            checked={!!checked}
+            onChange={onToggle}
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="mt-1 size-4 shrink-0 cursor-pointer accent-primary"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1 font-semibold">
             <span className="truncate">{app.employer}</span>
@@ -107,6 +129,11 @@ export function ApplicationCard({
         )}
       </div>
       <NextStep app={app} timeZone={timeZone} />
+      {chip && (
+        <div>
+          <EmployerChip chip={chip} hide={["free", "role_in_progress"]} />
+        </div>
+      )}
     </KanbanCard>
   )
 }

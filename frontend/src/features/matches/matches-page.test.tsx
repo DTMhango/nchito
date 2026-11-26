@@ -295,14 +295,15 @@ describe("Why? panel and bulk", () => {
     const bar = screen.getByRole("toolbar", { name: "Selected jobs" })
     expect(bar).toHaveTextContent("2 selected")
     await user.click(within(bar).getByRole("button", { name: "Archive" }))
-    const dialog = await screen.findByRole("dialog", {
-      name: "Archive these roles?",
-    })
-    await within(dialog).findByText("2 roles would change.")
+    const dialog = await screen.findByRole("dialog", { name: "Archive" })
+    await user.click(within(dialog).getByRole("button", { name: "Preview" }))
+    await within(dialog).findByText(/2 selected: 2 will change/)
     expect(
       matchesMock.get().jobs.find((j) => j.title === "Analytics Lead")?.triage
     ).toBe("new")
-    await user.click(within(dialog).getByRole("button", { name: "Confirm" }))
+    await user.click(
+      within(dialog).getByRole("button", { name: /Run on 2 items/ })
+    )
     await waitFor(() =>
       expect(
         matchesMock.get().jobs.find((j) => j.title === "Analytics Lead")?.triage

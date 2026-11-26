@@ -5,7 +5,7 @@
  *   (authed)                              guard: owner exists and signed in
  *     /onboarding?step=                   full-screen set-up guide
  *     (shell)                             AppShell: sidebar, top bar, palette
- *       /today?action= /matches /applications /jobs/$id?tab= /compare?ids= /studio?application=&run= /autopilot
+ *       /today?action= /matches /applications /employers /employers/$key /jobs/$id?tab= /compare?ids= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
  *       /settings/{appearance,ai,connections,notifications,runners,tracking,interview,accounts,sources,data,health,security,activity,history}
@@ -62,6 +62,14 @@ const MatchesPage = lazyPage(
 const ApplicationsPage = lazyPage(
   () => import("@/features/applications/applications-page"),
   "ApplicationsPage"
+)
+const EmployersPage = lazyPage(
+  () => import("@/features/employers/employers-page"),
+  "EmployersPage"
+)
+const EmployerPage = lazyPage(
+  () => import("@/features/employers/employer-page"),
+  "EmployerPage"
 )
 const JobPage = lazyPage(() => import("@/features/jobs/job-page"), "JobPage")
 const ComparePage = lazyPage(
@@ -289,6 +297,15 @@ const applicationsRoute = page(
   "Applications",
   ApplicationsPage
 )
+const employersRoute = page("/employers", "Employers", EmployersPage)
+const employerRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/employers/$key",
+  staticData: { title: "Employer" },
+  component: function EmployerRoute() {
+    return <EmployerPage employerKey={employerRoute.useParams().key} />
+  },
+})
 const studioRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/studio",
@@ -513,6 +530,8 @@ export const routeTree = rootRoute.addChildren([
       todayRoute,
       matchesRoute,
       applicationsRoute,
+      employersRoute,
+      employerRoute,
       jobRoute,
       compareRoute,
       studioRoute,

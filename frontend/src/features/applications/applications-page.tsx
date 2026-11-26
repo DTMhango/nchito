@@ -24,6 +24,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { View } from "@/components/view"
+import { BulkDialog } from "@/features/bulk/bulk-dialog"
+import type { BulkAction } from "@/features/bulk/api"
+import { useEmployerChips } from "@/features/employers/api"
+import { EmployerChip } from "@/features/employers/employer-chip"
 import { meQuery } from "@/lib/api/endpoints"
 import {
   appKeys,
@@ -65,6 +69,15 @@ export function ApplicationsPage() {
   const [refusal, setRefusal] = useState<string | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [appliedId, setAppliedId] = useState<string | null>(null)
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const [bulkOpen, setBulkOpen] = useState<BulkAction | "more" | null>(null)
+  const toggleChecked = (id: string) =>
+    setChecked((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
 
   const all = useMemo(() => apps.data?.items ?? [], [apps.data])
   const rows = useMemo(() => {
@@ -79,6 +92,8 @@ export function ApplicationsPage() {
             .includes(q))
     )
   }, [all, text, channel, campaign])
+
+  const chips = useEmployerChips(rows.map((a) => a.job_id))
 
   const campaignOptions = useMemo(() => {
     const names = new Map(
@@ -135,14 +150,45 @@ export function ApplicationsPage() {
   const openApp = all.find((a) => a.id === openId) ?? null
   const appliedApp = all.find((a) => a.id === appliedId) ?? null
 
+  const allRowsChecked = rows.length > 0 && rows.every((r) => checked.has(r.id))
   const columns: Column<ApplicationSummary>[] = [
+    {
+      id: "select",
+      header: (
+        <input
+          type="checkbox"
+          aria-label="Select all shown"
+          checked={allRowsChecked}
+          onChange={() =>
+            setChecked(
+              allRowsChecked ? new Set() : new Set(rows.map((r) => r.id))
+            )
+          }
+          className="size-4 cursor-pointer accent-primary"
+        />
+      ),
+      cell: (r) => (
+        <input
+          type="checkbox"
+          aria-label={`Select ${r.employer}, ${r.title}`}
+          checked={checked.has(r.id)}
+          onChange={() => toggleChecked(r.id)}
+          onClick={(e) => e.stopPropagation()}
+          className="size-4 cursor-pointer accent-primary"
+        />
+      ),
+    },
     {
       id: "employer",
       header: "Company",
       sortValue: (r) => r.employer,
       cell: (r) => (
-        <span className="inline-flex items-center gap-1 font-semibold">
+        <span className="inline-flex flex-wrap items-center gap-1 font-semibold">
           {r.employer}
+          <EmployerChip
+            chip={chips[r.job_id]}
+            hide={["free", "role_in_progress"]}
+          />
           {r.pinned && (
             <Pin
               className="size-3 text-primary-ink"
@@ -302,6 +348,56 @@ export function ApplicationsPage() {
         )}
       </div>
 
+      {checked.size > 0 && (
+        <div
+          role="toolbar"
+          aria-label="Selected applications"
+          className="mb-3 flex flex-wrap items-center gap-1.5 rounded-sm bg-highlight-soft px-3 py-2 text-sm"
+        >
+          <span
+            className="mr-1 font-semibold text-highlight-ink"
+            aria-live="polite"
+          >
+            {checked.size} selected
+          </span>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => setBulkOpen("move_stage")}
+          >
+            Move stage
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => setBulkOpen("send_for_approval")}
+          >
+            Send for approval
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => setBulkOpen("snooze")}
+          >
+            Snooze
+          </Button>
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={() => setBulkOpen("more")}
+          >
+            More actions
+          </Button>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="ml-auto"
+            onClick={() => setChecked(new Set())}
+          >
+            Clear
+          </Button>
+        </div>
+      )}
       {refusal && (
         <Alert variant="destructive" className="mb-3" role="alert">
           <AlertTitle>Move refused</AlertTitle>
@@ -339,7 +435,15 @@ export function ApplicationsPage() {
           getId={(r) => r.id}
           getColumn={(r) => columnOf(r.stage)}
           getLabel={(r) => `${r.employer}, ${r.title}`}
-          renderCard={(r) => <ApplicationCard app={r} timeZone={timeZone} />}
+          renderCard={(r) => (
+            <ApplicationCard
+              app={r}
+              timeZone={timeZone}
+              chip={chips[r.job_id]}
+              checked={checked.has(r.id)}
+              onToggle={() => toggleChecked(r.id)}
+            />
+          )}
           onMove={onMove}
           onOpen={setOpenId}
           emptyColumn={(c) => (
@@ -372,6 +476,25 @@ export function ApplicationsPage() {
         />
       )}
 
+      <BulkDialog
+        key={bulkOpen ?? "closed"}
+        open={bulkOpen !== null}
+        subject="applications"
+        scope={{
+          ids: [...checked],
+          view: {
+            count: rows.length,
+            selection: {
+              q: text.trim() || undefined,
+              channel: channel === ALL ? undefined : channel,
+              campaign_id: campaign === ALL ? undefined : campaign,
+            },
+          },
+        }}
+        initialAction={bulkOpen && bulkOpen !== "more" ? bulkOpen : undefined}
+        onOpenChange={(o) => !o && setBulkOpen(null)}
+        onDone={() => setChecked(new Set())}
+      />
       <QuickLookDrawer
         app={openApp}
         timeZone={timeZone}

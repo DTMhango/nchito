@@ -9,7 +9,6 @@ import type { RecheckResult } from "@/lib/api/types"
 import type {
   AppliedMyselfIn,
   AssessmentOut,
-  BulkActionIn,
   ConditionSet,
   CustomFacetIn,
   CustomFacetOut,
@@ -170,6 +169,10 @@ function parseSet(raw: string | null): ConditionSet | undefined {
     return undefined
   }
 }
+
+/** The jobs a Matches list shows for these conditions and text (what "everything matching this view" means). */
+export const viewJobs = (conditions: string | null, q?: string | null) =>
+  visible(parseSet(conditions), q)
 
 const FACETS: { facet: string; label: string; kind?: "range" }[] = [
   { facet: "facets.relocation_required", label: "Relocation required" },
@@ -376,68 +379,6 @@ export const matchesHandlers = [
       total: list.length,
       next_cursor: start + limit < list.length ? String(start + limit) : null,
       groups: groupBy ? groupCounts(list, groupBy) : null,
-    })
-  }),
-
-  http.post("*/api/jobs/bulk", async ({ request }) => {
-    if (!signedIn()) return unauthorized()
-    await latency()
-    const body = (await request.json()) as BulkActionIn
-    const jobs = body.job_ids.map(findJob).filter((j): j is MockJob => !!j)
-    const verb: Record<BulkActionIn["action"], string> = {
-      skip: "Skip",
-      archive: "Archive",
-      shortlist: "Shortlist",
-      tag: `Tag "${body.tag ?? ""}"`,
-      untag: `Remove tag "${body.tag ?? ""}"`,
-      pin: "Pin",
-      unpin: "Unpin",
-      snooze: "Snooze",
-    }
-    const affected = jobs.filter((j) => {
-      switch (body.action) {
-        case "skip":
-          return j.triage !== "skipped"
-        case "archive":
-          return j.triage !== "archived"
-        case "shortlist":
-          return j.triage !== "shortlisted"
-        case "tag":
-          return !!body.tag && !j.tags.includes(body.tag)
-        case "untag":
-          return !!body.tag && j.tags.includes(body.tag)
-        case "pin":
-          return !j.pinned
-        case "unpin":
-          return j.pinned
-        case "snooze":
-          return true
-      }
-    })
-    const detailLines = affected.map(
-      (j) => `${verb[body.action]}: ${j.title}, ${j.employer}`
-    )
-    const unchanged = jobs.length - affected.length
-    if (unchanged)
-      detailLines.push(`${unchanged} already in that state, unchanged`)
-    if (body.preview === false) {
-      for (const j of affected) {
-        if (body.action === "skip") j.triage = "skipped"
-        if (body.action === "archive") j.triage = "archived"
-        if (body.action === "shortlist") j.triage = "shortlisted"
-        if (body.action === "tag" && body.tag) j.tags = [...j.tags, body.tag]
-        if (body.action === "untag")
-          j.tags = j.tags.filter((t) => t !== body.tag)
-        if (body.action === "pin") j.pinned = true
-        if (body.action === "unpin") j.pinned = false
-        if (body.action === "snooze") j.snoozed_until = body.until ?? null
-        j.updated_at = now()
-      }
-    }
-    return HttpResponse.json({
-      affected: affected.length,
-      preview: body.preview !== false,
-      detail: detailLines,
     })
   }),
 
