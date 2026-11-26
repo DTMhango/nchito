@@ -508,3 +508,81 @@ async def test_sign_in_action_and_its_notification_count_every_application_waiti
         notice = await s.scalar(select(Notification).where(Notification.dedupe_key == f"pending:{action.id}"))
         assert notice is not None and notice.title == action.title
         assert notice.body and notice.body.count(" at ") >= 3  # the three roles are listed
+
+
+# ----- the owner's choices per blocker kind ------------------------------------------------------------
+
+
+async def _blocked(kind: str, employer: str) -> tuple[uuid.UUID, uuid.UUID, str, str]:
+    app_id, _ = await approved_app(employer=employer)
+    runner, _ = await make_token(f"pc-{employer}")
+    task_id = await claim(runner)
+    if kind == "redirect_off_domain":
+        await call(runner, "get_packet", task_id=task_id)
+        await permit(runner, task_id, url="https://elsewhere.example.org/form")
+        async with maker()() as s:
+            action = await s.scalar(select(PendingAction).where(PendingAction.agent_task_id == uuid.UUID(task_id)))
+            action_id = str(action.id)
+    else:
+        out = await call(runner, "raise_blocker", task_id=task_id, type=kind, detail="over to you", url=URL)
+        action_id = out["pending_action_id"]
+    return app_id, runner, task_id, action_id
+
+
+async def test_each_blocker_kind_lists_its_owner_choices(owner_client):
+    expected = {
+        "captcha": ["continue", "manual_handoff", "skipped"],
+        "assessment": ["continue", "manual_handoff", "skipped"],
+        "declaration": ["continue", "manual_handoff", "skipped"],
+        "unsupported_form": ["manual_handoff", "skipped"],
+        "page_instruction": ["manual_handoff", "skipped", "continue_acknowledged"],
+        "redirect_off_domain": ["manual_handoff", "skipped", "continue_acknowledged"],
+    }
+    for kind, choices in expected.items():
+        _, _, _, action_id = await _blocked(kind, f"{kind.title()} Example")
+        got = (await owner_client.get(f"/api/pending-actions/{action_id}")).json()
+        assert got["kind"] == kind and got["choices"] == choices, (kind, got["choices"])
+
+
+@pytest.mark.parametrize("kind", ["assessment", "declaration"])
+async def test_assessment_and_declaration_continue_once_the_owner_did_their_part(owner_client, kind):
+    _, runner, task_id, action_id = await _blocked(kind, "Done Example")
+    r = await owner_client.post(f"/api/pending-actions/{action_id}/resolve", json={"resolution": "continue"})
+    assert r.status_code == 200 and r.json()["status"] == "resolved"
+    task = await load(AgentTask, uuid.UUID(task_id))
+    assert task.status == AgentTaskStatus.queued and task.payload["resume_runner_token_id"] == str(runner)
+    assert (await call(runner, "next_task"))["task_id"] == task_id  # back to the same runner
+
+
+@pytest.mark.parametrize("kind", ["redirect_off_domain", "page_instruction"])
+async def test_suspicious_page_continues_only_with_an_audited_acknowledgement(owner_client, kind):
+    _, runner, task_id, action_id = await _blocked(kind, "Odd Example")
+    r = await owner_client.post(f"/api/pending-actions/{action_id}/resolve", json={"resolution": "continue"})
+    assert r.status_code == 422 and r.json()["detail"]["code"] == "acknowledgement_required"
+    assert (await load(AgentTask, uuid.UUID(task_id))).status == AgentTaskStatus.blocked
+    r = await owner_client.post(f"/api/pending-actions/{action_id}/resolve", json={
+        "resolution": "continue", "acknowledged": True, "note": "the careers site moved to its new host"})
+    assert r.status_code == 200 and r.json()["resolution"]["acknowledged"] is True
+    (event,) = await audits("pending_action.suspicious_page_acknowledged")
+    assert event.detail["kind"] == kind and event.detail["note"] == "the careers site moved to its new host"
+    assert (await load(AgentTask, uuid.UUID(task_id))).status == AgentTaskStatus.queued
+    assert (await call(runner, "next_task"))["task_id"] == task_id
+
+
+@pytest.mark.parametrize(("kind", "outcome"), [("redirect_off_domain", "manual_handoff"),
+                                               ("page_instruction", "skipped"),
+                                               ("unsupported_form", "manual_handoff")])
+async def test_give_up_works_for_page_and_form_blockers(owner_client, kind, outcome):
+    app_id, _, task_id, action_id = await _blocked(kind, "Giveup Example")
+    r = await owner_client.post(f"/api/portal-accounts/actions/{action_id}/give-up", json={"outcome": outcome})
+    assert r.status_code == 200 and r.json()["closed"] is True, r.text
+    app = await load(Application, app_id)
+    assert (app.channel.value == "manual") if outcome == "manual_handoff" else (app.stage.value == "skipped")
+    assert (await load(AgentTask, uuid.UUID(task_id))).status == AgentTaskStatus.cancelled
+
+
+async def test_unsupported_form_cannot_be_continued(owner_client):
+    _, _, task_id, action_id = await _blocked("unsupported_form", "Widget Example")
+    r = await owner_client.post(f"/api/pending-actions/{action_id}/resolve", json={"resolution": "continue"})
+    assert r.status_code == 422
+    assert (await load(AgentTask, uuid.UUID(task_id))).status == AgentTaskStatus.blocked

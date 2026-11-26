@@ -963,3 +963,12 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   names no known portal (`accounts.blocker_ref`: the apply link's host, plus the board's first path segment on an
   applicant-tracking host), so the title counts every application waiting. The first notification
   (`pending:<id>`) is kept in step (title and body) as roles join or leave.
+- **Owner choices per blocker kind** (`accounts.CHOICES`, invariant): `PendingActionOut.choices` lists them for an open
+  blocker. `sign_in`, `create_account`, `verification_code`, `captcha`, `assessment`, `declaration`: `continue`,
+  `manual_handoff`, `skipped`. `unsupported_form`: `manual_handoff`, `skipped`. `redirect_off_domain`,
+  `page_instruction` (suspicious page; raised through `accounts.register_blocker` like the others):
+  `manual_handoff`, `skipped`, `continue_acknowledged`. `continue` is `POST /api/pending-actions/{id}/resolve
+  {resolution: continue}`; `continue_acknowledged` the same with `acknowledged: true` (`ResolveIn.acknowledged`;
+  without it 422 `{code: acknowledgement_required}`; audited as `pending_action.suspicious_page_acknowledged` with the
+  note). A kind with no continue is 422 (`not_continuable` or "does not resolve"). `manual_handoff` / `skipped` are
+  `POST /api/portal-accounts/actions/{id}/give-up` for every blocker kind.

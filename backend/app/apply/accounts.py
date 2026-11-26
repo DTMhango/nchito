@@ -60,7 +60,8 @@ from app.ops import notifications
 log = logging.getLogger(__name__)
 
 TENANT_KINDS = ("sign_in", "create_account")
-TASK_KINDS = ("verification_code", "captcha", "assessment", "declaration", "unsupported_form")
+SUSPICIOUS_KINDS = ("redirect_off_domain", "page_instruction")
+TASK_KINDS = ("verification_code", "captcha", "assessment", "declaration", "unsupported_form", *SUSPICIOUS_KINDS)
 BLOCKER_KINDS = TENANT_KINDS + TASK_KINDS
 # The pending action type each blocker kind is raised as (the type enum is shared; ``detail.kind`` is exact).
 TYPE_FOR_KIND: dict[str, PendingActionType] = {
@@ -68,10 +69,21 @@ TYPE_FOR_KIND: dict[str, PendingActionType] = {
     "verification_code": PendingActionType.sign_in, "captcha": PendingActionType.captcha,
     "assessment": PendingActionType.assessment, "declaration": PendingActionType.declaration,
     "unsupported_form": PendingActionType.unsupported_form,
+    "redirect_off_domain": PendingActionType.redirect_off_domain,
+    "page_instruction": PendingActionType.page_instruction,
 }
-ACCOUNT_TYPES = (PendingActionType.sign_in, PendingActionType.create_account, PendingActionType.captcha,
-                 PendingActionType.unsupported_form,
-                 PendingActionType.assessment, PendingActionType.declaration)
+ACCOUNT_TYPES = tuple(dict.fromkeys(TYPE_FOR_KIND.values()))
+# What the owner may do with each blocker (invariant, not a setting). ``continue``: "I've done my part, continue"
+# (the task goes back to the same runner). ``continue_acknowledged``: a suspicious page (a redirect off the
+# destination, or a page asking for something outside the application) may be continued only with an explicit
+# acknowledgement, which is audited. ``manual_handoff`` / ``skipped``: ``give_up``.
+CHOICES: dict[str, tuple[str, ...]] = {
+    **{k: ("continue", "manual_handoff", "skipped") for k in (
+        "sign_in", "create_account", "verification_code", "captcha", "assessment", "declaration")},
+    "unsupported_form": ("manual_handoff", "skipped"),
+    **{k: ("manual_handoff", "skipped", "continue_acknowledged") for k in SUSPICIOUS_KINDS},
+}
+_LEGACY_CONTINUABLE = (PendingActionType.sign_in, PendingActionType.create_account, PendingActionType.captcha)
 ACTIVE_STAGES = stages.PRE_SUBMIT
 MAX_LISTED = 3
 
@@ -248,12 +260,29 @@ async def _title(session: AsyncSession, kind: str, entries: list[dict[str, Any]]
         return template.format(employer=employer, count=count, waiting=_waiting_phrase(count))[:300]
     label = {"verification_code": "Enter the verification code", "captcha": "Solve the CAPTCHA",
              "assessment": "Complete the assessment", "declaration": "Make the declaration",
-             "unsupported_form": "Fill in the form by hand"}[kind]
+             "unsupported_form": "Fill in the form by hand",
+             "redirect_off_domain": "Check where the form went",
+             "page_instruction": "Check what the page asked"}[kind]
     return f"{label} for {entries[0]['title']} at {employer}"[:300] if entries else label
 
 
 def _is_account_action(action: PendingAction) -> bool:
     return (action.detail or {}).get("kind") in BLOCKER_KINDS
+
+
+def choices_for(action: PendingAction) -> list[str]:
+    """The owner's choices on an open blocker action (empty for anything else)."""
+    if action.status != PendingStatus.open:
+        return []
+    kind = (action.detail or {}).get("kind")
+    if kind in CHOICES:
+        return list(CHOICES[kind])
+    return ["continue"] if action.type in _LEGACY_CONTINUABLE and kind is None else []
+
+
+def continue_choice(action: PendingAction) -> str | None:
+    """``continue``, ``continue_acknowledged`` (needs the owner's explicit acknowledgement) or ``None``."""
+    return next((c for c in choices_for(action) if c.startswith("continue")), None)
 
 
 async def _open_for_group(session: AsyncSession, group_key: str) -> PendingAction | None:
@@ -489,10 +518,23 @@ def _task_entries(action: PendingAction) -> list[dict[str, Any]]:
 
 
 async def continue_blocker(session: AsyncSession, action: PendingAction, *, actor: str, note: str | None = None,
-                           now: datetime | None = None) -> list[PendingAction]:
-    """'I've signed in, continue'. Returns the actions that closed."""
-    from app.apply.owner_actions import CONTINUABLE, _close
+                           now: datetime | None = None, acknowledged: bool = False) -> list[PendingAction]:
+    """'I've signed in (or done my part), continue'. Returns the actions that closed. A suspicious-page blocker
+    (``SUSPICIOUS_KINDS``) continues only with ``acknowledged``; the acknowledgement is audited."""
+    from app.apply.owner_actions import CONTINUABLE, ResolveError, _close
 
+    choice = continue_choice(action)
+    if choice is None:
+        raise ResolveError(f"a {(action.detail or {}).get('kind') or action.type.value} blocker cannot be continued; "
+                           "apply yourself or skip", 422, code="not_continuable")
+    if choice == "continue_acknowledged":
+        if not acknowledged:
+            raise ResolveError("confirm you checked the page and it is safe to continue", 422,
+                               code="acknowledgement_required")
+        await audit.record(session, actor=actor, action="pending_action.suspicious_page_acknowledged",
+                           subject_type="pending_action", subject_id=action.id,
+                           detail={"kind": action.detail.get("kind"), "url": action.detail.get("url"),
+                                   "acknowledged": True, "note": note})
     now = now or utcnow()
     closed = [action]
     if action.group_key:
@@ -540,7 +582,9 @@ async def continue_blocker(session: AsyncSession, action: PendingAction, *, acto
                                    {"reason": item["reason"], "pending_action_id": str(a.id)})
         via = None if a is action else str(action.id)
         await _close(session, a, {"resolution": "continue", "note": note, "via": via, "runner": runner,
-                                  "resumed_tasks": resumed, "not_resumed": not_resumed}, actor, now)
+                                  "resumed_tasks": resumed, "not_resumed": not_resumed,
+                                  **({"acknowledged": True} if choice == "continue_acknowledged" else {})},
+                     actor, now)
     return closed
 
 

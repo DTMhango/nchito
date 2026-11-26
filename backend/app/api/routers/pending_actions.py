@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, Page, Timestamps
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.apply import owner_actions, resolvers, stages
+from app.apply import accounts, owner_actions, resolvers, stages
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.events import publish
@@ -57,6 +57,11 @@ class PendingActionOut(Timestamps):
     resolution: dict[str, Any] | None = None
     kind: str | None = Field(default=None, description="The exact kind within the type (``detail.kind``): e.g. "
                                                        "posting_changed, posting_closed, verification_code")
+    choices: list[Literal["continue", "continue_acknowledged", "manual_handoff", "skipped"]] = Field(
+        default_factory=list, description=(
+            "A runner blocker's owner choices: continue (resolve 'continue'), continue_acknowledged (resolve "
+            "'continue' with acknowledged=true), manual_handoff / skipped (POST /api/portal-accounts/actions/{id}"
+            "/give-up). Empty for other actions."))
 
 
 class DecisionGroup(BaseModel):
@@ -80,6 +85,9 @@ class ResolveIn(BaseModel):
     note: str | None = None
     reference: str | None = Field(default=None, max_length=200,
                                   description="confirmed: the employer's reference number, kept as evidence")
+    acknowledged: bool = Field(default=False, description=(
+        "continue on a suspicious-page blocker (redirect_off_domain, page_instruction): the owner confirms they "
+        "checked the page and it is safe; required there (422 acknowledgement_required), audited"))
 
 
 class DismissIn(BaseModel):
@@ -130,7 +138,8 @@ async def _outs(session: AsyncSession, actions: list[PendingAction]) -> list[Pen
             application_id=a.application_id, agent_task_id=a.agent_task_id, group_key=a.group_key, title=a.title,
             detail=a.detail, checkpoint=a.checkpoint, deadline=a.deadline, status=a.status.value,
             snoozed_until=a.snoozed_until, snoozed=_is_snoozed(a, now, days), employer=employer, job_title=title,
-            resolution=a.resolution, kind=(a.detail or {}).get("kind")))
+            resolution=a.resolution, kind=(a.detail or {}).get("kind"),
+            choices=accounts.choices_for(a)))  # type: ignore[arg-type]
     return out
 
 
@@ -402,7 +411,8 @@ async def resolve(action_id: uuid.UUID, body: ResolveIn, principal: PrincipalDep
             await owner_actions.choose(session, action, body.chosen_job_id, actor=principal.actor, note=body.note)
         elif body.resolution == "continue" and kind in owner_actions.CONTINUABLE:
             _require_open(action)
-            await owner_actions.continue_task(session, action, actor=principal.actor, note=body.note)
+            await owner_actions.continue_task(session, action, actor=principal.actor, note=body.note,
+                                              acknowledged=body.acknowledged)
         elif body.resolution == "confirmed" and kind == PendingActionType.confirm_submission:
             _require_open(action)
             await owner_actions.confirm_submission(session, action, actor=principal.actor,
@@ -410,7 +420,8 @@ async def resolve(action_id: uuid.UUID, body: ResolveIn, principal: PrincipalDep
         else:
             raise HTTPException(422, detail=f"'{body.resolution}' does not resolve a {kind.value} action")
     except owner_actions.ResolveError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        detail: Any = {"code": exc.code, "reason": exc.message} if exc.code else exc.message
+        raise HTTPException(exc.status, detail=detail) from exc
     except stages.IllegalTransition as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=exc.reason) from exc
     await publish(session, "pending_action.resolved", {"pending_action_id": str(action.id)})
