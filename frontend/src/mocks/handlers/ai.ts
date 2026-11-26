@@ -2,7 +2,7 @@
  * MSW handlers for Settings > AI: provider records, routing, price table, spend, prompts and
  * the budget settings. In-memory, fictional, reset with `resetAiMock()` (tests).
  */
-import { settingValues } from "../data/settings"
+import { settingValues } from "../dataset/settings"
 import { http, HttpResponse } from "msw"
 import type { components } from "@/lib/api/types"
 

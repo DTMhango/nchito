@@ -2,8 +2,8 @@
 import { http, HttpResponse } from "msw"
 import type { Resource } from "@/features/kit/api"
 import { db } from "../db"
-import { kitSeed } from "@/mocks/data/kit"
-import { FACTS } from "@/mocks/data/jobs"
+import { kitSeed } from "@/mocks/dataset/kit"
+import { FACTS } from "@/mocks/dataset/jobs"
 import type { AnswerUse, Waiver, WaiverIn } from "@/lib/api/types"
 import { applicationsMock } from "./applications"
 

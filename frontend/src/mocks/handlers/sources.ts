@@ -11,7 +11,7 @@ import type {
   SourceInput,
 } from "@/features/sources/api"
 import { db } from "../db"
-import { PROPOSED, store, tickRun, withNext } from "@/mocks/data/sources"
+import { PROPOSED, store, tickRun, withNext } from "@/mocks/dataset/sources"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)

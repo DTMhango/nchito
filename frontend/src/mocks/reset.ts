@@ -6,7 +6,7 @@ import { resetJobsMock } from "./handlers/jobs"
 import { resetKitMock } from "./handlers/kit"
 import { resetMatchesMock } from "./handlers/matches"
 import { resetSettingsMock } from "./handlers/settings"
-import { resetSourcesMock } from "./data/sources"
+import { resetSourcesMock } from "./dataset/sources"
 
 export function resetAllMocks() {
   resetSettingsMock()

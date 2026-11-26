@@ -9,8 +9,8 @@ import type {
   RubricBody,
 } from "@/features/campaigns/types"
 import type { CampaignRuleIn } from "@/features/matches/types"
-import { rubrics as seedRubrics, seedCampaigns } from "@/mocks/data/campaigns"
-import { RUBRIC } from "@/mocks/data/jobs"
+import { rubrics as seedRubrics, seedCampaigns } from "@/mocks/dataset/campaigns"
+import { RUBRIC } from "@/mocks/dataset/jobs"
 import { matchesMock } from "./matches"
 import { matches as evaluate } from "./matches-evaluator"
 

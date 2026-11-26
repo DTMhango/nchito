@@ -5,9 +5,9 @@
  */
 import { http, HttpResponse } from "msw"
 import { db } from "../db"
-import { seedContacts } from "../data/contacts"
+import { seedContacts } from "../dataset/contacts"
 import { matchesMock } from "./matches"
-import type { MockJob } from "../data/jobs"
+import type { MockJob } from "../dataset/jobs"
 
 let contacts = seedContacts()
 export const jobAudit: {

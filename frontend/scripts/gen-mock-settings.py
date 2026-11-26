@@ -1,6 +1,6 @@
 """Snapshot the backend settings registry for the mock backend (`npm run gen:mock-settings`).
 
-Writes src/mocks/data/settings-registry.json: groups and every setting's key, label, kind,
+Writes src/mocks/dataset/settings-registry.json: groups and every setting's key, label, kind,
 default and bounds. Run from frontend/ with the backend installed (`pip install -e ../backend`).
 """
 import json
@@ -25,6 +25,6 @@ for d in REGISTRY.values():
         "choices": list(d.choices) if d.choices else None, "minimum": d.minimum,
         "maximum": d.maximum, "unit": d.unit,
     })
-target = here.parent / "src" / "mocks" / "data" / "settings-registry.json"
+target = here.parent / "src" / "mocks" / "dataset" / "settings-registry.json"
 target.write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
 print(f"{len(out['settings'])} settings -> {target}")

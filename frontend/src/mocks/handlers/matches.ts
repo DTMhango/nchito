@@ -29,7 +29,7 @@ import {
   seedTagRules,
   seedViews,
   type MockJob,
-} from "@/mocks/data/jobs"
+} from "@/mocks/dataset/jobs"
 import { groupCounts, matches, NOT_STATED } from "./matches-evaluator"
 
 type State = {

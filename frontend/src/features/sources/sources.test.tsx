@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { resetSourcesMock, store } from "@/mocks/data/sources"
-import { settingValues } from "@/mocks/data/settings"
+import { resetSourcesMock, store } from "@/mocks/dataset/sources"
+import { settingValues } from "@/mocks/dataset/settings"
 import { renderApp } from "@/test/render"
 import { plainError } from "./words"
 

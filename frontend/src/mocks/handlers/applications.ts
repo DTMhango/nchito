@@ -7,7 +7,7 @@ import {
   seedApplications,
   toDetail,
   type MockApplications,
-} from "@/mocks/data/applications"
+} from "@/mocks/dataset/applications"
 
 let state: MockApplications = seedApplications()
 

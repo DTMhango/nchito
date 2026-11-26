@@ -9,7 +9,7 @@ import {
   settingRow,
   settingRows,
   writeSetting,
-} from "../data/settings"
+} from "../dataset/settings"
 import type {
   AuditEvent,
   ConfigRevision,
