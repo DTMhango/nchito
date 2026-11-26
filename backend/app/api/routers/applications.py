@@ -23,6 +23,7 @@ from app.core.clock import utcnow
 from app.core.config import get_config
 from app.core.events import publish
 from app.core.settings import service as settings_service
+from app.docs.api import router as documents_router
 from app.kit.importers import history
 from app.models.applications import (
     Application,
@@ -704,11 +705,8 @@ async def run_checks(application_id: uuid.UUID) -> list[CheckResult]:
     not_implemented(2, "tailoring")
 
 
-@router.get("/applications/{application_id}/documents/{kind}", name="applications_document",
-            responses={200: {"content": {"application/pdf": {}, "text/html": {}}}})
-async def document(application_id: uuid.UUID, kind: Literal["cv", "letter", "answers"],
-                   fmt: Literal["pdf", "docx", "html"] = "pdf") -> None:
-    not_implemented(2, "documents")
+# Documents (list, render, download): app/docs/api.py
+router.include_router(documents_router)
 
 
 @router.get("/applications/{application_id}/packets", response_model=list[PacketOut], name="applications_packets")

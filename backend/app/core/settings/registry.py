@@ -329,6 +329,14 @@ _int("documents.letter_pages", "Letter pages", "Maximum cover letter length.", 1
 _int("documents.letter_paragraphs", "Letter paragraphs", "Maximum cover letter paragraphs.", 4, 5, 1, 10)
 _add("documents.cv_template", "string", "CV template", "Default CV template (by template key).",
      "classic", "modern", str, validators=(slug,), invalid_example="Not A Key", has_invalid_example=True)
+_add("documents.letter_template", "string", "Letter template", "Default cover letter template (by template key).",
+     "letter-plain", "letter-formal", str, validators=(slug,), invalid_example="Not A Key", has_invalid_example=True)
+_add("documents.letter_salutation", "string", "Letter salutation",
+     "Opening line when the letter has no named recipient.", "Dear Hiring Manager,", "Dear Hiring Team,", str,
+     validators=(non_empty, max_length(80)), invalid_example="", has_invalid_example=True)
+_add("documents.letter_signoff", "string", "Letter sign-off", "Closing line before the name.",
+     "Kind regards,", "Yours sincerely,", str, validators=(non_empty, max_length(80)), invalid_example="",
+     has_invalid_example=True)
 
 # Retention (14)
 _int("retention.below_threshold_text_days", "Below-threshold text",

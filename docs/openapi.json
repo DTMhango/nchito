@@ -10115,12 +10115,135 @@
         }
       }
     },
+    "/api/applications/{application_id}/documents": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Documents",
+        "description": "Every file rendered for this application (newest first), including ones from earlier spec versions.",
+        "operationId": "applications_documents",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentOut"
+                  },
+                  "title": "Response Applications Documents"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/documents/render": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Render Documents",
+        "description": "Render the current spec. The same spec and template return the files already stored (no new rows).",
+        "operationId": "applications_render_documents",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/{application_id}/documents/{kind}": {
       "get": {
         "tags": [
           "applications"
         ],
         "summary": "Applications Document",
+        "description": "Download the current spec's document, rendering it first when it is not stored yet.\n\nWarnings travel in the ``X-Render-Warnings`` header as a count; the render endpoint lists them.",
         "operationId": "applications_document",
         "parameters": [
           {
@@ -10155,12 +10278,31 @@
               "enum": [
                 "pdf",
                 "docx",
+                "txt",
                 "html"
               ],
               "type": "string",
               "default": "pdf",
               "title": "Fmt"
             }
+          },
+          {
+            "name": "template",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Template key",
+              "title": "Template"
+            },
+            "description": "Template key"
           }
         ],
         "responses": {
@@ -10171,7 +10313,71 @@
                 "schema": {}
               },
               "application/pdf": {},
-              "text/html": {}
+              "text/html": {},
+              "text/plain": {},
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/document-files/{document_id}": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Document File",
+        "description": "Download a stored file exactly as rendered (what a packet's hash refers to), whatever the spec says now.",
+        "operationId": "applications_document_file",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
             }
           },
           "501": {
@@ -18277,6 +18483,105 @@
         ],
         "title": "DispatchOut"
       },
+      "DocumentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cv",
+              "letter"
+            ],
+            "title": "Kind"
+          },
+          "fmt": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "docx",
+              "txt",
+              "html"
+            ],
+            "title": "Fmt"
+          },
+          "template_key": {
+            "type": "string",
+            "title": "Template Key"
+          },
+          "spec_hash": {
+            "type": "string",
+            "title": "Spec Hash",
+            "description": "sha256 of the canonical spec this file was rendered from"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash",
+            "description": "sha256 of the stored file; packets bind to this"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RenderWarning"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "application_id",
+          "kind",
+          "fmt",
+          "template_key",
+          "spec_hash",
+          "content_hash",
+          "size_bytes",
+          "mime_type",
+          "page_count",
+          "warnings"
+        ],
+        "title": "DocumentOut"
+      },
       "DryRunOut": {
         "properties": {
           "run_id": {
@@ -24949,6 +25254,112 @@
         ],
         "title": "ReleaseRecord",
         "description": "What a runner was given and what it reports having entered (18.1)."
+      },
+      "RenderIn": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cv",
+              "letter"
+            ],
+            "title": "Kind"
+          },
+          "template_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Key",
+            "description": "Template key; default from the documents settings"
+          },
+          "formats": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "pdf",
+                "docx",
+                "txt",
+                "html"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Formats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "RenderIn"
+      },
+      "RenderOut": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentOut"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RenderWarning"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Page limit, overflow and omission notices for the Studio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "warnings"
+        ],
+        "title": "RenderOut"
+      },
+      "RenderWarning": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "detail": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Detail"
+          },
+          "severity": {
+            "type": "string",
+            "const": "warn",
+            "title": "Severity",
+            "default": "warn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "RenderWarning"
       },
       "RequireWording": {
         "properties": {
