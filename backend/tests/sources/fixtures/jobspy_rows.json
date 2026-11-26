@@ -1,0 +1,13 @@
+[
+ {"id":"in-1","site":"indeed","title":"Treaty Actuary","company":"Kalumbila Re","location":"Lusaka, ZM",
+  "job_url":"https://zm.indeed.com/viewjob?jk=abc&utm_campaign=z","job_url_direct":"https://careers.example.com/jobs/treaty-actuary",
+  "description":"Price treaty business.","date_posted":"2026-11-20","min_amount":null,"max_amount":null,"currency":null,"interval":null,"is_remote":null,"job_type":"fulltime"},
+ {"id":"in-2","site":"indeed","title":"Claims Analyst","company":"Zambezi Insurance","location":"Remote",
+  "job_url":"https://zm.indeed.com/viewjob?jk=def","job_url_direct":null,"description":"Analyse claims.","date_posted":"2026-11-21",
+  "min_amount":30000,"max_amount":45000,"currency":"ZMW","interval":"monthly","is_remote":true,"job_type":null},
+ {"id":"in-3","site":"indeed","title":"Gone Role","company":"Old Co","location":"Ndola","job_url":"https://zm.indeed.com/viewjob?jk=gone",
+  "description":"x","date_posted":"2026-11-21","is_remote":false},
+ {"id":"in-4","site":"indeed","title":"Blocked Role","company":"Wall Co","location":"Kitwe","job_url":"https://zm.indeed.com/viewjob?jk=wall",
+  "description":"y","date_posted":"2026-11-21","is_remote":false},
+ {"id":"in-5","site":"indeed","title":"No Url","company":"X","job_url":null}
+]

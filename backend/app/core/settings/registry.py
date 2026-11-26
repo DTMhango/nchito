@@ -58,6 +58,7 @@ GROUPS: dict[str, str] = {
     "health": "Health",
     "runners": "Runners",
     "data": "Data import and export",
+    "sources": "Discovery sources",
 }
 
 AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
@@ -606,6 +607,60 @@ _int("data.import_staging_hours", "Import preview lifetime",
 _bool("data.old_kit_ai_extraction", "AI for unrecognised old-kit files",
       "Send old-kit files the built-in parser does not recognise to your chosen AI provider, as data, to propose "
       "facts. Off means only the built-in parser runs.", False)
+
+# Discovery sources: JobSpy, careers pages, web search (DESIGN 6). A source row's own config may override each of
+# these per source (same last word of the key, e.g. ``results_per_board``).
+JOBSPY_BOARDS = ("linkedin", "indeed", "glassdoor", "google", "zip_recruiter")
+
+
+def _query_template_check(value: Any) -> None:
+    text = str(value)
+    if "{title}" not in text:
+        raise SettingValueError("the template must contain {title}")
+    try:
+        string.Formatter().vformat(text, (), {"title": "x", "location": "y"})
+    except (KeyError, IndexError, ValueError) as exc:
+        raise SettingValueError("only {title} and {location} may be used") from exc
+
+
+_bool("sources.jobspy.enabled", "JobSpy boards",
+      "Let JobSpy search the scraped job boards (LinkedIn, Indeed, Glassdoor, Google Jobs). Off by default: "
+      "datacentre IPs get blocked and the boards forbid automated reading. Discovery only, never applying.", False)
+_add("sources.jobspy.boards", "list", "JobSpy boards searched", "Which boards JobSpy reads when it is enabled.",
+     ["indeed", "google"], ["linkedin"], list[str], choices=JOBSPY_BOARDS, validators=(unique_items,),
+     invalid_example=["myspace"], has_invalid_example=True)
+_int("sources.jobspy.results_per_board", "JobSpy results per board and query",
+     "Most postings requested from one board for one search phrase.", 20, 50, 1, 100, "postings")
+_int("sources.jobspy.board_delay_seconds", "JobSpy pause between requests",
+     "Wait this long between two board searches so the boards are not hammered.", 8, 15, 0, 300, "seconds")
+_int("sources.jobspy.max_age_hours", "JobSpy oldest posting",
+     "Ask the boards only for postings newer than this (the sweep window can only narrow it).",
+     72, 168, 1, 720, "hours")
+_bool("sources.jobspy.verify_links", "JobSpy link check",
+      "Open every found link to confirm the posting is real and live before it enters the pipeline. A blocked page "
+      "stays, marked unverified.", True)
+_int("sources.careers.max_postings", "Careers page postings per employer",
+     "Most postings read from one employer's careers page in one sweep.", 100, 40, 1, 500, "postings")
+_int("sources.careers.max_detail_pages", "Careers page detail pages",
+     "Most individual posting pages opened per employer in one sweep (listing links and sitemap entries).",
+     40, 20, 1, 200, "pages")
+_bool("sources.careers.llm_extraction", "Model reading of careers pages",
+      "When no structured data or listing pattern is found, a model reads the listing page (as data) to name the "
+      "posting links. Costs API tokens, within the budget caps.", False)
+_int("sources.careers.llm_max_cost_micros", "Model reading cost cap per page",
+     "A page whose model read would cost more than this (millionths of the budget currency) is skipped.",
+     50_000, 20_000, 1_000, 5_000_000, "micros")
+_int("sources.search.max_queries", "Web search queries per sweep",
+     "Most search phrases sent to the search provider in one sweep.", 5, 3, 1, 20, "queries")
+_int("sources.search.results_per_query", "Web search results per query",
+     "Most results taken from one search.", 10, 5, 1, 50, "results")
+_int("sources.search.max_leads", "Web search leads opened per sweep",
+     "Most result pages fetched and checked for a real posting in one sweep.", 30, 15, 1, 200, "pages")
+_add("sources.search.query_template", "string", "Web search phrase",
+     "How a campaign title and location become a search phrase. Fields: {title}, {location}.",
+     "{title} {location} job vacancy apply", "{title} careers {location}", str,
+     validators=(_query_template_check, max_length(200)), invalid_example="jobs for {role}",
+     has_invalid_example=True)
 
 
 REGISTRY: dict[str, SettingDef] = {d.key: d for d in _DEFS}
