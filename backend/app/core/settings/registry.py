@@ -52,6 +52,7 @@ GROUPS: dict[str, str] = {
     "budget": "Budget",
     "documents": "Documents",
     "tailoring": "Tailoring and checks",
+    "interview": "Interview pack",
     "retention": "Retention",
     "backups": "Backups",
     "notifications": "Notifications",
@@ -509,6 +510,71 @@ _terms("tailoring.qualification_terms", "Qualification words",
         "certificate", "certified", "certification", "chartered", "acca", "cima", "cfa", "cpa", "frm", "pmp",
         "fellow"],
        ["mba", "phd", "cfa"])
+
+# Interview pack (10.3a)
+INTERVIEW_SECTIONS = ("role_brief", "why_you", "questions", "stories", "questions_to_ask", "gaps", "pay_sheet",
+                      "crib_sheet")
+INTERVIEW_TRIGGERS = ("off", "invite_or_stage", "stage_only")
+
+
+def _topic_lines(value: Any) -> None:
+    for item in value:
+        topic, _, question = str(item).partition("|")
+        if not topic.strip() or not question.strip():
+            raise SettingValueError(f"{item!r}: write 'Topic|Question the employer may ask'")
+
+
+_enum("interview.auto_offer", "Offer a pack when",
+      "When to offer an interview pack: when a reply is classified as an interview invitation or the stage moves "
+      "to interview, only when the stage moves, or never (build it from the job page).", "invite_or_stage",
+      "stage_only", INTERVIEW_TRIGGERS)
+_bool("interview.auto_generate", "Build offered packs straight away",
+      "Off: an offer waits on Today for your yes. On: the pack is generated at once (budgeted).", False)
+_add("interview.sections", "list", "Pack sections",
+     "Which sections a pack has, in this order. The crib sheet is built from the others.",
+     list(INTERVIEW_SECTIONS), ["role_brief", "questions", "stories", "pay_sheet", "crib_sheet"], list[str],
+     choices=INTERVIEW_SECTIONS, validators=(unique_items, non_empty), invalid_example=["company_news"],
+     has_invalid_example=True)
+_model("interview.model_role_brief", "Model: role brief", "Reads the posting for the role brief.",
+       "claude-sonnet-5-5", "claude-haiku-5-5")
+_model("interview.model_why_you", "Model: why you", "Writes the talking points from approved facts.",
+       "claude-sonnet-5-5", "claude-opus-5-5")
+_model("interview.model_questions", "Model: likely questions", "Writes likely questions and suggested answers.",
+       "claude-sonnet-5-5", "claude-opus-5-5")
+_model("interview.model_stories", "Model: story bank", "Builds STAR stories from approved facts.",
+       "claude-sonnet-5-5", "claude-opus-5-5")
+_model("interview.model_questions_to_ask", "Model: questions to ask", "Suggests questions to ask the employer.",
+       "claude-haiku-5-5", "claude-sonnet-5-5")
+_model("interview.model_gaps", "Model: gaps", "Finds gaps and honest ways to address them.",
+       "claude-sonnet-5-5", "claude-opus-5-5")
+_model("interview.model_practice", "Model: practice feedback", "Gives feedback on a practice answer.",
+       "claude-sonnet-5-5", "claude-haiku-5-5")
+_int("interview.questions_per_category", "Questions per category",
+     "Most likely questions in each category (behavioural, technical, role, motivation, logistics).",
+     5, 3, 1, 15, "questions")
+_int("interview.max_stories", "Stories in the bank", "Most STAR stories in the story bank.", 6, 4, 1, 20,
+     "stories")
+_int("interview.regenerate_attempts", "Retries after a failed truth check",
+     "How many times a section that fails fact tracing is regenerated before it is shown flagged.", 1, 2, 0, 3)
+_int("interview.practice_answer_max_chars", "Practice answer length", "Longest practice answer accepted.",
+     4000, 2000, 200, 20_000, "characters")
+_add("interview.pay_topics", "list", "Pay and logistics topics",
+     "One line per topic on the pay and logistics sheet, as 'Topic|Question'. The question is matched against "
+     "your confirmed answers and the answers you gave on the form.",
+     ["Salary expectation|What are your salary expectations?", "Notice period|What is your notice period?",
+      "Right to work|Do you have the right to work in this country?",
+      "Relocation|Are you willing to relocate?", "Start date|When can you start?"],
+     ["Salary expectation|What are your salary expectations?"], list[str],
+     validators=(unique_items, _topic_lines), invalid_example=["no separator"], has_invalid_example=True)
+_add("interview.decide_wording", "string", "Undecided wording",
+     "What the pay sheet says where no confirmed answer exists.", "Decide before the interview",
+     "Settle this before the call", str, validators=(non_empty, max_length(120)), invalid_example="",
+     has_invalid_example=True)
+_add("interview.research_note", "string", "Research note",
+     "Shown on the role brief: where company notes come from.",
+     "No web research was done: company notes come only from the posting and your own notes.",
+     "Company notes are from the posting and your notes only.", str, validators=(non_empty, max_length(300)),
+     invalid_example="", has_invalid_example=True)
 
 # Retention (14)
 _int("retention.below_threshold_text_days", "Below-threshold text",
