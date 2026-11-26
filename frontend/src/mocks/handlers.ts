@@ -13,6 +13,8 @@ import { kitHandlers } from "./handlers/kit"
 import { sourcesHandlers } from "./handlers/sources"
 import { campaignHandlers } from "./handlers/campaigns"
 import { applicationsHandlers } from "./handlers/applications"
+import { jobHandlers } from "./handlers/jobs"
+import { settingsHandlers } from "./handlers/settings"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -89,6 +91,7 @@ export const handlers = [
       display_name: owner.display_name,
       timezone: owner.timezone,
       app_name: "Nchito",
+      totp_enabled: owner.totp_secret !== null,
     })
   }),
 
@@ -199,4 +202,6 @@ export const handlers = [
 
   // Today, applications, pending actions (wave 1). Last, so other streams' handlers win on overlap.
   ...applicationsHandlers,
+  ...jobHandlers,
+  ...settingsHandlers,
 ]
