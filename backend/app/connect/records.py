@@ -13,12 +13,13 @@ import secrets
 import time
 import uuid
 from typing import Any
+from urllib.parse import urlsplit
 
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.connect import gdrive
+from app.connect import gdrive, s3
 from app.connect.http_transport import HttpTransport, get_transport
 from app.connect.notifier import (
     DeliveryError,
@@ -36,17 +37,22 @@ from app.core.settings import service as settings_service
 from app.llm.provider_records import read_secrets
 from app.models.platform import Connection, ConnectionProvider
 
-OPS_PROVIDERS = frozenset({"gdrive", "telegram", "webhook"})
-CONFIG_KEYS = {"telegram": ("chat_id",), "webhook": ("url",), "gdrive": ("root_folder_name", "root_folder_id")}
-SECRET_KEYS = {"telegram": ("bot_token",), "webhook": ("signing_secret",), "gdrive": ()}
+OPS_PROVIDERS = frozenset({"gdrive", "telegram", "webhook", "s3"})
+CONFIG_KEYS = {"telegram": ("chat_id",), "webhook": ("url",), "gdrive": ("root_folder_name", "root_folder_id"),
+               "s3": ("endpoint", "bucket", "region", "prefix")}
+SECRET_KEYS = {"telegram": ("bot_token",), "webhook": ("signing_secret",), "gdrive": (),
+               "s3": ("access_key_id", "secret_access_key")}
 READS = {
     "telegram": "Sends messages to one chat. Reads nothing: no messages, contacts or chats.",
     "webhook": "Sends signed JSON messages to one address. Reads nothing.",
     "gdrive": gdrive.READS_DESCRIPTION,
+    "s3": ("Writes, reads back and deletes encrypted backup files in one bucket (under an optional prefix). "
+           "Lists nothing else."),
 }
 STATE_SALT = "nchito-oauth-state"
 STATE_MAX_AGE_SECONDS = 600
 _CHAT_RE = re.compile(r"^(-?\d{1,20}|@[A-Za-z0-9_]{4,64})$")
+_BUCKET_RE = re.compile(r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
 _TOKEN_RE = re.compile(r"^\d{3,}:[A-Za-z0-9_-]{16,}$")
 
 
@@ -67,6 +73,21 @@ def validate(provider: str, config: dict[str, Any], secrets_in: dict[str, str], 
         token = secrets_in.get("bot_token", "")
         if (creating or token) and not _TOKEN_RE.match(token):
             raise ValueError("bot_token looks wrong; paste the whole token from BotFather")
+    elif provider == "s3":
+        if creating or "endpoint" in config:
+            parts = urlsplit(str(config.get("endpoint", "")))
+            local = parts.hostname in ("localhost", "127.0.0.1", "::1")
+            if (parts.scheme != "https" and not (parts.scheme == "http" and local)) or not parts.hostname:
+                raise ValueError("endpoint must be an https address (http only for localhost)")
+            if parts.username or parts.password:
+                raise ValueError("put the keys in the secrets, not in the endpoint")
+        if (creating or "bucket" in config) and not _BUCKET_RE.match(str(config.get("bucket", ""))):
+            raise ValueError("bucket must be 3 to 63 lowercase letters, digits, dots or hyphens")
+        if "prefix" in config and (".." in str(config["prefix"]).split("/") or len(str(config["prefix"])) > 200):
+            raise ValueError("prefix is not valid")
+        for name in ("access_key_id", "secret_access_key"):
+            if (creating or name in secrets_in) and not secrets_in.get(name, "").strip():
+                raise ValueError(f"{name} is required")
     elif provider == "webhook":
         if creating or "url" in config:
             validate_url(str(config.get("url", "")))
@@ -174,6 +195,9 @@ async def run_test(session: AsyncSession, conn: Connection, *, transport: HttpTr
             store = await drive_store(session, conn, transport=transport)
             name = await store.check()
             detail = f"Drive folder '{name}' is reachable"
+        elif provider == "s3":
+            name = await s3_store(conn).check()
+            detail = f"bucket '{name}' is reachable"
         else:
             notifier = build_notifier(conn, transport)
             if isinstance(notifier, TelegramNotifier):
@@ -184,11 +208,29 @@ async def run_test(session: AsyncSession, conn: Connection, *, transport: HttpTr
             await notifier.send(OutboundMessage(
                 event_id=f"test-{uuid.uuid4()}", kind="test", title="Test message", created_at=utcnow(),
                 body="If you can read this, the connection works."))
-    except (DeliveryError, gdrive.DriveError, KeyError, ValueError) as exc:
+    except (DeliveryError, gdrive.DriveError, s3.S3Error, KeyError, ValueError) as exc:
         conn.health, conn.last_checked_at = "failing", utcnow()
         return False, str(exc)[:300]
     conn.health, conn.last_checked_at = "ok", utcnow()
     return True, detail
+
+
+# ----- S3-compatible storage ------------------------------------------------------------------
+
+
+def s3_store(conn: Connection) -> s3.S3Store:
+    """The backup store for one S3 connection (keys are decrypted only here)."""
+    secrets_in = read_secrets(conn)
+    client = s3.make_client(str(conn.config["endpoint"]), str(conn.config.get("region") or ""),
+                            secrets_in["access_key_id"], secrets_in["secret_access_key"])
+    return s3.S3Store(client, str(conn.config["bucket"]), str(conn.config.get("prefix") or ""))
+
+
+async def first_s3_store(session: AsyncSession) -> s3.S3Store:
+    conn = await _first(session, "s3")
+    if conn is None:
+        raise s3.S3Error("S3 storage is not connected (Settings, Connections)")
+    return s3_store(conn)
 
 
 # ----- Google Drive ---------------------------------------------------------------------------

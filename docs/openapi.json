@@ -13203,7 +13203,8 @@
                     "expiry_check",
                     "digest",
                     "backup",
-                    "retention"
+                    "retention",
+                    "tailoring"
                   ],
                   "type": "string"
                 },
@@ -15926,7 +15927,7 @@
           "data"
         ],
         "summary": "Data Config Rollback",
-        "description": "Rollback affects future work only.",
+        "description": "Restore a revision's value as a NEW revision (history is never edited). Settings go through the settings\nvalidators; a setting with its own endpoint (the global pause) and a model route that has not passed a recent\ntest are refused. Rollback affects future work only.",
         "operationId": "data_config_rollback",
         "parameters": [
           {
@@ -31167,7 +31168,8 @@
               "expiry_check",
               "digest",
               "backup",
-              "retention"
+              "retention",
+              "tailoring"
             ],
             "title": "Kind"
           },
@@ -31220,7 +31222,8 @@
               "expiry_check",
               "digest",
               "backup",
-              "retention"
+              "retention",
+              "tailoring"
             ],
             "title": "Kind"
           },
@@ -31755,7 +31758,8 @@
               "expiry_check",
               "digest",
               "backup",
-              "retention"
+              "retention",
+              "tailoring"
             ],
             "title": "Kind"
           },
@@ -31836,7 +31840,8 @@
               "expiry_check",
               "digest",
               "backup",
-              "retention"
+              "retention",
+              "tailoring"
             ],
             "title": "Kind"
           },

@@ -25,7 +25,8 @@ import {
   type DecisionGroup,
   type PendingAction,
 } from "@/features/applications/api"
-import { isHandoff } from "@/features/accounts/logic"
+import { giveUp } from "@/features/accounts/api"
+import { giveUpBody, isHandoff } from "@/features/accounts/logic"
 import { AnswerForm, type AnswerSubmit } from "./answer-form"
 import {
   actionKit,
@@ -106,6 +107,13 @@ export function DecisionRow({
     onError: (e) => toast.error(e.message),
   })
 
+  // "Skip" on a blocker is the give-up endpoint: every waiting application is skipped and the action closes.
+  const skip = useMutation({
+    mutationFn: () => giveUp(first.id, giveUpBody("skip", null)),
+    onSuccess: refresh,
+    onError: (e) => toast.error(e.message),
+  })
+
   const answer = (v: AnswerSubmit) =>
     resolve.mutate({
       resolution: "answered",
@@ -115,6 +123,7 @@ export function DecisionRow({
 
   const run = (r: KitResolution) => {
     if (r === "answer") setAnswering(true)
+    else if (r === "skip") skip.mutate()
     else if (r !== "link" && r !== "handoff" && r !== "changes")
       resolve.mutate({ resolution: r })
   }
@@ -194,7 +203,7 @@ export function DecisionRow({
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={resolve.isPending}
+                  disabled={resolve.isPending || skip.isPending}
                   onClick={() => run(secondary.resolution)}
                 >
                   {secondary.label}

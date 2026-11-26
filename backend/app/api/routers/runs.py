@@ -25,7 +25,7 @@ from app.schemas.json_types import SourceRunResult
 router = APIRouter(prefix="/api", tags=["runs"], dependencies=[RequireOwner], responses=NOT_IMPLEMENTED_RESPONSES)
 WAVE, AREA = 1, "runs"
 
-RunKindT = Literal["sweep", "rescore", "expiry_check", "digest", "backup", "retention"]
+RunKindT = Literal["sweep", "rescore", "expiry_check", "digest", "backup", "retention", "tailoring"]
 ACTIVE = (RunStatus.queued, RunStatus.running)
 
 
@@ -136,6 +136,8 @@ async def get_run(run_id: uuid.UUID, session: SessionDep) -> RunOut:
 async def create_run(body: RunCreate, session: SessionDep, principal: PrincipalDep, enqueue: EnqueueDep) -> RunOut:
     """Start a manual run (or a dry run: counts what a sweep would do, writes nothing)."""
     kind = RunKind(body.kind)
+    if kind == RunKind.tailoring:
+        raise HTTPException(422, detail="Tailoring runs start from an application (Studio), not from here.")
     if kind == RunKind.sweep:
         if body.campaign_id is None or await session.get(Campaign, body.campaign_id) is None:
             raise HTTPException(422, detail="A sweep needs an existing campaign.")
@@ -190,6 +192,8 @@ async def _prepare_schedule(session: Any, data: dict[str, Any], existing: Schedu
         except (ZoneInfoNotFoundError, ValueError) as exc:
             raise ValueError(f"unknown time zone {tz!r}") from exc
     kind = RunKind(data["kind"])
+    if kind == RunKind.tailoring:
+        raise ValueError("tailoring cannot be scheduled: it starts from an application")
     if kind == RunKind.sweep and (data.get("campaign_id") is None
                                   or await session.get(Campaign, data["campaign_id"]) is None):
         raise ValueError("a sweep schedule needs an existing campaign")

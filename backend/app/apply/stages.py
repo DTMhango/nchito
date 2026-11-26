@@ -117,11 +117,25 @@ def allowed_targets(app: Application, via: Via = "owner") -> list[Stage]:
     return [t for t in Stage if check_transition(app, t, via).ok]
 
 
+_last_event_at: datetime | None = None
+
+
+def _next_event_time() -> datetime:
+    """A strictly increasing time. The system clock can tick coarsely (about 16 ms on Windows), so two
+    events written back to back would share a time and their order would fall to a random id."""
+    global _last_event_at
+    now = utcnow()
+    if _last_event_at is not None and now <= _last_event_at:
+        now = _last_event_at + timedelta(microseconds=1)
+    _last_event_at = now
+    return now
+
+
 async def add_event(session: AsyncSession, application_id: uuid.UUID, kind: str, actor: str,
                     detail: dict[str, Any] | None = None) -> ApplicationEvent:
     # An explicit time keeps events written in one transaction in order (now() is the same for all of them).
     event = ApplicationEvent(application_id=application_id, kind=kind, actor=actor, detail=detail or {},
-                             created_at=utcnow())
+                             created_at=_next_event_time())
     session.add(event)
     await session.flush()
     return event

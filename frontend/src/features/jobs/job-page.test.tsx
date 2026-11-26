@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest"
 import { configure, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { http, HttpResponse } from "msw"
+import { server } from "@/test/server"
 import { renderApp } from "@/test/render"
 import { matchesMock } from "@/mocks/handlers/matches"
 import { applicationsMock } from "@/mocks/handlers/applications"
@@ -261,6 +263,48 @@ describe("messages tab", () => {
     expect(rows[1].querySelector("b b")).toBeNull()
     expect(
       screen.getByText(/proposes the change, and the proposal waits for you/)
+    ).toBeInTheDocument()
+  })
+})
+
+describe("job page loading", () => {
+  it("recovers from a refused first request instead of staying on the skeleton", async () => {
+    let calls = 0
+    server.use(
+      http.get("*/api/jobs/:id", () => {
+        calls += 1
+        // The first request lands before the session is usable.
+        if (calls === 1)
+          return HttpResponse.json(
+            { detail: "Not signed in." },
+            { status: 401 }
+          )
+        return undefined
+      })
+    )
+    renderApp(`/jobs/${WIN}`)
+    expect(
+      await screen.findByRole("heading", { name: /Head of Data/ })
+    ).toBeInTheDocument()
+    expect(calls).toBeGreaterThanOrEqual(2)
+  })
+
+  it("offers Try again (not a dead end) when the role cannot be loaded", async () => {
+    const user = userEvent.setup()
+    let fail = true
+    server.use(
+      http.get("*/api/jobs/:id", () =>
+        fail
+          ? HttpResponse.json({ detail: "boom" }, { status: 500 })
+          : undefined
+      )
+    )
+    renderApp(`/jobs/${WIN}`)
+    const again = await screen.findByRole("button", { name: "Try again" })
+    fail = false
+    await user.click(again)
+    expect(
+      await screen.findByRole("heading", { name: /Head of Data/ })
     ).toBeInTheDocument()
   })
 })

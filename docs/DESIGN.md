@@ -4,6 +4,11 @@ Working title "Nchito" (Nyanja for work). The name is a setting (`APP_NAME`), no
 Status: design v1, 25 Nov 2026. Awaiting the owner's go-ahead to build.
 Visual reference: `design/ui-preview.html` (clickable mockup, five themes).
 
+Build status (26 Nov 2026): waves 0 to 3 are built (foundations; sweep, score and documents;
+approvals, email channel and tracker; agent gateway, runners, sign-in handoff and interview pack).
+Wave 4 adds the remaining screens and channels, hardening of earlier waves, and the old-kit
+importer.
+
 This document is the build specification. Build agents read it in full before touching code.
 Where it says MUST, a reviewer rejects work that does otherwise.
 
@@ -887,6 +892,16 @@ they come from the Kit and must be confirmed by the owner.
 
 ---
 
+## 17. Open items the owner can change before or after the build
+
+1. Product name (Nchito is a placeholder).
+2. Default theme, after seeing the mockup.
+3. Mailbox and storage for wave 2: Gmail and Google Drive first (Microsoft in wave 4).
+4. AI billing: Anthropic API key with a cap by default; subscription CLI as a PC-only option.
+5. Whether to run the server browser runner at all (it costs tokens; the PC runner does not).
+
+---
+
 ## 18. Amendments from the external review (26 Nov 2026)
 
 An outside review was weighed item by item. What was adopted is below and binds like the
@@ -1010,13 +1025,3 @@ to Applied never creates submission evidence: it opens "I applied myself".
 | Structured ownership / period / units attributes on every figure | Canonical-wording facts plus the claim-drift tests cover it without a heavier schema |
 | Redact everything locally before any model sees an import | The owner chooses the provider and is told; only referees and identity documents are held back |
 | Make v1 an assisted-only product | The default mode is already Prepare, and each channel is raised by the owner when ready |
-
----
-
-## 17. Open items the owner can change before or after the build
-
-1. Product name (Nchito is a placeholder).
-2. Default theme, after seeing the mockup.
-3. Mailbox and storage for wave 2: Gmail and Google Drive first (Microsoft in wave 4).
-4. AI billing: Anthropic API key with a cap by default; subscription CLI as a PC-only option.
-5. Whether to run the server browser runner at all (it costs tokens; the PC runner does not).

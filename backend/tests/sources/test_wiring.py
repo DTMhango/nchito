@@ -97,3 +97,21 @@ async def test_a_reworded_posting_does_not_fail_the_job_version_gate_but_a_mater
     job.deadline = date(2026, 12, 1)
     outcome, reason = await gates._job_version(session, job, packet)
     assert outcome == "fail" and "deadline" in reason.lower()
+
+
+async def test_a_web_search_source_uses_the_search_connection_it_names(owner_client, session):
+    ids = []
+    for label, endpoint in (("First", API), ("Second", "https://api.other.example.com/search")):
+        r = await owner_client.post("/api/connections", json={
+            "provider": "search_api", "label": label, "config": {"endpoint": endpoint},
+            "secrets": {"api_key": f"key-{label}"}})
+        assert r.status_code == 201, r.text
+        ids.append(r.json()["id"])
+    default = await search_api.connection_for(session, source("web_search"))
+    assert default is not None and default.endpoint == API  # nothing named: the first enabled
+    named = await search_api.connection_for(session, source("web_search", connection_id=ids[1]))
+    assert named is not None and named.endpoint == "https://api.other.example.com/search"
+    assert named.api_key == "key-Second"
+    await owner_client.put(f"/api/connections/{ids[1]}", json={"enabled": False})
+    session.expire_all()
+    assert await search_api.connection_for(session, source("web_search", connection_id=ids[1])) is None

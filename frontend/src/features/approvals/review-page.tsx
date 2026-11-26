@@ -98,7 +98,8 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
     void qc.invalidateQueries({ queryKey: ["today"] })
   }
 
-  const channel: Channel = app.data?.channel ?? "manual"
+  // The channel is the packet's: what was prepared is what gets approved, whatever the application says now.
+  const channel: Channel = receipt.data?.packet.contents.channel ?? "manual"
   const approve = useMutation({
     mutationFn: () =>
       approvePacket(applicationId, receipt.data!.packet, channel),

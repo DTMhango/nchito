@@ -1,0 +1,17 @@
+Chanda Example
+chanda.example@example.com  +260 970 000 111
+
+PROFILE
+Reporting analyst with eight years in telecoms and retail finance.
+
+WORK EXPERIENCE
+Senior Reporting Analyst, Copperline Telecom (Fictional), Mar 2020 - Present
+- Cut month-end reporting from five days to two.
+Reporting Analyst, Zambezi Retail Group (Fictional), 01/2016 - 02/2020
+- Produced weekly sales reports for 40 stores.
+
+EDUCATION
+BSc Statistics, Example University of Zambia, 2015
+
+SKILLS
+SQL, Python, Power BI

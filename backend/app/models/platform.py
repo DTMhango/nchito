@@ -88,6 +88,7 @@ class SettingRevision(Base, Entity):
     new_value: Mapped[Any] = mapped_column(JSONB, nullable=True)
     changed_by: Mapped[str] = mapped_column(String(120), nullable=False)
     reason: Mapped[str | None] = mapped_column(Text)
+    rollback_of: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), doc="the revision this one restored")
 
 
 class ConfigKind(enum.StrEnum):

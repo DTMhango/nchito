@@ -93,7 +93,7 @@ export const changeJobId = (action: PendingAction): string | null => {
  * "changes" (the job's Changes tab).
  */
 export type KitResolution =
-  ResolveIn["resolution"] | "answer" | "link" | "handoff" | "changes"
+  ResolveIn["resolution"] | "answer" | "link" | "handoff" | "changes" | "skip"
 
 export type ActionKit = {
   primary: { label: string; resolution: KitResolution }
@@ -134,7 +134,10 @@ export function actionKit(action: PendingAction, count: number): ActionKit {
           (choicesOf(action).length ? "Choose what to do" : "See the details"),
         resolution: "handoff",
       },
-      secondary: null,
+      // Skip is the server's `skipped` choice (the give-up endpoint), offered only when it lists it.
+      secondary: choicesOf(action).includes("skipped")
+        ? { label: `Skip ${these}`, resolution: "skip" }
+        : null,
     }
   }
   switch (action.type) {

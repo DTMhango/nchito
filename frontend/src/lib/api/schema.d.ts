@@ -3871,7 +3871,9 @@ export interface paths {
         put?: never;
         /**
          * Data Config Rollback
-         * @description Rollback affects future work only.
+         * @description Restore a revision's value as a NEW revision (history is never edited). Settings go through the settings
+         *     validators; a setting with its own endpoint (the global pause) and a model route that has not passed a recent
+         *     test are refused. Rollback affects future work only.
          */
         post: operations["data_config_rollback"];
         delete?: never;
@@ -9422,7 +9424,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention";
+            kind: "sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention" | "tailoring";
             /** Campaign Id */
             campaign_id?: string | null;
             /**
@@ -9452,7 +9454,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention";
+            kind: "sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention" | "tailoring";
             /** Trigger */
             trigger: string;
             /** Campaign Id */
@@ -9657,7 +9659,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention";
+            kind: "sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention" | "tailoring";
             /** Campaign Id */
             campaign_id?: string | null;
             /**
@@ -9704,7 +9706,7 @@ export interface components {
              * Kind
              * @enum {string}
              */
-            kind: "sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention";
+            kind: "sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention" | "tailoring";
             /** Campaign Id */
             campaign_id: string | null;
             /**
@@ -20774,7 +20776,7 @@ export interface operations {
     runs_list: {
         parameters: {
             query?: {
-                kind?: ("sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention") | null;
+                kind?: ("sweep" | "rescore" | "expiry_check" | "digest" | "backup" | "retention" | "tailoring") | null;
                 campaign_id?: string | null;
                 cursor?: string | null;
                 limit?: number;

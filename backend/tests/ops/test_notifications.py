@@ -287,3 +287,43 @@ async def test_two_deliveries_at_once_send_a_message_only_once(session, telegram
 
     await asyncio.gather(run(), run())
     assert len(telegram.sent) == 1
+
+
+class Crash(BaseException):
+    """The process dying mid-send (not an Exception: nothing in the delivery code can catch it)."""
+
+
+async def test_a_crash_between_send_and_commit_never_sends_twice(session, telegram) -> None:
+    await configure(session)
+    await notifications.notify(session, kind="pending_action", key="crash", title="Sign in")
+    await session.commit()
+
+    async def die(message):
+        telegram.sent.append(message)  # the provider accepted it ...
+        raise Crash  # ... and the process died before the result was saved
+
+    telegram.send = die  # type: ignore[method-assign]
+    with pytest.raises(Crash):
+        await notifications.deliver_due(session, NOON)
+    await session.rollback()
+    row = (await rows(session))[0]
+    assert row.channels_sent == [] and "telegram" in row.payload["_delivery"]["sending"]
+    assert len(telegram.sent) == 1
+
+    # A restart soon after: another worker may still be sending, so it waits and sends nothing.
+    async def forbidden(message):
+        raise AssertionError("resent")
+
+    telegram.send = forbidden  # type: ignore[method-assign]
+    held = await notifications.deliver_due(session, NOON + timedelta(seconds=30))
+    assert held.held == 1 and held.sent == 0
+    # Later the outcome is still unknown: marked uncertain, audited, never resent.
+    later = NOON + timedelta(hours=1)
+    await notifications.deliver_due(session, later)
+    row = (await rows(session))[0]
+    state = row.payload["_delivery"]
+    assert state["state"] == "done" and "telegram" in state["uncertain"] and row.channels_sent == []
+    assert await session.scalar(select(func.count()).select_from(AuditEvent).where(
+        AuditEvent.action == "notification.delivery_uncertain")) == 1
+    await notifications.deliver_due(session, later + timedelta(hours=1))
+    assert len(telegram.sent) == 1

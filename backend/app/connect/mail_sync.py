@@ -346,8 +346,9 @@ async def sync_connection(session: AsyncSession, conn: Connection, mailbox: Mail
     newest = since
     seen: set[str] = set()
     cursor = since
+    limit = page_size
     while True:  # a full page means more may be waiting: page forward until a page is not full
-        messages = await mailbox.list_messages(cursor, limit=page_size)
+        messages = await mailbox.list_messages(cursor, limit=limit)
         fresh = [m for m in messages if m.provider_message_id not in seen]
         res.fetched += len(fresh)
         for msg in sorted(fresh, key=lambda m: m.received_at):
@@ -357,9 +358,13 @@ async def sync_connection(session: AsyncSession, conn: Connection, mailbox: Mail
                 res.skipped += 1  # job-alert mail belongs to the alert source, not to an application
                 continue
             await process_message(session, conn, msg, llm, values, res, now)
-        if len(messages) < page_size or not fresh:
+        if len(messages) < limit:
             break
-        cursor = max(m.received_at for m in messages)
+        # A full page of messages already seen must not end the sync: move on. When the cursor cannot move
+        # (a whole page shares one time) widen the page so the next call gets past the tie.
+        next_cursor = max(m.received_at for m in messages)
+        limit = limit * 2 if next_cursor <= cursor else limit
+        cursor = next_cursor
     conn.config = {**conn.config, "checkpoint_at": newest.isoformat(), "last_sync_at": now.isoformat(),
                    "last_error": None}
     conn.health, conn.last_checked_at = "ok", now

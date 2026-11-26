@@ -48,7 +48,7 @@ async def test_tailor_queues_once_per_spec_version(owner_client, queued):
     w = await seeded()
     r = await owner_client.post(f"/api/applications/{w.app.id}/tailor")
     assert r.status_code == 202, r.text
-    assert r.json() == {"run_id": None, "queued": True}
+    assert r.json()["queued"] is True and r.json()["run_id"] is not None
     r2 = await owner_client.post(f"/api/applications/{w.app.id}/tailor")
     assert r2.status_code == 202 and r2.json()["queued"] is True
     assert len(queued) == 1  # the same request, not queued twice

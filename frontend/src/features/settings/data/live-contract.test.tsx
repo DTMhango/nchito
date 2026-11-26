@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { http, HttpResponse } from "msw"
+import { server } from "@/test/server"
 import { renderApp } from "@/test/render"
 import { aiMockState } from "@/mocks/handlers/ai"
 import { dataMock } from "@/mocks/handlers/data"
@@ -156,6 +158,33 @@ describe("Data against the wave 2 contract", () => {
 })
 
 describe("Health, notifications and history against the wave 2 contract", () => {
+  it("says none yet, with the instance age, for a backup that has not happened", async () => {
+    server.use(
+      http.get("*/api/health/detail", () => {
+        const body = structuredClone(dataMock.health)
+        for (const c of body.components) {
+          if (c.name === "sweep") {
+            c.status = "unknown"
+            c.detail = "None yet. This instance is 5 h old"
+          }
+          if (c.name === "backup") {
+            c.status = "warn"
+            c.detail =
+              "None yet. This instance is 5 days old, so one is overdue (limit 36 h)"
+          }
+        }
+        return HttpResponse.json(body)
+      })
+    )
+    renderApp("/settings/health")
+    const sweep = await screen.findByRole("listitem", { name: "Last sweep" })
+    expect(within(sweep).getByText("None yet")).toBeInTheDocument()
+    expect(within(sweep).getByText(/5 h old/)).toBeInTheDocument()
+    const backup = screen.getByRole("listitem", { name: "Last backup" })
+    expect(within(backup).getByText("Needs a look")).toBeInTheDocument()
+    expect(within(backup).getByText(/overdue/)).toBeInTheDocument()
+  })
+
   it("never shows an unknown component as OK", async () => {
     renderApp("/settings/health")
     const sweep = await screen.findByRole("listitem", { name: "Last sweep" })
@@ -185,15 +214,43 @@ describe("Health, notifications and history against the wave 2 contract", () => 
     expect(await within(digest).findByRole("alert")).toHaveTextContent(/25/)
   })
 
-  it("shows setting changes and offers no rollback (not built on the server)", async () => {
+  it("restores an earlier setting value as a new revision, after a confirm", async () => {
+    const user = userEvent.setup()
     renderApp("/settings/history")
     expect(
-      await screen.findByText("notifications.quiet_hours_start")
-    ).toBeInTheDocument()
+      (await screen.findAllByText("notifications.quiet_hours_start")).length
+    ).toBe(2)
     expect(screen.getByText("22:00")).toBeInTheDocument()
-    expect(screen.getByTestId("rollback-note")).toHaveTextContent(
-      /not available yet/
+    // Only the older revision of the setting can be restored; the newest is what is in force.
+    const buttons = screen.getAllByRole("button", {
+      name: "Restore this value",
+    })
+    expect(buttons).toHaveLength(1)
+    await user.click(buttons[0])
+    await user.click(screen.getByRole("button", { name: "Restore it" }))
+    expect(await screen.findByText("A rollback")).toBeInTheDocument()
+    expect(screen.getAllByText("notifications.quiet_hours_start").length).toBe(
+      3
     )
-    expect(screen.queryByRole("button", { name: /Roll back/ })).toBeNull()
+  })
+
+  it("explains a refused restore", async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.post("*/api/data/config-history/:id/rollback", () =>
+        HttpResponse.json(
+          { detail: "that value is no longer valid" },
+          { status: 422 }
+        )
+      )
+    )
+    renderApp("/settings/history")
+    await user.click(
+      await screen.findByRole("button", { name: "Restore this value" })
+    )
+    await user.click(screen.getByRole("button", { name: "Restore it" }))
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /no longer valid/
+    )
   })
 })

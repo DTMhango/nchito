@@ -280,3 +280,19 @@ async def test_a_full_page_is_followed_by_the_next_so_nothing_in_the_window_is_m
     assert result.fetched == 5 and result.new == 5 and box.list_calls >= 3
     assert len(await threads(session)) == 5
     assert conn.config["checkpoint_at"] == messages[-1].received_at.isoformat()
+
+
+async def test_a_full_page_of_already_seen_messages_does_not_stop_the_sync(session):
+    await settings_service.set_value(session, "mail.max_messages_per_check", 2, actor="owner")
+    conn = await connection(session)
+    same_time = NOW - timedelta(minutes=30)
+    messages = [inbound(subject=f"Note {i}", body="Just checking in about lunch.", thread_id=f"t-{i}",
+                        received=same_time) for i in range(3)]
+    messages.append(inbound(subject="Later", body="Just checking in about lunch.", thread_id="t-late",
+                            received=NOW - timedelta(minutes=10)))
+    box = FakeMailbox()
+    box.inbox = list(messages)
+    result = await mail_sync.sync_connection(session, conn, box, None, now=NOW + timedelta(hours=1))
+    await session.commit()
+    assert result.new == 4
+    assert len(await threads(session)) == 4

@@ -50,6 +50,10 @@ export function SignInPage({ redirectTo }: { redirectTo?: string }) {
       }),
     onSuccess: async () => {
       qc.removeQueries({ queryKey: keys.me })
+      // Anything fetched before the session existed (a 401, a query left waiting) must not survive it.
+      qc.removeQueries({
+        predicate: (q) => q.queryKey[0] !== "auth" && q.queryKey[0] !== "setup",
+      })
       await qc.fetchQuery(meQuery())
       await router.navigate({ href: safeRedirect(redirectTo) })
     },

@@ -873,7 +873,7 @@ async def tailor(application_id: uuid.UUID, principal: PrincipalDep, session: Se
     await session.commit()
     if needs_queue:
         await enqueue(req)
-    return TailorOut(run_id=req.run_id, queued=req.status in tailoring_service.OPEN)
+    return TailorOut(run_id=req.tailoring_run_id, queued=req.status in tailoring_service.OPEN)
 
 
 @router.get("/applications/{application_id}/spec", response_model=SpecStateOut, name="applications_get_spec")

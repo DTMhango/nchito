@@ -139,7 +139,10 @@ class TailoringRequest(Base, Entity):
     request_key: Mapped[str] = mapped_column(String(64), nullable=False,
                                              doc="sha256 of the spec version it starts from and the Kit facts")
     from_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("run.id", ondelete="SET NULL"))
+    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("run.id", ondelete="SET NULL"),
+                                                     doc="the sweep that asked for it (its spend cap applies)")
+    tailoring_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("run.id", ondelete="SET NULL"), doc="this request's own run: history, status and cost")
     status: Mapped[TailoringStatus] = mapped_column(str_enum(TailoringStatus), nullable=False,
                                                     default=TailoringStatus.queued)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

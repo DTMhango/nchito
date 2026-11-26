@@ -18,6 +18,7 @@ export const CONNECTION_PROVIDERS = [
   "telegram",
   "webhook",
   "search_api",
+  "s3",
 ] as const satisfies readonly Provider[]
 export type ConnectionProvider = (typeof CONNECTION_PROVIDERS)[number]
 

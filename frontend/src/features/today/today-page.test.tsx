@@ -1,6 +1,8 @@
 import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { http, HttpResponse } from "msw"
 import { describe, expect, it } from "vitest"
+import { server } from "@/test/server"
 import { renderApp } from "@/test/render"
 import { applicationsMock } from "@/mocks/handlers/applications"
 import { ACTION } from "@/mocks/dataset/runners"
@@ -148,6 +150,37 @@ describe("Today: Needs you", () => {
     ).toBeInTheDocument()
     // A suspicious page is never closed or continued from Today: its choices are on the handoff.
     expect(within(needs).queryByRole("button", { name: "Close it" })).toBeNull()
+  })
+
+  it("lets a suspicious-page blocker be skipped from Today when the server lists skipped", async () => {
+    const user = userEvent.setup()
+    const calls: unknown[] = []
+    server.use(
+      http.post(
+        "*/api/portal-accounts/actions/:id/give-up",
+        async ({ request, params }) => {
+          calls.push([params.id, await request.json()])
+          return HttpResponse.json({
+            outcome: "skipped",
+            handled: [],
+            remaining: 0,
+            closed: true,
+          })
+        }
+      )
+    )
+    renderApp("/today")
+    const needs = await screen.findByRole("region", { name: "Needs you" })
+    const link = await within(needs).findByRole("link", {
+      name: "See where it went",
+    })
+    const row = link.closest("[class]")!.parentElement!
+    await user.click(within(row).getByRole("button", { name: /^Skip/ }))
+    await waitFor(() =>
+      expect(calls).toEqual([
+        [ACTION.offDomain, expect.objectContaining({ outcome: "skipped" })],
+      ])
+    )
   })
 
   it("continues a portal sign-in once, for every waiting application", async () => {

@@ -370,6 +370,7 @@ class RunKind(enum.StrEnum):
     digest = "digest"
     backup = "backup"
     retention = "retention"
+    tailoring = "tailoring"  # one tailoring request (a sweep's or the owner's): its cost and outcome
 
 
 class RunStatus(enum.StrEnum):
