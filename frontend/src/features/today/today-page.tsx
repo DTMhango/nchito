@@ -17,6 +17,7 @@ import {
   UpcomingSection,
   sweepFailed,
 } from "./today-sections"
+import { UpcomingInterviews } from "./upcoming-interviews"
 import { useLiveUpdates } from "./use-live-updates"
 
 function greeting(hour: number) {
@@ -145,6 +146,7 @@ export function TodayPage({
         >
           {today.data ? (
             <>
+              <UpcomingInterviews />
               <UpcomingSection items={today.data.upcoming} timeZone={tz} />
               <SentSection timeZone={tz} />
               <SpendSection />

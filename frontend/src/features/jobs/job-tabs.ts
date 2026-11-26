@@ -8,6 +8,7 @@ export const JOB_TABS = [
   "messages",
   "people",
   "interview",
+  "schedule",
   "changes",
   "activity",
 ] as const

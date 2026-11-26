@@ -55,7 +55,7 @@ export const testConnection = (id: string) =>
       params: { path: { connection_id: id } },
     })
   )
-export const oauthStart = (provider: "gmail" | "gdrive") =>
+export const oauthStart = (provider: "gmail" | "gdrive" | "gcalendar") =>
   unwrap(
     api.POST("/api/connections/oauth/{provider}/start", {
       params: { path: { provider } },

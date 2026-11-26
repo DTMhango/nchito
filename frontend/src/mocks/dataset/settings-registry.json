@@ -61,6 +61,10 @@
    "label": "Interview pack"
   },
   {
+   "key": "calendar",
+   "label": "Calendar"
+  },
+  {
    "key": "retention",
    "label": "Retention"
   },
@@ -2129,6 +2133,156 @@
    "unit": null
   },
   {
+   "key": "calendar.detail_level",
+   "group": "calendar",
+   "label": "Calendar detail",
+   "description": "What the subscription feed and Google Calendar show. employer: 'Interview: <employer>' only. role: adds the role title. full: adds place or link, interviewers, round and type. Your private notes never leave.",
+   "kind": "enum",
+   "default": "employer",
+   "nullable": false,
+   "choices": [
+    "employer",
+    "role",
+    "full"
+   ],
+   "minimum": null,
+   "maximum": null,
+   "unit": null
+  },
+  {
+   "key": "calendar.propose_from_mail",
+   "group": "calendar",
+   "label": "Propose events from invitation mail",
+   "description": "When a reply is classified as an interview invitation, propose an event (never confirmed for you).",
+   "kind": "bool",
+   "default": true,
+   "nullable": false,
+   "choices": null,
+   "minimum": null,
+   "maximum": null,
+   "unit": null
+  },
+  {
+   "key": "calendar.llm_extract",
+   "group": "calendar",
+   "label": "Read invitations with the model",
+   "description": "Off: dates come from the attached calendar file and plain wording rules only. On: when the rules find no time, a budgeted model reads the email as untrusted data and its answer is still only a proposal.",
+   "kind": "bool",
+   "default": false,
+   "nullable": false,
+   "choices": null,
+   "minimum": null,
+   "maximum": null,
+   "unit": null
+  },
+  {
+   "key": "calendar.reminder_offsets_minutes",
+   "group": "calendar",
+   "label": "Reminders before an interview",
+   "description": "Minutes before the start at which you are reminded. Empty: no reminders. Quiet hours apply.",
+   "kind": "list",
+   "default": [
+    1440,
+    60
+   ],
+   "nullable": false,
+   "choices": null,
+   "minimum": null,
+   "maximum": null,
+   "unit": null
+  },
+  {
+   "key": "calendar.prep_nudge_minutes",
+   "group": "calendar",
+   "label": "Preparation nudge",
+   "description": "Minutes before the start at which you are nudged to open the interview pack. 0 turns the nudge off.",
+   "kind": "int",
+   "default": 2880,
+   "nullable": false,
+   "choices": null,
+   "minimum": 0,
+   "maximum": 20160,
+   "unit": "minutes"
+  },
+  {
+   "key": "calendar.debrief_delay_minutes",
+   "group": "calendar",
+   "label": "Ask how it went after",
+   "description": "Minutes after an interview ends before you are asked how it went.",
+   "kind": "int",
+   "default": 60,
+   "nullable": false,
+   "choices": null,
+   "minimum": 0,
+   "maximum": 2880,
+   "unit": "minutes"
+  },
+  {
+   "key": "calendar.followup_days",
+   "group": "calendar",
+   "label": "Follow-up reminder",
+   "description": "Days after a debrief at which a follow-up is due (a thank-you or a chase).",
+   "kind": "int",
+   "default": 2,
+   "nullable": false,
+   "choices": null,
+   "minimum": 1,
+   "maximum": 30,
+   "unit": "days"
+  },
+  {
+   "key": "calendar.default_duration_minutes",
+   "group": "calendar",
+   "label": "Default length",
+   "description": "Length assumed for an event that has no end time (overlap checks, reminders, the feed).",
+   "kind": "int",
+   "default": 60,
+   "nullable": false,
+   "choices": null,
+   "minimum": 5,
+   "maximum": 480,
+   "unit": "minutes"
+  },
+  {
+   "key": "calendar.feed_past_days",
+   "group": "calendar",
+   "label": "Feed history",
+   "description": "How many days of past events stay in the subscription feed.",
+   "kind": "int",
+   "default": 30,
+   "nullable": false,
+   "choices": null,
+   "minimum": 0,
+   "maximum": 365,
+   "unit": "days"
+  },
+  {
+   "key": "calendar.upcoming_days",
+   "group": "calendar",
+   "label": "Upcoming window",
+   "description": "How many days ahead the Upcoming block on Today looks.",
+   "kind": "int",
+   "default": 14,
+   "nullable": false,
+   "choices": null,
+   "minimum": 1,
+   "maximum": 120,
+   "unit": "days"
+  },
+  {
+   "key": "calendar.google_calendar_name",
+   "group": "calendar",
+   "label": "Google calendar name",
+   "description": "Name of the dedicated calendar the app creates in your Google account (used when it is created).",
+   "kind": "string",
+   "default": "Nchito interviews",
+   "nullable": false,
+   "choices": null,
+   "minimum": null,
+   "maximum": null,
+   "unit": null
+  },
+  {
    "key": "retention.below_threshold_text_days",
    "group": "retention",
    "label": "Below-threshold text",
@@ -2283,7 +2437,8 @@
     "run_failed",
     "budget",
     "health",
-    "backup"
+    "backup",
+    "interview_reminder"
    ],
    "nullable": false,
    "choices": [
@@ -2294,7 +2449,8 @@
     "run_failed",
     "budget",
     "health",
-    "backup"
+    "backup",
+    "interview_reminder"
    ],
    "minimum": null,
    "maximum": null,

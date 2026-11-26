@@ -12,6 +12,7 @@ import { resetSettingsMock } from "./handlers/settings"
 import { resetSourcesMock } from "./dataset/sources"
 import { resetStudioMock } from "./handlers/studio"
 import { resetW3JobUiMock } from "./handlers/w3-job-ui"
+import { resetCalendarMock } from "./handlers/calendar"
 
 export function resetAllMocks() {
   resetSettingsMock()
@@ -28,4 +29,5 @@ export function resetAllMocks() {
   resetStudioMock()
   resetDataMock()
   resetW3JobUiMock()
+  resetCalendarMock()
 }
