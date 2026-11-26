@@ -42,7 +42,6 @@ def test_gateway_tools_have_schemas():
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/jobs/compare/00000000-0000-4000-8000-000000000001"),
     ("GET", "/api/insights"),
 ])
 async def test_later_wave_endpoints_answer_501(owner_client, method, path):

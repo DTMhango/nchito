@@ -39,8 +39,10 @@ from app.models.search import (
     SkillAlias,
     TagRule,
 )
+from app.pipeline import compare as compare_roles
 from app.pipeline import conflicts, custom_facets, filters, normalise, scoring
 from app.pipeline.capture import CaptureError, capture
+from app.pipeline.compare import CompareOut
 from app.pipeline.decisions import decide
 from app.schemas.json_types import CustomFacetValue, JobFacets, Requirement, SavedViewBody, StructuredLocation
 
@@ -256,13 +258,6 @@ class WhyOut(BaseModel):
     decision: str
     rules: list[WhyRule]
     conditions: list[ConditionResult] = Field(default_factory=list)
-
-
-class CompareOut(BaseModel):
-    job_ids: list[uuid.UUID]
-    rows: list[dict[str, str | int | None]]
-    winner_id: uuid.UUID | None
-    winner_reason: str | None
 
 
 class SavedViewIn(ApiModel):
@@ -581,9 +576,15 @@ async def why(job_id: uuid.UUID, session: SessionDep, campaign_id: uuid.UUID | N
 
 
 @router.get("/jobs/compare/{job_ids}", response_model=CompareOut, name="jobs_compare")
-async def compare(job_ids: str) -> CompareOut:
-    """Comma-separated job ids. Wave 3."""
-    not_implemented(3, AREA)
+async def compare(job_ids: str, session: SessionDep, campaign_id: uuid.UUID | None = None) -> CompareOut:
+    """Side by side, 2 to 4 roles (comma-separated ids): facets (three-state), pay (normalised per year where
+    that is sound, else marked not comparable), score by rubric criterion, eligibility gates, employer group,
+    deadline and how to apply. ``campaign_id`` picks whose assessment is shown (default: the best scored one).
+    No model call; unknown stays unknown."""
+    try:
+        return await compare_roles.build(session, compare_roles.parse_ids(job_ids), campaign_id=campaign_id)
+    except compare_roles.CompareError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
 
 
 # applied-myself, merge, split and employer fixes live in jobs_corrections.py

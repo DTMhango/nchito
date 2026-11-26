@@ -306,6 +306,23 @@ _int("tracking.imminent_deadline_days", "Imminent deadline",
      "days")
 _int("tracking.stale_pending_days", "Stale pending action",
      "Remind the owner when an open pending action has waited this long.", 3, 7, 1, 90, "days")
+# Posting change alerts (18.4)
+CHANGE_WATCH_STAGES = ("shortlisted", "tailoring", "ready", "applying", "submitted_unconfirmed", "submitted",
+                       "screening", "interview", "offer")
+_bool("tracking.change_watch_enabled", "Watch postings for changes",
+      "Recheck live roles on a schedule and raise an alert when the posting closes or changes in a way that matters.",
+      True)
+_add("tracking.change_watch_stages", "list", "Roles watched for changes",
+     "Roles whose application is in one of these stages are rechecked.",
+     ["shortlisted", "tailoring", "ready"], ["ready", "submitted"], list[str], choices=CHANGE_WATCH_STAGES,
+     validators=(unique_items,), invalid_example=["flying"], has_invalid_example=True)
+_bool("tracking.change_watch_pinned", "Watch pinned roles",
+      "Also recheck roles the owner pinned, even before they have an application.", True)
+_int("tracking.change_check_every_hours", "Posting recheck interval",
+     "A watched role is rechecked at most this often (a failed check counts, so a down site is not hammered).",
+     12, 24, 1, 720, "hours")
+_int("tracking.change_batch_size", "Rechecks per pass",
+     "The most roles rechecked in one scheduled pass; the rest wait for the next pass.", 20, 5, 1, 200)
 
 # Portal accounts and sign-in handoff (8.4)
 def _positive_ints(value: Any) -> None:
@@ -692,6 +709,9 @@ _bool("runners.server_runner_enabled", "Server runner",
       "Run the optional server browser runner. It costs API tokens.", False)
 _int("runners.stale_after_minutes", "Runner offline after",
      "Show a runner as offline when not seen for this long.", 15, 30, 1, 1440, "minutes")
+_int("runners.browser_task_expiry_hours", "Browser task expiry",
+     "A browser application task no runner has claimed after this long is withdrawn (the approved packet stays; "
+     "queue it again when a runner is available).", 24, 48, 1, 336, "hours")
 
 # Data import and export (kit-io)
 _int("data.import_max_zip_mb", "Largest upload", "Refuse an uploaded kit or old-kit zip larger than this.",
