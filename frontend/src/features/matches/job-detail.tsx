@@ -118,7 +118,9 @@ export function JobDetailPane({
         <span className="eyebrow">
           {j.employer}
           {source ? ` · ${source}` : ""}
-          {j.posted_at ? ` · posted ${age(j.posted_at)} ago` : ""}
+          {j.posted_at
+            ? ` · posted ${age(j.posted_at) === "today" ? "today" : `${age(j.posted_at)} ago`}`
+            : ""}
         </span>
         <h2 className="text-xl">{j.title}</h2>
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[0.9rem] text-muted-foreground">
@@ -248,7 +250,7 @@ export function JobDetailPane({
         </Button>
       </div>
 
-      <div className="grid gap-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <div className="grid gap-7 2xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <div className="grid content-start gap-6">
           <ScoreBreakdown assessment={a} loading={assessments.isLoading} />
           <FilterResults assessment={a} />

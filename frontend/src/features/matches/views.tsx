@@ -147,7 +147,7 @@ function ViewList({
   catalog: FacetCatalogEntry[]
 }) {
   return (
-    <ul className="grid gap-px">
+    <ul className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-px">
       {views.map((v) => (
         <ViewItem
           key={v.id}

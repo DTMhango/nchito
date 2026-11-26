@@ -29,6 +29,8 @@ type FilterBarProps = {
   searchRef?: Ref<HTMLInputElement>
   /** Save / update view controls, shown beside the summary. */
   viewActions?: ReactNode
+  /** Extra controls at the end of the first row (views menu, shortcuts). */
+  tools?: ReactNode
 }
 
 const selectCls =
@@ -41,6 +43,7 @@ export function FilterBar({
   onChange,
   searchRef,
   viewActions,
+  tools,
 }: FilterBarProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const sels: FacetSels = { f: search.f, r: search.r }
@@ -111,6 +114,7 @@ export function FilterBar({
           Filters
           {n > 0 && <span className="num text-xs">{n}</span>}
         </Button>
+        {tools}
       </div>
 
       <div

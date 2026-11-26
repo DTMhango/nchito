@@ -290,7 +290,7 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
         <div
           role="tablist"
           aria-label="Match lists"
-          className="flex min-w-0 flex-1 [scrollbar-width:none] gap-0.5 overflow-x-auto"
+          className="flex min-w-0 flex-1 [scrollbar-width:none] gap-0.5 overflow-x-auto [mask-image:linear-gradient(to_left,transparent,black_20px)] pr-4"
         >
           {TABS.map((t) => (
             <button
@@ -303,7 +303,7 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
                 setChecked(new Set())
               }}
               className={cn(
-                "-mb-px inline-flex items-center gap-1.5 border-b-2 border-transparent px-2.5 pt-2 pb-2.5 text-[0.88rem] font-semibold whitespace-nowrap text-muted-foreground hover:text-foreground",
+                "-mb-px inline-flex items-center gap-1.5 border-b-2 border-transparent px-2 pt-2 pb-2.5 text-sm font-semibold whitespace-nowrap text-muted-foreground hover:text-foreground",
                 "aria-selected:border-primary aria-selected:text-foreground"
               )}
             >
@@ -314,15 +314,6 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
             </button>
           ))}
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="mb-1.5 shrink-0 max-md:hidden"
-          aria-label="Keyboard shortcuts"
-          onClick={() => setKeysOpen(true)}
-        >
-          <Keyboard aria-hidden="true" />
-        </Button>
       </div>
       {checked.size > 0 && (
         <BulkBar
@@ -437,7 +428,7 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
               catalog={catalog}
               onChange={(p) => update({ ...p, job: undefined })}
               searchRef={searchRef}
-              viewActions={
+              tools={
                 <>
                   <ViewsMenu
                     views={views}
@@ -445,12 +436,26 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
                     onManageTags={() => setTagsOpen(true)}
                     activeViewId={search.view}
                   />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="shrink-0 max-md:hidden"
+                    aria-label="Keyboard shortcuts"
+                    title="Keyboard shortcuts (?)"
+                    onClick={() => setKeysOpen(true)}
+                  >
+                    <Keyboard aria-hidden="true" />
+                  </Button>
+                </>
+              }
+              viewActions={
+                search.f || search.r || search.q || search.g || activeView ? (
                   <ViewActions
                     state={viewState}
                     activeView={activeView}
                     onSaved={(v) => update({ view: v.id }, true)}
                   />
-                </>
+                ) : undefined
               }
             />
           </div>
