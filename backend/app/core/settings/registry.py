@@ -52,6 +52,7 @@ GROUPS: dict[str, str] = {
     "backups": "Backups",
     "notifications": "Notifications",
     "runners": "Runners",
+    "data": "Data import and export",
 }
 
 AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
@@ -354,6 +355,20 @@ _bool("runners.server_runner_enabled", "Server runner",
       "Run the optional server browser runner. It costs API tokens.", False)
 _int("runners.stale_after_minutes", "Runner offline after",
      "Show a runner as offline when not seen for this long.", 15, 30, 1, 1440, "minutes")
+
+# Data import and export (kit-io)
+_int("data.import_max_zip_mb", "Largest upload", "Refuse an uploaded kit or old-kit zip larger than this.",
+     50, 20, 1, 500, "MB")
+_int("data.import_max_file_mb", "Largest file in a zip", "Refuse a zip holding a file larger than this once unpacked.",
+     25, 10, 1, 200, "MB")
+_int("data.import_max_files", "Most files in a zip", "Refuse a zip with more files than this.", 500, 100, 1, 5000)
+_int("data.export_link_minutes", "Export link lifetime", "How long a prepared export stays downloadable.",
+     60, 15, 1, 1440, "minutes")
+_int("data.import_staging_hours", "Import preview lifetime",
+     "How long a previewed import waits for confirmation before it is discarded.", 24, 48, 1, 168, "hours")
+_bool("data.old_kit_ai_extraction", "AI for unrecognised old-kit files",
+      "Send old-kit files the built-in parser does not recognise to your chosen AI provider, as data, to propose "
+      "facts. Off means only the built-in parser runs.", False)
 
 
 REGISTRY: dict[str, SettingDef] = {d.key: d for d in _DEFS}
