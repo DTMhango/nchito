@@ -1008,6 +1008,9 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
 - Query: `since`, `until` (default `insights.default_range_days` back from today), `campaign_id`, `track_id`, `source_id`, `country`, `channel`, `period` (week or month).
 - Counting: a role counts once (merged jobs and second applications ignored; skipped and never-sent closed are not applications); sent = `applied_at` set (includes "I applied myself"); reply = reached screening, interview, offer or accepted, or rejected after sending.
 - Settings: `insights.min_sample`, `insights.default_range_days`, `insights.week_start`.
+- Messages (integration): `InsightsOut.messages {sent, by_kind: CountRow[], uncertain_sends}` counts messages about
+  applications (follow-ups, thank-yous, replies) sent in the range, apart from applications; message packets never
+  count as an application's approval, and `automation.uncertain_sends` counts application sends only.
 - Drill-through (integration): `GET /api/applications` also takes `since`, `until`, `track_id`, `source_id`, `country` and `reached` (`tailored`, `approved`, `sent`, `reply`, `interview`, `offer`); any of them makes the list exactly the applications the Insights number counted (`campaign_id` and `channel` join the same filter). `GET /api/jobs` takes `since`, `until`, `campaign_id`, `track_id`, `source_id`, `country` and `reached` (`found`, `passed_filters`, `scored_above`; absent = the source table's roles found). Both go through `app.ops.insights.drill_application_ids` / `drill_job_ids`, the report's own counting code. The Applications and Matches screens read these from the URL and show them as removable chips; while a drill is on, Matches bulk actions take only ticked roles.
 
 ## Wave 4 themes additions

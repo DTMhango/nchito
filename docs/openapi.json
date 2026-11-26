@@ -30142,6 +30142,9 @@
             "type": "array",
             "title": "Exclusions",
             "description": "Hard filters that excluded the most roles, most first"
+          },
+          "messages": {
+            "$ref": "#/components/schemas/MessageOutcomes"
           }
         },
         "type": "object",
@@ -30156,7 +30159,8 @@
           "spend",
           "sources",
           "automation",
-          "exclusions"
+          "exclusions",
+          "messages"
         ],
         "title": "InsightsOut"
       },
@@ -32816,6 +32820,36 @@
           "dispatch"
         ],
         "title": "MessageOut"
+      },
+      "MessageOutcomes": {
+        "properties": {
+          "sent": {
+            "type": "integer",
+            "title": "Sent",
+            "description": "Messages that went out in the period"
+          },
+          "by_kind": {
+            "items": {
+              "$ref": "#/components/schemas/CountRow"
+            },
+            "type": "array",
+            "title": "By Kind",
+            "description": "Sent messages per MessageKind, most first"
+          },
+          "uncertain_sends": {
+            "type": "integer",
+            "title": "Uncertain Sends",
+            "description": "Message sends whose outcome is not known yet"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sent",
+          "by_kind",
+          "uncertain_sends"
+        ],
+        "title": "MessageOutcomes",
+        "description": "Messages about applications (follow-ups, thank-yous, replies): counted here, never as applications."
       },
       "MessagePacketOut": {
         "properties": {

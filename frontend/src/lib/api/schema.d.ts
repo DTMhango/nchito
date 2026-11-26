@@ -8937,6 +8937,7 @@ export interface components {
              * @description Hard filters that excluded the most roles, most first
              */
             exclusions: components["schemas"]["CountRow"][];
+            messages: components["schemas"]["MessageOutcomes"];
         };
         /** InterviewEstimateOut */
         InterviewEstimateOut: {
@@ -9858,6 +9859,27 @@ export interface components {
             created_by: string;
             packet: components["schemas"]["MessagePacketOut"] | null;
             dispatch: components["schemas"]["MessageDispatchOut"] | null;
+        };
+        /**
+         * MessageOutcomes
+         * @description Messages about applications (follow-ups, thank-yous, replies): counted here, never as applications.
+         */
+        MessageOutcomes: {
+            /**
+             * Sent
+             * @description Messages that went out in the period
+             */
+            sent: number;
+            /**
+             * By Kind
+             * @description Sent messages per MessageKind, most first
+             */
+            by_kind: components["schemas"]["CountRow"][];
+            /**
+             * Uncertain Sends
+             * @description Message sends whose outcome is not known yet
+             */
+            uncertain_sends: number;
         };
         /** MessagePacketOut */
         MessagePacketOut: {

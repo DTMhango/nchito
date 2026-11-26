@@ -32,7 +32,6 @@ function serveRounds() {
     focus: [],
     pack_id: "pack-1",
     thank_you_draft: null,
-    content: {},
   })
   server.use(
     http.get("*/api/jobs/:jobId/interview-pack/rounds", () =>

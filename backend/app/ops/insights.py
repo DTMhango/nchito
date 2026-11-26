@@ -27,6 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apply.approval import AUTO_APPROVER
+from app.apply.packets import is_application_packet
 from app.core.clock import utcnow
 from app.core.settings import service as settings_service
 from app.models.applications import (
@@ -41,6 +42,7 @@ from app.models.applications import (
     PendingActionType,
     Stage,
 )
+from app.models.followups import OutboundMessage
 from app.models.kit import Track
 from app.models.platform import AuditEvent, LedgerEntry, LedgerKind
 from app.models.search import Assessment, AssessmentState, Campaign, Job, JobSighting, Source
@@ -159,6 +161,14 @@ class AutomationOutcomes(BaseModel):
     permits_denied: list[CountRow]
 
 
+class MessageOutcomes(BaseModel):
+    """Messages about applications (follow-ups, thank-yous, replies): counted here, never as applications."""
+
+    sent: int = Field(description="Messages that went out in the period")
+    by_kind: list[CountRow] = Field(description="Sent messages per MessageKind, most first")
+    uncertain_sends: int = Field(description="Message sends whose outcome is not known yet")
+
+
 class InsightsOut(BaseModel):
     since: date
     until: date
@@ -171,6 +181,7 @@ class InsightsOut(BaseModel):
     sources: list[SourceRow]
     automation: AutomationOutcomes
     exclusions: list[CountRow] = Field(description="Hard filters that excluded the most roles, most first")
+    messages: MessageOutcomes
 
 
 # ----- helpers ------------------------------------------------------------------------------------
@@ -271,7 +282,7 @@ class Collector:
     def track_of(self, campaign_id: uuid.UUID | None) -> uuid.UUID | None:
         return self.campaigns[campaign_id][1] if campaign_id in self.campaigns else None
 
-    def _job_ok(self, job: Job, campaign_id: uuid.UUID | None) -> bool:
+    def job_ok(self, job: Job, campaign_id: uuid.UUID | None) -> bool:
         f = self.f
         if job.merged_into_id is not None:
             return False
@@ -294,7 +305,7 @@ class Collector:
         for app, job in rows:
             if app.stage == Stage.skipped or (app.stage == Stage.closed and app.applied_at is None):
                 continue
-            if job.id in seen or not self._job_ok(job, app.campaign_id):
+            if job.id in seen or not self.job_ok(job, app.campaign_id):
                 continue
             if f.channel and app.channel != f.channel:
                 continue
@@ -327,7 +338,8 @@ class Collector:
             by_id[app_id].tailored = True
         for app_id, approver in await s.execute(
                 select(ApplicationPacket.application_id, ApplicationPacket.approved_by)
-                .where(ApplicationPacket.application_id.in_(ids), ApplicationPacket.approved_at.is_not(None))
+                .where(ApplicationPacket.application_id.in_(ids), ApplicationPacket.approved_at.is_not(None),
+                       is_application_packet())
                 .order_by(ApplicationPacket.approved_at)):
             x = by_id[app_id]
             x.approved = True
@@ -338,7 +350,7 @@ class Collector:
         rows = (await self.session.execute(
             select(Assessment, Job).join(Job, Job.id == Assessment.job_id)
             .where(Assessment.created_at >= self.start, Assessment.created_at < self.end))).all()
-        return [(a, j) for a, j in rows if self._job_ok(j, a.campaign_id)]
+        return [(a, j) for a, j in rows if self.job_ok(j, a.campaign_id)]
 
     async def jobs(self) -> list[Job]:
         return list((await self.session.scalars(
@@ -470,9 +482,10 @@ async def _automation(session: AsyncSession, apps: list[AppFacts], c: Collector)
             auto += 1
         else:
             approved += 1
-    uncertain = await session.scalar(select(func.count()).select_from(DispatchAttempt).where(
+    uncertain = await session.scalar(select(func.count()).select_from(DispatchAttempt).join(
+        ApplicationPacket, ApplicationPacket.id == DispatchAttempt.packet_id).where(
         DispatchAttempt.status == DispatchStatus.unknown, DispatchAttempt.created_at >= c.start,
-        DispatchAttempt.created_at < c.end)) or 0
+        DispatchAttempt.created_at < c.end, is_application_packet())) or 0
     blockers = (await session.execute(
         select(PendingAction.type, func.count()).where(
             PendingAction.type.in_(BLOCKER_TYPES), PendingAction.created_at >= c.start,
@@ -488,6 +501,30 @@ async def _automation(session: AsyncSession, apps: list[AppFacts], c: Collector)
                         key=lambda r: (-r.count, r.key)),
         permits_denied=sorted((CountRow(key=k, count=n) for k, n in denied.items()),
                               key=lambda r: (-r.count, r.key)))
+
+
+async def _messages(session: AsyncSession, c: Collector) -> MessageOutcomes:
+    """Message sends in the period, for applications whose role passes the report's filters (the channel
+    filter is about applications and does not apply)."""
+    rows = (await session.execute(
+        select(OutboundMessage.kind, DispatchAttempt.status, Job, Application.campaign_id)
+        .join(DispatchAttempt, DispatchAttempt.packet_id == OutboundMessage.packet_id)
+        .join(Application, Application.id == OutboundMessage.application_id)
+        .join(Job, Job.id == Application.job_id)
+        .where(DispatchAttempt.status.in_((DispatchStatus.sent, DispatchStatus.acknowledged, DispatchStatus.unknown)),
+               DispatchAttempt.created_at >= c.start, DispatchAttempt.created_at < c.end))).all()
+    kinds: dict[str, int] = defaultdict(int)
+    uncertain = 0
+    for kind, status, job, campaign_id in rows:
+        if not c.job_ok(job, campaign_id):
+            continue
+        if status == DispatchStatus.unknown:
+            uncertain += 1
+        else:
+            kinds[kind] += 1
+    return MessageOutcomes(sent=sum(kinds.values()), uncertain_sends=uncertain,
+                           by_kind=sorted((CountRow(key=k, count=n) for k, n in kinds.items()),
+                                          key=lambda r: (-r.count, r.key)))
 
 
 def _exclusions(assessments: list[tuple[Assessment, Job]]) -> list[CountRow]:
@@ -599,4 +636,5 @@ async def build_insights(session: AsyncSession, f: InsightFilters, *, period: Sp
                            str(values["budget.currency"]), sent, interviews),
         sources=_sources(jobs, assessments, apps, c),
         automation=await _automation(session, apps, c),
-        exclusions=_exclusions(assessments))
+        exclusions=_exclusions(assessments),
+        messages=await _messages(session, c))

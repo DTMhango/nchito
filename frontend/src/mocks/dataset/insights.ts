@@ -214,6 +214,14 @@ export function insightsDataset(): InsightsReport {
       { key: "work_rights", count: 20 },
       { key: "pay_floor", count: 9 },
     ],
+    messages: {
+      sent: 3,
+      by_kind: [
+        { key: "follow_up", count: 2 },
+        { key: "thank_you", count: 1 },
+      ],
+      uncertain_sends: 0,
+    },
   }
 }
 
@@ -251,4 +259,5 @@ export const emptyInsights = (): InsightsReport => ({
     permits_denied: [],
   },
   exclusions: [],
+  messages: { sent: 0, by_kind: [], uncertain_sends: 0 },
 })

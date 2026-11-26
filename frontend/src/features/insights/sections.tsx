@@ -626,6 +626,37 @@ function CountTable({
   )
 }
 
+const MESSAGE_KIND: Record<string, string> = {
+  follow_up: "follow-up",
+  thank_you: "thank-you",
+  info_reply: "reply with information",
+  slot_accept: "slot accepted",
+  slot_decline: "slot declined",
+  withdraw: "withdrawal",
+  offer_decline: "offer declined",
+}
+
+/** Messages about applications, counted apart: they never add to the applications above. */
+function MessagesLine({ messages }: { messages: InsightsReport["messages"] }) {
+  const kinds = messages.by_kind
+    .map((r) => `${r.count} ${MESSAGE_KIND[r.key] ?? r.key.replace(/_/g, " ")}`)
+    .join(", ")
+  return (
+    <p
+      data-testid="insights-messages"
+      className="text-sm text-muted-foreground"
+    >
+      Messages about applications (not counted as applications):{" "}
+      <b className="num text-foreground">{messages.sent}</b> sent
+      {kinds ? ` (${kinds})` : ""}
+      {messages.uncertain_sends > 0
+        ? `, ${messages.uncertain_sends} not confirmed yet`
+        : ""}
+      .
+    </p>
+  )
+}
+
 export function AutomationSection({ report }: { report: InsightsReport }) {
   const a = report.automation
   const sent = a.auto + a.approved + a.manual
@@ -646,6 +677,7 @@ export function AutomationSection({ report }: { report: InsightsReport }) {
           Nothing sent in this range yet, so there is no split to show.
         </Small>
       )}
+      <MessagesLine messages={report.messages} />
       <div className="mt-3 grid gap-6 lg:grid-cols-3">
         <CountTable
           title="Blockers by kind"

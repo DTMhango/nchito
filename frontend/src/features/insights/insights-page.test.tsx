@@ -11,6 +11,15 @@ const section = async (name: string) =>
   (await screen.findByRole("heading", { level: 2, name })).closest("section")!
 
 describe("Insights", () => {
+  it("counts messages about applications apart from applications", async () => {
+    renderApp("/insights")
+    const auto = await section("Automation and exclusions")
+    const line = within(auto).getByTestId("insights-messages")
+    expect(line).toHaveTextContent(
+      "Messages about applications (not counted as applications): 3 sent (2 follow-up, 1 thank-you)."
+    )
+  })
+
   it("shows the funnel and states each small-sample rate with its caveat", async () => {
     renderApp("/insights")
     const funnel = await section("Funnel by campaign")
