@@ -908,3 +908,46 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   `app.apply.accounts.register_blocker` when that module is present (`app.gateway.accounts_bridge`).
 - **Settings** (`runners.*`): `task_lease_minutes`, `max_claimed_tasks`, `claims_per_hour`, `calls_per_minute`,
   `file_url_minutes`, `evidence_max_kb`, `route_account_free`, `account_free_portals`, `task_instructions`.
+
+## Wave 3 integration
+
+- **Migrations** chained: `0013_interview` -> `0014_accounts` -> `0015_browser_changes` -> `0016_gateway` ->
+  `0017_search_api` (connection provider `search_api`).
+- **One permit flow for browser applications** (the browser channel's, see "Wave 3 browser-changes additions"). Apply
+  tasks are created only by `dispatch.queue` without a runner token / `browser.queue_approved_tasks`; the gateway's
+  own hand-out (`enqueue_apply`, `hand_out`, `requeue_approved`) is gone and `gateway_tick` only expires leases.
+  `next_task` claims through `browser.mark_task_claimed`; `request_submit_permit` (after comparing what was entered
+  with the packet) calls `dispatch.queue(app, runner_token_id=, agent_task_id=)` + `dispatch.run` and answers
+  `granted` only for a `handed_off` attempt: the permit is **consumed at clearance**, bound to the packet hash and the
+  claimed task. `report_result` goes to `browser.record_result`; `UnpermittedReport` (no cleared attempt) is the
+  violation: audited, runner suspended, alert, held as uncertain. A task blocked by `wait_for_owner` is rebound to the
+  newly approved packet and returned to the same runner by `browser.queue_task`. `permit_id` on `report_result` is
+  optional; when given it must be the cleared attempt's permit.
+- **Routing** `browser.preferred_runner(job)`: `accounts.preferred_runner_kind`, else `runners.route_account_free`.
+  `accounts.assess_need` falls back to the system recognised from the apply link when the posting names none.
+  Setting `runners.account_free_portals` is removed (folded into `accounts.account_free_methods`).
+- **Accounts**: `raise_blocker` calls `accounts.register_blocker` directly (the optional bridge is removed); the
+  action keeps the gateway's detail (`url`, `released`, ...). Per-task blockers are one action per task **and kind**
+  (`group_key = task:<id>:<kind>`): one "continue" never closes a CAPTCHA and a verification code together, and a
+  task stays blocked while another of its blockers is open. `unsupported_form` uses its own pending action type.
+  Approving a browser packet calls `accounts.ensure_for_application` at once.
+- **Pending actions**: `PendingActionOut.type` includes `unsupported_form`, `redirect_off_domain`, `page_instruction`;
+  new `kind` (= `detail.kind`, e.g. `posting_changed`, `posting_closed`, `verification_code`) and list filter
+  `?kind=`.
+- **Gateway**: `find_answer` outcome `skip_role` when `automation.unknown_question = skip_role` (task ended, role
+  skipped, nothing asked or guessed). New tool `get_runner_config` -> `RunnerConfigOut {runner_kind, enabled, model,
+  currency, task_cap_minor, day_cap_minor, task_max_tokens, day_max_tokens, max_steps, lease_minutes,
+  evidence_max_bytes}` (settings `runners.server_day_cap_minor`, `runners.server_task_max_tokens`,
+  `runners.server_day_max_tokens`). Any authenticated `/mcp` request updates `ApiToken.last_used_at`.
+  `POST /api/tokens/{id}/reinstate` takes `ReinstateIn {acknowledged, note?}`; a suspended token needs
+  `acknowledged: true` (422 `acknowledgement_required`), audited with the note.
+- **Sources**: `build_connector(source, transport, extras=)` passes each connector what its constructor takes
+  (`api_key` from the `search_api` connection named by the source's `connection_id` or the first enabled one; the
+  run's `llm`; live `settings`). Connection `search_api`: config `endpoint` + response shape, secret `api_key`
+  (encrypted, masked), `POST /api/connections/{id}/test` runs one search. A posting a sweep sees again goes through
+  `changes.record_changes` (source `sweep`). The permit's `job_version` gate and the dispatch-time source recheck
+  pass a reworded posting and fail a material change.
+- **Interview**: `PUT /api/jobs/{job_id}/interview-pack/stories/{story_id}` `StoryEditIn {title?, requirement?,
+  situation?, task?, action?, result?, base_version?}` -> new checked `stories` version (409 `version_conflict`).
+- **Exit tests** `tests/integration/test_wave3_exit.py` (in-process MCP client, fakes only); the module docstring
+  lists which test covers each 18.6 release gate.
