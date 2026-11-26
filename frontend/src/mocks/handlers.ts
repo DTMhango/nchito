@@ -15,6 +15,7 @@ import { campaignHandlers } from "./handlers/campaigns"
 import { applicationsHandlers } from "./handlers/applications"
 import { jobHandlers } from "./handlers/jobs"
 import { settingsHandlers } from "./handlers/settings"
+import { matchesHandlers } from "./handlers/matches"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -204,4 +205,6 @@ export const handlers = [
   ...applicationsHandlers,
   ...jobHandlers,
   ...settingsHandlers,
+
+  ...matchesHandlers,
 ]

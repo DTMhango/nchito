@@ -1,9 +1,16 @@
-import { CircleCheck, CircleHelp, CircleX, HelpCircle } from "lucide-react"
+import {
+  CircleCheck,
+  CircleHelp,
+  CircleX,
+  HelpCircle,
+  Info,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Chip, type ChipTone } from "./chip"
 import { EmptyState } from "./empty-state"
 
-export type WhyOutcome = "pass" | "fail" | "unknown"
+/** "info" marks a rule that applied without deciding anything (e.g. quiet hours). */
+export type WhyOutcome = "pass" | "fail" | "unknown" | "info"
 
 export type WhyReason = {
   /** The rule or gate, e.g. "Auto-apply threshold" or "One role per employer". */
@@ -33,6 +40,7 @@ const OUTCOME = {
   pass: { icon: CircleCheck, cls: "text-good", text: "Passed" },
   fail: { icon: CircleX, cls: "text-danger", text: "Stopped it" },
   unknown: { icon: CircleHelp, cls: "text-warn", text: "Unknown" },
+  info: { icon: Info, cls: "text-info", text: "For information" },
 } as const
 
 /**
@@ -76,11 +84,11 @@ export function WhyPanel({
         />
       ) : (
         <ul className="grid">
-          {reasons.map((r) => {
+          {reasons.map((r, i) => {
             const o = OUTCOME[r.outcome]
             return (
               <li
-                key={r.rule}
+                key={`${r.rule}-${i}`}
                 className="grid grid-cols-[18px_minmax(0,1fr)] gap-2.5 border-t border-border row-pad first:border-t-0"
               >
                 <o.icon

@@ -34,6 +34,7 @@ import { SetupPage } from "@/features/auth/setup-page"
 import { SignInPage } from "@/features/auth/sign-in-page"
 import { TodayPage } from "@/features/today/today-page"
 import { MatchesPage } from "@/features/matches/matches-page"
+import { matchesSearchSchema } from "@/features/matches/filters"
 import { ApplicationsPage } from "@/features/applications/applications-page"
 import { JOB_TABS, JobPage } from "@/features/jobs/job-page"
 import { StudioPage } from "@/features/studio/studio-page"
@@ -142,7 +143,24 @@ const page = <P extends string>(
   })
 
 const todayRoute = page("/today", "Today", TodayPage)
-const matchesRoute = page("/matches", "Matches", MatchesPage)
+const matchesRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/matches",
+  staticData: { title: "Matches" },
+  validateSearch: matchesSearchSchema,
+  component: function MatchesRoute() {
+    const search = matchesRoute.useSearch()
+    const navigate = matchesRoute.useNavigate()
+    return (
+      <MatchesPage
+        search={search}
+        onSearch={(next, opts) =>
+          void navigate({ search: next, replace: opts?.replace })
+        }
+      />
+    )
+  },
+})
 const applicationsRoute = page(
   "/applications",
   "Applications",
