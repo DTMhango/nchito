@@ -2,8 +2,9 @@
 # Self-check for the Nchito local runner. Needs no browser.
 #   check.sh [--quiet]
 # Checks environment variables, the installed MCP config (placeholders only), the skill, the
-# claude CLI, GET /api/health/live, and an MCP initialize call to /mcp with the runner token
-# (a warning, not a failure, when the server has no /mcp yet). Exit 0 when nothing failed.
+# claude CLI, GET /api/health/live, and the gateway with the runner token: MCP initialize,
+# tools/list compared with the tools this kit expects, and get_runner_config (is this runner
+# switched on). Exit 0 when nothing failed.
 set -uo pipefail
 
 runner_home="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,6 +16,9 @@ warn() { echo "  warn  $1"; }
 fail() { echo "  FAIL  $1"; failed=$((failed + 1)); }
 
 [ -n "$quiet" ] || echo "Nchito runner self-check ($runner_home)"
+
+# The gateway tools this kit is written for (backend/app/gateway/tools.py; nchito_runner.gateway.EXPECTED_TOOLS).
+expected_tools="next_task get_packet find_answer save_checkpoint raise_blocker request_submit_permit report_result report_jobs report_check release_task evidence_upload_url get_runner_config"
 
 url="${NCHITO_URL:-}"
 token="${NCHITO_RUNNER_TOKEN:-}"
@@ -67,19 +71,49 @@ if [ -n "$url" ]; then
 
   if [ -n "$token" ]; then
     body_file="$(mktemp)"
+    # One stateless MCP request; the token goes in a header read from stdin, so it does not
+    # appear in the process list. Prints the HTTP status; the reply lands in $body_file.
+    mcp_post() {
+      printf 'Authorization: Bearer %s\n' "$token" | curl -s -o "$body_file" -w '%{http_code}' --max-time 15 \
+        -X POST -H @- -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
+        --data "$1" "$url/mcp" || true
+    }
     init='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"nchito-runner-check","version":"1"}}}'
-    # The token goes in a header read from stdin, so it does not appear in the process list.
-    code="$(printf 'Authorization: Bearer %s\n' "$token" | curl -s -o "$body_file" -w '%{http_code}' --max-time 15 \
-      -X POST -H @- -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' \
-      --data "$init" "$url/mcp" || true)"
+    code="$(mcp_post "$init")"
+    gateway_up=""
     case "$code" in
-      200) if grep -q serverInfo "$body_file"; then ok "POST /mcp initialize -> 200, token accepted"
-           else warn "POST /mcp -> 200 but no serverInfo in the reply"; fi ;;
-      401|403) fail "POST /mcp -> $code: token rejected (revoked, suspended or mistyped)" ;;
-      307|308) warn "POST /mcp -> $code redirect: the server may want /mcp/ (edit mcp.json url)" ;;
-      404|405|501) warn "POST /mcp -> $code: this server has no gateway yet; token not verified" ;;
+      200) if grep -q serverInfo "$body_file"; then ok "POST /mcp initialize -> 200, token accepted"; gateway_up=1
+           else fail "POST /mcp -> 200 but no serverInfo in the reply"; fi ;;
+      401) fail "POST /mcp -> 401: token rejected (unknown, revoked or mistyped)" ;;
+      429) warn "POST /mcp -> 429: too many calls from this token; try again in a minute" ;;
+      307|308) fail "POST /mcp -> $code redirect: check NCHITO_URL (scheme, host, no path)" ;;
       *) fail "POST /mcp -> ${code:-no answer}" ;;
     esac
+    if [ -n "$gateway_up" ]; then
+      code="$(mcp_post '{"jsonrpc":"2.0","id":2,"method":"tools/list"}')"
+      if [ "$code" != "200" ]; then fail "tools/list -> ${code:-no answer}: no tool list from the gateway"
+      else
+        missing=""
+        for t in $expected_tools; do
+          grep -Eq "\"name\": ?\"$t\"" "$body_file" || missing="$missing $t"
+        done
+        if [ -n "$missing" ]; then fail "the gateway lacks$missing: update Nchito or this runner kit"
+        else ok "tools/list: all $(echo $expected_tools | wc -w | tr -d ' ') expected gateway tools present"; fi
+        if [ -n "${py:-}" ]; then  # tools the kit does not know yet (needs python to read the list)
+          extra="$("$py" -c '
+import json, sys
+names = [t["name"] for t in json.load(open(sys.argv[1], encoding="utf-8"))["result"]["tools"]]
+print(" ".join(n for n in names if n not in sys.argv[2].split()))' "$body_file" "$expected_tools" 2>/dev/null || true)"
+          [ -z "$extra" ] || warn "the gateway has tools this kit does not know: $extra (update the kit)"
+        fi
+      fi
+      code="$(mcp_post '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_runner_config","arguments":{}}}')"
+      if [ "$code" != "200" ]; then fail "get_runner_config -> ${code:-no answer}"
+      elif grep -Eq '"isError": ?true' "$body_file"; then fail "get_runner_config refused: $(head -c 300 "$body_file")"
+      elif grep -Eq '"enabled": ?false' "$body_file"; then fail "this runner is switched off or suspended: see Settings, Runners"
+      elif grep -Eq '"enabled": ?true' "$body_file"; then ok "get_runner_config: runner enabled"
+      else fail "get_runner_config: unreadable reply"; fi
+    fi
     rm -f "$body_file"
   fi
 fi

@@ -4,9 +4,9 @@
 
 .DESCRIPTION
   Checks: environment variables, the installed MCP config (placeholders only, no token in the
-  file), the skill, the claude CLI, conflicting auth variables, GET /api/health/live, and an
-  MCP initialize call to /mcp with the runner token (skipped with a warning when the server
-  has no /mcp yet). Exit code 0 when nothing failed.
+  file), the skill, the claude CLI, conflicting auth variables, GET /api/health/live, and the
+  gateway itself with the runner token: MCP initialize, tools/list compared with the tools this
+  kit expects, and get_runner_config (is this runner switched on). Exit code 0 when nothing failed.
 
 .PARAMETER RunnerHome
   Install folder (default: this script's folder).
@@ -38,6 +38,10 @@ function Get-HttpStatus([string]$Method, [string]$Uri, [hashtable]$Headers, [str
         return @{ Status = 0; Body = ""; Error = $_.Exception.Message }
     }
 }
+
+# The gateway tools this kit is written for (backend/app/gateway/tools.py; nchito_runner.gateway.EXPECTED_TOOLS).
+$ExpectedTools = @("next_task", "get_packet", "find_answer", "save_checkpoint", "raise_blocker", "request_submit_permit",
+    "report_result", "report_jobs", "report_check", "release_task", "evidence_upload_url", "get_runner_config")
 
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 -bor [Net.ServicePointManager]::SecurityProtocol
 
@@ -103,18 +107,42 @@ if ($url) {
     else { Write-Fail "GET /api/health/live -> $($live.Status) $($live.Error)" }
 
     if ($token) {
-        $init = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"nchito-runner-check","version":"1"}}}'
         $h = @{ Authorization = "Bearer $token"; Accept = "application/json, text/event-stream" }
+        $init = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"nchito-runner-check","version":"1"}}}'
         $m = Get-HttpStatus -Method POST -Uri "$url/mcp" -Headers $h -Body $init
+        $gatewayUp = $false
         switch ($m.Status) {
             200 {
-                if ($m.Body -match 'serverInfo') { Write-Ok "POST /mcp initialize -> 200, token accepted" }
-                else { Write-Warn "POST /mcp -> 200 but no serverInfo in the reply" }
+                if ($m.Body -match 'serverInfo') { Write-Ok "POST /mcp initialize -> 200, token accepted"; $gatewayUp = $true }
+                else { Write-Fail "POST /mcp -> 200 but no serverInfo in the reply" }
             }
-            { $_ -in 401, 403 } { Write-Fail "POST /mcp -> $($m.Status): token rejected (revoked, suspended or mistyped)" }
-            { $_ -in 307, 308 } { Write-Warn "POST /mcp -> $($m.Status) redirect: the server may want /mcp/ (edit mcp.json url)" }
-            { $_ -in 404, 405, 501 } { Write-Warn "POST /mcp -> $($m.Status): this server has no gateway yet; token not verified" }
+            401 { Write-Fail "POST /mcp -> 401: token rejected (unknown, revoked or mistyped)" }
+            429 { Write-Warn "POST /mcp -> 429: too many calls from this token; try again in a minute" }
+            { $_ -in 307, 308 } { Write-Fail "POST /mcp -> $($m.Status) redirect: check NCHITO_URL (scheme, host, no path)" }
             default { Write-Fail "POST /mcp -> $($m.Status) $($m.Error)" }
+        }
+        if ($gatewayUp) {
+            # The gateway is stateless: each request stands alone. Compare its tools with this kit's.
+            $list = Get-HttpStatus -Method POST -Uri "$url/mcp" -Headers $h -Body '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+            $names = @()
+            try { $names = @(($list.Body | ConvertFrom-Json).result.tools | ForEach-Object { $_.name }) } catch { }
+            if ($list.Status -ne 200 -or $names.Count -eq 0) { Write-Fail "tools/list -> $($list.Status): no tool list from the gateway" }
+            else {
+                $missing = @($ExpectedTools | Where-Object { $names -notcontains $_ })
+                $extra = @($names | Where-Object { $ExpectedTools -notcontains $_ })
+                if ($missing.Count -gt 0) { Write-Fail "the gateway lacks $($missing -join ', '): update Nchito or this runner kit" }
+                else { Write-Ok "tools/list: all $($ExpectedTools.Count) expected gateway tools present" }
+                if ($extra.Count -gt 0) { Write-Warn "the gateway has tools this kit does not know: $($extra -join ', ') (update the kit)" }
+            }
+            $call = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_runner_config","arguments":{}}}'
+            $rc = Get-HttpStatus -Method POST -Uri "$url/mcp" -Headers $h -Body $call
+            try {
+                $res = ($rc.Body | ConvertFrom-Json).result
+                $conf = $res.structuredContent
+                if ($res.isError -or -not $conf) { Write-Fail "get_runner_config refused: $($res.content[0].text)" }
+                elseif (-not $conf.enabled) { Write-Fail "this runner ($($conf.runner_kind)) is switched off or suspended: see Settings, Runners" }
+                else { Write-Ok "get_runner_config: $($conf.runner_kind) runner enabled, $($conf.max_steps) steps per task" }
+            } catch { Write-Fail "get_runner_config -> $($rc.Status): unreadable reply" }
         }
     }
 }
