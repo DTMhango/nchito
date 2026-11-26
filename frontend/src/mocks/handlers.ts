@@ -16,6 +16,7 @@ import { applicationsHandlers } from "./handlers/applications"
 import { jobHandlers } from "./handlers/jobs"
 import { settingsHandlers } from "./handlers/settings"
 import { matchesHandlers } from "./handlers/matches"
+import { studioHandlers } from "./handlers/studio"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -25,6 +26,8 @@ const notFound = (what: string) =>
   HttpResponse.json({ detail: `${what} not found.` }, { status: 404 })
 
 export const handlers = [
+  // Studio first: it adds spec and checks to the applications it knows and falls through otherwise.
+  ...studioHandlers,
   ...kitHandlers,
   ...sourcesHandlers,
   http.get("*/api/health", () =>

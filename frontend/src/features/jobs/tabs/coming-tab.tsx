@@ -71,7 +71,9 @@ export function ComingTab({
         actions={
           tab === "documents" && applicationId ? (
             <Button asChild size="sm" variant="outline">
-              <Link to="/studio">Open the Studio</Link>
+              <Link to="/studio" search={{ application: applicationId }}>
+                Open the Studio
+              </Link>
             </Button>
           ) : undefined
         }

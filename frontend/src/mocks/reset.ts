@@ -7,6 +7,7 @@ import { resetKitMock } from "./handlers/kit"
 import { resetMatchesMock } from "./handlers/matches"
 import { resetSettingsMock } from "./handlers/settings"
 import { resetSourcesMock } from "./dataset/sources"
+import { resetStudioMock } from "./handlers/studio"
 
 export function resetAllMocks() {
   resetSettingsMock()
@@ -17,4 +18,6 @@ export function resetAllMocks() {
   resetJobsMock()
   resetKitMock()
   resetSourcesMock()
+  // After the Kit, Matches and Applications: the Studio seed reads all three.
+  resetStudioMock()
 }

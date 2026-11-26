@@ -5,7 +5,7 @@
  *   (authed)                              guard: owner exists and signed in
  *     /onboarding?step=                   full-screen set-up guide
  *     (shell)                             AppShell: sidebar, top bar, palette
- *       /today /matches /applications /jobs/$id?tab= /studio /autopilot
+ *       /today /matches /applications /jobs/$id?tab= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
  *       /settings/{appearance,ai,connections,notifications,runners,data,security,activity,history}
@@ -35,6 +35,7 @@ import { SetupPage } from "@/features/auth/setup-page"
 import { SignInPage } from "@/features/auth/sign-in-page"
 import { matchesSearchSchema } from "@/features/matches/filters"
 import { JOB_TABS } from "@/features/jobs/job-tabs"
+import { studioSearchSchema } from "@/features/studio/search"
 import type { SettingsPageKey } from "@/features/settings/settings-group-page"
 import { OnboardingPage } from "@/features/onboarding/onboarding-page"
 
@@ -240,7 +241,22 @@ const applicationsRoute = page(
   "Applications",
   ApplicationsPage
 )
-const studioRoute = page("/studio", "Studio", StudioPage)
+const studioRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/studio",
+  staticData: { title: "Studio" },
+  validateSearch: studioSearchSchema,
+  component: function StudioRoute() {
+    const search = studioRoute.useSearch()
+    const navigate = studioRoute.useNavigate()
+    return (
+      <StudioPage
+        search={search}
+        onSearch={(next) => void navigate({ search: next, replace: true })}
+      />
+    )
+  },
+})
 const autopilotRoute = page("/autopilot", "Autopilot", AutopilotPage)
 const runsRoute = page("/autopilot/runs", "Run history", RunsPage)
 const runDetailRoute = createRoute({
