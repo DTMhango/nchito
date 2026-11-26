@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { Link } from "@tanstack/react-router"
+import { isApiError } from "@/lib/api/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -85,6 +86,24 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
         <Skeleton
           className="h-8 w-[min(360px,70vw)] bg-sunken"
           aria-label="Loading the role"
+        />
+      </View>
+    )
+  if (job.isError && !isApiError(job.error, 404))
+    return (
+      <View>
+        <EmptyState
+          title="The role could not be loaded"
+          description={`${job.error.message} Try again; nothing was changed.`}
+          actions={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void job.refetch()}
+            >
+              Try again
+            </Button>
+          }
         />
       </View>
     )
