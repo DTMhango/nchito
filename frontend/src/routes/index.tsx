@@ -5,7 +5,7 @@
  *   (authed)                              guard: owner exists and signed in
  *     /onboarding?step=                   full-screen set-up guide
  *     (shell)                             AppShell: sidebar, top bar, palette
- *       /today?action= /matches /applications /jobs/$id?tab= /studio?application=&run= /autopilot
+ *       /today?action= /matches /applications /jobs/$id?tab= /compare?ids= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
  *       /settings/{appearance,ai,connections,notifications,runners,data,health,security,activity,history}
@@ -35,6 +35,7 @@ import { SetupPage } from "@/features/auth/setup-page"
 import { SignInPage } from "@/features/auth/sign-in-page"
 import { matchesSearchSchema } from "@/features/matches/filters"
 import { JOB_TABS } from "@/features/jobs/job-tabs"
+import { compareSearchSchema } from "@/features/jobs/compare/api"
 import { studioSearchSchema } from "@/features/studio/search"
 import type { SettingsPageKey } from "@/features/settings/settings-group-page"
 import { OnboardingPage } from "@/features/onboarding/onboarding-page"
@@ -63,6 +64,10 @@ const ApplicationsPage = lazyPage(
   "ApplicationsPage"
 )
 const JobPage = lazyPage(() => import("@/features/jobs/job-page"), "JobPage")
+const ComparePage = lazyPage(
+  () => import("@/features/jobs/compare/compare-page"),
+  "ComparePage"
+)
 const StudioPage = lazyPage(
   () => import("@/features/studio/studio-page"),
   "StudioPage"
@@ -342,6 +347,25 @@ const jobRoute = createRoute({
   },
 })
 
+const compareRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/compare",
+  staticData: { title: "Compare roles" },
+  validateSearch: compareSearchSchema,
+  component: function CompareRoute() {
+    const { ids } = compareRoute.useSearch()
+    const navigate = compareRoute.useNavigate()
+    return (
+      <ComparePage
+        ids={ids}
+        onIds={(next) =>
+          void navigate({ search: { ids: next }, replace: true })
+        }
+      />
+    )
+  },
+})
+
 // ---- Kit ----
 const kitRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -474,6 +498,7 @@ export const routeTree = rootRoute.addChildren([
       matchesRoute,
       applicationsRoute,
       jobRoute,
+      compareRoute,
       studioRoute,
       autopilotRoute,
       approvalsRoute,

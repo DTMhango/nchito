@@ -49,9 +49,9 @@ describe("job page tabs", () => {
     expect(await screen.findByText("At a glance")).toBeInTheDocument()
   })
 
-  it("shows what a later-wave tab will hold", async () => {
+  it("explains the Interview tab when there is no application yet", async () => {
     renderApp(`/jobs/${WIN}?tab=interview`)
-    expect(await screen.findByText(/Arrives in wave 3/)).toBeInTheDocument()
+    expect(await screen.findByText("No application yet")).toBeInTheDocument()
   })
 
   it("shows the sentence behind a facet on focus", async () => {

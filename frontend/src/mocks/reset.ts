@@ -10,6 +10,7 @@ import { resetMatchesMock } from "./handlers/matches"
 import { resetSettingsMock } from "./handlers/settings"
 import { resetSourcesMock } from "./dataset/sources"
 import { resetStudioMock } from "./handlers/studio"
+import { resetW3JobUiMock } from "./handlers/w3-job-ui"
 
 export function resetAllMocks() {
   resetSettingsMock()
@@ -24,4 +25,5 @@ export function resetAllMocks() {
   // After the Kit, Matches and Applications: the Studio seed reads all three.
   resetStudioMock()
   resetDataMock()
+  resetW3JobUiMock()
 }
