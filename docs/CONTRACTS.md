@@ -677,3 +677,22 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   oldest `limit` messages since `since`, oldest first; a full page makes the sync ask again from the newest one.
 - **Handoff**: kit file links for rendered documents use `/api/applications/{id}/document-files/{document_id}`;
   `GET /api/applications/{id}/documents/answers` returns the current packet's answers as text (404 without one).
+
+## Wave 2 send-flow additions
+
+- **Application address** (`app/apply/target.py`, migration `0012_apply_email`: `job.apply_email_owner`,
+  `apply_email_confirmed`, `apply_email_confirmed_at`, `apply_email_confirmed_by`). `Job.apply_email` stays what the
+  pipeline found in the posting; the owner's address (`apply_email_owner`) wins over it. An address is **usable** only
+  while the owner has confirmed that exact address, or its domain is on the trusted-sites list (suffix match). A
+  posting's address is unconfirmed until then: unknown is not yes.
+- `JobDetail` gains `apply_email: ApplyEmailOut | null` (`address`, `found_in: posting_text | posting_link | owner`,
+  `evidence` (the posting's sentence), `confirmed`, `confirmed_by`, `confirmed_at`, `trusted_domain`, `usable`) and
+  `apply_channel_candidates: [{channel: email | browser | manual, available, reason}]`.
+- `PUT /api/jobs/{id}/apply-email` `ApplyEmailIn {address?: string | null, confirmed: bool = true}` -> `JobDetail`.
+  `address` null keeps (or returns to) the posting's address; `confirmed` confirms the resulting address, false
+  withdraws a confirmation. 422 `{code: invalid_address | no_address, reason}`. Audited `job.apply_email_set`; a
+  changed address retires a current packet addressed elsewhere.
+- Permit gate `recipient_confirmed` (email packets): every recipient must be the role's usable address; otherwise
+  `unknown`, settled only by an owner approval, so an automatic approval never sends to an unconfirmed address.
+  `prepare_packet` picks email only for a usable address with a connected mailbox; otherwise manual (to `apply_url`,
+  or `mailto:<address>` when the posting gives only an address).

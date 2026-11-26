@@ -210,6 +210,7 @@ async def test_kit_import_to_one_sent_email_with_the_full_audit_chain(world, own
     request = next(r for r in world["queued"] if r.application_id == app_id)
 
     senior.apply_email = APPLY_TO  # the posting's application address (invented)
+    senior.apply_email_confirmed = APPLY_TO  # the owner confirmed it (the API path is the next test)
     await session.commit()
     async with get_sessionmaker()() as s:  # what the tailoring task does: draft, check, then render and pack
         status = await tailoring.process(s, LedgeredFake(world["fake"], run.id), request.id)

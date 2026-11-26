@@ -20,6 +20,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.apply import target
 from app.connect import mail_connections
 from app.connect.filestore import FileStore
 from app.core import audit
@@ -124,20 +125,23 @@ async def prepare_packet(session: AsyncSession, store: FileStore, app: Applicati
     job = await session.get(Job, app.job_id)
     assert job is not None
     identity = await sending_identity(session)
-    if job.apply_email and identity:
+    address = await target.apply_email(session, job)
+    if address is not None and address.usable and identity:
         channel = "email"
-    elif job.apply_url:
-        channel = "manual"
+        destination = ""
+    elif job.apply_url or address is not None:
+        channel = "manual"  # an unconfirmed address is handed to the owner, never sent by the system
+        destination = job.apply_url or f"mailto:{address.address if address else ''}"
     else:
-        return await _waiting(session, app, "the posting gives no email address or link to apply through"
-                              if not job.apply_email else "no mailbox is connected to send from", actor)
+        return await _waiting(session, app, "the posting gives no email address or link to apply through", actor)
     cv, _ = await _render(session, store, app, "cv", actor)
     letter, letter_text = await _render(session, store, app, "letter", actor)
     email = None
     if channel == "email":
         subject = str(await settings_service.get_value(session, "automation.email_subject_template")).format(
             role=job.title, employer=job.employer, requisition=job.requisition_id or "")
-        email = PacketEmail(to=[str(job.apply_email)], subject=subject.strip(), body=letter_text.strip())
+        assert address is not None
+        email = PacketEmail(to=[address.address], subject=subject.strip(), body=letter_text.strip())
     answers = [packets.DraftAnswer(question=a.question, answer_id=uuid.UUID(a.answer_id)) if a.answer_id
                else packets.DraftAnswer(question=a.question, value=a.value)
                for a in version.answers if a.outcome == "value"]
@@ -145,7 +149,7 @@ async def prepare_packet(session: AsyncSession, store: FileStore, app: Applicati
     if not identity:
         return await _waiting(session, app, "no sending identity: connect a mailbox or add your email to the Kit",
                               actor)
-    draft = packets.PacketDraft(channel=channel, destination_url=job.apply_url or "",  # type: ignore[arg-type]
+    draft = packets.PacketDraft(channel=channel, destination_url=destination,  # type: ignore[arg-type]
                                 sending_identity=identity, answers=answers, email=email, files=[cv, letter],
                                 requisition=job.requisition_id)
     try:

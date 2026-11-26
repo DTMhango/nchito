@@ -36,6 +36,8 @@ async def setup_app(session: AsyncSession, campaign: Campaign, *, title: str = "
                         pay_state="stated", pay_min_minor=50_000_00, pay_max_minor=60_000_00, pay_currency="USD",
                         pay_period="year", raw_text=f"{title} at {employer}. Apply to jobs@acme.example.com.")
     job.last_checked_at = now
+    # The posting's address, confirmed by the owner (app.apply.target): the email channel may send to it.
+    job.apply_email = job.apply_email_confirmed = "jobs@acme.example.com"
     assessment = Assessment(job_id=job.id, campaign_id=campaign.id, state=AssessmentState.scored, score=score,
                             base_score=score, filter_results=[], rubric_id=campaign.rubric_id)
     session.add(assessment)

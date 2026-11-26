@@ -7158,6 +7158,63 @@
         }
       }
     },
+    "/api/jobs/{job_id}/apply-email": {
+      "put": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Set Apply Email",
+        "description": "Set, correct or confirm where this role's application email goes (audited ``job.apply_email_set``).\nAn address found in a posting stays unconfirmed until the owner confirms it here (or its domain is a\ntrusted site); only a usable address is sent to. A changed address retires a packet addressed elsewhere.",
+        "operationId": "jobs_set_apply_email",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyEmailIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not an email address, or nothing to confirm ({code, reason})"
+          }
+        }
+      }
+    },
     "/api/jobs/capture": {
       "post": {
         "tags": [
@@ -16278,6 +16335,135 @@
         "title": "AppliedMyselfIn",
         "description": "\"I applied myself\": counts at once for duplicates, employer limits and follow-ups. No evidence is\ncreated; the application is marked owner-attested."
       },
+      "ApplyChannelCandidate": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "browser",
+              "manual"
+            ],
+            "title": "Channel"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel",
+          "available",
+          "reason"
+        ],
+        "title": "ApplyChannelCandidate"
+      },
+      "ApplyEmailIn": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ApplyEmailIn",
+        "description": "Set, correct or confirm the application address. ``address`` null keeps (or goes back to) the\nposting's own address; ``confirmed`` confirms the resulting address, false withdraws a confirmation."
+      },
+      "ApplyEmailOut": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "found_in": {
+            "type": "string",
+            "enum": [
+              "posting_text",
+              "posting_link",
+              "owner"
+            ],
+            "title": "Found In",
+            "description": "posting_text: quoted in the posting (see evidence); posting_link: its mailto link; owner: set by the owner"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence",
+            "description": "The posting's sentence that gives the address"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed"
+          },
+          "confirmed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed By"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "trusted_domain": {
+            "type": "boolean",
+            "title": "Trusted Domain",
+            "description": "The address's domain is on the trusted-sites list"
+          },
+          "usable": {
+            "type": "boolean",
+            "title": "Usable",
+            "description": "confirmed or trusted_domain: the email channel may send to it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address",
+          "found_in",
+          "confirmed",
+          "trusted_domain",
+          "usable"
+        ],
+        "title": "ApplyEmailOut",
+        "description": "The role's application address and where it came from (``app.apply.target``). Usable for the email\nchannel only when ``confirmed`` by the owner or on a ``trusted_domain``: unknown is not yes."
+      },
       "ApprovalStatusOut": {
         "properties": {
           "approved": {
@@ -22128,6 +22314,23 @@
           "apply_method": {
             "type": "string",
             "title": "Apply Method"
+          },
+          "apply_email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApplyEmailOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "apply_channel_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ApplyChannelCandidate"
+            },
+            "type": "array",
+            "title": "Apply Channel Candidates"
           },
           "requirements": {
             "items": {

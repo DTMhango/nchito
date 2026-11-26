@@ -257,7 +257,13 @@ class Job(Base, Entity):
     apply_url: Mapped[str | None] = mapped_column(Text)
     apply_method: Mapped[str] = mapped_column(String(30), nullable=False, default="unknown",
                                               doc="email, greenhouse, lever, workday, ..., unknown")
-    apply_email: Mapped[str | None] = mapped_column(String(320))
+    apply_email: Mapped[str | None] = mapped_column(String(320), doc="As found in the posting (pipeline-owned)")
+    apply_email_owner: Mapped[str | None] = mapped_column(
+        String(320), doc="The owner's address for this role; wins over the posting's (app.apply.target)")
+    apply_email_confirmed: Mapped[str | None] = mapped_column(
+        String(320), doc="The address the owner confirmed; usable only while it equals the effective one")
+    apply_email_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    apply_email_confirmed_by: Mapped[str | None] = mapped_column(String(120))
     requirements: Mapped[list[Requirement]] = mapped_column(PydanticJSON(list[Requirement]), nullable=False,
                                                             default=list)
     raw_text: Mapped[str | None] = mapped_column(Text)

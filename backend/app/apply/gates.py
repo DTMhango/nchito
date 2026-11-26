@@ -15,6 +15,9 @@ Checks added here (each ``(outcome, reason[, owner_settles])``):
 - ``answers_auto``: every answer comes from a confirmed ``auto`` answer (owner settles).
 - ``destination_verified``: the destination's domain is the posting's own (owner settles).
 - ``trusted_site``: browser only, the destination is on the trusted list (18.1; owner settles).
+- ``recipient_confirmed``: email only, every recipient is the role's usable application address
+  (``app.apply.target``: confirmed by the owner or on a trusted domain; owner settles, so an automatic
+  approval never sends to an unconfirmed address).
 - ``duplicate``: nothing already sent or in flight for this job, requisition or application.
 - ``outstanding_permit`` (permit only): no other unused, unexpired permit for this application.
 - ``runner``: the runner token is not revoked or suspended.
@@ -161,6 +164,16 @@ async def _answers(session: AsyncSession, packet: ApplicationPacket) -> Check:
     return "pass", "every answer comes from a confirmed automatic answer"
 
 
+async def _recipient(session: AsyncSession, job: Job, to: list[str]) -> Check:
+    """An email goes only to the role's usable address (confirmed by the owner, or on a trusted domain)."""
+    from app.apply import target
+
+    usable = await target.usable_email(session, job)
+    if usable and to and all(t.strip().lower() == usable.lower() for t in to):
+        return "pass", f"{usable} is the confirmed application address"
+    return "unknown", f"{', '.join(to) or 'no recipient'} is not an application address you confirmed", True
+
+
 async def _budget(session: AsyncSession, channel: str, runner: ApiToken | None, settings: dict[str, Any]
                   ) -> Check:
     if channel != "browser":
@@ -249,6 +262,8 @@ async def evaluate(session: AsyncSession, app: Application, packet: ApplicationP
         if channel == "browser":
             checks["trusted_site"] = (("pass", f"{dest.domain} is on the trusted list") if dest.trusted
                                       else ("unknown", f"{dest.domain} is not a trusted site: ask first", True))
+        if bound == "email" and packet.contents.email is not None:
+            checks["recipient_confirmed"] = await _recipient(session, job, list(packet.contents.email.to))
         if approval == "auto":
             checks["answers_auto"] = await _answers(session, packet)
     if not for_approval:
