@@ -41,8 +41,16 @@ export function mergeThemes(fromApi: Theme[] | undefined): Theme[] {
   return [...byId.values()]
 }
 
-export function findTheme(themes: Theme[], id: string): Theme {
+/** The theme with `id`; when it is gone, the default theme (`defaultId`), then the first built-in. */
+export function findTheme(
+  themes: Theme[],
+  id: string,
+  defaultId?: string | null
+): Theme {
   return (
-    themes.find((t) => t.id === id) ?? builtinTheme(id) ?? BUILTIN_THEMES[0]
+    themes.find((t) => t.id === id) ??
+    builtinTheme(id) ??
+    (defaultId ? themes.find((t) => t.id === defaultId) : undefined) ??
+    BUILTIN_THEMES[0]
   )
 }

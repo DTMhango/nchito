@@ -25,6 +25,7 @@ from app.models.platform import ConfigKind, ConfigRevision, SettingRevision
 # Settings whose own endpoint enforces what the generic write cannot (the restore lock, pause effects).
 OWN_ENDPOINT = {
     "automation.paused": "use PUT /api/autopilot (and POST /api/autopilot/resume-after-restore after a restore)",
+    "themes.default_theme_id": "use PUT /api/themes/{id}/default",
 }
 
 

@@ -107,7 +107,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return list
   }, [themesQ.data, cached])
 
-  const theme = findTheme(themes, appearance.theme_id)
+  // The API marks the default theme (the fallback when the active one is gone).
+  const defaultId = (
+    themesQ.data as (Theme & { is_default?: boolean })[] | undefined
+  )?.find((t) => t.is_default)?.id
+  const theme = findTheme(themes, appearance.theme_id, defaultId)
   const mode = resolveMode(appearance.mode, systemDark)
 
   const mutation = useMutation({ mutationFn: putAppearance })

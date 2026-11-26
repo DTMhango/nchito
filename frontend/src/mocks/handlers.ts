@@ -1,11 +1,9 @@
 import { delay, http, HttpResponse } from "msw"
-import { BUILTIN_THEMES } from "@/themes"
-import { appearanceSchema, themeSchema } from "@/themes/schema"
+import { appearanceSchema } from "@/themes/schema"
 import type {
   JobCaptureRequest,
   LoginRequest,
   OwnerCreate,
-  ThemeInput,
 } from "@/lib/api/types"
 import { db } from "./db"
 import { aiHandlers } from "./handlers/ai"
@@ -22,14 +20,12 @@ import { autopilotHandlers } from "./handlers/autopilot"
 import { w3JobUiHandlers } from "./handlers/w3-job-ui"
 import { runnersHandlers } from "./handlers/runners"
 import { insightsHandlers } from "./handlers/insights"
+import { themesHandlers } from "./handlers/themes"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
 const unauthorized = () =>
   HttpResponse.json({ detail: "Not signed in." }, { status: 401 })
-const notFound = (what: string) =>
-  HttpResponse.json({ detail: `${what} not found.` }, { status: 404 })
-
 export const handlers = [
   // Explicit order (MSW: first matching handler that returns a response wins).
   // 1. Studio: spec, checks, tailor, documents; its packets handler answers only for
@@ -114,59 +110,8 @@ export const handlers = [
     })
   }),
 
-  // ---- themes ----
-  http.get("*/api/themes", () => {
-    if (!db.get().session) return unauthorized()
-    return HttpResponse.json([...BUILTIN_THEMES, ...db.get().customThemes])
-  }),
-  http.post("*/api/themes", async ({ request }) => {
-    if (!db.get().session) return unauthorized()
-    const body = (await request.json()) as ThemeInput
-    const theme = themeSchema.safeParse({
-      ...body,
-      id: body.id ?? crypto.randomUUID(),
-      builtin: false,
-    })
-    if (!theme.success)
-      return HttpResponse.json(
-        { detail: theme.error.issues[0]?.message },
-        { status: 422 }
-      )
-    db.update((s) => {
-      s.customThemes.push(theme.data)
-    })
-    return HttpResponse.json(theme.data, { status: 201 })
-  }),
-  http.put("*/api/themes/:id", async ({ params, request }) => {
-    if (!db.get().session) return unauthorized()
-    const id = String(params.id)
-    if (BUILTIN_THEMES.some((t) => t.id === id))
-      return HttpResponse.json(
-        { detail: "Built-in themes can't be edited. Duplicate it first." },
-        { status: 403 }
-      )
-    const idx = db.get().customThemes.findIndex((t) => t.id === id)
-    if (idx < 0) return notFound("Theme")
-    const body = (await request.json()) as ThemeInput
-    const theme = themeSchema.parse({ ...body, id, builtin: false })
-    db.update((s) => {
-      s.customThemes[idx] = theme
-    })
-    return HttpResponse.json(theme)
-  }),
-  http.delete("*/api/themes/:id", ({ params }) => {
-    if (!db.get().session) return unauthorized()
-    const id = String(params.id)
-    if (BUILTIN_THEMES.some((t) => t.id === id))
-      return HttpResponse.json(
-        { detail: "Built-in themes can't be deleted." },
-        { status: 403 }
-      )
-    db.update((s) => {
-      s.customThemes = s.customThemes.filter((t) => t.id !== id)
-    })
-    return new HttpResponse(null, { status: 204 })
-  }),
+  // ---- themes and the theme studio ----
+  ...themesHandlers,
 
   // ---- appearance ----
   http.get("*/api/settings/appearance", () => {

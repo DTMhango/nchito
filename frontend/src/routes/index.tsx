@@ -125,6 +125,10 @@ const AppearancePage = lazyPage(
   () => import("@/features/settings/appearance-page"),
   "AppearancePage"
 )
+const ThemeStudioPage = lazyPage(
+  () => import("@/features/theme-studio/theme-studio-page"),
+  "ThemeStudioPage"
+)
 const AiSettingsPage = lazyPage(
   () => import("@/features/settings/ai/ai-page"),
   "AiSettingsPage"
@@ -347,6 +351,14 @@ const campaignEditorRoute = createRoute({
     return <CampaignEditorPage id={campaignEditorRoute.useParams().id} />
   },
 })
+const themeStudioRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/theme-studio/$themeId",
+  staticData: { title: "Theme studio" },
+  component: function ThemeStudioRoute() {
+    return <ThemeStudioPage themeId={themeStudioRoute.useParams().themeId} />
+  },
+})
 const sourcesRoute = page("/sources", "Sources", SourcesPage)
 const insightsRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -542,6 +554,7 @@ export const routeTree = rootRoute.addChildren([
       kitRoute.addChildren([kitIndex, ...kitChildren]),
       campaignsRoute,
       campaignEditorRoute,
+      themeStudioRoute,
       sourcesRoute,
       insightsRoute,
       settingsRoute.addChildren([

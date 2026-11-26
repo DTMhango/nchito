@@ -45,6 +45,7 @@ from app.models.platform import (
     Setting,
     SettingRevision,
     Theme,
+    ThemeRevision,
     WorkerHeartbeat,
 )
 from app.models.search import (
@@ -76,5 +77,6 @@ __all__ = [
     "Owner",
     "PayEstimate", "PendingAction", "Person", "PortalAccount", "Prompt", "Reference", "Rubric", "Run",
     "SavedView", "Schedule", "Setting", "SettingRevision", "Skill", "SkillAlias", "Source", "SubmitPermit",
-    "TagRule", "Template", "Theme", "Track", "TrustedSite", "VaultDocument", "WatchedEmployer", "WorkerHeartbeat",
+    "TagRule", "Template", "Theme", "ThemeRevision", "Track", "TrustedSite", "VaultDocument", "WatchedEmployer",
+    "WorkerHeartbeat",
 ]

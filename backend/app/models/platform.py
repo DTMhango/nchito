@@ -28,7 +28,7 @@ from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, Entity, IdMixin, PydanticJSON, str_enum
-from app.schemas.json_types import ScoreRamp, ThemeFonts
+from app.schemas.json_types import ContrastWaiver, ScoreRamp, ThemeFonts
 
 
 class Owner(Base, Entity):
@@ -250,6 +250,24 @@ class Theme(Base, Entity):
     dark: Mapped[dict[str, str]] = mapped_column(PydanticJSON(dict[str, str]), nullable=False)
     chart: Mapped[list[str]] = mapped_column(PydanticJSON(list[str]), nullable=False)
     score: Mapped[ScoreRamp] = mapped_column(PydanticJSON(ScoreRamp), nullable=False)
+    current_revision: Mapped[int | None] = mapped_column(Integer)
+    contrast_waiver: Mapped[ContrastWaiver | None] = mapped_column(PydanticJSON(ContrastWaiver))
+
+
+class ThemeRevision(Base, Entity):
+    """One saved state of an owner theme (theme studio undo/redo). ``parent`` is the revision it was
+    edited from, so undo walks back along the edit path."""
+
+    __tablename__ = "theme_revision"
+    __table_args__ = (Index("uq_theme_revision_number", "theme_id", "number", unique=True),)
+
+    theme_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), ForeignKey("theme.id", ondelete="CASCADE"),
+                                                nullable=False)
+    number: Mapped[int] = mapped_column(Integer, nullable=False)
+    parent: Mapped[int | None] = mapped_column(Integer)
+    body: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    note: Mapped[str] = mapped_column(String(120), nullable=False)
+    actor: Mapped[str] = mapped_column(String(120), nullable=False)
 
 
 class Notification(Base, Entity):
