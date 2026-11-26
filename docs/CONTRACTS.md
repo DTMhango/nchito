@@ -1011,6 +1011,9 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
 - Messages (integration): `InsightsOut.messages {sent, by_kind: CountRow[], uncertain_sends}` counts messages about
   applications (follow-ups, thank-yous, replies) sent in the range, apart from applications; message packets never
   count as an application's approval, and `automation.uncertain_sends` counts application sends only.
+- `SpendReport.by_run_kind [{kind, runs, micros}]` (integration): runs started in the range per kind with the cost
+  recorded on them (dry runs left out), so `tailoring` runs show; a sweep's cost also covers the tailoring it asked
+  for. Run history filters by kind (`GET /api/runs?kind=`, already there) and labels `tailoring`.
 - Drill-through (integration): `GET /api/applications` also takes `since`, `until`, `track_id`, `source_id`, `country` and `reached` (`tailored`, `approved`, `sent`, `reply`, `interview`, `offer`); any of them makes the list exactly the applications the Insights number counted (`campaign_id` and `channel` join the same filter). `GET /api/jobs` takes `since`, `until`, `campaign_id`, `track_id`, `source_id`, `country` and `reached` (`found`, `passed_filters`, `scored_above`; absent = the source table's roles found). Both go through `app.ops.insights.drill_application_ids` / `drill_job_ids`, the report's own counting code. The Applications and Matches screens read these from the URL and show them as removable chips; while a drill is on, Matches bulk actions take only ticked roles.
 
 ## Wave 4 themes additions

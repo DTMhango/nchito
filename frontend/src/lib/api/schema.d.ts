@@ -12756,6 +12756,21 @@ export interface components {
             /** Error */
             error: string | null;
         };
+        /** RunSpendRow */
+        RunSpendRow: {
+            /**
+             * Kind
+             * @description Run kind (RunKind), e.g. sweep or tailoring
+             */
+            kind: string;
+            /** Runs */
+            runs: number;
+            /**
+             * Micros
+             * @description Cost recorded on those runs
+             */
+            micros: number;
+        };
         /** RunnerStatus */
         RunnerStatus: {
             /**
@@ -13634,6 +13649,11 @@ export interface components {
             per_sent_micros: number | null;
             /** Per Interview Micros */
             per_interview_micros: number | null;
+            /**
+             * By Run Kind
+             * @description Runs started in the range per kind, with the cost recorded on them (tailoring requests are their own runs; a sweep's cost also covers the tailoring it asked for), most cost first
+             */
+            by_run_kind: components["schemas"]["RunSpendRow"][];
         };
         /** SpendRow */
         SpendRow: {

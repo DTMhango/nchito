@@ -45,7 +45,7 @@ from app.models.applications import (
 from app.models.followups import OutboundMessage
 from app.models.kit import Track
 from app.models.platform import AuditEvent, LedgerEntry, LedgerKind
-from app.models.search import Assessment, AssessmentState, Campaign, Job, JobSighting, Source
+from app.models.search import Assessment, AssessmentState, Campaign, Job, JobSighting, Run, Source
 
 REPLY_STAGES = frozenset({Stage.screening, Stage.interview, Stage.offer, Stage.accepted})
 INTERVIEW_STAGES = frozenset({Stage.interview, Stage.offer, Stage.accepted})
@@ -126,6 +126,12 @@ class SpendRow(BaseModel):
     micros: int
 
 
+class RunSpendRow(BaseModel):
+    kind: str = Field(description="Run kind (RunKind), e.g. sweep or tailoring")
+    runs: int
+    micros: int = Field(description="Cost recorded on those runs")
+
+
 class SpendReport(BaseModel):
     currency: str
     period: SpendPeriod
@@ -135,6 +141,9 @@ class SpendReport(BaseModel):
     interviews: int
     per_sent_micros: int | None
     per_interview_micros: int | None
+    by_run_kind: list[RunSpendRow] = Field(description=(
+        "Runs started in the range per kind, with the cost recorded on them (tailoring requests are their own "
+        "runs; a sweep's cost also covers the tailoring it asked for), most cost first"))
 
 
 class SourceRow(BaseModel):
@@ -439,7 +448,24 @@ async def _spend(session: AsyncSession, c: Collector, period: SpendPeriod, week_
     total = sum(r.micros for r in rows)
     return SpendReport(currency=currency, period=period, rows=rows, total_micros=total, sent=sent,
                        interviews=interviews, per_sent_micros=total // sent if sent else None,
-                       per_interview_micros=total // interviews if interviews else None)
+                       per_interview_micros=total // interviews if interviews else None,
+                       by_run_kind=await _run_spend(session, c))
+
+
+async def _run_spend(session: AsyncSession, c: Collector) -> list[RunSpendRow]:
+    runs: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+    for kind, campaign_id, micros in await session.execute(
+            select(Run.kind, Run.campaign_id, Run.cost_micros).where(
+                Run.created_at >= c.start, Run.created_at < c.end, Run.dry_run.is_(False))):
+        if c.f.campaign_id and campaign_id != c.f.campaign_id:
+            continue
+        if c.f.track_id and c.track_of(campaign_id) != c.f.track_id:
+            continue
+        row = runs[kind.value]
+        row[0] += 1
+        row[1] += int(micros or 0)
+    return sorted((RunSpendRow(kind=k, runs=n, micros=m) for k, (n, m) in runs.items()),
+                  key=lambda r: (-r.micros, -r.runs, r.kind))
 
 
 def _sources(jobs: list[Job], assessments: list[tuple[Assessment, Job]], apps: list[AppFacts],

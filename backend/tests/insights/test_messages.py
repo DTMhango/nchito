@@ -36,3 +36,16 @@ async def test_a_sent_follow_up_is_a_message_not_an_application(channel):  # noq
     assert after.funnel == before.funnel  # still one application sent, approved once
     assert after.automation == before.automation
     assert after.spend.sent == before.spend.sent == 1
+
+
+async def test_tailoring_runs_show_in_spend_by_run_kind(session):
+    from app.models.search import Run, RunKind, RunStatus
+
+    for kind, cost in ((RunKind.tailoring, 1_200), (RunKind.tailoring, 800), (RunKind.sweep, 500)):
+        session.add(Run(kind=kind, trigger="manual", status=RunStatus.succeeded, cost_micros=cost, counts={}))
+    session.add(Run(kind=RunKind.tailoring, trigger="manual", status=RunStatus.succeeded, cost_micros=9_999,
+                    counts={}, dry_run=True))  # a dry run spends nothing real
+    await session.commit()
+    report = await build_insights(session, WINDOW)
+    rows = [(r.kind, r.runs, r.micros) for r in report.spend.by_run_kind]
+    assert rows == [("tailoring", 2, 2_000), ("sweep", 1, 500)]

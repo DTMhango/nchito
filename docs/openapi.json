@@ -40840,6 +40840,31 @@
         ],
         "title": "RunOut"
       },
+      "RunSpendRow": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind",
+            "description": "Run kind (RunKind), e.g. sweep or tailoring"
+          },
+          "runs": {
+            "type": "integer",
+            "title": "Runs"
+          },
+          "micros": {
+            "type": "integer",
+            "title": "Micros",
+            "description": "Cost recorded on those runs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "runs",
+          "micros"
+        ],
+        "title": "RunSpendRow"
+      },
       "RunnerStatus": {
         "properties": {
           "token_id": {
@@ -42935,6 +42960,14 @@
               }
             ],
             "title": "Per Interview Micros"
+          },
+          "by_run_kind": {
+            "items": {
+              "$ref": "#/components/schemas/RunSpendRow"
+            },
+            "type": "array",
+            "title": "By Run Kind",
+            "description": "Runs started in the range per kind, with the cost recorded on them (tailoring requests are their own runs; a sweep's cost also covers the tailoring it asked for), most cost first"
           }
         },
         "type": "object",
@@ -42946,7 +42979,8 @@
           "sent",
           "interviews",
           "per_sent_micros",
-          "per_interview_micros"
+          "per_interview_micros",
+          "by_run_kind"
         ],
         "title": "SpendReport"
       },

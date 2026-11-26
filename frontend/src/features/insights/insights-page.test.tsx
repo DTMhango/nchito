@@ -11,6 +11,13 @@ const section = async (name: string) =>
   (await screen.findByRole("heading", { level: 2, name })).closest("section")!
 
 describe("Insights", () => {
+  it("shows spend per kind of run, tailoring included", async () => {
+    renderApp("/insights")
+    const spend = await section("Spend")
+    expect(within(spend).getByText("By kind of run")).toBeInTheDocument()
+    expect(within(spend).getByText("Tailoring (3 runs)")).toBeInTheDocument()
+  })
+
   it("counts messages about applications apart from applications", async () => {
     renderApp("/insights")
     const auto = await section("Automation and exclusions")

@@ -178,6 +178,10 @@ export function insightsDataset(): InsightsReport {
       interviews: 2,
       per_sent_micros: 558_333,
       per_interview_micros: 3_350_000,
+      by_run_kind: [
+        { kind: "sweep", runs: 12, micros: 4_100_000 },
+        { kind: "tailoring", runs: 3, micros: 2_600_000 },
+      ],
     },
     sources: [
       {
@@ -248,6 +252,7 @@ export const emptyInsights = (): InsightsReport => ({
     interviews: 0,
     per_sent_micros: null,
     per_interview_micros: null,
+    by_run_kind: [],
   },
   sources: [],
   automation: {

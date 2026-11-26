@@ -7,13 +7,27 @@ import { renderApp } from "@/test/render"
 beforeEach(() => resetSourcesMock())
 
 describe("Run history", () => {
+  it("filters by kind, tailoring included, with its label", async () => {
+    const user = userEvent.setup()
+    renderApp("/autopilot/runs")
+    await screen.findByRole("list", { name: "Runs" })
+    await user.selectOptions(screen.getByLabelText("Kind"), "tailoring")
+    await waitFor(() => {
+      const list = screen.getByRole("list", { name: "Runs" })
+      const titles = within(list)
+        .getAllByRole("heading", { level: 3 })
+        .map((h) => h.textContent?.split(",")[0])
+      expect(titles).toEqual(["Tailoring"])
+    })
+  })
+
   it("lists runs with status, funnel and cost", async () => {
     renderApp("/autopilot/runs")
     const list = await screen.findByRole("list", { name: "Runs" })
     const cards = within(list)
       .getAllByRole("listitem", {})
       .filter((li) => li.tagName === "LI" && li.closest("ol") === list)
-    expect(cards.length).toBe(5)
+    expect(cards.length).toBe(6)
     expect(
       within(list).getAllByText("Done with problems").length
     ).toBeGreaterThan(0)
@@ -26,7 +40,7 @@ describe("Run history", () => {
     renderApp("/autopilot/runs")
     await screen.findByRole("list", { name: "Runs" })
     await user.click(screen.getByRole("button", { name: "Dry run" }))
-    await waitFor(() => expect(store.runs.length).toBe(6))
+    await waitFor(() => expect(store.runs.length).toBe(7))
     expect(store.runs[0].dry_run).toBe(true)
   })
 

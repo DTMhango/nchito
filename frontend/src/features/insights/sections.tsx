@@ -13,6 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { formatCost } from "@/lib/cost"
+import type { RunKind } from "@/features/sources/api"
+import { KIND_LABEL } from "@/features/sources/words"
 import type {
   CampaignFunnel,
   CountRow,
@@ -457,6 +459,16 @@ export function SpendSection({ report }: { report: InsightsReport }) {
             <div className="grid min-w-0 gap-4">
               <Breakdown title="By stage" rows={byStage} money={money} />
               <Breakdown title="By model" rows={byModel} money={money} />
+              {s.by_run_kind.length > 0 && (
+                <Breakdown
+                  title="By kind of run"
+                  rows={s.by_run_kind.map((r) => [
+                    `${KIND_LABEL[r.kind as RunKind] ?? r.kind} (${r.runs} ${r.runs === 1 ? "run" : "runs"})`,
+                    r.micros,
+                  ])}
+                  money={money}
+                />
+              )}
             </div>
           </div>
         </>
