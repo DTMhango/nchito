@@ -102,7 +102,8 @@ class HttpxFetcher:
                     return response.status_code, response.text
                 last = f"HTTP {response.status_code}"
                 retry_after = response.headers.get("retry-after", "")
-                if response.status_code == 429 and retry_after.isdigit() and int(retry_after) > policy.backoff_cap_seconds:
+                too_long = retry_after.isdigit() and int(retry_after) > policy.backoff_cap_seconds
+                if response.status_code == 429 and too_long:
                     return response.status_code, response.text  # a source that asks us to wait long is not hammered
             if attempt < policy.max_attempts:
                 await self._sleep(min(policy.backoff_cap_seconds, policy.backoff_seconds * 2 ** (attempt - 1)))

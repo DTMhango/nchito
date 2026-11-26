@@ -31,6 +31,7 @@ def _salary(lo: Any, hi: Any, currency: Any, period: Any) -> str | None:
 
 
 def himalayas_raw(job: Mapping[str, Any]) -> RawJob:
+    expires = from_epoch(job.get("expiryDate"))
     restrictions = [str(r) for r in job.get("locationRestrictions") or []]
     link = job.get("applicationLink") or job.get("guid") or ""
     title = job.get("title") or ""
@@ -44,7 +45,7 @@ def himalayas_raw(job: Mapping[str, Any]) -> RawJob:
         extra={"listing_open": True, "employment_type": job.get("employmentType"),
                "seniority": job.get("seniority"), "categories": job.get("categories"),
                "timezone_restrictions": job.get("timezoneRestrictions"),
-               "expires_at": from_epoch(job.get("expiryDate")).isoformat() if from_epoch(job.get("expiryDate")) else None})
+               "expires_at": expires.isoformat() if expires else None})
 
 
 @register_connector

@@ -12,6 +12,7 @@ from app.core.config import get_config
 from app.core.db import get_sessionmaker
 from app.core.events import publish
 from app.models.search import Run, RunStatus
+from app.pipeline.capture import process_capture as run_capture
 from app.pipeline.runs import handler_for
 from app.worker.scheduler import tick
 
@@ -69,6 +70,21 @@ async def run_pipeline(run_id: str) -> None:
         run.status = status
         run.finished_at = utcnow()
         await publish(session, "run.finished", {"run_id": run_id, "status": status.value})
+        await session.commit()
+
+
+async def enqueue_capture(job_id: uuid.UUID) -> None:
+    """Defer ``process_capture`` for a captured stub (call after the capture transaction commits)."""
+    await process_capture.configure(queue=RUNS_QUEUE, lock=f"capture:{job_id}").defer_async(job_id=str(job_id))
+
+
+@queue_app.task(name="process_capture", queue=RUNS_QUEUE, retry=procrastinate.RetryStrategy(max_attempts=3,
+                                                                                            exponential_wait=10))
+async def process_capture(job_id: str) -> None:
+    async with get_sessionmaker()() as session:
+        result = await run_capture(session, uuid.UUID(job_id))
+        if result is not None and result.error:
+            log.info("capture %s kept as a stub: %s", job_id, result.error)
         await session.commit()
 
 

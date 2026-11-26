@@ -12,8 +12,15 @@ from collections.abc import Mapping
 from html.parser import HTMLParser
 from typing import Any
 
-from app.sources.base import Availability, HttpFetcher, RateLimitSpec, RawJob, SearchContext, SourceError
-from app.sources.base import register_connector
+from app.sources.base import (
+    Availability,
+    HttpFetcher,
+    RateLimitSpec,
+    RawJob,
+    SearchContext,
+    SourceError,
+    register_connector,
+)
 from app.sources.common import ConnectorBase, page_availability
 from app.sources.text import html_to_text, parse_date, parse_iso
 
@@ -95,7 +102,10 @@ def _ld_pay(posting: Mapping[str, Any]) -> str | None:
     low, high = value.get("minValue"), value.get("maxValue") or value.get("value")
     if low is None and high is None:
         return None
-    span = f"{low} - {high}" if low is not None and high is not None and low != high else str(low if low is not None else high)
+    if low is not None and high is not None and low != high:
+        span = f"{low} - {high}"
+    else:
+        span = str(low if low is not None else high)
     return f"{salary.get('currency', '')} {span} per {str(value.get('unitText', 'year')).lower()}".strip()
 
 

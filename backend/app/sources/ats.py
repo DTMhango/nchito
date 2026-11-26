@@ -52,7 +52,8 @@ class _BoardConnector(ConnectorBase):
         failures = 0
         for board in boards:
             try:
-                found.extend(job for job in await self._board_jobs(board, ctx.source_config) if _recent(job.posted_at, since))
+                jobs = await self._board_jobs(board, ctx.source_config)
+                found.extend(job for job in jobs if _recent(job.posted_at, since))
             except SourceError as exc:
                 failures += 1
                 self.warnings.append(f"{board['slug']}: {exc}")
@@ -137,7 +138,8 @@ def _lever_api(config_or_url: Mapping[str, Any] | str) -> str:
 
 def lever_raw(post: Mapping[str, Any], slug: str, name: str | None) -> RawJob:
     cats = post.get("categories") or {}
-    lists = "\n".join(f"{item.get('text', '')}\n{html_to_text(item.get('content'))}" for item in post.get("lists") or [])
+    lists = "\n".join(f"{item.get('text', '')}\n{html_to_text(item.get('content'))}"
+                      for item in post.get("lists") or [])
     salary = post.get("salaryRange")
     pay = None
     if salary and salary.get("min") is not None and salary.get("max") is not None:
@@ -198,7 +200,8 @@ def ashby_raw(job: Mapping[str, Any], slug: str, name: str | None) -> RawJob:
     comp = job.get("compensation") or {}
     title = job.get("title") or ""
     address = ((job.get("address") or {}).get("postalAddress") or {})
-    location = job.get("location") or ", ".join(x for x in (address.get("addressLocality"), address.get("addressCountry")) if x)
+    places = (address.get("addressLocality"), address.get("addressCountry"))
+    location = job.get("location") or ", ".join(x for x in places if x)
     return RawJob(
         source_url=job.get("jobUrl") or "",
         title=title,
@@ -293,7 +296,8 @@ class WorkableConnector(_BoardConnector):
         parts = path_parts(url)
         if len(parts) >= 3 and parts[1] == "j":
             return parts[0], parts[2]
-        raise SourceError("a Workable posting URL with the company in it is needed (apply.workable.com/<company>/j/<id>)")
+        raise SourceError("a Workable posting URL with the company in it is needed "
+                          "(apply.workable.com/<company>/j/<id>)")
 
     async def fetch(self, url: str) -> RawJob:
         slug, shortcode = self._parts(url)

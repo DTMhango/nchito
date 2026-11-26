@@ -9,12 +9,12 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
+from app.models.search import Source, WatchedEmployer
+from app.schemas.json_types import RateLimit
 from app.sources import ats, feeds, page, remote, workday  # noqa: F401  (registration)
 from app.sources.base import HttpFetcher, RateLimitSpec, SourceConnector, connector_class, registered_connectors
 from app.sources.http import HttpxFetcher, polite
 from app.sources.workday import parse_board
-from app.models.search import Source, WatchedEmployer
-from app.schemas.json_types import RateLimit
 
 BOARD_TYPES = ("greenhouse", "lever", "ashby", "workable", "workday")
 

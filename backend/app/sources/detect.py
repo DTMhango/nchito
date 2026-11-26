@@ -64,13 +64,14 @@ def detect_from_url(url: str) -> Detected:
             return NOT_DETECTED
         tenant = host.split(".")[0]
         return Detected("workday", f"{host}/{tenant}/{site}", guess_name(tenant), 0.95)
-    if path and re.search(r"\.(rss|xml|atom)$", path[-1]) or "rss" in host:
+    if (path and re.search(r"\.(rss|xml|atom)$", path[-1])) or "rss" in host:
         return Detected("rss", url.strip(), None, 0.6)
     return NOT_DETECTED
 
 
 _EMBEDDED = (
-    (re.compile(r"(?:boards|job-boards)(?:\.eu)?\.greenhouse\.io/(?:embed/job_board(?:/js)?\?for=)?(?P<s>[\w-]+)", re.I),
+    (re.compile(r"(?:boards|job-boards)(?:\.eu)?\.greenhouse\.io/(?:embed/job_board(?:/js)?\?for=)?(?P<s>[\w-]+)",
+                re.I),
      "greenhouse"),
     (re.compile(r"jobs(?:\.eu)?\.lever\.co/(?P<s>[\w-]+)", re.I), "lever"),
     (re.compile(r"jobs\.ashbyhq\.com/(?P<s>[\w.%-]+)", re.I), "ashby"),

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-import xml.etree.ElementTree as ET  # noqa: S405 - DOCTYPE/ENTITY is refused before parsing
+import xml.etree.ElementTree as ET
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime

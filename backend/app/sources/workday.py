@@ -129,7 +129,8 @@ class WorkdayConnector(ConnectorBase):
         out["boards"] = [parse_board(b) for b in raw]
         return out
 
-    async def _listing(self, board: Mapping[str, str], query: str, since: datetime | None, now: datetime) -> list[dict[str, Any]]:
+    async def _listing(self, board: Mapping[str, str], query: str, since: datetime | None,
+                       now: datetime) -> list[dict[str, Any]]:
         postings: list[dict[str, Any]] = []
         offset = 0
         for _ in range(MAX_PAGES):
