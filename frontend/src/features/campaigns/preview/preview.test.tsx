@@ -198,3 +198,22 @@ describe("suggestions", () => {
     })
   })
 })
+
+describe("campaign editor", () => {
+  it("shows the policy preview and the feedback suggestions together, each in its own section", async () => {
+    renderApp(`/campaigns/${IDS.camp1}`)
+    const preview = await screen.findByRole("region", {
+      name: "Policy preview",
+    })
+    const suggestions = await screen.findByRole("region", {
+      name: "Suggestions from your feedback",
+    })
+    expect(preview.closest("section[id]")?.id).toBe("automation")
+    expect(suggestions.closest("section[id]")?.id).toBe("feedback")
+    expect(preview.contains(suggestions)).toBe(false)
+    expect(suggestions.contains(preview)).toBe(false)
+    expect(
+      await within(suggestions).findByRole("list", { name: "Open suggestions" })
+    ).toBeInTheDocument()
+  })
+})
