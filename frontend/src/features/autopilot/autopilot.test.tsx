@@ -10,7 +10,7 @@ import {
   canCancel,
   dispatchView,
   gateState,
-  postponedUntil,
+  deferredText,
   roleChoices,
   shortHash,
   validateLimit,
@@ -145,7 +145,10 @@ describe("approval and packet change", () => {
   it("shows an approval refusal plainly, with the gates that stopped it", async () => {
     const user = userEvent.setup()
     const id = appId("Zambezi Mining Systems")
-    autopilotMock().refuseApproval = "role_open is unknown"
+    autopilotMock().refuseApproval = {
+      code: "role_closed",
+      reason: "role_open is unknown",
+    }
     renderApp(`/approvals/${id}`)
     await user.click(
       await screen.findByRole("button", { name: "Let the agent submit" })
@@ -249,23 +252,40 @@ describe("dispatch: no retry on uncertain", () => {
     expect(canCancel(dispatchView({ ...base, status: "reserved" }))).toBe(true)
   })
 
-  it("reads a quiet-hours deferral as postponed, not failed", () => {
+  it("reads a quiet-hours deferral from the dispatch itself, as held, not failed", () => {
     const d = {
-      id: "d1",
       status: "reserved" as const,
       send_after: "2026-11-27T05:00:00Z",
+      deferred_reason: "quiet_hours" as const,
+      deferred_until: "2026-11-27T05:00:00Z",
     }
-    const events = [{ kind: "dispatch_deferred", detail: { attempt_id: "d1" } }]
-    expect(postponedUntil(d, events)).toBe(d.send_after)
-    expect(postponedUntil({ ...d, id: "other" }, events)).toBeNull()
-    expect(postponedUntil({ ...d, status: "cancelled" }, events)).toBeNull()
-    const v = dispatchView(
-      { ...d, provider_message_id: null, error: null },
-      postponedUntil(d, events)
+    const now = new Date("2026-11-27T01:00:00Z")
+    // the owner's zone: 05:00 UTC is 07:00 in Lusaka
+    expect(deferredText(d, "Africa/Lusaka", now)).toBe(
+      "Held for quiet hours until 07:00"
     )
+    expect(
+      deferredText(d, "Africa/Lusaka", new Date("2026-11-25T12:00:00Z"))
+    ).toBe("Held for quiet hours until Fri 07:00")
+    expect(
+      deferredText({ ...d, deferred_reason: null }, "Africa/Lusaka")
+    ).toBeNull()
+    expect(
+      deferredText({ ...d, status: "cancelled" }, "Africa/Lusaka")
+    ).toBeNull()
+    const v = dispatchView({ ...d, provider_message_id: null, error: null })
     expect(v.kind).toBe("postponed")
-    expect(v.explain).toMatch(/^Postponed until .*\(quiet hours\)/)
+    expect(v.explain).toMatch(/^Held for quiet hours until /)
     expect(canCancel(v)).toBe(true)
+    // a plain send delay is queued, not held
+    expect(
+      dispatchView({
+        ...d,
+        deferred_reason: null,
+        provider_message_id: null,
+        error: null,
+      }).kind
+    ).toBe("queued")
   })
 
   it("shows the postponed send on the Sending tab", async () => {
@@ -276,7 +296,7 @@ describe("dispatch: no retry on uncertain", () => {
       name: /Principal Data Engineer, Nyika Labs/,
     })
     expect(
-      await within(card).findByText(/Postponed until .*\(quiet hours\)/)
+      await within(card).findByText(/Held for quiet hours until /)
     ).toBeInTheDocument()
     expect(within(card).queryByText("Failed")).toBeNull()
   })

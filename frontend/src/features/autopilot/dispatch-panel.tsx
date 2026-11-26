@@ -1,4 +1,4 @@
-﻿import { useState, type FormEvent } from "react"
+import { useState, type FormEvent } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { toast } from "sonner"
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Chip } from "@/components/chip"
 import { EmptyState } from "@/components/empty-state"
+import { meQuery } from "@/lib/api/endpoints"
 import { SectionHeader } from "@/components/page-header"
 import {
   apKeys,
@@ -14,7 +15,6 @@ import {
   dispatchesQuery,
   errorText,
   reconcileDispatch,
-  timelineQuery,
   type ApplicationSummary,
   type DispatchOut,
   type ReconcileIn,
@@ -24,7 +24,6 @@ import {
   canCancel,
   dispatchView,
   evidenceLabel,
-  postponedUntil,
   shortHash,
   stamp,
 } from "./logic"
@@ -61,9 +60,7 @@ export function DispatchPanel() {
 function AppAttempts({ app }: { app: ApplicationSummary }) {
   const attempts = useQuery(dispatchesQuery(app.id))
   const list = attempts.data ?? []
-  // Only needed to tell a quiet-hours postponement from the normal send delay.
-  const waiting = list.some((d) => d.status === "reserved" && d.send_after)
-  const timeline = useQuery({ ...timelineQuery(app.id), enabled: waiting })
+  const tz = useQuery(meQuery()).data?.timezone
   if (attempts.isSuccess && list.length === 0) return null
   return (
     <li
@@ -82,12 +79,7 @@ function AppAttempts({ app }: { app: ApplicationSummary }) {
       </div>
       <ul className="grid gap-2">
         {list.map((d) => (
-          <Attempt
-            key={d.id}
-            app={app}
-            d={d}
-            postponed={postponedUntil(d, timeline.data ?? [])}
-          />
+          <Attempt key={d.id} app={app} d={d} timeZone={tz} />
         ))}
       </ul>
     </li>
@@ -97,14 +89,14 @@ function AppAttempts({ app }: { app: ApplicationSummary }) {
 function Attempt({
   app,
   d,
-  postponed,
+  timeZone,
 }: {
   app: ApplicationSummary
   d: DispatchOut
-  postponed: string | null
+  timeZone: string | undefined
 }) {
   const qc = useQueryClient()
-  const v = dispatchView(d, postponed)
+  const v = dispatchView(d, timeZone)
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: apKeys.dispatches(app.id) })
     void qc.invalidateQueries({ queryKey: apKeys.dispatchApps })

@@ -8,7 +8,7 @@ import { needsOwner, type ScreeningRow } from "./draft"
 /**
  * The form's screening questions as the draft answered them (`DraftAnswer`). Unknown is not
  * yes: a question waiting on the owner shows no value at all, only that it needs them, with a
- * link to the pending action that asks.
+ * link that opens the pending action that asks (`/today?action=<pending_action_id>`).
  */
 export function AnswersPanel({
   rows,
@@ -101,7 +101,11 @@ function AnswerRow({ row }: { row: ScreeningRow }) {
           <span className="ml-auto flex gap-1.5">
             {row.actionId && (
               <Button asChild size="xs" variant="outline">
-                <Link to="/today" data-action-id={row.actionId}>
+                <Link
+                  to="/today"
+                  search={{ action: row.actionId }}
+                  data-action-id={row.actionId}
+                >
                   Answer the question on Today
                 </Link>
               </Button>

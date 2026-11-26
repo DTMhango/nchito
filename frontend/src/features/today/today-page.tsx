@@ -58,7 +58,12 @@ export function nowIn(timezone: string | undefined, d = new Date()) {
  * coming. On a phone only the decisions show until you open "Everything else", unless a
  * source has failed.
  */
-export function TodayPage() {
+export function TodayPage({
+  focusAction,
+}: {
+  /** A pending action to open in "Needs you" (a deep link from the Studio). */
+  focusAction?: string
+} = {}) {
   const me = useQuery(meQuery())
   const today = useQuery(todayQuery())
   useLiveUpdates()
@@ -81,7 +86,7 @@ export function TodayPage() {
 
       <div className="grid items-start gap-7 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="min-w-0 xl:col-start-1 xl:row-start-1">
-          <NeedsYou />
+          <NeedsYou focusAction={focusAction} />
         </div>
 
         {failed && (

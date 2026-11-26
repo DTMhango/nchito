@@ -231,26 +231,57 @@ export const stamp = (iso: string) =>
     minute: "2-digit",
   })
 
+/** A time in the owner's zone: "07:00" today, else "Fri 07:00". */
+export function clockIn(iso: string, timeZone?: string, now = new Date()) {
+  const opts = { timeZone } as const
+  try {
+    const time = new Intl.DateTimeFormat("en-GB", {
+      ...opts,
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(iso))
+    const day = (d: Date) =>
+      new Intl.DateTimeFormat("en-GB", { ...opts, dateStyle: "short" }).format(
+        d
+      )
+    if (day(new Date(iso)) === day(now)) return time
+    const weekday = new Intl.DateTimeFormat("en-GB", {
+      ...opts,
+      weekday: "short",
+    }).format(new Date(iso))
+    return `${weekday} ${time}`
+  } catch {
+    return stamp(iso)
+  }
+}
+
 /**
- * When a queued send was postponed by quiet hours: the dispatch row keeps `reserved` with a new
- * `send_after`, and the timeline records `dispatch_deferred` for that attempt. Null otherwise.
+ * "Held for quiet hours until 07:00": a reserved send the server postponed at send time
+ * (`deferred_reason`, `deferred_until`). Null for any other attempt.
  */
-export function postponedUntil(
-  d: Pick<DispatchOut, "id" | "status" | "send_after">,
-  events: readonly { kind: string; detail: Record<string, unknown> }[]
+export function deferredText(
+  d: Partial<Pick<DispatchOut, "deferred_reason" | "deferred_until">> &
+    Pick<DispatchOut, "status">,
+  timeZone?: string,
+  now = new Date()
 ): string | null {
-  if (d.status !== "reserved" || !d.send_after) return null
-  const deferred = events.some(
-    (e) => e.kind === "dispatch_deferred" && e.detail.attempt_id === d.id
-  )
-  return deferred ? d.send_after : null
+  if (d.status !== "reserved" || d.deferred_reason !== "quiet_hours")
+    return null
+  return d.deferred_until
+    ? `Held for quiet hours until ${clockIn(d.deferred_until, timeZone, now)}`
+    : "Held for quiet hours"
 }
 
 type DispatchFacts = Pick<
   DispatchOut,
   "status" | "provider_message_id" | "error" | "send_after"
 > &
-  Partial<Pick<DispatchOut, "evidence" | "uncertain">>
+  Partial<
+    Pick<
+      DispatchOut,
+      "evidence" | "uncertain" | "deferred_reason" | "deferred_until"
+    >
+  >
 
 /**
  * What an attempt means to the owner. "Sent" needs evidence. An attempt the server marks
@@ -259,8 +290,9 @@ type DispatchFacts = Pick<
  */
 export function dispatchView(
   d: DispatchFacts,
-  postponed: string | null = null
+  timeZone?: string
 ): DispatchView {
+  const held = deferredText(d, timeZone)
   const evidence = evidenceText({
     evidence: d.evidence ?? null,
     provider_message_id: d.provider_message_id,
@@ -271,12 +303,12 @@ export function dispatchView(
     )
   switch (d.status) {
     case "reserved":
-      if (postponed)
+      if (held)
         return {
           kind: "postponed",
-          label: "Postponed",
+          label: "Quiet hours",
           tone: "info",
-          explain: `Postponed until ${stamp(postponed)} (quiet hours). It goes out then; you can cancel it until it is sent.`,
+          explain: `${held}. It goes out then; you can cancel it until it is sent.`,
           evidence: null,
         }
       return {

@@ -5,7 +5,7 @@
  *   (authed)                              guard: owner exists and signed in
  *     /onboarding?step=                   full-screen set-up guide
  *     (shell)                             AppShell: sidebar, top bar, palette
- *       /today /matches /applications /jobs/$id?tab= /studio?application=&run= /autopilot
+ *       /today?action= /matches /applications /jobs/$id?tab= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
  *       /settings/{appearance,ai,connections,notifications,runners,data,health,security,activity,history}
@@ -241,7 +241,18 @@ const page = <P extends string>(
     component: () => <Component />,
   })
 
-const todayRoute = page("/today", "Today", TodayPage)
+/** `?action=<pending action id>`: Today opens that decision (the Studio's question links). */
+const todaySearch = z.object({ action: z.string().optional().catch(undefined) })
+const todayRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/today",
+  staticData: { title: "Today" },
+  validateSearch: todaySearch,
+  component: function TodayRoute() {
+    const { action } = todayRoute.useSearch()
+    return <TodayPage focusAction={action} />
+  },
+})
 const matchesRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/matches",

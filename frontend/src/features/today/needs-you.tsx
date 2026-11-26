@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import {
@@ -50,13 +50,26 @@ export function useRefreshDecisions() {
 }
 
 /** One decision: actions that share a blocker are resolved together. */
-export function DecisionRow({ group }: { group: DecisionGroup }) {
+export function DecisionRow({
+  group,
+  focused = false,
+}: {
+  group: DecisionGroup
+  /** Opened from a deep link (`/today?action=`): scrolled to, and a question opens its answer form. */
+  focused?: boolean
+}) {
   const refresh = useRefreshDecisions()
-  const [answering, setAnswering] = useState(false)
-  const [open, setOpen] = useState(false)
   const first = group.actions[0]
   const n = group.actions.length
   const kit = actionKit(first.type, n)
+  const [answering, setAnswering] = useState(
+    focused && kit.primary.resolution === "answer"
+  )
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView?.({ block: "center" })
+  }, [focused])
   const detail = readDetail(first)
   const roles = group.actions.map((a) => {
     const d = readDetail(a)
@@ -94,123 +107,133 @@ export function DecisionRow({ group }: { group: DecisionGroup }) {
   const primaryIsLink = kit.primary.resolution === "link"
 
   return (
-    <SeverityItem
-      severity={urgency(deadline)}
-      icon={TYPE_ICON[first.type] ?? HelpCircle}
-      title={group.title}
-      meta={
-        <>
-          {group.consequence}
-          {deadline && (
-            <>
-              {" "}
-              <b className="font-semibold text-foreground">
-                {deadlineText(deadline, verb)}.
-              </b>
-            </>
-          )}
-        </>
-      }
-      actions={
-        !answering && (
+    <div
+      ref={ref}
+      data-focused={focused || undefined}
+      aria-current={focused || undefined}
+      className={focused ? "bg-info-soft" : undefined}
+    >
+      <SeverityItem
+        severity={urgency(deadline)}
+        icon={TYPE_ICON[first.type] ?? HelpCircle}
+        title={group.title}
+        meta={
           <>
-            {n > 1 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-expanded={open}
-                onClick={() => setOpen((o) => !o)}
-              >
-                {n} roles
-                <ChevronDown
-                  className={open ? "rotate-180" : undefined}
-                  aria-hidden="true"
-                />
-              </Button>
-            )}
-            {secondaryIsLink ? (
-              detail.url && (
-                <Button asChild variant="outline" size="sm">
-                  <a
-                    href={detail.url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                  >
-                    {kit.secondary.label}
-                  </a>
-                </Button>
-              )
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={resolve.isPending}
-                onClick={() => run(kit.secondary.resolution)}
-              >
-                {kit.secondary.label}
-              </Button>
-            )}
-            {primaryIsLink &&
-            first.type === "approve" &&
-            first.application_id ? (
-              <Button asChild size="sm">
-                <Link
-                  to="/approvals/$applicationId"
-                  params={{ applicationId: first.application_id }}
-                >
-                  {kit.primary.label}
-                </Link>
-              </Button>
-            ) : primaryIsLink ? (
-              <Button asChild size="sm">
-                <Link
-                  to="/studio"
-                  search={{ application: first.application_id ?? undefined }}
-                >
-                  {kit.primary.label}
-                </Link>
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                disabled={resolve.isPending}
-                onClick={() => run(kit.primary.resolution)}
-              >
-                {kit.primary.label}
-              </Button>
+            {group.consequence}
+            {deadline && (
+              <>
+                {" "}
+                <b className="font-semibold text-foreground">
+                  {deadlineText(deadline, verb)}.
+                </b>
+              </>
             )}
           </>
-        )
-      }
-    >
-      {open && !answering && (
-        <ul className="w-full list-disc pl-5 text-[0.9rem] text-muted-foreground">
-          {group.actions.map((a, i) => (
-            <li key={a.id}>
-              {roles[i]}
-              {a.deadline &&
-                ` (${deadlineText(a.deadline, "closes").toLowerCase()})`}
-            </li>
-          ))}
-        </ul>
-      )}
-      {answering && (
-        <AnswerForm
-          action={first}
-          affected={roles}
-          busy={resolve.isPending}
-          onSubmit={answer}
-          onCancel={() => setAnswering(false)}
-        />
-      )}
-    </SeverityItem>
+        }
+        actions={
+          !answering && (
+            <>
+              {n > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-expanded={open}
+                  onClick={() => setOpen((o) => !o)}
+                >
+                  {n} roles
+                  <ChevronDown
+                    className={open ? "rotate-180" : undefined}
+                    aria-hidden="true"
+                  />
+                </Button>
+              )}
+              {secondaryIsLink ? (
+                detail.url && (
+                  <Button asChild variant="outline" size="sm">
+                    <a
+                      href={detail.url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {kit.secondary.label}
+                    </a>
+                  </Button>
+                )
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={resolve.isPending}
+                  onClick={() => run(kit.secondary.resolution)}
+                >
+                  {kit.secondary.label}
+                </Button>
+              )}
+              {primaryIsLink &&
+              first.type === "approve" &&
+              first.application_id ? (
+                <Button asChild size="sm">
+                  <Link
+                    to="/approvals/$applicationId"
+                    params={{ applicationId: first.application_id }}
+                  >
+                    {kit.primary.label}
+                  </Link>
+                </Button>
+              ) : primaryIsLink ? (
+                <Button asChild size="sm">
+                  <Link
+                    to="/studio"
+                    search={{ application: first.application_id ?? undefined }}
+                  >
+                    {kit.primary.label}
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  disabled={resolve.isPending}
+                  onClick={() => run(kit.primary.resolution)}
+                >
+                  {kit.primary.label}
+                </Button>
+              )}
+            </>
+          )
+        }
+      >
+        {open && !answering && (
+          <ul className="w-full list-disc pl-5 text-[0.9rem] text-muted-foreground">
+            {group.actions.map((a, i) => (
+              <li key={a.id}>
+                {roles[i]}
+                {a.deadline &&
+                  ` (${deadlineText(a.deadline, "closes").toLowerCase()})`}
+              </li>
+            ))}
+          </ul>
+        )}
+        {answering && (
+          <AnswerForm
+            action={first}
+            affected={roles}
+            busy={resolve.isPending}
+            onSubmit={answer}
+            onCancel={() => setAnswering(false)}
+          />
+        )}
+      </SeverityItem>
+    </div>
   )
 }
 
 /** "Needs you": the one elevated surface on Today (DESIGN 10.1, 18.4). */
-export function NeedsYou() {
+export function NeedsYou({ focusAction }: { focusAction?: string } = {}) {
   const q = useQuery(decisionsQuery())
   const groups = q.data ?? []
+  const holds = (g: DecisionGroup) =>
+    !!focusAction && g.actions.some((a) => a.id === focusAction)
+  const missing = !!focusAction && q.isSuccess && !groups.some(holds)
   return (
     <section aria-labelledby="needs-title" className="elev py-1.5">
       <div className="flex items-center gap-2.5 px-4.5 pt-2.5 pb-2">
@@ -224,6 +247,15 @@ export function NeedsYou() {
             : "Everything else is running"}
         </span>
       </div>
+      {missing && (
+        <p
+          role="status"
+          className="border-t border-border px-4.5 py-2.5 text-sm text-muted-foreground"
+        >
+          That question is no longer waiting for you. It may already be
+          answered.
+        </p>
+      )}
       {q.isPending ? (
         <div className="grid gap-2 border-t border-border p-4.5">
           <Skeleton className="h-10 w-full" />
@@ -256,7 +288,7 @@ export function NeedsYou() {
       ) : (
         <div className="border-t border-border">
           {groups.map((g) => (
-            <DecisionRow key={g.group_key} group={g} />
+            <DecisionRow key={g.group_key} group={g} focused={holds(g)} />
           ))}
         </div>
       )}
