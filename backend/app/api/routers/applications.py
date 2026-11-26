@@ -17,7 +17,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.apply import autopilot, stages
+from app.apply import approval, autopilot, stages
+from app.apply import dispatch as apply_dispatch
+from app.apply import handoff as apply_handoff
+from app.apply import outcomes as apply_outcomes
+from app.apply import packets as apply_packets
+from app.apply import receipt as apply_receipt
+from app.apply import reconcile as apply_reconcile
+from app.apply import restore as apply_restore
 from app.apply.autopilot import AutopilotState, AutopilotWrite
 from app.core import audit
 from app.core.clock import utcnow
@@ -31,8 +38,10 @@ from app.llm.service import LLMService
 from app.models.applications import (
     Application,
     ApplicationEvent,
+    ApplicationPacket,
     Channel,
     Contact,
+    DispatchAttempt,
     PendingAction,
     PendingStatus,
     Stage,
@@ -50,6 +59,8 @@ from app.schemas.json_types import (
     Evidence,
     GateResult,
     PacketContents,
+    PacketEmail,
+    PacketFile,
     SubmittedSnapshot,
 )
 
@@ -265,6 +276,53 @@ class ReceiptOut(BaseModel):
     gates: list[GateResult]
 
 
+class PacketAnswerIn(BaseModel):
+    """An answer from the bank (``answer_id``: value and materiality are read from the bank) or typed for
+    this packet only (``value``; counted as material)."""
+
+    question: str = Field(min_length=1)
+    answer_id: uuid.UUID | None = None
+    value: str | None = None
+
+
+class PacketBuildIn(BaseModel):
+    """What would be sent. The server sets the destination domain, ``verified`` and ``trusted``, the
+    requisition (from the job unless given) and the job version."""
+
+    channel: ChannelT
+    destination_url: str | None = Field(default=None, description="Apply URL (browser, manual)")
+    sending_identity: str = Field(min_length=1, description="Mailbox or name the application is sent as")
+    answers: list[PacketAnswerIn] = Field(default_factory=list)
+    email: PacketEmail | None = None
+    files: list[PacketFile] = Field(default_factory=list)
+    link_permissions: list[str] = Field(default_factory=list)
+    requisition: str | None = None
+
+
+class ApprovalStatusOut(BaseModel):
+    approved: bool
+    status: Literal["granted", "wait_for_owner", "denied"]
+    reason: str
+    pending_action_id: uuid.UUID | None = None
+
+
+class PacketBuildOut(BaseModel):
+    packet: PacketOut
+    created: bool = Field(description="False when the contents were identical to the current packet")
+    changes: list[PacketChange] = Field(default_factory=list,
+                                        description="What changed from the previous version")
+    approval: ApprovalStatusOut | None = Field(
+        default=None, description="What the automation policy did with the new packet (None: nothing to do)")
+
+
+class RejectIn(BaseModel):
+    reason: str | None = None
+
+
+class RequestChangesIn(BaseModel):
+    note: str = Field(min_length=1)
+
+
 class ApproveIn(BaseModel):
     packet_version: int
     packet_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -283,11 +341,52 @@ class DispatchOut(Timestamps):
     outcome_at: datetime | None
     gate_results: list[GateResult]
     error: str | None
+    started_at: datetime | None = Field(default=None, description="Handed to the channel (in flight from here)")
+    evidence: Evidence | None = None
+    uncertain: bool = Field(default=False, description="Handed over with no final outcome: reconcile, never resend")
+    reconcile_attempts: int = 0
+    last_reconciled_at: datetime | None = None
+
+
+class DispatchCreateIn(BaseModel):
+    """Queue the current approved packet now (permit, then the attempt; email waits the send delay)."""
+
+
+class DispatchCreateOut(BaseModel):
+    status: Literal["queued", "wait_for_owner", "denied"]
+    reason: str
+    dispatch: DispatchOut | None = None
+    gates: list[GateResult] = Field(default_factory=list)
+    pending_action_id: uuid.UUID | None = None
+
+
+class ReconcileIn(BaseModel):
+    decision: Literal["check", "sent", "not_sent"] = Field(
+        description="check: ask the channel now; sent: it went out (reference kept as evidence); not_sent: it never "
+                    "left (the role goes back to ready; nothing is resent automatically)")
+    reference: str | None = Field(default=None, max_length=200)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ReconcileOut(BaseModel):
+    result: Literal["sent", "not_sent", "waiting"]
+    dispatch: DispatchOut
+
+
+class RestoreStateOut(BaseModel):
+    active: bool
+    entered_at: datetime | None = None
+    backup_taken_at: str | None = None
+    outstanding: list[DispatchOut] = Field(default_factory=list,
+                                           description="Sends from before the backup still to reconcile")
+    held_application_ids: list[uuid.UUID] = Field(default_factory=list,
+                                                  description="Approvals withdrawn at restore, to approve again")
 
 
 class ManualHandoffOut(BaseModel):
     posting_url: str | None
-    files: list[str] = Field(description="Signed download URLs for the final PDFs")
+    files: list[str] = Field(description="Download links for the final files (behind the owner's session), or "
+                                         "the share links the packet records")
     answers: list[dict[str, str]]
     remaining_steps: list[str]
 
@@ -820,44 +919,248 @@ async def run_checks(application_id: uuid.UUID, principal: PrincipalDep, session
 router.include_router(documents_router)
 
 
+def _packet_out(p: ApplicationPacket) -> PacketOut:
+    return PacketOut(id=p.id, created_at=p.created_at, updated_at=p.updated_at, application_id=p.application_id,
+                     version=p.version, content_hash=p.content_hash, contents=p.contents, approved_at=p.approved_at,
+                     approved_by=p.approved_by, invalidated_at=p.invalidated_at,
+                     invalidated_reason=p.invalidated_reason)
+
+
+def _approval_error(exc: approval.ApprovalError) -> HTTPException:
+    return HTTPException(exc.status, detail={"code": "approval_refused", "reason": exc.message, **exc.detail})
+
+
 @router.get("/applications/{application_id}/packets", response_model=list[PacketOut], name="applications_packets")
-async def packets(application_id: uuid.UUID) -> list[PacketOut]:
-    not_implemented(2, "apply")
+async def packets(application_id: uuid.UUID, session: SessionDep) -> list[PacketOut]:
+    """Every packet version, newest first (invalidated ones say why)."""
+    await _load(session, application_id)
+    return [_packet_out(p) for p in await apply_packets.history(session, application_id)]
+
+
+@router.get("/applications/{application_id}/packet", response_model=PacketOut, name="applications_packet_get",
+            responses={404: {"description": "No current packet"}})
+async def current_packet(application_id: uuid.UUID, session: SessionDep) -> PacketOut:
+    """The current packet: exactly what would be sent."""
+    await _load(session, application_id)
+    packet = await apply_packets.current(session, application_id)
+    if packet is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no packet has been built")
+    return _packet_out(packet)
+
+
+@router.post("/applications/{application_id}/packet", response_model=PacketBuildOut,
+             name="applications_packet_build", responses={409: {"description": "The application has gone out"}})
+async def build_packet(application_id: uuid.UUID, body: PacketBuildIn, principal: PrincipalDep,
+                       session: SessionDep) -> PacketBuildOut:
+    """Snapshot what would be sent. Identical contents return the current packet; any change makes a new
+    version and invalidates the old one and its approval. Then the automation policy runs: automatic
+    approval when every gate passes, an approval request when the mode lets the system apply."""
+    app = await _load(session, application_id)
+    if app.stage not in approval.APPROVABLE_STAGES:
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            detail=f"an application in {app.stage.value} cannot be repacked")
+    draft = apply_packets.PacketDraft(
+        channel=body.channel, destination_url=body.destination_url or "", sending_identity=body.sending_identity,
+        answers=[apply_packets.DraftAnswer(question=a.question, value=a.value, answer_id=a.answer_id)
+                 for a in body.answers],
+        email=body.email, files=list(body.files), link_permissions=list(body.link_permissions),
+        requisition=body.requisition)
+    try:
+        built = await apply_packets.build(session, app, draft, actor=principal.actor)
+    except apply_packets.PacketError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
+    outcome = await approval.after_packet_built(session, app, built.packet) if built.created else None
+    await _changed(session, app.id)
+    await session.refresh(built.packet)
+    return PacketBuildOut(
+        packet=_packet_out(built.packet), created=built.created,
+        changes=[PacketChange(**c) for c in built.changes] if built.previous else [],
+        approval=None if outcome is None else ApprovalStatusOut(
+            approved=outcome.approved, status=outcome.status, reason=outcome.reason,  # type: ignore[arg-type]
+            pending_action_id=outcome.pending_action_id))
 
 
 @router.get("/applications/{application_id}/receipt", response_model=ReceiptOut, name="applications_receipt")
-async def receipt(application_id: uuid.UUID) -> ReceiptOut:
-    not_implemented(2, "apply")
+async def receipt(application_id: uuid.UUID, session: SessionDep) -> ReceiptOut:
+    """The approval receipt for the current packet, with the gates an approval would check."""
+    app = await _load(session, application_id)
+    built = await apply_receipt.build(session, app)
+    if built is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no packet has been built")
+    return ReceiptOut(
+        application_id=app.id, packet=_packet_out(built.packet), employer=built.employer,
+        destination=built.destination, role=built.role, pay_answers=built.pay_answers,
+        work_rights_answers=built.work_rights_answers, attachments=built.attachments,
+        unusual_disclosures=built.unusual_disclosures,
+        changes_since_last_look=[PacketChange(**c) for c in built.changes_since_last_look],
+        action_label=built.action_label, gates=[GateResult(**g) for g in built.gates])
 
 
 @router.post("/applications/{application_id}/approve", response_model=ApplicationDetail,
              name="applications_approve", responses={409: {"description": "Packet changed since it was shown"}})
-async def approve(application_id: uuid.UUID, body: ApproveIn) -> ApplicationDetail:
-    not_implemented(2, "apply")
+async def approve(application_id: uuid.UUID, body: ApproveIn, principal: PrincipalDep,
+                  session: SessionDep) -> ApplicationDetail:
+    """Approve exactly this packet (version and hash) for this channel. Refused (409, with the gates) when
+    the packet changed, the role is excluded or held in its employer group, a document check blocks, or
+    the mode does not let the system apply."""
+    app = await _load(session, application_id)
+    try:
+        await approval.approve(session, app, packet_version=body.packet_version, packet_hash=body.packet_hash,
+                               channel=body.channel, actor=principal.actor, waiver_ids=body.waivers,
+                               waiver_reason=body.waiver_reason)
+    except approval.ApprovalError as exc:
+        raise _approval_error(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
+
+
+@router.post("/applications/{application_id}/reject", response_model=ApplicationDetail,
+             name="applications_reject", responses={409: {"description": "Cannot be rejected now"}})
+async def reject(application_id: uuid.UUID, body: RejectIn, principal: PrincipalDep,
+                 session: SessionDep) -> ApplicationDetail:
+    """Say no at approval: the role is skipped and the next role in its employer group is promoted."""
+    app = await _load(session, application_id)
+    try:
+        await approval.reject(session, app, actor=principal.actor, reason=body.reason)
+    except approval.ApprovalError as exc:
+        raise _approval_error(exc) from exc
+    except stages.IllegalTransition as exc:
+        raise _illegal(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
+
+
+@router.post("/applications/{application_id}/request-changes", response_model=ApplicationDetail,
+             name="applications_request_changes", responses={409: {"description": "Cannot be changed now"}})
+async def request_changes(application_id: uuid.UUID, body: RequestChangesIn, principal: PrincipalDep,
+                          session: SessionDep) -> ApplicationDetail:
+    """Retire the packet and send the application back to tailoring with a note."""
+    app = await _load(session, application_id)
+    try:
+        await approval.request_changes(session, app, actor=principal.actor, note=body.note)
+    except approval.ApprovalError as exc:
+        raise _approval_error(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
+
+
+def _dispatch_out(a: DispatchAttempt) -> DispatchOut:
+    return DispatchOut(id=a.id, created_at=a.created_at, updated_at=a.updated_at, application_id=a.application_id,
+                       packet_hash=a.packet_hash, channel=a.channel.value, status=a.status.value,
+                       send_after=a.send_after, provider_message_id=a.provider_message_id, outcome_at=a.outcome_at,
+                       gate_results=a.gate_results, error=a.error, started_at=a.started_at, evidence=a.evidence,
+                       uncertain=apply_outcomes.is_uncertain(a), reconcile_attempts=a.reconcile_attempts,
+                       last_reconciled_at=a.last_reconciled_at)
+
+
+async def _attempt(session: AsyncSession, application_id: uuid.UUID, dispatch_id: uuid.UUID) -> DispatchAttempt:
+    attempt = await session.get(DispatchAttempt, dispatch_id, with_for_update=True)
+    if attempt is None or attempt.application_id != application_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="dispatch not found")
+    return attempt
 
 
 @router.get("/applications/{application_id}/dispatches", response_model=list[DispatchOut],
             name="applications_dispatches")
-async def dispatches(application_id: uuid.UUID) -> list[DispatchOut]:
-    not_implemented(2, "apply")
+async def dispatches(application_id: uuid.UUID, session: SessionDep) -> list[DispatchOut]:
+    """Every dispatch attempt, newest first: what was reserved, handed over, sent (with evidence), failed,
+    cancelled or is uncertain."""
+    await _load(session, application_id)
+    rows = await session.scalars(select(DispatchAttempt).where(DispatchAttempt.application_id == application_id)
+                                 .order_by(DispatchAttempt.created_at.desc()))
+    return [_dispatch_out(a) for a in rows]
+
+
+@router.post("/applications/{application_id}/dispatches", response_model=DispatchCreateOut,
+             name="applications_dispatch_create")
+async def create_dispatch(application_id: uuid.UUID, body: DispatchCreateIn, principal: PrincipalDep,
+                          session: SessionDep) -> DispatchCreateOut:
+    """Send the current approved packet: a submit permit (every gate), then the attempt, in one transaction.
+    Email waits ``automation.email_send_delay_minutes`` (cancellable) and is sent by the worker; the manual
+    channel hands the kit to the owner at once."""
+    await _load(session, application_id)
+    try:
+        result = await apply_dispatch.queue(session, application_id, actor=principal.actor)
+    except apply_dispatch.DispatchError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
+    attempt = result.attempt
+    if attempt is not None and attempt.channel == Channel.manual:
+        attempt_id = attempt.id
+        await session.commit()
+        await apply_dispatch.run(session, attempt_id)
+        attempt = await session.get(DispatchAttempt, attempt_id, populate_existing=True)
+    elif attempt is not None:
+        await session.refresh(attempt)
+    await _changed(session, application_id)
+    return DispatchCreateOut(status=result.status, reason=result.reason,  # type: ignore[arg-type]
+                             dispatch=_dispatch_out(attempt) if attempt else None,
+                             gates=[GateResult(**g) for g in result.gates], pending_action_id=result.pending_action_id)
 
 
 @router.post("/applications/{application_id}/dispatches/{dispatch_id}/cancel", response_model=DispatchOut,
-             name="applications_cancel_dispatch")
-async def cancel_dispatch(application_id: uuid.UUID, dispatch_id: uuid.UUID) -> DispatchOut:
-    not_implemented(2, "apply")
+             name="applications_cancel_dispatch", responses={409: {"description": "Already handed over"}})
+async def cancel_dispatch(application_id: uuid.UUID, dispatch_id: uuid.UUID, principal: PrincipalDep,
+                          session: SessionDep) -> DispatchOut:
+    """Cancel a queued send before it is handed to its channel (during the send delay)."""
+    attempt = await _attempt(session, application_id, dispatch_id)
+    app = await apply_outcomes.lock_application(session, application_id)
+    try:
+        await apply_outcomes.cancel(session, attempt, app, "cancelled by the owner", actor=principal.actor,
+                                    now=utcnow())
+    except apply_outcomes.OutcomeError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
+    await _changed(session, application_id)
+    await session.refresh(attempt)
+    return _dispatch_out(attempt)
+
+
+@router.post("/applications/{application_id}/dispatches/{dispatch_id}/reconcile", response_model=ReconcileOut,
+             name="applications_reconcile_dispatch", responses={409: {"description": "Not uncertain"}})
+async def reconcile_dispatch(application_id: uuid.UUID, dispatch_id: uuid.UUID, body: ReconcileIn,
+                             principal: PrincipalDep, session: SessionDep) -> ReconcileOut:
+    """Settle an uncertain send: ask its channel now, or say it went out (with the reference) or did not.
+    An uncertain send is never resent automatically."""
+    attempt = await _attempt(session, application_id, dispatch_id)
+    try:
+        result = await apply_reconcile.decide(session, attempt, body.decision, actor=principal.actor,
+                                              reference=body.reference, note=body.note)
+    except apply_outcomes.OutcomeError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
+    await _changed(session, application_id)
+    await session.refresh(attempt)
+    return ReconcileOut(result=result, dispatch=_dispatch_out(attempt))  # type: ignore[arg-type]
 
 
 @router.get("/applications/{application_id}/handoff", response_model=ManualHandoffOut,
             name="applications_manual_handoff")
-async def manual_handoff(application_id: uuid.UUID) -> ManualHandoffOut:
-    not_implemented(2, "apply")
+async def manual_handoff(application_id: uuid.UUID, session: SessionDep) -> ManualHandoffOut:
+    """The manual handoff kit for the current packet: posting link, files, answers sheet, remaining steps."""
+    app = await _load(session, application_id)
+    try:
+        built = await apply_handoff.kit(session, app)
+    except apply_handoff.HandoffError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
+    return ManualHandoffOut(posting_url=built.posting_url, files=built.files, answers=built.answers,
+                            remaining_steps=built.remaining_steps)
 
 
 @router.post("/applications/{application_id}/mark-submitted", response_model=ApplicationDetail,
-             name="applications_mark_submitted")
-async def mark_submitted(application_id: uuid.UUID, body: MarkSubmittedIn) -> ApplicationDetail:
-    not_implemented(2, "apply")
+             name="applications_mark_submitted", responses={409: {"description": "Nothing approved to submit"}})
+async def mark_submitted(application_id: uuid.UUID, body: MarkSubmittedIn, principal: PrincipalDep,
+                         session: SessionDep) -> ApplicationDetail:
+    """The owner submitted it: closes the open send (manual hand-off, or an uncertain one) as sent with the
+    owner's evidence, or sends the approved manual packet through permit and attempt first. Duplicate
+    protection then holds exactly as after an automatic send."""
+    app = await _load(session, application_id)
+    try:
+        await apply_handoff.mark_submitted(session, app, reference=body.reference, note=body.note,
+                                           actor=principal.actor)
+    except apply_handoff.HandoffError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
+    except apply_outcomes.OutcomeError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
 
 
 @router.get("/applications/{application_id}/releases", response_model=list[ReleaseRecord],
@@ -976,11 +1279,31 @@ async def autopilot_state(session: SessionDep) -> AutopilotState:
 @router.put("/autopilot", response_model=AutopilotState, name="autopilot_set")
 async def autopilot_set(body: AutopilotWrite, principal: PrincipalDep, session: SessionDep) -> AutopilotState:
     """Pause stops every new outward action at once and cancels queued sends; the response
-    lists what was cancelled, paused, and already out. Resume clears the pause. Audited."""
-    return await autopilot.set_paused(session, body.paused, actor=principal.actor)
+    lists what was cancelled, paused, and already out. Resume clears the pause (409 while paused for a
+    restore: use resume-after-restore). Audited."""
+    try:
+        return await autopilot.set_paused(session, body.paused, actor=principal.actor, reason=body.reason)
+    except autopilot.ResumeRefused as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": "restore_paused", "reason": str(exc)}) from exc
 
 
-@router.post("/autopilot/resume-after-restore", response_model=Ok, name="autopilot_resume_after_restore")
-async def resume_after_restore() -> Ok:
-    """A restored instance starts paused and reconciles its outbox first (18.3)."""
-    not_implemented(2, "apply")
+@router.get("/autopilot/restore", response_model=RestoreStateOut, name="autopilot_restore_state")
+async def restore_state(session: SessionDep) -> RestoreStateOut:
+    """Paused for a restore from backup: what is still to reconcile before sending can resume (18.3)."""
+    st = await apply_restore.state(session)
+    return RestoreStateOut(active=st.active, entered_at=st.entered_at, backup_taken_at=st.backup_taken_at,
+                           outstanding=[_dispatch_out(a) for a in st.outstanding],
+                           held_application_ids=st.held_application_ids)
+
+
+@router.post("/autopilot/resume-after-restore", response_model=Ok, name="autopilot_resume_after_restore",
+             responses={409: {"description": "Sends from before the backup are not reconciled yet"}})
+async def resume_after_restore(principal: PrincipalDep, session: SessionDep) -> Ok:
+    """A restored instance starts paused and reconciles its outbox first (18.3). Refused (409, with the
+    outstanding dispatch ids) until every send in flight at backup time is settled."""
+    try:
+        await apply_restore.resume(session, actor=principal.actor)
+    except apply_restore.RestoreError as exc:
+        raise HTTPException(exc.status, detail={"code": "restore_unreconciled", "reason": exc.message,
+                                                "outstanding": [str(i) for i in exc.outstanding]}) from exc
+    return Ok()

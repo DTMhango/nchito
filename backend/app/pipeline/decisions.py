@@ -12,7 +12,12 @@ Module boundary (contract):
 - Every gate result carries a human reason and the effective value and source of each rule
   (setting key, campaign field, rubric version), which the "Why?" panel displays.
 - ``decide`` is the only public entry point. Wave 1 (filters/scoring stream) implements it;
-  wave 2 (apply stream) adds the permit-time gates using the same function.
+  wave 2 (apply stream) adds the permit-time gates using the same function: with purpose
+  ``permit``, ``application`` carries ``approval``, ``channel``, ``permit_checks``
+  (``{name: (outcome, reason[, owner_settles])}``) and ``for_approval``, and ``Decision.permit``
+  is ``granted`` / ``wait_for_owner`` / ``denied`` with ``permit_reason``.
+- The automation mode is resolved only by ``resolve_mode`` (campaign per-channel override, else
+  campaign mode, else ``automation.default_mode``; capped while the campaign is unconfirmed).
 
 Record shapes (built by ``app.pipeline.filters``):
 
@@ -39,12 +44,22 @@ GateOutcome = Literal["pass", "fail", "unknown"]
 Purpose = Literal["discovery", "dry_run", "permit"]
 Verdict = Literal["excluded", "review", "below_threshold", "shortlist", "tailor", "ask_owner", "auto_apply"]
 Policy = Literal["review", "pass_with_penalty", "pass_blocks_auto", "fail"]
+PermitStatus = Literal["granted", "wait_for_owner", "denied"]
 
 # The order gates are evaluated in; later layers cannot override an earlier fail.
 LAYERS: tuple[str, ...] = ("exclusion", "eligibility", "score", "automation")
 MODES: tuple[str, ...] = ("save_only", "prepare", "ask_then_apply", "auto_apply")
 # Unconfirmed campaigns cannot go above this mode (principle 2, 8.1). An invariant, not a setting.
 UNCONFIRMED_CEILING = "prepare"
+# Lowest mode in which the system itself sends an application the owner approved (8.1).
+SYSTEM_APPLIES_FROM = "ask_then_apply"
+
+# Permit purpose (wave 2). Gates that only stand in for the owner's judgement: an owner approval of
+# the packet settles them; an automatic approval needs every one to pass.
+OWNER_SETTLES: frozenset[str] = frozenset({"auto_threshold", "known_data", "pay_stated", "always_ask_first"})
+# Gates about *when* something may go out rather than *whether*: they do not decide an approval and
+# are checked again when the permit is requested.
+TIMING_GATES: frozenset[str] = frozenset({"global_pause", "daily_cap", "weekly_cap", "quiet_hours", "budget"})
 
 
 @dataclass(frozen=True)
@@ -91,6 +106,9 @@ class Decision:
     auto_apply_allowed: bool
     effective_score: int | None = None
     mode: str | None = None
+    # Permit purpose only: the outcome of the permit check and its reason (blocking gates named).
+    permit: PermitStatus | None = None
+    permit_reason: str | None = None
 
     @property
     def blocking(self) -> list[GateDecision]:
@@ -510,15 +528,49 @@ def _score(data: DecisionInput, ctx: _Ctx, unknown_penalty: int) -> tuple[list[G
 # ----- layer 4: automation ----------------------------------------------------------------
 
 
-def _effective_mode(data: DecisionInput, ctx: _Ctx) -> tuple[str, list[RuleRef], bool]:
-    automation = data.campaign.get("automation") or {}
-    wanted = automation.get("mode") or "prepare"
-    refs = [ctx.campaign_ref("automation.mode", wanted)]
-    confirmed = data.campaign.get("review_state") == "confirmed" and bool(data.campaign.get("confirmed", True))
+@dataclass(frozen=True)
+class ModeResolution:
+    """The automation mode in force for one campaign and channel, and why (DESIGN.md 8.1)."""
+
+    mode: str
+    rules: tuple[RuleRef, ...]
+    confirmed: bool
+    reason: str
+
+
+def resolve_mode(campaign: Mapping[str, Any], channel: str | None, *, default_mode: Any = None,
+                 default_version: str | None = None) -> ModeResolution:
+    """The one place the automation mode is resolved: the campaign's per-channel override, else its
+    mode, else ``automation.default_mode``; then capped at ``prepare`` while the campaign is not confirmed.
+    Pure; the reason names the rule, value, source and version used."""
+    version = str(campaign.get("version")) if campaign.get("version") else None
+    automation = campaign.get("automation") or {}
+    per_channel = automation.get("per_channel") or {}
+    if channel and per_channel.get(channel):
+        wanted = per_channel[channel]
+        ref = RuleRef(f"automation.per_channel.{channel}", wanted, "campaign", version)
+    elif automation.get("mode"):
+        wanted = automation["mode"]
+        ref = RuleRef("automation.mode", wanted, "campaign", version)
+    else:
+        wanted = default_mode or UNCONFIRMED_CEILING
+        ref = RuleRef("automation.default_mode", wanted, "setting", default_version)
+    refs = [ref]
+    reason = f"mode {wanted} from {ref.rule} ({ref.source}{f' {ref.version}' if ref.version else ''})"
+    confirmed = campaign.get("review_state") == "confirmed" and bool(campaign.get("confirmed", True))
     if not confirmed and MODES.index(wanted) > MODES.index(UNCONFIRMED_CEILING):
-        refs.append(RuleRef("mode_ceiling", UNCONFIRMED_CEILING, "campaign not confirmed", ctx.campaign_version))
-        return UNCONFIRMED_CEILING, refs, confirmed
-    return wanted, refs, confirmed
+        refs.append(RuleRef("mode_ceiling", UNCONFIRMED_CEILING, "campaign not confirmed", version))
+        reason += f"; capped at {UNCONFIRMED_CEILING} until the campaign is confirmed"
+        return ModeResolution(UNCONFIRMED_CEILING, tuple(refs), confirmed, reason)
+    return ModeResolution(wanted, tuple(refs), confirmed, reason)
+
+
+def _effective_mode(data: DecisionInput, ctx: _Ctx) -> tuple[str, list[RuleRef], bool]:
+    channel = (data.application or {}).get("channel")
+    version = data.setting_versions.get("automation.default_mode")
+    res = resolve_mode(data.campaign, channel, default_mode=data.settings.get("automation.default_mode"),
+                       default_version=f"v{version}" if version is not None else None)
+    return res.mode, list(res.rules), res.confirmed
 
 
 def _in_quiet_hours(data: DecisionInput) -> bool | None:
@@ -610,16 +662,66 @@ def _automation(data: DecisionInput, ctx: _Ctx, score: int | None, blocks: list[
          "quiet hours not known" if quiet is None else ("inside quiet hours" if quiet else "outside quiet hours"),
          qref)
     if data.purpose == "permit":
-        # Permit-time checks (document checks, answers, channel, prior application, budget) are added
-        # by the apply stream. Until they are evaluated, the permit is not granted.
+        # Permit-time checks (packet binding, approval, document checks, answers, channel, trusted site,
+        # duplicates, budget) are assembled by ``app.apply.gates``. Until they are evaluated, the permit
+        # is not granted.
         app = data.application or {}
         checks = app.get("permit_checks")
         if not checks:
             gate("permit_checks", "unknown", "permit-time checks not evaluated")
         else:
-            for name, (outcome, reason) in checks.items():
-                gate(name, outcome, reason)
+            for name, check in checks.items():
+                gate(name, check[0], check[1])
     return gates
+
+
+def _owner_settled_checks(data: DecisionInput) -> set[str]:
+    """Permit checks supplied as ``(outcome, reason, True)``: the owner's approval settles them."""
+    checks = (data.application or {}).get("permit_checks") or {}
+    return {name for name, check in checks.items() if len(check) > 2 and check[2]}
+
+
+def _permit(data: DecisionInput, verdict: Verdict, mode: str, gates: Sequence[GateDecision],
+            auto_gates: Sequence[GateDecision]) -> tuple[PermitStatus, str]:
+    """The permit outcome (wave 2). ``application``: ``approval`` (``owner`` / ``auto`` / ``None``),
+    ``channel``, ``permit_checks`` and ``for_approval`` (True when deciding an automatic approval, so the
+    timing gates are left for the permit itself).
+
+    Precedence holds: an excluded role is denied whatever its score or approval. Every other gate that
+    is not passing denies, except the ones an owner approval settles (``OWNER_SETTLES``, plus a role not
+    confirmed open recently when ``automation.permit_unknown_open`` allows it), which send an automatic
+    approval back to the owner. Unknown never grants."""
+    app = data.application or {}
+    approval, channel = app.get("approval"), app.get("channel")
+    if verdict == "excluded":
+        first = next(g for g in gates if g.layer in ("exclusion", "eligibility") and g.outcome == "fail"
+                     and g.mandatory)
+        return "denied", f"excluded: {first.reason}"
+    settles = set(OWNER_SETTLES) | _owner_settled_checks(data)
+    if approval == "owner" and data.settings.get("automation.permit_unknown_open") == "allow_when_owner_approved":
+        settles.add("role_open")
+    blocking = [g for g in auto_gates if g.mandatory and g.outcome != "pass"]
+    if app.get("for_approval"):
+        # An owner's approval is not about freshness either: the open check is repeated at permit time.
+        later = TIMING_GATES | ({"role_open"} if approval == "owner" else set())
+        blocking = [g for g in blocking if g.gate not in later]
+    hard = [g for g in blocking if g.gate not in settles]
+    soft = [g for g in blocking if g.gate in settles]
+    if hard:
+        return "denied", "; ".join(f"{g.gate}: {g.reason}" for g in hard)
+    if approval == "owner":
+        if channel != "manual" and MODES.index(mode) < MODES.index(SYSTEM_APPLIES_FROM):
+            return "denied", f"effective mode {mode} does not let the system apply; use the manual handoff"
+        return "granted", "approved by the owner; every permit gate passes"
+    if approval == "auto":
+        if mode != "auto_apply":
+            return "wait_for_owner", f"effective mode {mode} needs your approval"
+        if soft:
+            return "wait_for_owner", "; ".join(f"{g.gate}: {g.reason}" for g in soft)
+        if verdict in ("review", "below_threshold") or data.conflict_state == "held":
+            return "wait_for_owner", f"verdict {verdict} needs your approval"
+        return "granted", "automatic approval; every gate passes with no unknowns"
+    return "denied", "the packet is not approved"
 
 
 # ----- decide -----------------------------------------------------------------------------
@@ -660,8 +762,12 @@ def decide(data: DecisionInput) -> Decision:
         all_pass = all(g.outcome == "pass" for g in auto_gates if g.mandatory)
         verdict = "auto_apply" if all_pass else "ask_owner"
     gates.append(GateDecision("mode", "automation", "pass", f"effective mode: {mode}", tuple(mode_refs), False))
+    permit: PermitStatus | None = None
+    permit_reason: str | None = None
+    if data.purpose == "permit":
+        permit, permit_reason = _permit(data, verdict, mode, gates, auto_gates)
     return Decision(verdict=verdict, gates=tuple(gates), auto_apply_allowed=verdict == "auto_apply",
-                    effective_score=score, mode=mode)
+                    effective_score=score, mode=mode, permit=permit, permit_reason=permit_reason)
 
 
 class Table:

@@ -7,6 +7,7 @@ import contextlib
 import logging
 import signal
 
+from app.apply import tasks as apply_tasks  # noqa: F401  (registers dispatch and reconciliation)
 from app.core.db import dispose_engine
 from app.ops import tasks as ops_tasks  # noqa: F401  (registers the periodic ops tick)
 from app.pipeline import wiring

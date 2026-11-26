@@ -1,4 +1,4 @@
-"""Command line: ``nchito migrate | web | worker | openapi | gen-key``."""
+"""Command line: ``nchito migrate | web | worker | openapi | contracts | gen-key | worker-alive | restored``."""
 
 from __future__ import annotations
 
@@ -101,7 +101,12 @@ def backup_now() -> int:
 
 def restore(path: str, *, database_url: str | None, files_dir: str | None, pause: bool, inspect: bool,
             yes: bool) -> int:
-    """Restore a backup. Without --yes it only shows what the backup holds and what would be replaced."""
+    """Restore a backup. Without --yes it only shows what the backup holds and what would be replaced.
+
+    A restore always ends paused for restore (``app.apply.restore.enter``): in-flight sends become
+    uncertain and are reconciled, approvals of unsent roles are withdrawn. ``--no-pause`` is for
+    rehearsals into a scratch database only.
+    """
     from app.ops import restore as restore_mod
 
     target_db = database_url or get_config().libpq_url
@@ -118,11 +123,40 @@ def restore(path: str, *, database_url: str | None, files_dir: str | None, pause
     result = asyncio.run(restore_mod.restore_backup(Path(path), database_url=target_db, files_dir=target_files,
                                                     pause=pause))
     print(f"restored: {result.tables_checked} tables verified, {result.files_restored} files."
-          + (f" Previous files kept in {result.files_moved_to}." if result.files_moved_to else "")
-          + (" The instance is PAUSED: check the reconciliation list, then resume." if result.paused else ""))
+          + (f" Previous files kept in {result.files_moved_to}." if result.files_moved_to else ""))
+    if result.paused:
+        try:
+            asyncio.run(restored(str(manifest["created_at"]), database_url=target_db))
+        except Exception as exc:  # an older schema: the plain pause stays in place
+            print(f"automation is paused, but the restore reconciliation could not start ({type(exc).__name__}). "
+                  "Run `nchito migrate`, then `nchito restored --backup-taken-at "
+                  f"{manifest['created_at']}` before resuming.")
+            return 3
     if result.app_revision:
         print(f"Run `nchito migrate` if this release is newer than schema {result.app_revision}.")
     return 0
+
+
+async def restored(backup_taken_at: str | None, *, database_url: str | None = None) -> None:
+    """Mark this database as restored from a backup: everything pauses until reconciled (DESIGN.md 18.3)."""
+    from datetime import datetime
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+
+    from app.apply import restore as apply_restore
+
+    url = database_url or get_config().libpq_url
+    engine = create_async_engine("postgresql+asyncpg://" + url.split("://", 1)[1])
+    taken = datetime.fromisoformat(backup_taken_at) if backup_taken_at else None
+    try:
+        async with async_sessionmaker(engine, expire_on_commit=False)() as session:
+            st = await apply_restore.enter(session, backup_taken_at=taken)
+            await session.commit()
+    finally:
+        await engine.dispose()
+    print(f"paused for restore: {len(st.outstanding)} send(s) to reconcile, "
+          f"{len(st.held_application_ids)} approval(s) withdrawn. The instance is PAUSED: check the "
+          "reconciliation list, then resume.")
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -148,6 +182,8 @@ def main(argv: list[str] | None = None) -> None:
     rs.add_argument("--inspect", action="store_true", help="Only print what the backup holds")
     rs.add_argument("--yes", action="store_true", help="Confirm that existing data may be replaced")
     sub.add_parser("worker-alive", help="Exit 0 if a worker heartbeat is fresh (container healthcheck)")
+    rd = sub.add_parser("restored", help="Mark a restored database paused for restore (restore does this itself)")
+    rd.add_argument("--backup-taken-at", default=None, help="ISO time the backup was taken")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=get_config().log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -176,6 +212,8 @@ def main(argv: list[str] | None = None) -> None:
     elif args.cmd == "restore":
         sys.exit(restore(args.file, database_url=args.database_url, files_dir=args.files_dir,
                          pause=not args.no_pause, inspect=args.inspect, yes=args.yes))
+    elif args.cmd == "restored":
+        asyncio.run(restored(args.backup_taken_at))
     elif args.cmd == "worker-alive":
         sys.exit(0 if asyncio.run(worker_alive()) else 1)
 

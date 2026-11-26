@@ -92,8 +92,12 @@ file or a manifest mismatch stops before anything is replaced.
 
 To rehearse: `nchito restore <file> --yes --database-url postgresql://user:pw@host/scratch --files-dir /tmp/scratch-files`.
 
-- **An instance started from a restored backup starts paused**, reconciles its outbox against the mailbox's sent
-  items, and waits for the owner to resume (DESIGN.md 18.3). Never resume before checking the reconciliation list.
+- **An instance started from a restored backup starts paused** (`nchito restore` does this itself; `nchito restored
+  --backup-taken-at <time>` repeats it by hand, e.g. after a restore into an older schema and `nchito migrate`): sends
+  that were in flight at backup time become uncertain and are reconciled against the mailbox's sent items, and
+  approvals of roles that were ready but unsent are withdrawn (the old instance may have sent them after the backup).
+  `GET /api/autopilot/restore` lists what is outstanding; `POST /api/autopilot/resume-after-restore` is refused until
+  it is empty (settle any by hand with a dispatch's `reconcile`). Never resume before checking the reconciliation list.
 
 ## Retention
 

@@ -93,6 +93,10 @@ def check_transition(app: Application, target: Stage, via: Via) -> Verdict:
         if current not in APPLIED_MYSELF_FROM:
             return Verdict(False, f"cannot record a submission from {current.value}")
         return Verdict(True)
+    if current == S.submitted_unconfirmed and target == S.ready:
+        # Only reconciliation, once it has established that nothing left (8.5, 18.3).
+        return Verdict(True) if via == "system" else Verdict(
+            False, "only reconciliation can establish that an unconfirmed send never left")
     if via == "owner" and current == S.applying:
         return Verdict(False, "it is being sent right now; only the apply process can move it")
     if via == "owner" and target in OWNER_FORBIDDEN_TARGETS:
@@ -135,6 +139,8 @@ async def transition(session: AsyncSession, app: Application, target: Stage, *, 
     app.stage = target
     if target in SUBMITTED_STATES and app.applied_at is None:
         app.applied_at = now
+    if previous == S.submitted_unconfirmed and target in PRE_SUBMIT:
+        app.applied_at = None  # reconciliation found that it never left
     if via == "applied_myself":
         app.owner_attested = True
         app.applied_outside = True

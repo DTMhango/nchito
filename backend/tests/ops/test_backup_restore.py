@@ -216,3 +216,21 @@ def test_restore_inspect_reads_the_manifest_only(scratch_db, tmp_path) -> None:
     assert manifest["vault_files"] == 2 and "job" in manifest["table_counts"]  # type: ignore[operator]
     shutil.rmtree(files)  # inspecting needs nothing else
     assert restore.describe(Path(info.path))["format"] == 1
+
+
+def test_cli_restore_always_starts_paused_for_restore(scratch_db, tmp_path) -> None:
+    """``nchito restore --yes`` enters the apply stream's paused-for-restore state itself."""
+    import asyncio
+
+    from app import cli
+
+    _, url = scratch_db
+    files = tmp_path / "files"
+    write_vault(files)
+    info = asyncio.run(backup.create_backup(database_url=url, files_dir=files, directory=tmp_path / "b"))
+    code = cli.restore(info.path, database_url=url, files_dir=str(tmp_path / "restored"), pause=True,
+                       inspect=False, yes=True)
+    assert code == 0
+    with psycopg.connect(url) as conn:
+        actions = [r[0] for r in conn.execute("SELECT action FROM audit_event ORDER BY created_at").fetchall()]
+    assert "backup.restored" in actions and "restore.paused" in actions
