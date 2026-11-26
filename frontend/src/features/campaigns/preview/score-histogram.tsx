@@ -45,7 +45,8 @@ export function ScoreHistogram({
               <div
                 className={
                   "w-full max-w-6 rounded-t-[4px] bg-chart-1 " +
-                  (b.start >= auto ? "" : "opacity-40")
+                  // 60% keeps a faded bar at 3:1 or more against the surface in every theme.
+                  (b.start >= auto ? "" : "opacity-60")
                 }
                 style={{ height: `${(b.count / max) * 100}%` }}
               />

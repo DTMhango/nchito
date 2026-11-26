@@ -275,7 +275,8 @@ function Studio({ theme }: { theme: ThemeOut }) {
             <ArrowLeft aria-hidden="true" />
           </Link>
         </Button>
-        <div className="min-w-0 flex-1">
+        {/* Keeps room for the name: the actions wrap below it before the name is cut short. */}
+        <div className="min-w-[min(100%,18rem)] flex-1">
           <div className="eyebrow">Theme studio</div>
           <h2 className="flex flex-wrap items-center gap-2 text-2xl">
             <span className="truncate">{draft.name || theme.name}</span>

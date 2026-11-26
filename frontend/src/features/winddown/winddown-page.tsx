@@ -4,6 +4,7 @@ import { Chip } from "@/components/chip"
 import { PageHeader, SectionHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { View } from "@/components/view"
 import {
   chooseWindDown,
   followupKeys,
@@ -46,7 +47,7 @@ export function WindDownPage() {
 
   if (wd.status !== "active")
     return (
-      <div>
+      <View>
         <PageHeader
           title="Wind down"
           description="Accepted an offer? This pauses every automatic send at once, then lets you decide what happens to everything else."
@@ -80,11 +81,11 @@ export function WindDownPage() {
           </Button>
         </form>
         {start.isError && <p role="alert">{start.error.message}</p>}
-      </div>
+      </View>
     )
 
   return (
-    <div>
+    <View>
       <PageHeader
         title="Winding down"
         description={wd.reason ?? undefined}
@@ -144,7 +145,7 @@ export function WindDownPage() {
           onSet={set}
         />
       </div>
-    </div>
+    </View>
   )
 }
 
@@ -175,7 +176,7 @@ function Section({
             <li
               key={i.key}
               aria-label={i.label}
-              className="flex flex-wrap items-center gap-2 border-t border-border row-pad first:border-t-0"
+              className="flex flex-wrap items-center gap-2 border-t border-border px-3 row-pad first:border-t-0"
             >
               <div className="min-w-0 flex-1">
                 <b className="font-semibold break-words">{i.label}</b>

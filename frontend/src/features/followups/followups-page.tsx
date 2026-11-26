@@ -4,6 +4,7 @@ import { Chip } from "@/components/chip"
 import { EmptyState } from "@/components/empty-state"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
+import { View } from "@/components/view"
 import {
   draftFollowup,
   followupKeys,
@@ -53,7 +54,7 @@ export function FollowupsPage() {
   })
 
   return (
-    <div>
+    <View>
       <PageHeader
         title="Follow-ups"
         description="Applications with no reply, by when a follow-up is due. A draft is never sent without your approval."
@@ -81,7 +82,7 @@ export function FollowupsPage() {
             <li
               key={`${i.application_id}-${i.sequence}`}
               aria-label={`${i.title} at ${i.employer}`}
-              className="flex flex-wrap items-center gap-2 border-t border-border row-pad first:border-t-0"
+              className="flex flex-wrap items-center gap-2 border-t border-border px-3 row-pad first:border-t-0"
             >
               <div className="min-w-0 flex-1">
                 <Link
@@ -138,6 +139,6 @@ export function FollowupsPage() {
           {act.error.message}
         </p>
       )}
-    </div>
+    </View>
   )
 }
