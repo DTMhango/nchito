@@ -21,6 +21,33 @@ but no worker heartbeat is fresh; `down` (HTTP 503) means the database is unreac
     docker compose up -d --build
     open http://localhost:8000
 
+## First run
+
+1. **Create the owner.** Open the app: with no owner yet it shows the setup page
+   (`POST /api/setup/owner`). Pick a long passphrase; there is one owner per instance.
+2. **Wizard.** Onboarding walks through the Kit (import a `.kit.zip` or the old job-hunting folder,
+   or start empty), the profile, work rights and answers, the first track and campaign, the theme
+   (built-in or one made in the Theme studio) and the autopilot mode (start in *review*).
+   Every imported fact, skill and guardrail starts *to review*; nothing is used until you confirm it.
+3. **Connect Gmail (and Drive, Calendar).** In Google Cloud console create one OAuth client
+   (type *Web application*) and set `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`.
+   Enable the **Gmail API**, **Google Drive API** and **Google Calendar API** for the project, and
+   register these redirect URIs (`BASE_URL` is the public address, e.g. `http://localhost:8000`):
+   - `BASE_URL/api/connections/oauth/gmail/callback` (scopes `gmail.send`, `gmail.readonly`)
+   - `BASE_URL/api/connections/oauth/gdrive/callback` (scope `drive.file`, backups and exports)
+   - `BASE_URL/api/connections/oauth/gcalendar/callback` (scope `calendar.app.created`)
+
+   While the consent screen is in *testing*, add your own address as a test user. Then
+   Settings → Connections → Connect. Outlook/OneDrive: see "Outlook and OneDrive" below.
+4. **Try it without real postings.** `docker compose exec web nchito demo-job` (or
+   `python -m app.cli demo-job` in `backend/`) inserts one fictional role so you can walk
+   score → tailor → approve → send-by-hand end to end. It is refused in production.
+5. **PC runner** (portals that need a browser): see "Local runner" below; pair it from
+   Settings → Runners. The optional server runner is under "Server runner".
+6. **Backups.** Set the backup target (local folder, S3, Google Drive or OneDrive) in Settings →
+   Data, run `nchito backup` once and test a restore (see "Backups and restore"). Keep
+   `ENCRYPTION_KEY` outside the server.
+
 ## First start (VPS, Dokploy)
 
 1. Create a Compose app in Dokploy from this repository, compose file `docker-compose.dokploy.yml`.
@@ -28,7 +55,8 @@ but no worker heartbeat is fresh; `down` (HTTP 503) means the database is unreac
    (`docker run --rm <image> nchito gen-key`), optionally `APP_NAME`, `S3_*` and
    `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` (one Google OAuth client for both the Gmail and the
    Drive connection; register `https://$DOMAIN/api/connections/oauth/gmail/callback` and
-   `.../oauth/gdrive/callback` as redirect URIs).
+   `.../oauth/gdrive/callback` as redirect URIs), `MS_OAUTH_CLIENT_ID` / `MS_OAUTH_CLIENT_SECRET` /
+   `MS_OAUTH_TENANT` (see "Outlook and OneDrive").
 3. Deploy. Traefik routes `https://$DOMAIN` to `web:8000` on the `dokploy-network`.
 4. Keep a copy of `ENCRYPTION_KEY` outside the server. It is never stored in the database or
    in backups; without it, stored provider tokens cannot be decrypted and must be reconnected.
@@ -75,7 +103,8 @@ copies are kept (default 14; older ones are deleted together with their remote c
 uploads each archive to the connected Google Drive folder (`backups/`); `local` only writes locally. A failed upload
 keeps the local copy and marks the run partial. The `s3` target is not available in this build: the backup stays
 local. `pg_dump` and `pg_restore` must be in the image (`postgresql-client`, the same major version as the database;
-set `PG_BIN_DIR` if they are not on PATH). Run one now with Settings, Data, or `nchito backup`.
+set `PG_BIN_DIR` if they are not on PATH). `backups.target` `onedrive` uploads to the connected OneDrive app folder
+the same way. Run one now with Settings, Data, or `nchito backup`.
 
 **Restore (new or wiped server).**
 
@@ -101,6 +130,30 @@ To rehearse: `nchito restore <file> --yes --database-url postgresql://user:pw@ho
   approvals of roles that were ready but unsent are withdrawn (the old instance may have sent them after the backup).
   `GET /api/autopilot/restore` lists what is outstanding; `POST /api/autopilot/resume-after-restore` is refused until
   it is empty (settle any by hand with a dispatch's `reconcile`). Never resume before checking the reconciliation list.
+
+## Outlook and OneDrive (Microsoft sign-in)
+
+One Microsoft Entra app registration serves both connections.
+
+1. Entra admin center (entra.microsoft.com), App registrations, New registration. Supported account types: pick
+   "personal Microsoft accounts only" for `MS_OAUTH_TENANT=consumers`, or "any directory and personal accounts"
+   for `common` (the default). Platform: Web.
+2. Redirect URIs (exact, one per connection): `BASE_URL/api/connections/oauth/msgraph/callback` and
+   `BASE_URL/api/connections/oauth/onedrive/callback`.
+3. API permissions, Microsoft Graph, Delegated: `offline_access`, `User.Read`, `Mail.Send`, `Mail.Read` (Outlook)
+   and `Files.ReadWrite.AppFolder` (OneDrive). Nothing else is requested, and no admin consent is needed for a
+   personal account.
+4. Certificates and secrets, New client secret. Put the value (not the id) in `MS_OAUTH_CLIENT_SECRET` and the
+   Application (client) id in `MS_OAUTH_CLIENT_ID`; `MS_OAUTH_TENANT` defaults to `common`. Restart the stack.
+   Until both are set, Connect answers "set MS_OAUTH_CLIENT_ID/SECRET".
+5. Settings, Connections, Connect Outlook / Connect OneDrive. For Outlook, then use Change to name the one folder
+   the app may read (Mail.Read covers the whole mailbox; the app reads only that folder and Sent Items).
+
+Notes. Microsoft keeps the app folder (`Apps/<app name>` in OneDrive) only for personal OneDrive accounts: a work
+or school OneDrive refuses it and the test says so. Outlook sends through a draft so the message carries the
+`X-Nchito-Idempotency-Key` header and a fixed Message-ID; a send that times out is never resent, it is settled from
+Sent Items. Attachments over 3 MB are refused on Outlook. When more than one mailbox is connected, "Use as default"
+on the card sets `mail.default_mailbox`; backups go to `backups.target`.
 
 ## Retention
 

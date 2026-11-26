@@ -4,6 +4,7 @@
  * saved views, rule tags and campaign rules share.
  */
 import { z } from "zod"
+import { jobDrillSchema } from "@/features/insights/drill-search"
 import type { FilterState } from "@/components/chip"
 import type {
   Condition,
@@ -83,6 +84,8 @@ export type ValueSels = Record<string, ValueSel>
 export type RangeSels = Record<string, RangeSel>
 
 export const matchesSearchSchema = z.object({
+  // Insights drill-through (since, until, campaign, track, source, market, funnel step).
+  ...jobDrillSchema.shape,
   tab: z.enum(TAB_IDS).catch("new").default("new"),
   q: z.string().optional().catch(undefined),
   f: z.record(z.string(), valueSel).optional().catch(undefined),

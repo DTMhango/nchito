@@ -223,11 +223,24 @@ export function LookStep() {
             key={t.id}
             type="button"
             aria-pressed={t.id === theme.id}
+            disabled={t.needs_review}
+            title={
+              t.needs_review
+                ? "Body text is below WCAG AA. Review it in the theme studio first."
+                : undefined
+            }
             onClick={() => setAppearance({ theme_id: t.id })}
-            className="flex items-center gap-2 rounded-sm border border-border bg-surface px-2.5 py-2 text-left font-medium aria-pressed:border-primary aria-pressed:shadow-[0_0_0_2px_var(--t-ring)]"
+            className="flex items-center gap-2 rounded-sm border border-border bg-surface px-2.5 py-2 text-left font-medium disabled:opacity-60 aria-pressed:border-primary aria-pressed:shadow-[0_0_0_2px_var(--t-ring)]"
           >
             <ThemeSwatch theme={t} />
-            {t.name}
+            <span className="grid">
+              {t.name}
+              {t.needs_review && (
+                <span className="text-[0.75rem] font-normal text-warn">
+                  Needs review
+                </span>
+              )}
+            </span>
           </button>
         ))}
       </div>

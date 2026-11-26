@@ -139,9 +139,12 @@ export const schedulesQuery = () =>
   queryOptions({ queryKey: sourceKeys.schedules, queryFn: listSchedules })
 
 // ---- runs ----
-export const listRuns = async () =>
-  (await unwrap(gen.GET("/api/runs", { params: { query: { limit: 100 } } })))
-    .items as Run[]
+export const listRuns = async (kind?: RunKind) =>
+  (
+    await unwrap(
+      gen.GET("/api/runs", { params: { query: { limit: 100, kind } } })
+    )
+  ).items as Run[]
 export const getRun = (id: string) =>
   unwrap(
     gen.GET("/api/runs/{run_id}", { params: { path: { run_id: id } } })
@@ -155,10 +158,11 @@ export const cancelRun = (id: string) =>
 
 const active = (s: RunStatus) => s === "running" || s === "queued"
 export const isActive = active
-export const runsQuery = () =>
+/** Run history, optionally one kind only (the key stays under `runs`, so run events refresh it). */
+export const runsQuery = (kind?: RunKind) =>
   queryOptions({
-    queryKey: sourceKeys.runs,
-    queryFn: listRuns,
+    queryKey: kind ? [...sourceKeys.runs, "kind", kind] : sourceKeys.runs,
+    queryFn: () => listRuns(kind),
     // Polling is the fallback when the event stream is not connected.
     refetchInterval: (q) =>
       q.state.data?.some((r) => active(r.status)) ? 4000 : false,

@@ -266,6 +266,16 @@ function runs(): Run[] {
       cost_minor: 0,
       cost_micros: 0,
     }),
+    done("run-tailor-1", 60 * 40, {
+      kind: "tailoring",
+      trigger: "manual",
+      schedule_id: null,
+      status: "succeeded",
+      counts: { tailored: 1 },
+      source_results: [],
+      cost_minor: 26,
+      cost_micros: 260000,
+    }),
     done("run-4", 60 * 52, {
       dry_run: true,
       trigger: "manual",

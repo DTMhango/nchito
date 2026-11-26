@@ -68,6 +68,15 @@ export const listConfigHistory = (kind: string, cursor?: string) =>
     })
   )
 
+/** Restore a revision's value as a NEW revision (settings, prompts and model routes). */
+export const rollbackRevision = (id: string, note?: string) =>
+  unwrap(
+    gen.POST("/api/data/config-history/{revision_id}/rollback", {
+      params: { path: { revision_id: id } },
+      body: { note: note?.trim() || null },
+    })
+  )
+
 export const changePassword = (
   current_password: string,
   new_password: string

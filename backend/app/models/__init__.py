@@ -7,6 +7,8 @@ from app.models.applications import (
     ApplicationPacket,
     Contact,
     DispatchAttempt,
+    InterviewMockSession,
+    InterviewMockTurn,
     InterviewPack,
     InterviewRound,
     MailThread,
@@ -15,8 +17,11 @@ from app.models.applications import (
     SubmitPermit,
 )
 from app.models.base import Base
+from app.models.bulk import BulkItem, BulkOperation, EmployerPolicy
+from app.models.calendar import CalendarFeed, InterviewEvent
 from app.models.changes import JobChange, JobVersion, JobWatch
 from app.models.documents import ApplicationDocument
+from app.models.followups import FollowupDue, OutboundMessage, WindDown
 from app.models.kit import (
     Answer,
     Experience,
@@ -45,8 +50,10 @@ from app.models.platform import (
     Setting,
     SettingRevision,
     Theme,
+    ThemeRevision,
     WorkerHeartbeat,
 )
+from app.models.preferences import PreferenceFeedback, PreferenceSuggestion
 from app.models.search import (
     Assessment,
     Campaign,
@@ -68,13 +75,13 @@ from app.models.search import (
 
 __all__ = [
     "AgentTask", "Answer", "ApiToken", "Application", "ApplicationDocument", "ApplicationEvent",
-    "ApplicationPacket", "Assessment",
-    "AuditEvent", "AuthSession", "Base", "Campaign", "ConfigRevision", "Connection", "Contact", "CustomFacet",
-    "DispatchAttempt", "EmployerAlias", "Experience", "Fact", "Guardrail", "GuardrailWaiver", "InterviewPack",
-    "InterviewRound", "Job", "JobChange", "JobSighting", "JobVersion", "JobWatch",
-    "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread", "Notification",
-    "Owner",
-    "PayEstimate", "PendingAction", "Person", "PortalAccount", "Prompt", "Reference", "Rubric", "Run",
-    "SavedView", "Schedule", "Setting", "SettingRevision", "Skill", "SkillAlias", "Source", "SubmitPermit",
-    "TagRule", "Template", "Theme", "Track", "TrustedSite", "VaultDocument", "WatchedEmployer", "WorkerHeartbeat",
+    "ApplicationPacket", "Assessment", "AuditEvent", "AuthSession", "Base", "BulkItem", "BulkOperation",
+    "CalendarFeed", "Campaign", "ConfigRevision", "Connection", "Contact", "CustomFacet", "DispatchAttempt",
+    "EmployerAlias", "EmployerPolicy", "Experience", "Fact", "FollowupDue", "Guardrail", "GuardrailWaiver",
+    "InterviewEvent", "InterviewMockSession", "InterviewMockTurn", "InterviewPack", "InterviewRound", "Job",
+    "JobChange", "JobSighting", "JobVersion", "JobWatch", "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread",
+    "Notification", "OutboundMessage", "Owner", "PayEstimate", "PendingAction", "Person", "PortalAccount",
+    "PreferenceFeedback", "PreferenceSuggestion", "Prompt", "Reference", "Rubric", "Run", "SavedView", "Schedule",
+    "Setting", "SettingRevision", "Skill", "SkillAlias", "Source", "SubmitPermit", "TagRule", "Template", "Theme",
+    "ThemeRevision", "Track", "TrustedSite", "VaultDocument", "WatchedEmployer", "WindDown", "WorkerHeartbeat",
 ]

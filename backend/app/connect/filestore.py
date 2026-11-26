@@ -15,6 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
+from app.schemas.json_types import BackupTargetName
+
 
 @dataclass(frozen=True)
 class StoredFile:
@@ -26,7 +28,7 @@ class StoredFile:
 
 @runtime_checkable
 class FileStore(Protocol):
-    kind: Literal["local", "gdrive", "onedrive", "s3"]
+    kind: BackupTargetName
 
     async def put(self, key: str, content: bytes, mime_type: str) -> StoredFile:
         ...

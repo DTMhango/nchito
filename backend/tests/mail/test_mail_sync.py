@@ -67,7 +67,8 @@ async def test_reply_matches_by_reference_and_proposes_instead_of_changing_the_s
     assert result.proposed == 1 and result.applied == 0
     await session.refresh(setup.app)
     assert setup.app.stage == Stage.submitted  # only proposed
-    (action,) = await pendings(session)
+    # the invitation also proposes an interview event (wave 4 calendar); this test is about the stage proposal
+    (action,) = [p for p in await pendings(session) if p.detail["kind"] == mail_sync.PROPOSAL_KIND]
     assert action.application_id == setup.app.id and action.detail["proposed_stage"] == "interview"
     assert action.detail["kind"] == mail_sync.PROPOSAL_KIND
 
@@ -280,3 +281,19 @@ async def test_a_full_page_is_followed_by_the_next_so_nothing_in_the_window_is_m
     assert result.fetched == 5 and result.new == 5 and box.list_calls >= 3
     assert len(await threads(session)) == 5
     assert conn.config["checkpoint_at"] == messages[-1].received_at.isoformat()
+
+
+async def test_a_full_page_of_already_seen_messages_does_not_stop_the_sync(session):
+    await settings_service.set_value(session, "mail.max_messages_per_check", 2, actor="owner")
+    conn = await connection(session)
+    same_time = NOW - timedelta(minutes=30)
+    messages = [inbound(subject=f"Note {i}", body="Just checking in about lunch.", thread_id=f"t-{i}",
+                        received=same_time) for i in range(3)]
+    messages.append(inbound(subject="Later", body="Just checking in about lunch.", thread_id="t-late",
+                            received=NOW - timedelta(minutes=10)))
+    box = FakeMailbox()
+    box.inbox = list(messages)
+    result = await mail_sync.sync_connection(session, conn, box, None, now=NOW + timedelta(hours=1))
+    await session.commit()
+    assert result.new == 4
+    assert len(await threads(session)) == 4

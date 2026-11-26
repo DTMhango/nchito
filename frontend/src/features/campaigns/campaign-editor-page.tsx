@@ -39,6 +39,8 @@ import {
   SourcesSection,
   UnknownSection,
 } from "./other-sections"
+import { PolicyPreview } from "./preview/policy-preview"
+import { SuggestionsPanel } from "./preview/suggestions-panel"
 import { RulesSection } from "./rules-section"
 import { ScoringSection } from "./scoring-section"
 import { TagInput } from "./tag-input"
@@ -53,6 +55,7 @@ const SECTIONS = [
   { id: "automation", label: "Automation" },
   { id: "sources", label: "Sources" },
   { id: "schedule", label: "Schedule and budget" },
+  { id: "feedback", label: "Feedback" },
 ] as const
 
 /** What is sent to the API: drop half-filled rows so the schema is always satisfied. */
@@ -335,6 +338,12 @@ function Editor({ initial }: { initial: Campaign }) {
             ceiling={ceiling}
             onChange={(a) => edit({ automation: a })}
           />
+          <PolicyPreview
+            campaignId={initial.id}
+            automation={{ ...draft.automation, mode }}
+            criteria={sanitise(draft).criteria}
+            unknown_data_policy={draft.unknown_data_policy}
+          />
           <Field
             label="If two roles score the same, prefer this level"
             htmlFor="pref-seniority"
@@ -378,6 +387,15 @@ function Editor({ initial }: { initial: Campaign }) {
             onBudget={(b) => edit({ budget: b })}
             currency={String(settings["budget.currency"] ?? "USD")}
           />
+        </EditorSection>
+
+        <EditorSection
+          id="feedback"
+          number={8}
+          title="What your feedback suggests"
+          lead="Your thumbs on roles, turned into changes you can test and accept. Nothing changes until you accept one."
+        >
+          <SuggestionsPanel campaignId={initial.id} />
         </EditorSection>
       </div>
     </View>

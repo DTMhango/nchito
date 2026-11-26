@@ -34,6 +34,7 @@ import {
   NAV_FOOT,
   NAV_MAIN,
   NAV_SETUP,
+  PALETTE_PLACES,
   SETTINGS_SECTIONS,
   type AppPath,
 } from "./nav"
@@ -122,6 +123,32 @@ export function CommandPalette({ open, onOpenChange, onAddJob }: Props) {
                   onSelect={() => go(s.to)}
                 />
               ))}
+              {PALETTE_PLACES.map((s) => (
+                <Item
+                  key={s.label}
+                  icon={s.icon}
+                  label={s.label}
+                  keywords={s.keywords}
+                  onSelect={() =>
+                    run(() => void navigate({ to: s.to, search: s.search }))
+                  }
+                />
+              ))}
+              <Item
+                icon={Palette}
+                label="Theme studio"
+                hint={theme.name}
+                keywords={["theme", "colours", "colors", "edit theme", "brand"]}
+                onSelect={() =>
+                  run(
+                    () =>
+                      void navigate({
+                        to: "/theme-studio/$themeId",
+                        params: { themeId: theme.id },
+                      })
+                  )
+                }
+              />
               {KIT_SECTIONS.map((s) => (
                 <Item
                   key={s.to}

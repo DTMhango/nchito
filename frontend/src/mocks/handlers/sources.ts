@@ -320,11 +320,12 @@ export const sourcesHandlers = [
   }),
 
   // ---- runs ----
-  http.get("*/api/runs", async () => {
+  http.get("*/api/runs", async ({ request }) => {
     if (!db.get().session) return unauthorized()
     await latency()
     store.runs.forEach((r) => tickRun(r))
-    return page(store.runs)
+    const kind = new URL(request.url).searchParams.get("kind")
+    return page(kind ? store.runs.filter((r) => r.kind === kind) : store.runs)
   }),
   http.post("*/api/runs", async ({ request }) => {
     if (!db.get().session) return unauthorized()

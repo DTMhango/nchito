@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react"
 import { Chip, type ChipTone } from "@/components/chip"
+import { JobEmployerChip } from "@/features/employers/employer-chip"
 import { EmptyState } from "@/components/empty-state"
 import { EvidencePopover } from "@/components/evidence-popover"
 import { KeyHint } from "@/components/key-hint"
@@ -48,6 +49,7 @@ import {
   placeLabel,
   workModelLabel,
 } from "./format"
+import { FeedbackControl } from "./feedback/feedback-control"
 import { TagEditor } from "./tag-editor"
 import type { AssessmentOut, FactOut, JobDetail } from "./types"
 import { WhySection } from "./why-section"
@@ -145,6 +147,7 @@ export function JobDetailPane({
             </Chip>
           )}
           {j.availability === "closed" && <Chip tone="danger">Closed</Chip>}
+          <JobEmployerChip jobId={j.id} />
         </div>
         <TagEditor job={j} />
       </header>
@@ -261,6 +264,12 @@ export function JobDetailPane({
       </div>
 
       <WhySection jobId={j.id} className="mt-7" />
+
+      <FeedbackControl
+        jobId={j.id}
+        campaignId={a?.campaign_id ?? null}
+        className="mt-7"
+      />
 
       <Block title="Requirements" className="mt-7">
         {j.requirements.length === 0 ? (

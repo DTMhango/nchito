@@ -59,6 +59,7 @@ export const KIND_LABEL: Record<RunKind, string> = {
   digest: "Digest",
   backup: "Backup",
   retention: "Retention",
+  tailoring: "Tailoring",
 }
 
 export const STATUS_LABEL: Record<RunStatus, string> = {

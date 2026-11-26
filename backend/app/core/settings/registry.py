@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 import string
+import uuid
 from collections.abc import Callable
 from typing import Any
 
@@ -40,6 +41,7 @@ from app.core.settings.types import (
 GROUPS: dict[str, str] = {
     "general": "General",
     "appearance": "Appearance",
+    "themes": "Theme studio",
     "schedule": "Schedule",
     "scoring": "Scoring",
     "matching": "Matching",
@@ -53,6 +55,7 @@ GROUPS: dict[str, str] = {
     "documents": "Documents",
     "tailoring": "Tailoring and checks",
     "interview": "Interview pack",
+    "calendar": "Calendar",
     "retention": "Retention",
     "backups": "Backups",
     "notifications": "Notifications",
@@ -61,6 +64,10 @@ GROUPS: dict[str, str] = {
     "accounts": "Portal accounts",
     "data": "Data import and export",
     "sources": "Discovery sources",
+    "insights": "Insights",
+    "preferences": "Preference learning",
+    "bulk": "Bulk actions",
+    "followups": "Follow-ups and messages",
 }
 
 AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
@@ -69,7 +76,7 @@ ANSWER_SCOPES = ("this_application", "this_employer", "this_country", "all_match
 NOTIFICATION_CHANNELS = ("telegram", "email", "webhook")
 # Notification kinds the owner can switch on or off (the digest is governed by notifications.digest).
 NOTIFIABLE_KINDS = ("pending_action", "pending_action_stale", "application_sent", "reply_received", "run_failed",
-                    "budget", "health", "backup")
+                    "budget", "health", "backup", "interview_reminder")
 TITLE_FIELDS = frozenset({"title", "app_name", "date", "count"})
 
 _DEFS: list[SettingDef] = []
@@ -110,6 +117,13 @@ def _theme_id_check(value: Any) -> None:
     """A theme id is a slug (built-ins, owner themes created with one) or a UUID."""
     if not _THEME_ID_RE.match(str(value)):
         raise SettingValueError(f"not a valid theme id: {value!r}")
+
+
+def _uuid_check(value: Any) -> None:
+    try:
+        uuid.UUID(str(value))
+    except ValueError as exc:
+        raise SettingValueError(f"not a valid id: {value!r}") from exc
 
 
 def _accent_check(value: Any) -> None:
@@ -196,6 +210,20 @@ _add("appearance.accent_override", "string", "Accent override",
      None, "cobalt", str | None, nullable=True, validators=(_accent_check,),
      invalid_example="not a colour!", has_invalid_example=True)
 _bool("appearance.reduced_motion", "Reduce motion", "Turn off non-essential animation.", False)
+
+# Theme studio (wave 4)
+_add("themes.default_theme_id", "string", "Default theme",
+     "The theme the app falls back to when the active one is unavailable. Set it from the theme studio.",
+     "copperbelt", "paper", str, validators=(_theme_id_check,), invalid_example="Not A Theme!",
+     has_invalid_example=True)
+_int("themes.import_max_bytes", "Theme file size limit", "Largest theme file accepted on import.",
+     65536, 32768, 4096, 1048576, unit="bytes")
+_int("themes.revisions_kept", "Theme revisions kept", "Saved states kept per theme for undo; older ones are pruned.",
+     50, 100, 5, 500)
+_add("themes.status_min_distance", "float", "Status colour separation",
+     "Smallest colour difference (OKLab) between good, warning, danger and info, also under colour-blind "
+     "simulation (protanopia, deuteranopia, tritanopia), before the studio warns.",
+     0.02, 0.05, float, minimum=0.005, maximum=0.3, invalid_example=1.0, has_invalid_example=True)
 
 # Schedule
 _cron("schedule.sweep_cron", "Sweep schedule", "Default schedule for new campaign sweeps (cron, owner's time zone).",
@@ -324,6 +352,15 @@ _int("tracking.change_check_every_hours", "Posting recheck interval",
 _int("tracking.change_batch_size", "Rechecks per pass",
      "The most roles rechecked in one scheduled pass; the rest wait for the next pass.", 20, 5, 1, 200)
 
+# Insights (10.3)
+_int("insights.min_sample", "Smallest sample worth a rate",
+     "A response rate based on fewer sent applications than this is marked 'too few to tell'.", 10, 5, 1, 1000,
+     "applications")
+_int("insights.default_range_days", "Default range",
+     "How far back Insights looks when no dates are chosen.", 90, 30, 7, 3650, "days")
+_enum("insights.week_start", "Week starts on", "The first day of the week in weekly spend and counts.",
+      "monday", "sunday", ("monday", "sunday"))
+
 # Portal accounts and sign-in handoff (8.4)
 def _positive_ints(value: Any) -> None:
     if not all(isinstance(v, int) and not isinstance(v, bool) and 0 < v <= 24 * 30 for v in value):
@@ -385,6 +422,11 @@ _int("mail.initial_lookback_days", "First check lookback",
      "How far back the first check of a new mailbox (or alert source) reads.", 14, 30, 1, 365, "days")
 _int("mail.max_messages_per_check", "Messages per check",
      "Most messages read from a mailbox in one check.", 200, 50, 1, 1000)
+_add("mail.default_mailbox", "uuid", "Default mailbox",
+     "The mailbox connection used first when more than one is connected (sending identity, notices). Empty: "
+     "the one connected first. Set it with Use as default on the Connections screen.",
+     None, "5b1c2f0e-8f4a-4d57-9c3e-2a6d7e8f9a10", str | None, nullable=True, validators=(_uuid_check,),
+     invalid_example="not-a-connection", has_invalid_example=True)
 _add("mail.auto_link_confidence", "float", "Link replies automatically at",
      "A reply matched to an application at or above this confidence is linked; below it goes to review.",
      0.8, 0.9, float, minimum=0.5, maximum=1.0, invalid_example=0.1, has_invalid_example=True)
@@ -561,6 +603,34 @@ _terms("tailoring.qualification_terms", "Qualification words",
         "certificate", "certified", "certification", "chartered", "acca", "cima", "cfa", "cpa", "frm", "pmp",
         "fellow"],
        ["mba", "phd", "cfa"])
+_terms("tailoring.tool_terms", "Tool and technology names",
+       "Tools, technologies and skills always checked in generated text, on top of your Kit's skills and the "
+       "posting's requirements. A draft may name one as yours only when a cited fact or a confirmed skill does.",
+       ["Python", "SQL", "Excel", "VBA", "Power BI", "Tableau", "Looker", "SAP", "Oracle", "Sage", "Pastel",
+        "QuickBooks", "Xero", "Salesforce", "HubSpot", "Dynamics 365", "AWS", "Azure", "GCP", "Docker",
+        "Kubernetes", "Terraform", "Java", "JavaScript", "TypeScript", "React", "Node.js", "C#", "C++",
+        "Spark", "Hadoop", "Snowflake", "Databricks", "Airflow", "dbt", "Stata", "SPSS", "MATLAB", "Jira",
+        "Git", "Linux", "PostgreSQL", "MySQL", "MongoDB", "IFRS", "GAAP", "Six Sigma", "Prince2", "Agile",
+        "Scrum"],
+       ["Python", "Power BI"])
+_terms("tailoring.tool_ignore_terms", "Not tool names",
+       "Capitalised or technical-looking words that are not tools (job titles, currencies, common acronyms). "
+       "The tool check skips them.",
+       ["CV", "CEO", "CFO", "COO", "CTO", "CIO", "MD", "HR", "IT", "ICT", "KPI", "KPIs", "OKR", "OKRs", "UK", "US",
+        "USA", "EU", "UN", "SADC", "COMESA", "NGO", "NGOs", "USD", "ZMW", "GBP", "EUR", "ZAR", "KES", "MWK", "FY",
+        "Q1", "Q2", "Q3", "Q4", "AM", "PM", "OK", "II", "III", "IV"],
+       ["CV", "KPI"])
+_terms("tailoring.tool_role_phrases", "Wording that names a tool without claiming it",
+       "A sentence with one of these phrases names a tool as the role's or as a gap, not as yours, so the tool "
+       "check lets it through (\"the role uses Kafka\").",
+       ["the role uses", "the role requires", "this role uses", "this role requires", "the team uses",
+        "your team uses", "you use", "which uses", "the posting", "the advert", "you are looking for",
+        "looking for", "would learn", "keen to learn", "to learn", "not yet used", "have not used",
+        "haven't used", "no experience with", "new to me", "a gap"],
+       ["the role uses", "the team uses"])
+_bool("tailoring.tool_token_detection", "Catch unknown technical names",
+      "Also treat technical-looking words that are on no list (CamelCase like PostgreSQL, acronyms like AWS, "
+      "C++, Node.js) as tool names that must be backed by a cited fact or a confirmed skill.", True)
 
 # Interview pack (10.3a)
 INTERVIEW_SECTIONS = ("role_brief", "why_you", "questions", "stories", "questions_to_ask", "gaps", "pay_sheet",
@@ -627,6 +697,94 @@ _add("interview.research_note", "string", "Research note",
      "Company notes are from the posting and your notes only.", str, validators=(non_empty, max_length(300)),
      invalid_example="", has_invalid_example=True)
 
+# Calendar: interview events, reminders, feed and Google Calendar (12, wave 4)
+def _reminder_minutes(value: Any) -> None:
+    if not all(isinstance(v, int) and not isinstance(v, bool) and 0 < v <= 60 * 24 * 14 for v in value):
+        raise SettingValueError("minutes must be whole numbers between 1 and 20160 (14 days)")
+
+
+_enum("calendar.detail_level", "Calendar detail",
+      "What the subscription feed and Google Calendar show. employer: 'Interview: <employer>' only. role: adds "
+      "the role title. full: adds place or link, interviewers, round and type. Your private notes never leave.",
+      "employer", "role", ("employer", "role", "full"))
+_bool("calendar.propose_from_mail", "Propose events from invitation mail",
+      "When a reply is classified as an interview invitation, propose an event (never confirmed for you).", True)
+_bool("calendar.llm_extract", "Read invitations with the model",
+      "Off: dates come from the attached calendar file and plain wording rules only. On: when the rules find no "
+      "time, a budgeted model reads the email as untrusted data and its answer is still only a proposal.", False)
+_add("calendar.reminder_offsets_minutes", "list", "Reminders before an interview",
+     "Minutes before the start at which you are reminded. Empty: no reminders. Quiet hours apply.",
+     [1440, 60], [30], list[int], validators=(unique_items, _reminder_minutes), invalid_example=[5, 5],
+     has_invalid_example=True)
+_int("calendar.prep_nudge_minutes", "Preparation nudge",
+     "Minutes before the start at which you are nudged to open the interview pack. 0 turns the nudge off.",
+     2880, 720, 0, 20_160, "minutes")
+_int("calendar.debrief_delay_minutes", "Ask how it went after",
+     "Minutes after an interview ends before you are asked how it went.", 60, 180, 0, 2880, "minutes")
+_int("calendar.followup_days", "Follow-up reminder",
+     "Days after a debrief at which a follow-up is due (a thank-you or a chase).", 2, 5, 1, 30, "days")
+_int("calendar.default_duration_minutes", "Default length",
+     "Length assumed for an event that has no end time (overlap checks, reminders, the feed).", 60, 45, 5, 480,
+     "minutes")
+_int("calendar.feed_past_days", "Feed history",
+     "How many days of past events stay in the subscription feed.", 30, 7, 0, 365, "days")
+_int("calendar.upcoming_days", "Upcoming window",
+     "How many days ahead the Upcoming block on Today looks.", 14, 30, 1, 120, "days")
+_add("calendar.google_calendar_name", "string", "Google calendar name",
+     "Name of the dedicated calendar the app creates in your Google account (used when it is created).",
+     "Nchito interviews", "Job interviews", str, validators=(non_empty, max_length(100)),
+     invalid_example="", has_invalid_example=True)
+# Mock interview (10.3a practice, wave 4)
+_RUBRIC_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,29}$")
+
+
+def _rubric_lines(value: Any) -> None:
+    keys: list[str] = []
+    for item in value:
+        key, _, label = str(item).partition("|")
+        if not _RUBRIC_KEY_RE.match(key.strip()) or not label.strip():
+            raise SettingValueError(f"{item!r}: write 'key|What it measures' (key: lower case letters, digits, _)")
+        keys.append(key.strip())
+    if len(set(keys)) != len(keys):
+        raise SettingValueError("each rubric key once")
+
+
+_model("interview.mock.model_interviewer", "Model: mock interviewer",
+       "Asks the questions and follow-up probes in a mock interview.", "claude-sonnet-5-5", "claude-haiku-5-5")
+_model("interview.mock.model_feedback", "Model: mock interview feedback",
+       "Scores the answers and writes the feedback at the end of a mock interview.", "claude-sonnet-5-5",
+       "claude-opus-5-5")
+_int("interview.mock.default_length", "Questions per mock interview",
+     "How many main questions a mock interview asks unless you choose otherwise.", 5, 3, 1, 30, "questions")
+_int("interview.mock.max_length", "Longest mock interview", "Most main questions one mock interview may ask.",
+     12, 8, 1, 30, "questions")
+_int("interview.mock.max_probes", "Follow-up probes per question",
+     "How many follow-up probes the interviewer may ask on one question before moving on.", 1, 2, 0, 3, "probes")
+_int("interview.mock.answer_max_chars", "Mock answer length", "Longest answer accepted in a mock interview.",
+     6000, 3000, 200, 20_000, "characters")
+_add("interview.mock.rubric", "list", "Mock interview rubric",
+     "The dimensions each answer is scored on, one per line as 'key|What it measures'.",
+     ["structure|Structure: situation, task, action, result", "relevance|Relevance to the posting's requirements",
+      "specificity|Specificity: concrete actions and results", "delivery|Concise and clear delivery"],
+     ["structure|Structure (STAR)", "relevance|Relevance"], list[str],
+     validators=(non_empty, _rubric_lines), invalid_example=["Structure"], has_invalid_example=True)
+_int("interview.mock.score_max", "Top score", "Scores run from 1 to this number on every rubric dimension.",
+     5, 10, 3, 10, "points")
+_int("interview.mock.weak_below", "Weak below",
+     "A question category whose average score is below this is shown as weak and practised next.", 3, 4, 1, 10,
+     "points")
+_int("interview.mock.practise_next", "Practise next", "How many questions 'practise these next' suggests.",
+     3, 5, 1, 10, "questions")
+_bool("interview.mock.feedback_each_default", "Feedback after each answer",
+      "Default for new mock interviews: feedback after every answer as well as at the end.", False)
+_int("interview.mock.budget_headroom_pct", "Session budget headroom",
+     "A mock interview may spend up to its estimate times this percentage before it pauses and asks you.",
+     120, 150, 100, 300, "%")
+_add("interview.mock.unverified_prompt", "string", "Unverified statement prompt",
+     "Shown next to something you said in a mock answer that is not in your Kit.",
+     "Is this accurate? Add it to your library as a draft fact?", "Not in your Kit yet: add it as a draft fact?",
+     str, validators=(non_empty, max_length(160)), invalid_example="", has_invalid_example=True)
+
 # Retention (14)
 _int("retention.below_threshold_text_days", "Below-threshold text",
      "Drop full posting text of below-threshold roles after this many days.", 30, 14, 1, 3650, "days")
@@ -643,7 +801,8 @@ _int("retention.temp_files_days", "Keep temporary files",
 # Backups (14)
 _cron("backups.cron", "Backup schedule", "When the nightly backup runs.", "0 2 * * *", "30 3 * * *")
 _int("backups.keep", "Copies kept", "Number of backups kept.", 14, 30, 1, 365)
-_enum("backups.target", "Backup target", "Where backups are written.", "local", "s3", ("local", "s3", "gdrive"))
+_enum("backups.target", "Backup target", "Where backups are written. Also the file store to use when more than one is "
+      "connected.", "local", "s3", ("local", "s3", "gdrive", "onedrive"))
 
 # Notifications
 _enum("notifications.digest", "Digest", "When the digest is sent.",
@@ -654,7 +813,8 @@ _add("notifications.channels", "list", "Channels",
      invalid_example=["pigeon"], has_invalid_example=True)
 _add("notifications.events", "list", "Events that notify",
      "Which kinds of event send a message to the channels. The digest has its own setting.",
-     ["pending_action", "pending_action_stale", "reply_received", "run_failed", "budget", "health", "backup"],
+     ["pending_action", "pending_action_stale", "reply_received", "run_failed", "budget", "health", "backup",
+      "interview_reminder"],
      ["pending_action"], list[str], choices=NOTIFIABLE_KINDS, validators=(unique_items,),
      invalid_example=["everything"], has_invalid_example=True)
 _bool("notifications.quiet_hours_enabled", "Notification quiet hours",
@@ -762,6 +922,35 @@ _int("data.export_link_minutes", "Export link lifetime", "How long a prepared ex
      60, 15, 1, 1440, "minutes")
 _int("data.import_staging_hours", "Import preview lifetime",
      "How long a previewed import waits for confirmation before it is discarded.", 24, 48, 1, 168, "hours")
+def _header_synonyms_check(value: Any) -> None:
+    for entry in value:
+        name, sep, words = str(entry).partition(":")
+        if not sep or not name.strip() or not [w for w in words.split(",") if w.strip()]:
+            raise SettingValueError("each entry reads 'column: word, word' (the column the words stand for)")
+
+
+_add("data.old_kit_tracker_headers", "list", "Old tracker column names",
+     "How column headings in an old tracker spreadsheet map to the columns the history importer reads. Each entry "
+     "is 'column: heading, heading'; a heading that matches none is kept in the notes. Add your own wording here.",
+     ["company: company, employer, organisation, organization, org, firm, company name",
+      "role: role, title, job title, position, job, vacancy, role title",
+      "location: location, city, place",
+      "link: link, url, posting, job link, advert, ad link",
+      "source: source, found via, board, found on",
+      "date_found: date found, found, date seen, seen",
+      "closes: closes, closing date, deadline, close date",
+      "status: status, stage, outcome, state, progress",
+      "date_tailored: date tailored, tailored on",
+      "date_applied: date applied, applied, applied on, applied date, application date, date sent",
+      "next_step: next step, next action, follow up",
+      "next_step_due: next step due, follow up date, next action date, due",
+      "last_update: last update, updated, last updated, last contact",
+      "notes: notes, comments, remarks",
+      "id: id, ref, reference, no, number",
+      "track: track, category",
+      "fit_1to5: fit, score, rating"],
+     ["company: employer, firm"], list[str], validators=(_header_synonyms_check,),
+     invalid_example=["company employer"], has_invalid_example=True)
 _bool("data.old_kit_ai_extraction", "AI for unrecognised old-kit files",
       "Send old-kit files the built-in parser does not recognise to your chosen AI provider, as data, to propose "
       "facts. Off means only the built-in parser runs.", False)
@@ -821,6 +1010,133 @@ _add("sources.search.query_template", "string", "Web search phrase",
      has_invalid_example=True)
 
 
+# ----- preference learning (wave 4 feedback stream) ---------------------------------------
+_int("preferences.min_evidence", "Evidence needed for a suggestion",
+     "How many thumbs (or outcomes) must agree before a rubric change is suggested.", 3, 5, 1, 50)
+_add("preferences.min_rating_gap", "float", "Criterion disagreement",
+     "How far apart (in 0-5 rating points) liked and disliked roles must sit on a criterion before its "
+     "weight is suggested to change.", 1.0, 1.5, float, minimum=0.1, maximum=5.0, invalid_example=6.0,
+     has_invalid_example=True)
+_int("preferences.reweight_step", "Reweight step", "Weight points moved between two criteria per suggestion.",
+     5, 10, 1, 50, "points")
+_int("preferences.penalty_points", "Suggested penalty", "Points of a suggested penalty for a disliked pattern.",
+     10, 15, 1, 100, "points")
+_int("preferences.bonus_points", "Suggested bonus", "Points of a suggested bonus for a liked pattern.",
+     5, 10, 1, 100, "points")
+_int("preferences.exclude_min_evidence", "Evidence needed to suggest an exclusion",
+     "Thumbs down (with none up) on one pattern before excluding it is suggested.", 6, 10, 2, 100)
+_int("preferences.backtest_days", "Suggestion backtest window",
+     "Roles found in this many recent days are replayed to show a suggestion's effect.", 30, 60, 1, 365, "days")
+_int("preferences.analysis_every_hours", "Suggestion analysis interval",
+     "How often new feedback is turned into suggestions automatically (0: only on demand).", 24, 12, 0, 720,
+     "hours")
+_int("preferences.note_max_length", "Feedback note length", "Longest free-text reason kept with a thumb.",
+     500, 1000, 50, 5000, "characters")
+_int("preferences.evidence_notes_shown", "Notes shown as evidence",
+     "How many of the owner's own notes a suggestion quotes as evidence.", 5, 10, 0, 50)
+_int("preferences.preview_days", "Policy preview window", "Recent days of roles a policy preview replays.",
+     30, 14, 1, 365, "days")
+_int("preferences.preview_max_jobs", "Policy preview size", "Most roles one policy preview replays.",
+     500, 1000, 10, 5000)
+_int("preferences.histogram_bin", "Score histogram bin", "Width of one bar in the score histogram.", 5, 10, 1, 25,
+     "points")
+_int("preferences.preview_changes_shown", "Changed roles listed", "How many changed roles a preview lists.",
+     50, 100, 5, 500)
+# Bulk actions (10.3, wave 4)
+_int("bulk.max_selection", "Largest bulk selection",
+     "Most roles or applications one bulk action may cover; a bigger selection must be narrowed first.",
+     500, 100, 1, 5000, "items")
+_int("bulk.undo_window_minutes", "Bulk undo window",
+     "How long after a bulk action finishes it can be undone (tags, snooze, skip, archive). 0 turns undo off.",
+     60, 15, 0, 1440, "minutes")
+_int("bulk.preview_sample_size", "Preview examples per reason",
+     "How many example roles the preview lists under each reason a role cannot be changed.", 5, 3, 1, 20)
+_bool("bulk.allow_approve_reviewed", "Offer 'approve all reviewed'",
+      "Offer a bulk approval for applications that already have a current packet and pass every gate with "
+      "no unknowns. Each is still approved one by one through the normal approval; off by default.", False)
+
+
+# Follow-ups and messages, wind-down (8.2, 18.4; wave 4)
+FOLLOWUP_STAGES = ("submitted", "screening", "interview", "offer")
+MESSAGE_KINDS = ("follow_up", "thank_you", "info_reply", "slot_accept", "slot_decline", "withdraw", "offer_decline")
+
+
+def _stage_days(value: Any) -> None:
+    seen: set[str] = set()
+    for item in value:
+        stage, _, days = str(item).partition("|")
+        stage = stage.strip()
+        if stage not in FOLLOWUP_STAGES:
+            raise SettingValueError(f"{item!r}: the stage must be one of {', '.join(FOLLOWUP_STAGES)}")
+        if stage in seen:
+            raise SettingValueError(f"{stage} is listed twice")
+        seen.add(stage)
+        if not days.strip().isdigit() or not 1 <= int(days) <= 120:
+            raise SettingValueError(f"{item!r}: write 'stage|days' with 1 to 120 days")
+
+
+def _kind_lines(value: Any) -> None:
+    for item in value:
+        kind, _, text = str(item).partition("|")
+        if kind.strip() not in MESSAGE_KINDS or not text.strip():
+            raise SettingValueError(f"{item!r}: write 'kind|instruction' with kind one of {', '.join(MESSAGE_KINDS)}")
+
+
+def _commitment_lines(value: Any) -> None:
+    for item in value:
+        parts = [p.strip() for p in str(item).split("|")]
+        if len(parts) != 3 or not all(parts) or not any(t.strip() for t in parts[2].split(",")):
+            raise SettingValueError(f"{item!r}: write 'Topic|Question in the answer bank|term, term'")
+
+
+_add("followups.due_days", "list", "Follow-up after no reply",
+     "Days without a reply before a follow-up is due, per stage, as 'stage|days'. A stage not listed gets no "
+     "follow-up.", ["submitted|10", "screening|7", "interview|7", "offer|3"], ["submitted|14", "interview|5"],
+     list[str], validators=(_stage_days,), invalid_example=["applied|10"], has_invalid_example=True)
+_int("followups.max_per_application", "Follow-ups per application",
+     "Most follow-ups after no reply for one application (sent or drafted).", 2, 1, 0, 10)
+_int("followups.snooze_days", "Snooze", "How long 'snooze' puts a due follow-up off.", 3, 7, 1, 60, "days")
+_bool("followups.auto_send", "Send plain follow-ups automatically",
+      "Only the plain no-reply follow-up, only to an address the application was already sent to, within the "
+      "follow-up caps and quiet hours, and never after any reply from the employer. Every other message waits "
+      "for your approval.", False)
+_int("followups.auto_daily_cap", "Automatic follow-ups per day",
+     "Most follow-ups sent automatically in one day (your time zone).", 3, 5, 0, 50)
+_int("followups.max_paragraphs", "Message length", "Most paragraphs in a drafted message.", 4, 3, 1, 10,
+     "paragraphs")
+_int("followups.max_facts", "Facts sent per message",
+     "Most Kit facts offered to the model for one message.", 12, 20, 0, 100, "facts")
+_int("followups.context_max_chars", "Thread excerpt length",
+     "Longest excerpt of the employer's message passed to the model (as data, never instructions).",
+     4000, 2000, 200, 20_000, "characters")
+_add("followups.subject_prefix", "string", "Reply subject prefix",
+     "Put before the original subject when a message replies in the thread.", "Re: ", "RE: ", str,
+     validators=(max_length(20),), invalid_example="x" * 21, has_invalid_example=True)
+_add("followups.kind_briefs", "list", "What each message is for",
+     "One line per message kind, as 'kind|instruction'. The instruction tells the model what to write.",
+     ["follow_up|A short, polite follow-up asking whether there is any news on the application. No pressure.",
+      "thank_you|Thank the interviewers for their time; mention one or two points from the interview notes "
+      "if given.",
+      "info_reply|Reply to the employer's request for information using only the facts and confirmed answers "
+      "given; list anything else as a question for the owner.",
+      "slot_accept|Confirm the interview slot given by the owner, exactly as given.",
+      "slot_decline|Politely say the slot offered does not work and ask for another, using the owner's note "
+      "if given.",
+      "withdraw|Politely withdraw the application and thank them for their time. Give no reason unless the "
+      "owner's note gives one.",
+      "offer_decline|Politely decline the offer and thank them. Give no reason unless the owner's note "
+      "gives one."],
+     ["follow_up|Ask briefly whether there is any news."], list[str],
+     validators=(unique_items, _kind_lines), invalid_example=["hello|world"], has_invalid_example=True)
+_add("followups.commitment_topics", "list", "Commitments that need a confirmed answer",
+     "One line per topic, as 'Topic|Question in the answer bank|term, term'. A message that mentions a term must "
+     "use your confirmed answer to that question word for word; otherwise it becomes a question for you.",
+     ["Pay|What are your salary expectations?|salary, pay, compensation, remuneration, package, rate",
+      "Notice period|What is your notice period?|notice, start date, available from, availability",
+      "Relocation|Are you willing to relocate?|relocat, move to"],
+     ["Pay|What are your salary expectations?|salary"], list[str],
+     validators=(unique_items, _commitment_lines), invalid_example=["Pay|salary"], has_invalid_example=True)
+
 REGISTRY: dict[str, SettingDef] = {d.key: d for d in _DEFS}
 if len(REGISTRY) != len(_DEFS):  # pragma: no cover - guards against copy-paste errors
     raise RuntimeError("duplicate setting key in registry")
@@ -844,3 +1160,8 @@ def cross_check(values: dict[str, Any]) -> None:
         raise SettingValueError("thresholds must satisfy shortlist <= tailor <= auto-apply")
     if values["automation.daily_cap"] > values["automation.weekly_cap"]:
         raise SettingValueError("the daily cap cannot exceed the weekly cap")
+
+    if values["interview.mock.default_length"] > values["interview.mock.max_length"]:
+        raise SettingValueError("the mock interview length cannot exceed the longest mock interview")
+    if values["interview.mock.weak_below"] > values["interview.mock.score_max"]:
+        raise SettingValueError("'weak below' cannot exceed the top score")

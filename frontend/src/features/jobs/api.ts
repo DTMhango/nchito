@@ -3,7 +3,7 @@
  * The shared client is cast to the generated `paths`; nothing else has to change.
  */
 import { queryOptions } from "@tanstack/react-query"
-import { api, unwrap } from "@/lib/api/client"
+import { api, isApiError, unwrap } from "@/lib/api/client"
 import type { components } from "@/lib/api/types"
 
 const gen = api
@@ -48,7 +48,10 @@ export const jobQuery = (id: string) =>
       unwrap(
         gen.GET("/api/jobs/{job_id}", { params: { path: { job_id: id } } })
       ),
-    retry: false,
+    // A role that is not there (404) is final. Anything else (a 401 or 5xx in the moments around
+    // sign-in, a dropped connection) is retried, so the page never needs a reload.
+    retry: (count, e) => !isApiError(e, 404) && count < 2,
+    retryDelay: (count) => 300 * (count + 1),
   })
 
 export const whyQuery = (id: string, enabled: boolean) =>

@@ -19,8 +19,10 @@ Rules that hold for everything produced here:
 
 from __future__ import annotations
 
+import hashlib
 import posixpath
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
@@ -30,7 +32,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app import __version__
 from app.core.clock import utcnow
 from app.kit import scan, service, vault
-from app.kit.importers import office
+from app.kit.importers import office, oldkit_cv, oldkit_tracker
 from app.kit.schema import (
     KitAnswer,
     KitCampaign,
@@ -60,10 +62,17 @@ TEXT_EXT = (".md", ".txt", ".csv", ".docx", ".xlsx", ".markdown")
 VAULT_EXT = (".pdf", ".png", ".jpg", ".jpeg", ".docx", ".doc", ".txt")
 # Currencies the pay parser recognises (two minor-unit digits). Parser vocabulary, not a default.
 CURRENCIES = frozenset({"ZMW", "USD", "EUR", "GBP", "ZAR", "KES", "BWP", "NGN", "GHS", "CAD", "AUD", "AED"})
-PERIODS = {"year": "year", "yr": "year", "annum": "year", "annual": "year", "month": "month", "mo": "month",
-           "week": "week", "day": "day", "hour": "hour", "hr": "hour"}
+PERIODS = {"year": "year", "yr": "year", "annum": "year", "annual": "year", "annually": "year", "yearly": "year",
+           "pa": "year", "month": "month", "mo": "month", "monthly": "month", "pm": "month", "week": "week",
+           "wk": "week", "weekly": "week", "day": "day", "daily": "day", "hour": "hour", "hr": "hour",
+           "hourly": "hour"}
+SYMBOLS = {"us$": "USD", "$": "USD", "£": "GBP", "€": "EUR", "k": "ZMW"}  # "K" counts only right before digits
+VAULT_DIRS = frozenset({"vault", "other application docs", "documents", "certificates", "scans"})
+MAX_NOT_IMPORTED = 60
+MAX_PDF_PAGES = 30
 EMPLOYMENT = {"permanent": "permanent", "fixed term": "fixed_term", "fixed-term": "fixed_term",
               "contract": "contract", "contractor": "contract", "eor": "eor"}
+_TRACKER_NAME = re.compile(r"application[-_ ]?(?:log|tracker|history)|tracker|job[-_ ]?search|applications?$", re.I)
 MAX_AI_ITEMS = 100
 MAX_AI_TEXT = 1000
 
@@ -100,7 +109,7 @@ def _wanted(name: str) -> bool:
 # ----- markdown helpers ----------------------------------------------------------------------
 
 _HEAD = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
-_BULLET = re.compile(r"^\s*(?:[-*+•]|\d+[.)])\s+(.*\S)\s*$")
+_BULLET = re.compile(r"^\s*(?:[-*+•–▪●]|\d+[.)])\s+(.*\S)\s*$")  # noqa: RUF001
 _KEY_ONLY = re.compile(r"^\s*(?:[-*+]\s+)?\**([A-Za-z][A-Za-z /&_-]{1,40}?)\**\s*:\s*$")
 _KV = re.compile(r"^\s*(?:[-*+]\s+)?\**([A-Za-z][A-Za-z /&_-]{1,40}?)\**\s*:\s*\**\s*(.+?)\s*$")
 
@@ -172,23 +181,44 @@ def _items(sec_lines: list[str], inline: str | None = None) -> list[str]:
 
 # ----- pay -----------------------------------------------------------------------------------
 
-_PAY = re.compile(
-    r"\b(?P<cur>[A-Z]{3})\s*(?P<amt>\d[\d,\s]*(?:\.\d+)?)\s*(?P<k>k)?\b(?:[^\n]{0,24}?\b(?:per|/|a|each)\s*"
-    r"(?P<per>year|yr|annum|annual|month|mo|week|day|hour|hr)\b)?", re.I)
+_AMT = r"(?:\d{1,3}(?:[,\s]\d{3})+|\d+)(?:\.\d+)?"
+_PAY_BEFORE = re.compile(rf"(?P<cur>US\$|\$|£|€|(?<![A-Za-z])K(?=\d)|(?<![A-Za-z])[A-Za-z]{{3}}(?![A-Za-z]))\s*"
+                         rf"(?P<amt>{_AMT})(?P<k>\s?[kK](?![A-Za-z]))?")
+_PAY_AFTER = re.compile(rf"(?<![\d,.])(?P<amt>{_AMT})(?P<k>\s?[kK](?![A-Za-z]))?\s*(?P<cur>[A-Za-z]{{3}})(?![A-Za-z])")
+_PERIOD_WORDS = "year|yr|annum|month|mo|week|wk|day|hour|hr"
+_PERIOD = re.compile(rf"\b(?:per|a|each|every)\s+(?P<w1>{_PERIOD_WORDS})\b|/\s*(?P<w2>{_PERIOD_WORDS})\b"
+                     r"|\b(?P<w3>pm|pa|monthly|annually|annual|yearly|weekly|daily|hourly)\b")
+
+
+def _currency_of(token: str) -> str | None:
+    code = SYMBOLS.get(token.lower()) if not token.isalpha() or token == "K" else token.upper()
+    if token == "K":
+        code = "ZMW"
+    return code if code in CURRENCIES else None
 
 
 def parse_pay(text: str) -> PayFloor | None:
-    """A pay floor only when currency, amount, period and employment type are all stated."""
-    m = _PAY.search(text)
-    if not m or m.group("cur").upper() not in CURRENCIES or not m.group("per"):
-        return None
-    low = text.casefold()
+    """A pay floor only when one currency, one amount, one period and one employment type are all stated.
+
+    Currency may be a code (ZMW), a symbol ($, £, EUR) or the kwacha K written straight before the figure.
+    Anything with two amounts (a range), two periods or two employment types is ambiguous and stays text."""
+    low = re.sub(r"\bp\.\s?a\.?", " per annum ", text.casefold())
+    low = re.sub(r"\bp\.\s?m\.?", " per month ", low)
+    found: set[tuple[str, float]] = set()
+    for rx in (_PAY_BEFORE, _PAY_AFTER):
+        for m in rx.finditer(text):
+            cur = _currency_of(m.group("cur"))
+            if cur is None:
+                continue
+            amount = float(re.sub(r"[,\s]", "", m.group("amt"))) * (1000 if m.group("k") else 1)
+            found.add((cur, amount))
+    periods = {PERIODS[(m.group("w1") or m.group("w2") or m.group("w3"))] for m in _PERIOD.finditer(low)}
     kinds = {v for k, v in EMPLOYMENT.items() if re.search(rf"\b{re.escape(k)}\b", low)}
-    if len(kinds) != 1:
+    if len(found) != 1 or len(periods) != 1 or len(kinds) != 1:
         return None
-    amount = float(re.sub(r"[,\s]", "", m.group("amt"))) * (1000 if m.group("k") else 1)
+    currency, amount = next(iter(found))
     return PayFloor(employment_type=kinds.pop(), amount_minor=round(amount * 100),  # type: ignore[arg-type]
-                    currency=m.group("cur").upper(), period=PERIODS[m.group("per").lower()])  # type: ignore[arg-type]
+                    currency=currency, period=periods.pop())  # type: ignore[arg-type]
 
 
 # ----- builder -------------------------------------------------------------------------------
@@ -209,7 +239,15 @@ class _Proposals:
         self.campaigns: list[KitCampaign] = []
         self.vault: list[KitVaultDocument] = []
         self.notices: list[str] = []
+        self.skipped: list[tuple[str, str]] = []
         self._fact_texts: set[str] = set()
+
+    def skip(self, name: str, why: str) -> None:
+        self.skipped.append((name, why))
+
+    def size(self) -> int:
+        return (len(self.facts) + len(self.skills) + len(self.answers) + len(self.guardrails)
+                + len(self.experiences) + len(self.references) + len(self.campaigns) + (1 if self.person else 0))
 
     def fact(self, kind: str, text: str, file: str, experience_ref: str | None = None) -> None:
         text = _clean(text)
@@ -236,14 +274,30 @@ class _Proposals:
 
 # ----- file parsers --------------------------------------------------------------------------
 
-_DATES = re.compile(r"(\d{4}(?:-\d{2})?)\s*(?:-|–|—|to)\s*(\d{4}(?:-\d{2})?|present|current|now|date)",  # noqa: RUF001
+_MONTHS = {m: i for i, m in enumerate(("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov",
+                                       "dec"), 1)}
+_WHEN = (r"(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+\d{4}|\d{1,2}[/.-]\d{4}"
+         r"|\d{4}-\d{2}|\d{4})")
+_PRESENT = ("present", "current", "now", "date", "ongoing", "today")
+_DATES = re.compile(rf"(?<![\w/.-])(?P<a>{_WHEN})\s*(?:-|–|—|to|until|till)\s*(?P<b>{_WHEN}|{'|'.join(_PRESENT)})\b",  # noqa: RUF001
                     re.I)
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _PHONE = re.compile(r"\+?\d[\d ()-]{7,}\d")
 
 
-def _month(value: str) -> str | None:
-    return value if re.fullmatch(r"\d{4}-\d{2}", value) else None
+def _when(token: str) -> tuple[str | None, bool]:
+    """``(YYYY-MM, False)`` for a month, ``(None, True)`` for a bare year, ``(None, False)`` when unreadable."""
+    value = token.strip().casefold().rstrip(",.")
+    if m := re.fullmatch(r"(\d{4})-(\d{2})", value):
+        return (value, False) if 1 <= int(m.group(2)) <= 12 else (None, False)
+    if m := re.fullmatch(r"(\d{1,2})[/.-](\d{4})", value):
+        return (f"{m.group(2)}-{int(m.group(1)):02d}", False) if 1 <= int(m.group(1)) <= 12 else (None, False)
+    if m := re.fullmatch(r"([a-z]{3})[a-z]*\.?,?\s+(\d{4})", value):
+        month = _MONTHS.get(m.group(1))
+        return (f"{m.group(2)}-{month:02d}", False) if month else (None, False)
+    if re.fullmatch(r"\d{4}", value):
+        return None, True
+    return None, False
 
 
 def parse_profile(text: str, file: str, out: _Proposals) -> None:
@@ -323,10 +377,10 @@ def _experience(sec: Section, file: str, out: _Proposals) -> None:
     m = _DATES.search(heading)
     start = end = None
     if m:
-        start = _month(m.group(1))
-        end = None if m.group(2).lower() in ("present", "current", "now", "date") else _month(m.group(2))
-        if (m.group(1) and not start) or (end is None and m.group(2).lower() not in ("present", "current", "now",
-                                                                                      "date")):
+        start, start_year_only = _when(m.group("a"))
+        open_end = m.group("b").casefold() in _PRESENT
+        end, end_year_only = (None, False) if open_end else _when(m.group("b"))
+        if start_year_only or end_year_only:
             out.notices.append(f"{file}: {heading!r} has year-only dates; months were not guessed.")
         heading = re.sub(r"\(\s*\)|\[\s*\]", "", heading[:m.start()] + heading[m.end():]).strip(" -,|")
     parts = [p.strip() for p in re.split(r"\s+(?:at|@)\s+|\s*\|\s*|\s+-\s+|,\s*", heading, maxsplit=1) if p.strip()]
@@ -423,6 +477,93 @@ _WORKMODEL = {"on-site": "on_site", "on site": "on_site", "onsite": "on_site", "
               "remote": "remote"}
 
 
+_SECTION_FIELD = (
+    ("Titles", re.compile(r"role|title|job|position|looking for|target", re.I)),
+    ("Locations", re.compile(r"location|where|place|cit(?:y|ies)|countr|based", re.I)),
+    ("Keywords", re.compile(r"keyword|skill|tool|tech|strength", re.I)),
+    ("Work model", re.compile(r"remote|hybrid|work model|work style|arrangement|on-?site", re.I)),
+    ("Seniority", re.compile(r"senior|level|grade", re.I)),
+    ("Pay", re.compile(r"pay|salary|compensation|money|rate|package", re.I)),
+)
+_LIST_SPLIT = re.compile(r",|;|\s+(?:and|or)\s+|\s/\s", re.I)
+_SENTENCE = re.compile(r"(?<=[.!?])\s+|\n+")
+_S_TITLES = re.compile(r"\b(?:roles?|titles?|positions?|jobs?)\b[^:]{0,40}?(?:such as|like|includ(?:es?|ing)|:)\s*(?P<v>.+)", re.I)  # noqa: E501
+_S_LOOKING = re.compile(r"\blooking for\s+(?P<v>.+?)\s+(?:roles?|positions?|jobs?)\b", re.I)
+_S_WHERE = re.compile(r"\b(?:based in|located in|work(?:ing)? in|open to (?:roles|work) in|locations?\s*:)\s*(?P<v>.+)", re.I)  # noqa: E501
+_S_NOT_WHERE = re.compile(r"\b(?i:not in|except(?: for)?|excluding|outside(?: of)?)\s+(?P<v>[A-Z].+)")
+_S_KEYWORDS = re.compile(r"\b(?:keywords?|skills?|tools?|technolog\w+)\b[^:]{0,30}?(?:such as|like|includ(?:es?|ing)|:)\s*(?P<v>.+)",  # noqa: E501
+                         re.I)
+_S_SENIORITY = re.compile(r"\b(?:seniority|level)\b[^.:]{0,20}?(?:is|:|of|at)\s+(?P<v>.+)", re.I)
+_S_PAY = re.compile(r"(?:salary|\bpay\b|paid|compensation|floor|package|per month|per annum|\bp\.?\s?a\b|\bpm\b)", re.I)
+_NEGATED = re.compile(r"\b(?:no|not|never|without|avoid)\b[^.]{0,15}$", re.I)
+
+
+def _list_items(value: str) -> list[str]:
+    return [p for p in (_clean(x) for x in _LIST_SPLIT.split(value.rstrip(". "))) if p]
+
+
+def _promote_plain_headings(text: str) -> str:
+    """Plain-text and Word notes often head a list with a bare line ('Where', 'Pay:'): make those headings."""
+    lines = text.splitlines()
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        nxt = next((ln for ln in lines[i + 1:] if ln.strip()), "")
+        bare = (stripped and not _BULLET.match(line) and not _HEAD.match(line) and len(stripped) <= 50
+                and not stripped.endswith((".", "!", "?")) and (stripped.endswith(":") or bool(_BULLET.match(nxt))))
+        out.append(f"## {stripped.rstrip(':').strip()}" if bare and ":" not in stripped.rstrip(":") else line)
+    return "\n".join(out)
+
+
+def _prose_to_kv(text: str, file: str) -> str:
+    """Criteria written as paragraphs or plain bullet lists, rewritten as the 'Key: value' layout the structured
+    reader knows. Only what a heading or a sentence plainly says is carried over; nothing is inferred."""
+    text = _promote_plain_headings(text)
+    secs = sections(text)
+    found: dict[str, list[str]] = {}
+
+    def add(field_name: str, items: list[str]) -> None:
+        bucket = found.setdefault(field_name, [])
+        bucket += [i for i in items if i and i not in bucket]
+
+    for sec in secs:
+        if not sec.title:
+            continue
+        field_name = next((f for f, rx in _SECTION_FIELD if rx.search(sec.title)), None)
+        if field_name is None:
+            continue
+        lines = bullets(sec.lines) or paragraphs(sec.lines)
+        if field_name == "Pay":
+            add("Pay", lines)
+        else:
+            add(field_name, [i for ln in lines for i in _list_items(ln)])
+    # Bullets belong to the heading above them (read above); only running text is read sentence by sentence.
+    sentences = [s.strip() for s in _SENTENCE.split(text)
+                 if s.strip() and not _HEAD.match(s.strip()) and not _BULLET.match(s)]
+    for s in sentences:
+        for rx, name in ((_S_TITLES, "Titles"), (_S_LOOKING, "Titles"), (_S_WHERE, "Locations"),
+                         (_S_KEYWORDS, "Keywords"), (_S_SENIORITY, "Seniority")):
+            if m := rx.search(s):
+                add(name, _list_items(m.group("v")))
+        if m := _S_NOT_WHERE.search(s):
+            add("Locations", [f"not {i}" for i in _list_items(m.group("v"))])
+        for word, model in (("remote", "remote"), ("hybrid", "hybrid"), ("on-site", "on-site"),
+                            ("on site", "on-site"), ("onsite", "on-site")):
+            hit = re.search(rf"\b{word}\b", s, re.I)
+            if hit and not _NEGATED.search(s[:hit.start()]):
+                add("Work model", [model])
+        if re.search(r"\d", s) and _S_PAY.search(s):
+            add("Pay", [s])
+    if not any(found.values()):
+        return ""
+    stem = posixpath.splitext(posixpath.basename(file))[0].replace("_", " ").replace("-", " ").strip() or "file"
+    lines = [f"## Track: Criteria from {stem}", ""]
+    for key in ("Titles", "Locations", "Keywords", "Work model", "Seniority", "Pay"):
+        if found.get(key):
+            lines += [f"{key}:", *(f"- {i}" for i in found[key])]
+    return "\n".join(lines) + "\n"
+
+
 def parse_criteria(text: str, file: str, out: _Proposals) -> None:
     secs = sections(text)
     groups: list[tuple[str, Section, list[Section]]] = []
@@ -436,6 +577,11 @@ def parse_criteria(text: str, file: str, out: _Proposals) -> None:
                     break
                 subs.append(nxt)
             groups.append((re.sub(r"^track\s*[:\-]?\s*", "", sec.title, flags=re.I).strip() or sec.title, sec, subs))
+    if not groups:  # prose paragraphs or plain lists: rewrite as 'Key: value' and read that
+        synthetic = _prose_to_kv(text, file)
+        if synthetic:
+            parse_criteria(synthetic, file, out)
+        return
     for name, sec, subs in groups:
         fields: dict[str, tuple[str | None, list[str]]] = {}
         pairs = kv_pairs(sec.lines)
@@ -473,12 +619,15 @@ def parse_criteria(text: str, file: str, out: _Proposals) -> None:
             models += [v for k, v in _WORKMODEL.items() if k in low and v not in models]
         seniority = pick("seniority", "level")
         floors: list[PayFloor] = []
+        unparsed: list[str] = []
         for item in pick("pay", "salary", "compensation", whole=True):
             p = parse_pay(item)
             if p:
                 floors.append(p)
             else:
-                out.answer(f"Pay floor ({name})", item, file)
+                unparsed.append(item)
+        if unparsed:  # a pay line without a currency, amount, period and type stays text for the owner
+            out.answer(f"Pay floor ({name})", "; ".join(unparsed), file)
         if not any((titles, keywords, places, models, seniority, floors)):
             continue
         key = _slug(name)
@@ -585,13 +734,15 @@ async def ai_extract(llm: LLMClient, files: dict[str, str], out: _Proposals) -> 
 # ----- entry points --------------------------------------------------------------------------
 
 
-def _text_of(name: str, content: bytes, limits: ZipLimits, notices: list[str]) -> str | None:
+def _text_of(name: str, content: bytes, limits: ZipLimits, out: _Proposals) -> str | None:
     try:
+        if name.casefold().endswith(".pdf"):
+            return oldkit_cv.pdf_text(content, max_pages=MAX_PDF_PAGES)
         if office.is_office(name):
             return office.to_text(name, content, limits)
         return content.decode("utf-8-sig", errors="replace")
-    except office.OfficeError as exc:
-        notices.append(f"{name}: not read ({exc}).")
+    except (office.OfficeError, ValueError) as exc:
+        out.skip(name, f"it could not be read ({exc})")
         return None
 
 
@@ -620,82 +771,158 @@ def _dedupe(out: _Proposals) -> None:
     out.tracks, out.campaigns = tracks, campaigns
 
 
+def _in_vault_dir(low: str) -> bool:
+    return any(seg in VAULT_DIRS for seg in low.split("/")[:-1])
+
+
+def _store_in_vault(name: str, content: bytes, out: _Proposals, vault_files: dict[str, bytes]) -> None:
+    sha = vault.sha256_hex(content)
+    path = f"vault/{sha}{posixpath.splitext(name.casefold())[1]}"
+    doc_type, sens = classify_vault(name)
+    if path not in vault_files:
+        vault_files[path] = content
+        title = re.sub(r"[_-]+", " ", posixpath.splitext(posixpath.basename(name))[0]).strip()[:200]
+        out.vault.append(KitVaultDocument(path=path, title=title or "Document", doc_type=doc_type,  # type: ignore[arg-type]
+                                          sha256=sha, sensitivity=sens))  # type: ignore[arg-type]
+
+
+def _read_cv(text: str, name: str, out: _Proposals) -> None:
+    """A CV is read like a profile, but it never replaces a person already read from a profile file."""
+    kept = out.person
+    parse_profile(oldkit_cv.cv_to_markdown(text), name, out)
+    if kept is not None:
+        out.person = kept
+
+
+def _tracker_text(name: str, content: bytes, limits: ZipLimits, out: _Proposals) -> str | None:
+    if name.casefold().endswith(".xlsx"):
+        return _text_of(name, content, limits, out)
+    return content.decode("utf-8-sig", errors="replace")
+
+
+def _not_imported(out: _Proposals) -> list[str]:
+    lines = [f"not imported: {name}, {why}" for name, why in out.skipped[:MAX_NOT_IMPORTED]]
+    if len(out.skipped) > MAX_NOT_IMPORTED:
+        lines.append(f"not imported: and {len(out.skipped) - MAX_NOT_IMPORTED} more files")
+    return lines
+
+
 async def build(data: bytes, limits: ZipLimits, *, existing_fact_codes: dict[str, str] | None = None,
-                next_fact_number: int = 1, llm: LLMClient | None = None, use_ai: bool = False) -> OldKitResult:
+                next_fact_number: int = 1, llm: LLMClient | None = None, use_ai: bool = False,
+                tracker_headers: Sequence[str] = ()) -> OldKitResult:
+    """``tracker_headers`` is the ``data.old_kit_tracker_headers`` setting (how tracker column names map)."""
     try:
         raw, skipped = read_zip(data, limits, allow=_wanted, skip_unallowed=True)
     except UnsafeZip as exc:
         raise OldKitError(str(exc)) from exc
     files = _strip_root(raw)
     out = _Proposals(existing_fact_codes or {}, next_fact_number)
-    history_csv: bytes | None = None
+    tracker_rows: list[dict[str, str]] = []
     unrecognised: dict[str, str] = {}
     vault_files: dict[str, bytes] = {}
-    if skipped:
-        out.notices.append(f"{len(skipped)} file(s) of unsupported types were ignored.")
+    seen_content: dict[str, str] = {}
+    for name in skipped:
+        if not posixpath.basename(name).startswith(("~$", ".")) and "__macosx" not in name.casefold():
+            out.skip(name, "unsupported file type")
 
     for name in sorted(files):
         content, low = files[name], name.casefold()
-        base = posixpath.basename(low)
-        if "other application docs" in low or low.startswith("vault/"):
-            if low.endswith(VAULT_EXT):
-                sha = vault.sha256_hex(content)
-                ext = posixpath.splitext(low)[1]
-                path = f"vault/{sha}{ext}"
-                doc_type, sens = classify_vault(name)
-                if path not in vault_files:
-                    vault_files[path] = content
-                    title = re.sub(r"[_-]+", " ", posixpath.splitext(posixpath.basename(name))[0]).strip()[:200]
-                    out.vault.append(KitVaultDocument(path=path, title=title or "Document", doc_type=doc_type,  # type: ignore[arg-type]
-                                                      sha256=sha, sensitivity=sens))  # type: ignore[arg-type]
+        base, ext = posixpath.basename(low), posixpath.splitext(low)[1]
+        digest = hashlib.sha256(content).hexdigest()
+        if digest in seen_content:
+            out.skip(name, f"identical to {seen_content[digest]}")
+            continue
+        seen_content[digest] = name
+        doc_type, _sens = classify_vault(name)
+        is_cv = doc_type == "cv" and ext in (".docx", ".pdf", ".txt", ".md", ".markdown", ".doc")
+        if ext in VAULT_EXT and (_in_vault_dir(low) or ext in (".pdf", ".png", ".jpg", ".jpeg", ".doc")
+                                 or (is_cv and ext == ".docx")):
+            _store_in_vault(name, content, out, vault_files)
+            if is_cv and ext == ".doc":
+                out.skip(name, "the old Word format (.doc) cannot be read; kept in the vault only")
+            elif is_cv:
+                text = _text_of(name, content, limits, out)
+                if text is not None:
+                    before = out.size()
+                    _read_cv(text, name, out)
+                    if out.size() == before:
+                        out.skip(name, "recognised as a CV, but no sections could be read (kept in the vault)")
+            elif ext in (".pdf", ".png", ".jpg", ".jpeg", ".doc") and not _in_vault_dir(low):
+                out.skip(name, "kept in the vault; its text is not read")
             continue
         if not low.endswith(TEXT_EXT):
             continue
-        if re.match(r"application[-_ ]?log", base):
-            if low.endswith(".xlsx"):
-                text = _text_of(name, content, limits, out.notices)
-                history_csv = text.encode() if text else None
-            else:
-                history_csv = content
+        if ext in (".csv", ".xlsx") and (_TRACKER_NAME.search(posixpath.splitext(base)[0])):
+            text = _tracker_text(name, content, limits, out)
+            if text is not None:
+                tracker = oldkit_tracker.read_tracker(text, name, tracker_headers)
+                tracker_rows += tracker.rows
+                out.notices += tracker.notices
+                if tracker.why_not:
+                    out.skip(name, tracker.why_not)
             continue
-        text = _text_of(name, content, limits, out.notices)
+        text = _text_of(name, content, limits, out)
         if text is None:
             continue
-        if base.startswith("master_profile") or base.startswith("master-profile"):
+        before = out.size()
+        kind = "file"
+        if base.startswith(("master_profile", "master-profile")):
             parse_profile(text, name, out)
+            kind = "profile"
         elif base.startswith("rules"):
             parse_rules(text, name, out)
+            kind = "rules file"
         elif base.startswith("answer"):
             parse_answers(text, name, out)
+            kind = "answer sheet"
         elif "criteria" in base:
             parse_criteria(text, name, out)
+            kind = "criteria file"
         elif "board" in base and "access" in base:
-            out.notices.append(f"{name}: board access notes were not imported; add them to the source registry "
-                               "by hand.")
+            out.skip(name, "board access notes are not imported; add them to the source registry by hand")
+            continue
         elif base.startswith("readme"):
             section4 = _readme_rules(text)
             if section4:
                 parse_rules(section4, name, out)
+            continue
         elif re.search(r"spec", low):
+            continue
+        elif is_cv:
+            _read_cv(text, name, out)
+            kind = "CV"
+        elif ext in (".csv", ".xlsx") and oldkit_tracker.looks_like_tracker(text, tracker_headers):
+            tracker = oldkit_tracker.read_tracker(text, name, tracker_headers)
+            tracker_rows += tracker.rows
+            out.notices += tracker.notices
+            if tracker.why_not:
+                out.skip(name, tracker.why_not)
             continue
         else:
             unrecognised[name] = text
+            continue
+        if out.size() == before:
+            out.skip(name, f"recognised as a {kind}, but nothing could be read from it")
 
     if unrecognised:
         if use_ai and llm is not None:
             notice = await ai_extract(llm, unrecognised, out)
             if notice:
                 out.notices.append(notice)
+                for name in sorted(unrecognised):
+                    out.skip(name, "not recognised by the built-in parser")
         else:
-            out.notices.append(f"{len(unrecognised)} file(s) were not recognised and were left unread: "
-                               + ", ".join(sorted(unrecognised)[:5]))
+            for name in sorted(unrecognised):
+                out.skip(name, "not recognised by the built-in parser and left unread (AI reading is off)")
     _dedupe(out)
+    out.notices += _not_imported(out)
     out.notices.append("Everything from an old kit arrives unconfirmed and may be stale. Pay floors, countries, "
                        "seniority, visa and relocation answers are never filled in for you; confirm each.")
     kit = KitFile(kind="personal_backup", exported_at=utcnow(), app_version=__version__, person=out.person,
                   experiences=out.experiences, facts=out.facts, skills=out.skills, references=out.references,
                   tracks=out.tracks, guardrails=out.guardrails, answers=out.answers, vault=out.vault,
                   campaigns=out.campaigns)
+    history_csv = oldkit_tracker.to_csv(tracker_rows) if tracker_rows else None
     return OldKitResult(kit=kit, vault_files=vault_files, history_csv=history_csv, notices=out.notices)
 
 

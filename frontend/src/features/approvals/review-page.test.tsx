@@ -6,6 +6,7 @@ import { renderApp } from "@/test/render"
 import { server } from "@/test/server"
 import { applicationsMock } from "@/mocks/handlers/applications"
 import { autopilotMock } from "@/mocks/handlers/autopilot"
+import { packetsFor } from "@/mocks/dataset/autopilot"
 import { matchesMock } from "@/mocks/handlers/matches"
 
 configure({ asyncUtilTimeout: 6000 })
@@ -91,6 +92,26 @@ describe("packet review", { timeout: 20_000 }, () => {
       expect(
         screen.queryByText(/A newer version of this packet exists/)
       ).not.toBeInTheDocument()
+    )
+  })
+
+  it("approves for the channel the packet was prepared for, not the application's current one", async () => {
+    const user = userEvent.setup()
+    const app = appOf("Zambezi Mining Systems")
+    packetsFor(app, autopilotMock()).at(-1)!.contents.channel = "browser"
+    const bodies: unknown[] = []
+    server.use(
+      http.post("*/api/applications/:id/approve", async ({ request }) => {
+        bodies.push(await request.json())
+        return HttpResponse.json({}, { status: 409 })
+      })
+    )
+    renderApp(`/approvals/${app.id}`)
+    await user.click(
+      await screen.findByRole("button", { name: "Let the agent submit" })
+    )
+    await waitFor(() =>
+      expect(bodies).toEqual([expect.objectContaining({ channel: "browser" })])
     )
   })
 })

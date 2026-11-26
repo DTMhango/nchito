@@ -243,6 +243,12 @@ def _exclusions(data: DecisionInput, ctx: _Ctx) -> list[GateDecision]:
                                   f"location in deny list: {sorted(hit)}" if hit else "location not denied", (ref,),
                                   would_change_if="remove the place from the deny list" if hit else None))
 
+    never = job.get("never_apply")
+    if never is not None:  # the owner's per-employer "never apply" (7.1): never tailored, never sent
+        gates.append(GateDecision("employer_never_apply", "exclusion", "fail",
+                                  "you never apply to this employer" + (f": {never}" if never else ""),
+                                  (RuleRef("employer_policy.never_apply", True, "employer policy"),),
+                                  would_change_if="remove 'never apply' from the employer"))
     state, deadline = job.get("deadline_state") or "not_stated", job.get("deadline")
     if state == "dated" and isinstance(deadline, date) and deadline < data.now.date():
         gates.append(GateDecision("deadline_passed", "exclusion", "fail", f"deadline passed on {deadline}",

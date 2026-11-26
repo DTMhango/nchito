@@ -25,6 +25,7 @@ from app.apply.channels.base import DispatchOutcome
 from app.core import audit
 from app.models.applications import (
     Application,
+    ApplicationPacket,
     DispatchAttempt,
     DispatchStatus,
     PendingAction,
@@ -50,6 +51,13 @@ def is_uncertain(attempt: DispatchAttempt) -> bool:
     """Handed to a channel (or possibly so) with no final outcome."""
     return attempt.status in (DispatchStatus.handed_off, DispatchStatus.unknown) or (
         attempt.status == DispatchStatus.reserved and attempt.started_at is not None)
+
+
+async def is_message_attempt(session: AsyncSession, attempt: DispatchAttempt) -> bool:
+    """A send of a message about the application (wave 4 follow-ups), not of the application itself. Its
+    outcome never moves the application's stage, evidence or confirmations."""
+    packet = await session.get(ApplicationPacket, attempt.packet_id)
+    return packet is not None and packet.contents.message_kind is not None
 
 
 async def lock_application(session: AsyncSession, application_id: uuid.UUID) -> Application:
@@ -118,7 +126,8 @@ async def cancel(session: AsyncSession, attempt: DispatchAttempt, app: Applicati
     attempt.status, attempt.error, attempt.outcome_at = DispatchStatus.cancelled, reason, now
     await session.flush()
     await _log(session, attempt, "dispatch.cancelled", actor, reason=reason, gates=gates or [])
-    await give_back(session, app, attempt, f"send cancelled: {reason}", now=now)
+    if not await is_message_attempt(session, attempt):
+        await give_back(session, app, attempt, f"send cancelled: {reason}", now=now)
 
 
 async def record(session: AsyncSession, attempt: DispatchAttempt, outcome: DispatchOutcome, *, via: str, actor: str,
@@ -128,6 +137,7 @@ async def record(session: AsyncSession, attempt: DispatchAttempt, outcome: Dispa
     if attempt.status in FINAL_STATUSES:
         raise OutcomeError(f"this send is already {attempt.status.value}")
     app = await lock_application(session, attempt.application_id)
+    message = await is_message_attempt(session, attempt)
     status = outcome.status
     error = outcome.error
     if status == "sent" and outcome.evidence is None:
@@ -139,6 +149,11 @@ async def record(session: AsyncSession, attempt: DispatchAttempt, outcome: Dispa
         evidence = outcome.evidence if outcome.evidence.at else outcome.evidence.model_copy(
             update={"at": now.isoformat()})
         attempt.status, attempt.evidence, attempt.outcome_at, attempt.error = DispatchStatus.sent, evidence, now, None
+        if message:
+            await session.flush()
+            await _log(session, attempt, "dispatch.sent", actor, via=via, evidence=evidence.model_dump(),
+                       provider_message_id=attempt.provider_message_id, message=True)
+            return DispatchStatus.sent
         app.confirmation_evidence = [*app.confirmation_evidence, evidence]
         if evidence.kind == "reference" and not app.reference:
             app.reference = evidence.value[:200]
@@ -166,7 +181,7 @@ async def record(session: AsyncSession, attempt: DispatchAttempt, outcome: Dispa
     # unknown: held for reconciliation, never resent.
     attempt.status, attempt.error = DispatchStatus.unknown, error or "outcome unknown"
     await session.flush()
-    if app.stage == Stage.applying:
+    if app.stage == Stage.applying and not message:
         await stages.transition(session, app, Stage.submitted_unconfirmed, actor=actor, via="system", now=now,
                                 why=f"outcome unknown: {attempt.error}", detail={"attempt_id": str(attempt.id)})
     await _log(session, attempt, "dispatch.uncertain", actor, via=via, error=attempt.error)
@@ -199,6 +214,9 @@ async def settle_not_sent(session: AsyncSession, attempt: DispatchAttempt, *, re
     app = await lock_application(session, attempt.application_id)
     attempt.status, attempt.error, attempt.outcome_at = DispatchStatus.failed, f"not sent: {reason}", now
     await session.flush()
+    if await is_message_attempt(session, attempt):
+        await _log(session, attempt, "dispatch.not_sent", actor, via=via, reason=reason, message=True)
+        return
     await close_confirmations(session, app.id, {"resolution": "not_sent", "via": via,
                                                 "attempt_id": str(attempt.id)}, actor=actor, now=now)
     await _log(session, attempt, "dispatch.not_sent", actor, via=via, reason=reason)

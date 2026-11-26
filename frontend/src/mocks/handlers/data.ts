@@ -31,6 +31,8 @@ export const importFallback = { source: "kit_file" }
 export const dataMock = {
   /** False: OAuth start answers 409 (no Google client configured on the server). */
   googleConfigured: true,
+  /** False: Microsoft (Outlook, OneDrive) OAuth start answers 409 (no Entra app configured). */
+  microsoftConfigured: true,
   /** False: backups answer 503 (pg_dump missing). */
   pgDump: true,
   /** True: every export link has expired (download answers 404). */
@@ -48,6 +50,7 @@ export function resetDataMock() {
   importCalls.length = 0
   importFallback.source = "kit_file"
   dataMock.googleConfigured = true
+  dataMock.microsoftConfigured = true
   dataMock.pgDump = true
   dataMock.exportsExpired = false
   dataMock.onboarding = null
@@ -136,6 +139,19 @@ function checkConnection(
     if ((creating || secret) && secret.length < 16)
       return "signing_secret must be at least 16 characters"
   }
+  if (provider === "s3") {
+    const endpoint = String(config.endpoint ?? "")
+    if ((creating || "endpoint" in config) && !endpoint.startsWith("https://"))
+      return "endpoint must be an https address (http only for localhost)"
+    if (
+      (creating || "bucket" in config) &&
+      !/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(String(config.bucket ?? ""))
+    )
+      return "bucket must be 3 to 63 lowercase letters, digits, dots or hyphens"
+    for (const k of ["access_key_id", "secret_access_key"])
+      if ((creating || k in secrets) && !(secrets[k] ?? "").trim())
+        return `${k} is required`
+  }
   if (provider === "search_api") {
     // search_api.py: known config keys only, endpoint http(s), the key as header or param.
     const known = [
@@ -162,6 +178,17 @@ function checkConnection(
     if (creating && !(secrets.api_key ?? "").trim())
       return "api_key is required"
   }
+  if (provider === "msgraph") {
+    // mail_connections.py: only the read folder is typed; the address comes from sign-in.
+    const unknown = Object.keys(config).filter((k) => k !== "read_folder")
+    if (unknown.length)
+      return `unknown config keys: ${unknown.sort().join(", ")} (secrets go in 'secrets')`
+  }
+  if (
+    provider === "onedrive" &&
+    (Object.keys(config).length || Object.keys(secrets).length)
+  )
+    return "OneDrive has no settings to change here; connect it again to sign in afresh"
   if (provider === "imap_smtp" && creating) {
     const missing = ["from_address", "imap_host", "smtp_host"].filter(
       (k) => !config[k]
@@ -180,17 +207,25 @@ const OWN = [
   "gmail",
   "imap_smtp",
   "gdrive",
+  "msgraph",
+  "onedrive",
   "telegram",
   "webhook",
   "search_api",
+  "s3",
 ]
 
 const READS: Record<string, string> = {
   gmail: "Only the label or search you choose. Nothing else is opened.",
   imap_smtp: "Only the folder you chose.",
   gdrive: "Only the files this app puts in its own folder.",
+  msgraph:
+    "Send mail, and read-only access to the whole mailbox (Microsoft offers no narrower read permission). This app reads only the folder you choose, and searches Sent Items for the message ids it sent.",
+  onedrive:
+    "Only files and folders this app creates itself, inside its own app folder. Nothing else in your OneDrive is listed or read.",
   telegram: "Nothing. It only sends messages to your chat.",
   webhook: "Nothing. It only sends signed messages.",
+  s3: "Writes, reads back and deletes encrypted backup files in one bucket. Lists nothing else.",
   search_api:
     "Sends search phrases built from your campaigns' titles and places to the search provider. Reads only the result links.",
 }
@@ -200,6 +235,8 @@ const SCOPES: Record<string, string[]> = {
     "https://www.googleapis.com/auth/gmail.readonly",
   ],
   gdrive: ["https://www.googleapis.com/auth/drive.file"],
+  msgraph: ["offline_access", "User.Read", "Mail.Send", "Mail.Read"],
+  onedrive: ["offline_access", "User.Read", "Files.ReadWrite.AppFolder"],
 }
 
 export const dataHandlers = [
@@ -360,6 +397,7 @@ export const dataHandlers = [
       created: taken.filter((d) => d.change === "add").length,
       updated: taken.filter((d) => d.change !== "add").length,
       needs_review: p.source === "kit_file" ? 0 : taken.length,
+      themes_need_review: [],
     } satisfies S["ImportCommitOut"])
   }),
 
@@ -413,7 +451,17 @@ export const dataHandlers = [
   // ---- connections other than the AI providers (those fall through to handlers/ai.ts) ----
   http.post("*/api/connections/oauth/:provider/start", ({ params }) => {
     if (!db.get().session) return unauthorized()
-    if (!dataMock.googleConfigured)
+    const microsoft =
+      params.provider === "msgraph" || params.provider === "onedrive"
+    if (microsoft && !dataMock.microsoftConfigured)
+      return HttpResponse.json(
+        {
+          detail:
+            "Outlook sign-in is not set up on this server: set MS_OAUTH_CLIENT_ID and MS_OAUTH_CLIENT_SECRET",
+        },
+        { status: 409 }
+      )
+    if (!microsoft && !dataMock.googleConfigured)
       return HttpResponse.json(
         {
           detail:
@@ -432,6 +480,11 @@ export const dataHandlers = [
     if (body.provider === "gmail" || body.provider === "gdrive")
       return HttpResponse.json(
         { detail: `${body.provider} connects through Google sign-in` },
+        { status: 422 }
+      )
+    if (body.provider === "msgraph" || body.provider === "onedrive")
+      return HttpResponse.json(
+        { detail: `${body.provider} connects through Microsoft sign-in` },
         { status: 422 }
       )
     const err = checkConnection(

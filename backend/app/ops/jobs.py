@@ -15,7 +15,7 @@ from croniter import croniter
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.connect import records
+from app.connect import onedrive_records, records
 from app.connect.filestore import FileStore
 from app.core import audit
 from app.core.clock import utcnow
@@ -60,8 +60,16 @@ async def remote_store(session: AsyncSession, target: str) -> tuple[FileStore | 
             return await records.drive_store(session), None
         except Exception as exc:
             return None, f"Google Drive unavailable: {type(exc).__name__}: {exc}"[:300]
+    if target == "onedrive":
+        try:
+            return await onedrive_records.onedrive_store(session), None
+        except Exception as exc:
+            return None, f"OneDrive unavailable: {type(exc).__name__}: {exc}"[:300]
     if target == "s3":
-        return None, "S3 backups are not available in this build; the backup was kept locally"
+        try:
+            return await records.first_s3_store(session), None
+        except Exception as exc:
+            return None, f"S3 storage unavailable: {type(exc).__name__}: {exc}"[:300]
     return None, None
 
 
@@ -137,6 +145,13 @@ async def tick(session_factory, now: datetime | None = None) -> dict[str, object
         await run_retention_job(s)
         return True
 
+    async def calendar_step(s: AsyncSession) -> int:
+        from app.pipeline import events, events_google
+
+        due = await events.run_due(s, now)
+        await events_google.sync_pending(s)
+        return due.reminders + due.debriefs
+
     async def deliver(s: AsyncSession) -> int:
         return (await notifications.deliver_due(s, now)).sent
 
@@ -144,6 +159,7 @@ async def tick(session_factory, now: datetime | None = None) -> dict[str, object
     await step("retention", retention_step)
     await step("health", health_step)
     await step("collect", collect)
+    await step("calendar", calendar_step)
     await step("digest", digest_step)
     await step("deliver", deliver)  # last, so what the steps above created goes out in the same minute
     return done

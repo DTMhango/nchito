@@ -58,7 +58,10 @@ const readOnly = [...closure(responseRoots)].filter((n) => !written.has(n))
 for (const name of readOnly) {
   const s = schemas[name]
   if (!s?.properties) continue
-  s.required = Object.keys(s.properties)
+  // A property the server leaves out when null (`x-omitted-when-null`) stays optional.
+  s.required = Object.keys(s.properties).filter(
+    (k) => !s.properties[k]["x-omitted-when-null"]
+  )
 }
 
 const ast = await openapiTS(doc, { defaultNonNullable: false })

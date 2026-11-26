@@ -21,6 +21,23 @@ MoneyPeriod = Literal["year", "month", "week", "day", "hour"]
 UnknownPolicy = Literal["review", "pass_with_penalty", "pass_blocks_auto", "fail"]
 AutomationMode = Literal["save_only", "prepare", "ask_then_apply", "auto_apply"]
 ChannelName = Literal["email", "browser", "manual"]
+# Where a backup or exported file is stored (local disk, S3-compatible, Google Drive, OneDrive).
+BackupTargetName = Literal["local", "s3", "gdrive", "onedrive"]
+# Connections that sign in with OAuth (start/callback endpoints).
+OAuthProviderName = Literal["gmail", "gdrive", "gcalendar", "msgraph", "onedrive"]
+# Who created a record: the system, the owner, or an import.
+RecordOrigin = Literal["system", "owner", "import"]
+# Wave 4 followups: outbound messages about an existing application.
+MessageKind = Literal["follow_up", "thank_you", "info_reply", "slot_accept", "slot_decline", "withdraw",
+                      "offer_decline"]
+MessageStatus = Literal["draft", "approved", "discarded", "budget_paused", "failed"]
+MessageSendState = Literal["none", "queued", "sending", "sent", "uncertain", "failed", "cancelled"]
+FollowupDueStatus = Literal["upcoming", "due", "snoozed", "not_needed", "drafted", "sent"]
+WindDownChoice = Literal["keep", "pause", "withdraw"]
+# Interview rounds and mock interviews (wave 4)
+RoundKind = Literal["screen", "technical", "panel", "final", "other"]
+MockMode = Literal["behavioural", "technical", "role", "mixed", "tough"]
+MockStatus = Literal["active", "paused", "failed", "done"]
 
 
 # ----- Job facets (6.1) ---------------------------------------------------------------------
@@ -301,11 +318,31 @@ class PacketAnswer(Shape):
     material: bool = False
 
 
+def _optional_in_output(*names: str) -> Any:
+    """``json_schema_extra`` for fields left out of the JSON when null (``exclude_if``): never required."""
+
+    def fix(schema: dict[str, Any]) -> None:
+        for name in names:  # the frontend generator keeps these optional in response-only schemas
+            schema.get("properties", {}).get(name, {})["x-omitted-when-null"] = True
+        req = [r for r in schema.get("required", []) if r not in names]
+        if req:
+            schema["required"] = req
+        else:
+            schema.pop("required", None)
+
+    return fix
+
+
 class PacketEmail(Shape):
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_optional_in_output("thread_ref"))
+
     to: list[str]
     cc: list[str] = Field(default_factory=list)
     subject: str
     body: str
+    # Wave 4 followups: left out of the canonical JSON when null, so packets built before it hash the same.
+    thread_ref: str | None = Field(default=None, exclude_if=lambda v: v is None,
+                                   description="The mail thread a message replies in (provider thread id)")
 
 
 class PacketFile(Shape):
@@ -319,6 +356,8 @@ class PacketFile(Shape):
 class PacketContents(Shape):
     """Everything an approval or permit binds to (18.2). Hashed canonically."""
 
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_optional_in_output("message_kind"))
+
     requisition: str | None = None
     destination: PacketDestination
     sending_identity: str
@@ -328,6 +367,10 @@ class PacketContents(Shape):
     link_permissions: list[str] = Field(default_factory=list)
     channel: ChannelName | None = Field(default=None, description="The channel this packet is sent through")
     job_version: str | None = Field(default=None, description="Content hash of the job as it was packed")
+    # Wave 4 followups: set only on a message packet (never on the application's own packet); left out of the
+    # canonical JSON when null, so application packets hash exactly as before.
+    message_kind: MessageKind | None = Field(default=None, exclude_if=lambda v: v is None,
+                                             description="Set when the packet is a message about the application")
 
 
 class SubmittedSnapshot(Shape):
@@ -461,6 +504,24 @@ class ScoreRamp(Shape):
     high: str
 
 
+ThemeModeName = Literal["light", "dark"]
+
+
+class ContrastWaiverPair(Shape):
+    mode: ThemeModeName
+    fg: str
+    bg: str
+    ratio: float
+
+
+class ContrastWaiver(Shape):
+    """The owner accepted body text below WCAG AA on a personal theme (recorded, also in the audit)."""
+
+    pairs: list[ContrastWaiverPair]
+    accepted_at: str
+    accepted_by: str
+
+
 class AgentTaskState(Shape):
     """Checkpoint saved by a runner. Free-form fields go in ``data``."""
 
@@ -476,3 +537,107 @@ class AgentTaskState(Shape):
 AgentTaskTypeName = Literal["apply", "sweep_site", "check_posting"]
 
 JsonDict = dict[str, Any]
+
+
+# ----- Preference feedback and suggestions (wave 4 feedback stream) ------------------------
+
+FeedbackVerdict = Literal["up", "down"]
+FeedbackReason = Literal["too_junior", "too_senior", "wrong_stack", "pay", "location", "employer_type",
+                         "commute_remote", "more_like_this"]
+SuggestionKind = Literal["reweight_criterion", "add_penalty", "add_bonus", "add_tag_rule", "add_saved_view",
+                         "tighten_filter"]
+SuggestionStatus = Literal["open", "accepted", "dismissed", "superseded"]
+
+
+class ReweightChange(Shape):
+    """New weights for the rubric's criteria (same names, summing to 100): a new rubric version."""
+
+    kind: Literal["reweight_criterion"] = "reweight_criterion"
+    weights: dict[str, int]
+
+
+class PenaltyChange(Shape):
+    """A rubric penalty (a new rubric version)."""
+
+    kind: Literal["add_penalty"] = "add_penalty"
+    name: str = Field(min_length=1, max_length=120)
+    points: int = Field(ge=1, le=100)
+    conditions: ConditionSet
+
+
+class BonusChange(Shape):
+    """A campaign bonus rule (raises the effective score of matching roles)."""
+
+    kind: Literal["add_bonus"] = "add_bonus"
+    reason: str = Field(min_length=1, max_length=200)
+    points: int = Field(ge=1, le=100)
+    conditions: ConditionSet
+
+
+class TagRuleChange(Shape):
+    kind: Literal["add_tag_rule"] = "add_tag_rule"
+    tag: str = Field(min_length=1, max_length=60)
+    conditions: ConditionSet
+
+
+class SavedViewChange(Shape):
+    kind: Literal["add_saved_view"] = "add_saved_view"
+    name: str = Field(min_length=1, max_length=120)
+    conditions: ConditionSet
+
+
+class TightenChange(Shape):
+    """A campaign exclusion rule: only ever narrows what the campaign matches."""
+
+    kind: Literal["tighten_filter"] = "tighten_filter"
+    reason: str = Field(min_length=1, max_length=200)
+    conditions: ConditionSet
+
+
+SuggestionChange = Annotated[ReweightChange | PenaltyChange | BonusChange | TagRuleChange | SavedViewChange
+                             | TightenChange, Field(discriminator="kind")]
+
+
+class SuggestionEvidence(Shape):
+    """What a suggestion rests on: owner feedback and real outcomes, counted and listed."""
+
+    up: int = 0
+    down: int = 0
+    feedback_ids: list[str] = Field(default_factory=list)
+    application_ids: list[str] = Field(default_factory=list)
+    reasons: dict[str, int] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    summary: str = ""
+
+
+class BacktestChangeRow(Shape):
+    job_id: str
+    title: str
+    employer: str
+    old_score: int | None = None
+    new_score: int | None = None
+    old_verdict: str
+    new_verdict: str
+
+
+class SuggestionBacktest(Shape):
+    """The change replayed over recent roles with the decision table (no model calls)."""
+
+    window_days: int
+    jobs: int
+    matched: int = Field(default=0, description="Recent roles the change's conditions match")
+    newly_pass: list[BacktestChangeRow] = Field(default_factory=list)
+    newly_drop: list[BacktestChangeRow] = Field(default_factory=list)
+    excluded_past_applications: list[BacktestChangeRow] = Field(default_factory=list)
+    score_changed: int = 0
+
+
+# ----- wave 4 bulk: one spelling each (equal Literals share a typing cache entry) ------------------------
+BulkSubject = Literal["jobs", "applications"]
+BulkActionName = Literal["tag", "untag", "skip", "snooze", "move_stage", "assign_campaign", "queue_tailoring",
+                         "send_for_approval", "approve_reviewed", "archive", "recheck", "export_csv"]
+BulkStatus = Literal["previewed", "queued", "running", "done", "partial", "failed", "undone"]
+BulkItemOutcome = Literal["pending", "changed", "unchanged", "refused", "failed", "undone", "undo_skipped"]
+BulkVerdict = Literal["change", "unchanged", "refused"]
+EmployerStateName = Literal["free", "role_in_progress", "cooling_down", "always_ask_first", "blocked"]
+CooldownKind = Literal["end_state", "applied_date"]

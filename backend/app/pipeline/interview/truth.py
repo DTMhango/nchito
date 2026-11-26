@@ -88,11 +88,11 @@ class SectionCheck:
 
 
 def check(section: str, content: sh.Shape, kit: KitView, cfg: CheckSettings, *,
-          job_terms: Iterable[str] = ()) -> SectionCheck:
+          job_terms: Iterable[str] = (), posting_terms: Sequence[str] = ()) -> SectionCheck:
     """Pure: the same content, Kit and settings always give the same findings."""
     located = claim_items(section, content)
     findings, cited = tracing.trace(ApplicationSpec(), located, kit, qualification_terms=cfg.qualification_terms,
-                                    job_terms=job_terms)
+                                    job_terms=job_terms, tools=cfg.tools, posting_terms=posting_terms)
     findings += drift(located, cited, cfg.drift_terms)
     text = "\n".join([*(it.text for it in located), *(t for t in other_texts(content) if t)])
     docs: Sequence[Document] = [Document(scope=SCOPE, text=text,

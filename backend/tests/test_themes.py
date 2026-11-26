@@ -11,6 +11,7 @@ from tests.conftest import REPO
 SLUGS = ["copperbelt", "midnight-ledger", "savanna-dusk", "paper", "workshop", "high-contrast"]
 NAMES = ["Copperbelt", "Midnight Ledger", "Savanna Dusk", "Paper", "Workshop", "High contrast"]
 # The frontend corrected two mockup values for contrast; everything else is lifted verbatim.
+STUDIO_KEYS = {"is_default", "revision", "can_undo", "can_redo", "contrast_waiver", "needs_review"}
 MOCKUP_CORRECTIONS = {("copperbelt", "light", "text-faint"), ("savanna-dusk", "light", "text-faint")}
 
 
@@ -26,7 +27,9 @@ async def test_list_builtins_public(client):
     assert all(t["builtin"] for t in themes)
     first = themes[0]
     assert set(first) == {"id", "name", "builtin", "description", "fonts", "radius", "density", "light", "dark",
-                          "chart", "score"}
+                          "chart", "score", "is_default", "revision", "can_undo", "can_redo", "contrast_waiver",
+                          "needs_review"}
+    assert first["is_default"] is True and not any(t["is_default"] for t in themes[1:])
     assert first["light"]["bg"] == "#F2F5F3" and first["dark"]["bg"] == "#0C1513"
     assert first["dark"]["chart-1"] == "#3FBF9A"
     assert first["score"] == {"low": "#A3B3AB", "mid": "#0F6B55", "high": "#B5673A"}
@@ -40,7 +43,8 @@ async def test_api_matches_frontend_theme_files_verbatim(client):
     for slug in SLUGS:
         expected = json.loads((folder / f"{slug}.json").read_text(encoding="utf-8"))
         expected.setdefault("description", None)
-        got = {k: v for k, v in themes[slug].items() if v is not None or k == "description"}
+        got = {k: v for k, v in themes[slug].items()
+               if (v is not None or k == "description") and k not in STUDIO_KEYS}
         got["fonts"] = {k: v for k, v in got["fonts"].items() if v is not None}
         assert got == expected, slug
 
@@ -92,19 +96,20 @@ async def test_create_update_delete_custom(owner_client):
     anon = (await owner_client.post("/api/themes", json=_custom("No id"))).json()
     assert re.fullmatch(r"[0-9a-f-]{36}", anon["id"])
 
-    theme_body = {k: v for k, v in theme.items() if k not in ("id", "builtin")}
+    theme_body = {k: v for k, v in theme.items() if k not in ("id", "builtin", *STUDIO_KEYS)}
     theme_body["light"] = {**theme_body["light"], "primary": "#123456"}
     r = await owner_client.put(f"/api/themes/{theme['id']}", json={**theme_body, "name": "Mine 2"})
     assert r.status_code == 200 and r.json()["light"]["primary"] == "#123456" and r.json()["name"] == "Mine 2"
 
-    # Make it active, delete it: appearance falls back to the default theme.
+    # The active theme cannot be deleted (409): switch away first.
     appearance = (await owner_client.get("/api/settings/appearance")).json()
     r = await owner_client.put("/api/settings/appearance", json={**appearance, "theme_id": theme["id"]})
     assert r.status_code == 200, r.text
+    assert (await owner_client.delete(f"/api/themes/{theme['id']}")).status_code == 409
+    r = await owner_client.put("/api/settings/appearance", json={**appearance, "theme_id": "copperbelt"})
+    assert r.status_code == 200, r.text
     assert (await owner_client.delete(f"/api/themes/{theme['id']}")).status_code == 204
     assert (await owner_client.get(f"/api/themes/{theme['id']}")).status_code == 404
-    after = (await owner_client.get("/api/settings/appearance")).json()
-    assert after["theme_id"] == "copperbelt"
 
     audit = (await owner_client.get("/api/audit", params={"action": "theme."})).json()
     assert [a["action"] for a in audit["items"]] == ["theme.deleted", "theme.updated", "theme.created",

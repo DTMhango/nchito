@@ -141,6 +141,21 @@ export function resetSettingsMock() {
       rollback_of: null,
       note: "Start preparing documents",
     },
+    {
+      id: "r0",
+      kind: "setting",
+      subject_id: null,
+      version: 1,
+      author: "owner",
+      created_at: iso(8),
+      diff: {
+        key: "notifications.quiet_hours_start",
+        old: "19:00",
+        new: "20:00",
+      },
+      rollback_of: null,
+      note: null,
+    },
   ]
 }
 resetSettingsMock()
@@ -240,10 +255,39 @@ export const settingsHandlers = [
       next_cursor: null,
     })
   }),
-  // Rollback is not built on the server yet (501), so the mock answers the same.
-  http.post("*/api/data/config-history/:id/rollback", () =>
-    signedIn() ? bad("Rollback is not available yet.", 501) : unauthorized()
-  ),
+  // Restore a setting's value as a new revision (the server's rules: validated, never the pause).
+  http.post("*/api/data/config-history/:id/rollback", async ({ params }) => {
+    if (!signedIn()) return unauthorized()
+    const rev = revisions.find((r) => r.id === params.id)
+    if (!rev) return bad("no such revision", 404)
+    if (rev.kind !== "setting" || !rev.diff)
+      return bad(`${rev.kind} revisions cannot be restored here yet`, 409)
+    const key = String(rev.diff.key)
+    if (key === "automation.paused")
+      return bad(`${key} cannot be restored here: use PUT /api/autopilot`, 409)
+    const row = settingRow(key)
+    if (!row) return bad("Setting not found.", 404)
+    if (JSON.stringify(row.value) === JSON.stringify(rev.diff.new))
+      return bad(`${key} already has this value`, 409)
+    const old = writeSetting(
+      row,
+      rev.diff.new,
+      `Restored version ${rev.version}`
+    )
+    const made: ConfigRevision = {
+      id: crypto.randomUUID(),
+      kind: "setting",
+      subject_id: null,
+      version: row.version,
+      author: "owner",
+      created_at: new Date().toISOString(),
+      diff: { key, old, new: rev.diff.new },
+      rollback_of: rev.id,
+      note: `Restored version ${rev.version}`,
+    }
+    revisions.unshift(made)
+    return HttpResponse.json(made)
+  }),
 
   // ---- security ----
   http.get("*/api/auth/sessions", () => {

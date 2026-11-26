@@ -1001,3 +1001,273 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
   The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
   skill asks for it.
+
+## Wave 4 insights additions
+
+- `GET /api/insights` replaces the 501 stub; the response changed from the wave 1 placeholder to `InsightsOut` (`app/ops/insights.py`): `funnel` per campaign (nine steps, counts and conversion), `response` (rates by track, source, market with `sent`, `replies`, `too_few`), `time_in_stage` (median, p75, first reply), `spend` (ledger micros by period, stage, model; cost per application sent and per interview), `sources`, `automation`, `exclusions`.
+- Query: `since`, `until` (default `insights.default_range_days` back from today), `campaign_id`, `track_id`, `source_id`, `country`, `channel`, `period` (week or month).
+- Counting: a role counts once (merged jobs and second applications ignored; skipped and never-sent closed are not applications); sent = `applied_at` set (includes "I applied myself"); reply = reached screening, interview, offer or accepted, or rejected after sending.
+- Settings: `insights.min_sample`, `insights.default_range_days`, `insights.week_start`.
+- Messages (integration): `InsightsOut.messages {sent, by_kind: CountRow[], uncertain_sends}` counts messages about
+  applications (follow-ups, thank-yous, replies) sent in the range, apart from applications; message packets never
+  count as an application's approval, and `automation.uncertain_sends` counts application sends only.
+- `SpendReport.by_run_kind [{kind, runs, micros}]` (integration): runs started in the range per kind with the cost
+  recorded on them (dry runs left out), so `tailoring` runs show; a sweep's cost also covers the tailoring it asked
+  for. Run history filters by kind (`GET /api/runs?kind=`, already there) and labels `tailoring`.
+- Drill-through (integration): `GET /api/applications` also takes `since`, `until`, `track_id`, `source_id`, `country` and `reached` (`tailored`, `approved`, `sent`, `reply`, `interview`, `offer`); any of them makes the list exactly the applications the Insights number counted (`campaign_id` and `channel` join the same filter). `GET /api/jobs` takes `since`, `until`, `campaign_id`, `track_id`, `source_id`, `country` and `reached` (`found`, `passed_filters`, `scored_above`; absent = the source table's roles found). Both go through `app.ops.insights.drill_application_ids` / `drill_job_ids`, the report's own counting code. The Applications and Matches screens read these from the URL and show them as removable chips; while a drill is on, Matches bulk actions take only ticked roles.
+
+## Wave 4 themes additions
+
+Theme studio (DESIGN 10.4). Code: `backend/app/themes/` (`tokens.py`, `colour.py`, `service.py`), router
+`app/api/routers/themes.py`; screen `frontend/src/features/theme-studio/`.
+
+- **Token spec.** `frontend/src/themes/token-spec.json` (copied verbatim to `backend/app/themes/token_spec.json`,
+  tested equal) gives every token its group, value type, label and contrast use, the bundled Fontsource families and
+  the WCAG levels. Required tokens are the `required` entries (same list as section 6).
+- **Strict values (replaces the "values may not contain" rule of section 6).** Per type: `colour` = `#rgb[a]`,
+  `#rrggbb[aa]`, `rgb()/rgba()`, `hsl()/hsla()`, `oklch()`, `transparent`, or `var(--t-<colour token>)` with no
+  fallback (must resolve in the mode map); `shadow` = `none` or 1-4 layers of `[inset] <2-4 lengths> <colour>`;
+  `weight` 100-900; `track` `<n>em` in range; `factor` number in range; `length` `<n>px` in range; `enum` listed
+  words. Unknown token names accept a colour or a plain length only. `chart` and `score` are literal colours; fonts
+  must be bundled families; `name`/`description` reject control characters. Values are at most 160 characters,
+  at most 80 tokens per mode. Anything else is 422.
+- **Contrast.** Pairs derive from the spec: a token with `use` is checked against each token in its `on` list
+  (`@ground` = `bg, bg-sunken, surface, surface-2`), composited over the page. Levels: `body` (AA 4.5, AAA 7,
+  **blocking**: `text`, `text-muted`), `text` (4.5/7, warning), `ui` and `graphic` (3, warning). Create, update and
+  import refuse a theme with a blocking pair: 422 `{"detail": {"code": "theme_low_contrast", "reason", "pairs":
+  [{mode, fg, bg, ratio}]}}` unless `accept_low_contrast` is true (body field on `ThemeIn`, query param on import);
+  the acceptance is stored as `ThemeOut.contrast_waiver {pairs, accepted_at, accepted_by}` and audited
+  (`theme.contrast_accepted`). **Kit import (integration)** runs the same token validation (`KitTheme` is
+  `ThemeBody`) and contrast check (`service.blocking_pairs`): a Kit carries no acceptance, so a theme whose body text
+  fails lands without one and `ThemeOut.needs_review` is true (derived: owner theme, no waiver, a blocking pair). It
+  cannot be made active (`PUT /api/settings/appearance[.theme_id]` 422) or default (409 `theme_needs_review`); if the
+  active theme is one, the app goes back to the default theme. The preview lists it in `notices`; `ImportCommitOut`
+  gains `themes_need_review [{id, name}]`; audited `theme.needs_review`. Saving it in the studio (fixed, or accepted)
+  clears the flag; a duplicate of it needs review too.
+  `POST /api/themes/contrast` (`ThemeBody`) -> `ContrastPairOut[] {mode, fg, bg, use, ratio, aa, aaa, blocking}`.
+- **`ThemeOut` gains** `is_default`, `revision`, `can_undo`, `can_redo`, `contrast_waiver`. `ThemeIn` rejects them
+  (extra fields forbidden): send the `ThemeBody` fields.
+- **Revisions.** Every create/update/duplicate/import of an owner theme records a `theme_revision` (`number`,
+  `parent` = the revision it was edited from, `body`, `note`, `actor`); `theme.current_revision` points at the live
+  one. `GET /api/themes/{id}/revisions` -> `ThemeRevisionOut[]` newest first; `POST /{id}/undo` (to the parent),
+  `POST /{id}/redo` (to the newest child), `POST /{id}/revisions/{n}/restore` -> `ThemeOut`; 409 when there is
+  nothing to move to, 403 for built-ins. History keeps `themes.revisions_kept` per theme.
+- **Duplicate.** `POST /api/themes/{id}/duplicate` (`{name?}`) -> 201 `ThemeOut`, any theme including built-ins;
+  default name `<name> copy`, then `(2)`, `(3)`.
+- **Default and delete.** `PUT /api/themes/{id}/default` sets `themes.default_theme_id` (the generic settings PUT
+  refuses that key with 409). **`DELETE` now returns 409 for the active theme (`appearance.theme_id`) and for the
+  default theme** (was: deleting the active theme reset it). The frontend falls back to the default theme when the
+  active one cannot be found.
+- **Files.** `GET /api/themes/{id}/export` -> `ThemeExport {format: "nchito-theme", version: 1, theme: ThemeBody}`
+  (`<name>.theme.json`). `POST /api/themes/import` (raw JSON body; `?accept_low_contrast=`) accepts a
+  `ThemeExport` or a bare theme object (`ThemeOut`-only keys ignored); larger than `themes.import_max_bytes` is 413;
+  invalid is 422 `{"code": "invalid_theme_file", "reason"}`; the imported name is made unique. Themes travel in the
+  share-setup kit as before (round trip tested).
+- **Settings** (group `themes`): `themes.default_theme_id` (copperbelt), `themes.import_max_bytes` (65536),
+  `themes.revisions_kept` (50), `themes.status_min_distance` (0.02, OKLab distance the studio requires between
+  status colours, also under protanopia/deuteranopia/tritanopia simulation; a warning, not a block).
+- **Migration** `0019_themes`: `theme.current_revision`, `theme.contrast_waiver`, table `theme_revision`.
+
+## Wave 4 msgraph additions
+
+- **No new endpoints or models.** `POST /api/connections/oauth/{msgraph|onedrive}/start` and
+  `GET .../callback` (already declared) are implemented: start answers 409 "set MS_OAUTH_CLIENT_ID/SECRET" until
+  the server has the Entra app; callback redirects to `/settings/connections?connected=msgraph|onedrive`.
+  `POST /api/connections` with `msgraph` or `onedrive` answers 422 (they connect through sign-in).
+- `msgraph` is a mailbox provider (same `Mailbox` contract and email channel as Gmail). Its non-secret config is
+  `from_address` (set at sign-in) and `read_folder` (a well-known name such as `inbox`, or a folder name; empty
+  means nothing is read). Secrets (access/refresh token, expiry) are encrypted and masked.
+- Integration: `msgraph` honours `OutgoingMail.thread_id` (a follow-up message's `thread_ref`: a conversation id,
+  or the application's Message-ID): the draft is made with `createReply` on the newest message of that thread
+  (a new mail when none is found), then sent once as before. `list_messages` fills `MailMessage.calendars` from
+  `.ics` / `text/calendar` file attachments of mail with attachments (same caps as the other mailboxes).
+- `onedrive` is a `FileStore` (`kind = "onedrive"`, scope `Files.ReadWrite.AppFolder`). Secrets are `{"tokens"}`.
+  Only its label and `enabled` change through `PUT`.
+- `BackupOut.target` and the setting `backups.target` gain `onedrive`.
+- New setting `mail.default_mailbox` (uuid or empty): the mailbox connection every "first mailbox" choice prefers.
+- `HttpResult` (mail transport) gains `headers` (response headers, for `Retry-After`).
+- Env: `MS_OAUTH_CLIENT_ID`, `MS_OAUTH_CLIENT_SECRET`, `MS_OAUTH_TENANT` (default `common`).
+
+## Wave 4 calendar additions
+
+Code: `app/pipeline/events.py` (events, proposals from mail, reminders, debrief), `events_feed.py` (token, feed, `.ics`),
+`events_google.py` (mirror), `app/connect/{ics,invite_text,gcalendar,calendar_records}.py`, router `api/routers/events.py`
+(`events.ROUTERS`: owner router plus the public feed). Migration `0019_calendar` (down_revision `0018_blocker_kind`, so
+`head` stays single): tables `interview_event`, `calendar_feed`; `connection.provider` gains `gcalendar`.
+
+- Events: `GET|POST /api/jobs/{job_id}/events`, `GET /api/interview-events/upcoming`, `GET|PUT /api/interview-events/{id}`,
+  `POST .../confirm|reschedule|cancel|debrief`, `GET .../ics`. Times are wall time plus IANA `timezone`
+  (`YYYY-MM-DDTHH:MM`); responses carry UTC and both wall times. Errors `{code, reason}`.
+- Mail: `MailMessage.calendars` (size-capped `.ics` parts). An interview invitation proposes an event
+  (`status=proposed`, `source=mail`, `candidates` when ambiguous); never confirmed or answered automatically.
+  Pending actions: `interview_event_proposal`, `interview_event_update`, `interview_debrief`, `interview_follow_up`
+  (all `follow_up` type).
+- Calendar out: `GET /api/calendar`, `POST|DELETE /api/calendar/feed` (rotate/revoke), public
+  `GET /api/calendar/feed/{token}.ics`. Detail level setting `calendar.detail_level` (employer|role|full); notes never leave.
+- Google: provider `gcalendar`, OAuth `/api/connections/oauth/gcalendar/*`; scope `calendar.app.created` (the only scope that
+  can create the dedicated calendar without exposing others; `calendar.events` cannot create calendars). Connected = off until
+  `PUT /api/connections/{id} {enabled:true}`.
+- Settings group `calendar.*`; `interview_reminder` added to `notifications.events` kinds and default.
+- Optional model extraction reuses stage `classify_email`; off by default (`calendar.llm_extract`).
+
+## Wave 4 feedback additions
+
+- **Tables (`0019_feedback`, `app/models/preferences.py`).** `preference_feedback` (one row per job + campaign:
+  `verdict` up/down, `reasons` chips, `note`, `score_at`, `rubric_version`, `actor`) and `preference_suggestion`
+  (`kind`, `target`, `title`, `change` = `SuggestionChange`, `evidence` = `SuggestionEvidence`, `backtest` =
+  `SuggestionBacktest`, `evidence_key` unique per campaign, `rubric_id`, `status` open/accepted/dismissed/superseded,
+  decision fields, `result`). Shared Literals in `json_types`: `FeedbackVerdict`, `FeedbackReason`, `SuggestionKind`,
+  `SuggestionStatus`.
+- **Feedback is evidence only**: nothing writes an assessment or rubric. `PUT/GET/DELETE /api/jobs/{id}/feedback`,
+  `GET /api/preferences/feedback`. Audited `preference.feedback` / `preference.feedback_withdrawn` (the note is not
+  copied into the audit).
+- **Suggestions** (`app/pipeline/preferences.py`): deterministic analysis of thumbs plus outcomes (screening,
+  interview, offer, accepted = liked; skipped = disliked). Kinds: `reweight_criterion` (new rubric version),
+  `add_penalty` (rubric penalty, new rubric version), `add_bonus` (campaign bonus rule), `add_tag_rule`,
+  `add_saved_view`, `tighten_filter` (campaign exclude rule). Rules are only appended (marks `rules` unconfirmed like any
+  owner-added rule). `guard` (invariant, not settings) refuses conditions on pay, location/countries, level/seniority,
+  work rights/visa, relocation, text filters, and reweighting a criterion whose name mentions those; applied at
+  generation and at acceptance (edited or not, 422). Reasons about seniority/pay/location become owner-only notes.
+  Backtest: recent roles (`preferences.backtest_days`) replayed through `decide` with stored ratings re-weighed (no model
+  calls): `newly_pass`, `newly_drop`, `excluded_past_applications`, `score_changed`, `matched`. Endpoints:
+  `GET /api/preferences/summary`, `POST /api/preferences/analyse`, `GET /api/preferences/suggestions[/{id}]`,
+  `POST .../{id}/backtest|accept|dismiss` (409 when decided or, for a reweight, when the rubric moved on). Dismissed
+  suggestions are not raised again for the same evidence; newer evidence supersedes an open one. Periodic pass:
+  `preferences_tick` (hourly, at most once per `preferences.analysis_every_hours` per campaign, only when evidence
+  changed). Audited `preferences.analysed`, `preference.suggestion_accepted|dismissed`, `rubric.activated`,
+  `campaign.rule_added`.
+- **Policy preview** (`app/pipeline/policy_preview.py`, `POST /api/campaigns/{id}/policy-preview`): proposal of
+  `automation`, `thresholds`, `criteria`, `unknown_data_policy`, `settings` (caps, quiet hours, default mode, global
+  thresholds only). Same order and counters as `dry_run.propose_actions` (a test holds them equal). Line = roles whose
+  mode is auto_apply and whose every automation gate passes except send-time ones (caps, quiet hours, pause, budget,
+  open-check), then caps applied day by day; split by channel (email / browser / other), held runner-ups apart.
+  Returns histogram, thresholds, changes (newly_automatic / newly_blocked / changed, with gate reasons), unknowns,
+  caps. Writes nothing.
+- **Settings** (group `preferences`): `min_evidence`, `min_rating_gap`, `reweight_step`, `penalty_points`,
+  `bonus_points`, `exclude_min_evidence`, `backtest_days`, `analysis_every_hours`, `note_max_length`,
+  `evidence_notes_shown`, `preview_days`, `preview_max_jobs`, `histogram_bin`, `preview_changes_shown`.
+
+## Wave 4 bulk additions (bulk actions, employers and cooldown)
+
+- **Bulk** (`app/pipeline/bulk.py`, `app/api/routers/bulk.py`, task `run_bulk_operation`). Replaces the 501
+  `POST /api/jobs/bulk` (removed). `POST /api/bulk/preview {subject: jobs|applications, action, params, selection}`
+  where `selection` is `{ids}` or `{view: {view_id?, conditions?, q?, triage?, stage?, campaign_id?, channel?,
+  pinned?}}` ("everything matching this view", resolved on the server by the list's own filter). It creates a
+  `previewed` operation, changes nothing, and returns `{operation_id, selected, will_change, unchanged, refused[]
+  {code, title, count, samples[] {id, label, reason}], refused_total, reversible}`. `POST /api/bulk/{id}/run
+  {confirm_count}` must equal `selected` (409 `count_mismatch`), then queues the background run (202); running a
+  `failed` or `partial` operation again retries only the failed items. `GET /api/bulk/{id}` (status, `counts` per
+  outcome, `done`, `can_undo`), `GET /api/bulk/{id}/items?outcome=`, `POST /api/bulk/{id}/undo`, `GET
+  /api/bulk/{id}/csv` (export), `GET /api/bulk` (recent), `GET /api/bulk/options`. SSE: `bulk.progress {operation_id,
+  done, total}`, `bulk.finished {operation_id, status}`.
+- Actions: `tag`, `untag`, `skip` (reason required), `snooze`, `move_stage` (applications; owner transitions only),
+  `assign_campaign`, `queue_tailoring`, `send_for_approval`, `approve_reviewed` (off unless
+  `bulk.allow_approve_reviewed`), `archive`, `recheck`, `export_csv`. Each item goes through the single-item service
+  (`bulk.patch_job_fields`, `bulk.create_application`, `stages.transition`, `approval.reject`,
+  `tailoring.service.request`, `prepare.prepare_packet`, `approval.approve`, `recheck.recheck_job`): a held role, a
+  "never apply" employer, an unchecked draft or an illegal move is refused per item with a stable code (`held`,
+  `never_apply`, `spec_not_ready`, `answers_waiting`, `no_packet`, `gates`, `illegal_stage`, `illegal_transition`,
+  `duplicate`, `merged`, ...). `queue_tailoring` and `send_for_approval` also re-check, at the time of the
+  action, the employer cooldown (`cooldown`) and an exclusion the owner accepted from feedback whose rule is still in
+  the campaign (`feedback_excluded`, reason names the rule; `preferences.accepted_exclusion`), since a role's
+  assessment may predate both (integration). A preview tries each item inside a savepoint and rolls it back, so preview counts equal
+  run results. Bulk send is never an approval: `send_for_approval` builds the packet and lets the policy act; each
+  approval stays per packet. Undo (tags, snooze, skip, archive) inside `bulk.undo_window_minutes`; an item that changed
+  since is left alone (`undo_skipped`, `changed_since`).
+- **Employers** (`app/pipeline/employers.py`, `app/api/routers/employers.py`), addressed by `key` (query): `GET
+  /api/employers?state=&q=`, `GET /api/employers/detail?key=`, `PATCH /api/employers/policy?key=` (cooldown_days,
+  always_ask_first, never_apply + never_reason, priority, watched, notes), `POST /api/employers/end-cooldown?key=
+  {reason}`, `POST /api/employers/merge?key= {into, remember_alias}`, `POST /api/employers/split {alias}`, `POST
+  /api/employers/states {job_ids}` (the chip for Matches and Applications). States: free, role_in_progress,
+  cooling_down, always_ask_first, blocked. Cooldown length: employer override, else the watched employer's, else
+  `matching.employer_cooldown_days`; it runs from the end state, or from the applied date when there has been no reply;
+  ending it early records who, when and why and ignores applications that ended or went out before then.
+  Integration: each chip (`ChipOut`) also carries `live` (the employer's roles in progress) and `live_elsewhere`
+  (those other than this job), so an application card shows "N other roles in progress" only when there are some.
+- **Never apply** is an exclusion gate (`employer_never_apply`, layer `exclusion`) in the decision table, a refusal in
+  `tailoring.service.request`, and a fail in `conflicts.check_conflict_at_submit` (so permits and dispatch refuse it).
+  `employer_policy.always_ask_first` joins the watched-employer flag.
+- Tables: `employer_policy`, `bulk_operation`, `bulk_item` (migration `0019_bulk`, after `0018_blocker_kind`). Settings:
+  `bulk.max_selection`, `bulk.undo_window_minutes`, `bulk.preview_sample_size`, `bulk.allow_approve_reviewed`.
+
+## Wave 4 followups additions
+
+Code: `backend/app/pipeline/followups/` (`context`, `drafting`, `checks`, `sending`, `due`, `campaigns`, `tasks`),
+`backend/app/apply/winddown.py`, router `backend/app/api/routers/followups.py`. Migration `0019_followups`
+(revises `0018_blocker_kind`): tables `outbound_message`, `followup_due`, `wind_down`.
+
+- **Message packets.** A message about an application is an `application_packet` row whose `PacketContents` carries
+  `message_kind` (`MessageKind`: `follow_up | thank_you | info_reply | slot_accept | slot_decline | withdraw |
+  offer_decline`); `PacketEmail` gains `thread_ref` (provider thread id, or the application's Message-ID for
+  IMAP/SMTP). Both fields use `exclude_if=None`, so every packet built before hashes exactly as before (pydantic
+  >= 2.11). `packets.current/history`, the receipt, the gates' current-packet check and the application caps
+  (`gates.sent_counts`) see application packets only (`packets.is_application_packet()`).
+  `packets.build_message` builds one; `permits.grant_message(packet, checks)` issues the single-use permit from the
+  message gates (same table, same `consume`); `permits.revoke` gains `packet_id`. `dispatch.recheck` delegates a
+  message attempt to `followups.sending.recheck`; `outcomes` never moves the application's stage, evidence or
+  confirmations for a message attempt; a failed message is never retried on its own. The email channel passes
+  `thread_ref` as `OutgoingMail.thread_id`.
+- **Message gates:** `global_pause`, `campaign_paused` (both waived only for an owner-approved message while a
+  wind-down is active), `message_current`, `approval_bound`, `message_checks`, `recipient_known`, `quiet_hours`;
+  automatic follow-ups add `auto_follow_ups`, `plain_follow_up`, `recipient_sent_before`, `employer_reply` (any
+  message in a linked thread, or any stage past `submitted`), `followup_cap`.
+- **Campaign pause until a date:** `dispatch.recheck` now cancels a queued application send whose campaign is
+  paused (`campaign_paused`); the `followups_tick` task (every 5 minutes) resumes campaigns whose `paused_until`
+  has come (owner's time zone).
+- **Endpoints.** `GET|POST /api/applications/{id}/messages` (`MessagesOut`, `MessageCreateIn` -> `MessageOut` 201);
+  `GET|PUT /api/messages/{id}` (`MessageEditIn {to, cc, subject, body, confirm_recipients}`); `POST
+  /api/messages/{id}/regenerate|check|approve|send|cancel|discard` (`send` -> `MessageSendOut {status: queued |
+  denied, reason, code, gates, message}`); `GET /api/follow-ups` (`FollowupListOut`), `POST
+  /api/follow-ups/{application_id}/draft|snooze|not-needed`; `GET|POST /api/wind-down` (`WindDownOut`,
+  `WindDownStartIn`), `POST /api/wind-down/choices` (`WindDownChoiceIn {key, choice: keep | pause | withdraw}`),
+  `POST /api/wind-down/reopen`, `GET /api/wind-down/summary` (Markdown).
+- **Error codes** added: `campaign_paused`, `reply_received`, `recipient_unconfirmed`, `recipient_changed`,
+  `not_plain_follow_up`, `followup_cap`, `message_not_draft`, `message_questions`, `no_recipient`,
+  `winddown_active`, `no_winddown`.
+- **Shared aliases** (`json_types`): `MessageKind`, `MessageStatus`, `MessageSendState`, `FollowupDueStatus`,
+  `WindDownChoice`. LLM stage `followup` (routes to `ai.model_tailor`).
+- **Settings** (group `followups`): `due_days`, `max_per_application`, `snooze_days`, `auto_send` (off),
+  `auto_daily_cap`, `max_paragraphs`, `max_facts`, `context_max_chars`, `subject_prefix`, `kind_briefs`,
+  `commitment_topics`.
+
+## Wave 4 mock-interview additions
+
+Code: `backend/app/pipeline/interview/mock/` (`session` steps and budget, `prompt`, `checks`, `library` for progress,
+story bank, draft facts and export, `shapes`); endpoints in `backend/app/api/routers/interview.py`. Migration
+`0019_mock_interview`: tables `interview_mock_session`, `interview_mock_turn` (unique `(session, seq)` and
+`(session, step_key)`), and `interview_round.kind` / `interview_round.focus`. Shared Literals in `json_types`:
+`RoundKind`, `MockMode`, `MockStatus`.
+
+- **Rounds.** `InterviewRoundIn/Out` gain `kind` (`screen|technical|panel|final|other`, optional) and `focus`
+  (list). A session with `round_id` sees only that round's kind, focus, interviewers and notes (data blocks). A
+  pack without rounds works as in wave 3.
+- **Flow (code-driven).** Steps `ask` (opening question; none when it comes from the pack), `reply` (after each
+  answer or skip: answer analysis, at most `interview.mock.max_probes` probes per question, next question,
+  feedback when `feedback_each`), `final` (summary, per-answer feedback, scores). Plan: the pack's likely
+  questions for the mode first (logistics excluded), then interviewer-written ones. `expects` = the answer key
+  (`a<q>.<probe>`); posting it again as `turn_key` is ignored (no duplicate turn or call); any other answer
+  while not waiting is 409 `not_your_turn`.
+- **Truth.** Suggested answers are `Claim`s citing Kit codes or the owner's answers in the session (`A<seq>`);
+  each runs the pack's checks (`fact_trace`, `claim_drift`, keep-out, guardrails) with the answers as citable
+  sources, and must cite something. Failures move to `removed` (`text` null when a keep-out fact was involved);
+  kept items carry `sources` (`fact` / `your_words`). Scores are clamped to the rubric keys and 1..`score_max`.
+  Statements in an answer not in the Kit (model list plus every unsupported figure, by code) are `claims`
+  (`unverified` -> `added` draft fact `needs_review` / `dismissed`); never facts on their own.
+- **Untrusted.** Posting, mail, owner notes, round focus/notes/interviewers and the transcript (owner answers
+  included) are `DataBlock`s; the system text is fixed per mode and round.
+- **Budget.** Stage `interview`, models `interview.mock.model_interviewer` / `model_feedback`. Start stores
+  `estimate_micros` (ask + replies at the longest answer x (1 + probes) x length + final) and `budget_micros` =
+  estimate x `interview.mock.budget_headroom_pct`. Each call reserves its own estimate; over the session cap or
+  the ledger -> `paused` with the step pending; LLM failure -> `failed`, pending kept. Resume reruns the step
+  (`budget_micros` may raise the cap, never lower it); turns are get-or-add by `step_key`.
+- **Endpoints** (`{code, reason}` errors): `GET|POST /api/jobs/{job_id}/interview-pack/mock-sessions`
+  (`MockSessionIn`; `?round_id=`), `GET .../mock-sessions/estimate?mode&length&use_pack_questions&round_id`,
+  `GET .../mock-progress?round_id=` (`categories`, `weak`, `practise_next`), `GET|DELETE /api/interview-mock/{id}`,
+  `POST .../answer` `{text, skip, turn_key}`, `POST .../finish`, `POST .../resume` `{budget_micros?}`,
+  `GET .../export?fmt=pdf|docx|txt`, `POST .../turns/{turn_id}/claims/{claim_id}` `{action: add_draft|dismiss,
+  text?}`, `POST .../turns/{turn_id}/story` `{title?, fact_ids?}` (an owner `stories` version, checked; story id
+  `m<n>`, the answer as the action).
+- **Settings** `interview.mock.*`: `model_interviewer`, `model_feedback`, `default_length`, `max_length`,
+  `max_probes`, `answer_max_chars`, `rubric` (`key|label`), `score_max`, `weak_below`, `practise_next`,
+  `feedback_each_default`, `budget_headroom_pct`, `unverified_prompt`. Streaming: none (`LLMService` has no
+  streaming); turn at a time.

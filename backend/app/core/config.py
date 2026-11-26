@@ -51,6 +51,13 @@ class EnvConfig(BaseSettings):
     google_oauth_client_secret: str | None = Field(default=None,
                                                    description="Google OAuth client secret (Gmail and Drive).")
 
+    ms_oauth_client_id: str | None = Field(default=None,
+                                           description="Microsoft Entra app client id (Outlook, OneDrive).")
+    ms_oauth_client_secret: str | None = Field(default=None,
+                                               description="Microsoft Entra app client secret (Outlook, OneDrive).")
+    ms_oauth_tenant: str = Field(default="common", description="Entra tenant: common, consumers, organizations or "
+                                                               "a tenant id.")
+
     s3_endpoint: str | None = None
     s3_bucket: str | None = None
     s3_access_key: str | None = None

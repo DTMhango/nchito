@@ -317,6 +317,20 @@ async def process_message(session: AsyncSession, conn: Connection, msg: MailMess
         res.linked += 1
         await act_on_thread(session, thread, match.application, cls.category, msg.provider_message_id,
                             list(values["mail.auto_apply_classes"]), res)
+        if cls.category == "interview":
+            await _propose_event(session, match.application, msg, values, llm)
+
+
+async def _propose_event(session: AsyncSession, app: Application, msg: MailMessage, values: dict[str, Any],
+                         llm: LLMClient | None) -> None:
+    """An interview invitation becomes a proposed event for the owner to confirm. It never breaks a mail check."""
+    from app.pipeline import events
+
+    try:
+        async with session.begin_nested():
+            await events.propose_from_message(session, app, msg, values=values, llm=llm)
+    except Exception:
+        log.exception("could not propose an interview event from message %s", msg.provider_message_id)
 
 
 async def _ignored_senders(session: AsyncSession) -> list[str]:
@@ -346,8 +360,9 @@ async def sync_connection(session: AsyncSession, conn: Connection, mailbox: Mail
     newest = since
     seen: set[str] = set()
     cursor = since
+    limit = page_size
     while True:  # a full page means more may be waiting: page forward until a page is not full
-        messages = await mailbox.list_messages(cursor, limit=page_size)
+        messages = await mailbox.list_messages(cursor, limit=limit)
         fresh = [m for m in messages if m.provider_message_id not in seen]
         res.fetched += len(fresh)
         for msg in sorted(fresh, key=lambda m: m.received_at):
@@ -357,9 +372,13 @@ async def sync_connection(session: AsyncSession, conn: Connection, mailbox: Mail
                 res.skipped += 1  # job-alert mail belongs to the alert source, not to an application
                 continue
             await process_message(session, conn, msg, llm, values, res, now)
-        if len(messages) < page_size or not fresh:
+        if len(messages) < limit:
             break
-        cursor = max(m.received_at for m in messages)
+        # A full page of messages already seen must not end the sync: move on. When the cursor cannot move
+        # (a whole page shares one time) widen the page so the next call gets past the tie.
+        next_cursor = max(m.received_at for m in messages)
+        limit = limit * 2 if next_cursor <= cursor else limit
+        cursor = next_cursor
     conn.config = {**conn.config, "checkpoint_at": newest.isoformat(), "last_sync_at": now.isoformat(),
                    "last_error": None}
     conn.health, conn.last_checked_at = "ok", now

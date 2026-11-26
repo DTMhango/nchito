@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Link } from "@tanstack/react-router"
+import { lazy, Suspense, useState } from "react"
+import { Link, useSearch } from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   CircleAlert,
@@ -27,6 +27,11 @@ import {
   type ExportFormat,
 } from "./api"
 import { PracticePanel } from "./practice"
+import { ScheduledRounds } from "../schedule/round-links"
+
+const MockInterviewPanel = lazy(() =>
+  import("./mock/panel").then((m) => ({ default: m.MockInterviewPanel }))
+)
 import { PackSectionView } from "./section"
 import {
   basisOf,
@@ -249,9 +254,12 @@ function ExportButtons({ jobId }: { jobId: string }) {
 
 function PackView({ jobId, pack }: { jobId: string; pack: InterviewPack }) {
   const qc = useQueryClient()
+  // `?round=` (from a schedule event's "Prepare round N") opens the mock interview on that round.
+  const { round } = useSearch({ strict: false }) as { round?: number }
   const facts = useQuery(listQuery<FactOut>("facts"))
   const index = indexFacts(facts.data ?? [])
   const [practising, setPractising] = useState(false)
+  const [mocking, setMocking] = useState(round != null)
   const open = isOpen(pack.status)
   const pending = pack.pending_sections ?? []
   const all = sectionsOf(pack)
@@ -283,6 +291,14 @@ function PackView({ jobId, pack }: { jobId: string; pack: InterviewPack }) {
           >
             Practice mode
           </Button>
+          <Button
+            size="sm"
+            variant={mocking ? "default" : "outline"}
+            aria-pressed={mocking}
+            onClick={() => setMocking((p) => !p)}
+          >
+            Mock interview
+          </Button>
           {pack.cost_micros > 0 && (
             <span className="self-center text-xs text-faint">
               Spent so far{" "}
@@ -291,6 +307,7 @@ function PackView({ jobId, pack }: { jobId: string; pack: InterviewPack }) {
           )}
           <ExportButtons jobId={jobId} />
         </div>
+        <ScheduledRounds jobId={jobId} />
       </header>
 
       {open && (
@@ -362,6 +379,14 @@ function PackView({ jobId, pack }: { jobId: string; pack: InterviewPack }) {
         <p role="alert" className="text-sm text-danger">
           {again.error.message}
         </p>
+      )}
+
+      {mocking && (
+        <Suspense
+          fallback={<p className="text-sm text-muted-foreground">Loading...</p>}
+        >
+          <MockInterviewPanel jobId={jobId} round={round} />
+        </Suspense>
       )}
 
       {practising && (

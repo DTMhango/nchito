@@ -1,6 +1,7 @@
 import {
   Activity,
   BriefcaseBusiness,
+  CalendarDays,
   ExternalLink,
   FileText,
   Columns3,
@@ -16,11 +17,13 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { Link } from "@tanstack/react-router"
+import { isApiError } from "@/lib/api/client"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/chip"
+import { JobEmployerChip } from "@/features/employers/employer-chip"
 import { EmptyState } from "@/components/empty-state"
 import { ScoreRing } from "@/components/score-ring"
 import { StagePill } from "@/components/stage-pill"
@@ -49,6 +52,7 @@ import { MessagesTab } from "./tabs/messages-tab"
 import { OverviewTab } from "./tabs/overview-tab"
 import { PeopleTab } from "./tabs/people-tab"
 import { PostingTab } from "./tabs/posting-tab"
+import { ScheduleTab } from "./schedule/schedule-tab"
 
 import { JOB_TABS, type JobTab } from "./job-tabs"
 
@@ -63,6 +67,7 @@ const TAB_META: Record<JobTab, { label: string; icon: LucideIcon }> = {
   messages: { label: "Messages", icon: Mail },
   people: { label: "People", icon: Users },
   interview: { label: "Interview", icon: MessagesSquare },
+  schedule: { label: "Schedule", icon: CalendarDays },
   changes: { label: "Changes", icon: History },
   activity: { label: "Activity", icon: Activity },
 }
@@ -85,6 +90,24 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
         <Skeleton
           className="h-8 w-[min(360px,70vw)] bg-sunken"
           aria-label="Loading the role"
+        />
+      </View>
+    )
+  if (job.isError && !isApiError(job.error, 404))
+    return (
+      <View>
+        <EmptyState
+          title="The role could not be loaded"
+          description={`${job.error.message} Try again; nothing was changed.`}
+          actions={
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void job.refetch()}
+            >
+              Try again
+            </Button>
+          }
         />
       </View>
     )
@@ -140,6 +163,7 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
         {tab === "messages" && <MessagesTab job={job.data} />}
         {tab === "people" && <PeopleTab job={job.data} />}
         {tab === "interview" && <InterviewTab job={job.data} />}
+        {tab === "schedule" && <ScheduleTab job={job.data} />}
         {tab === "changes" && <ChangesTab job={job.data} />}
         {tab === "activity" && <ActivityTab job={job.data} />}
       </section>
@@ -184,6 +208,7 @@ function JobHeader({ job }: { job: JobDetail }) {
               <Chip tone="line">{TRIAGE_LABEL[job.triage]}</Chip>
             )}
             {job.conflict_state === "held" && <Chip tone="warn">Held</Chip>}
+            <JobEmployerChip jobId={job.id} />
             <span>
               Deadline:{" "}
               <b className="text-foreground">{deadlineText(job.deadline)}</b>

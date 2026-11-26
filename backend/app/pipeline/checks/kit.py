@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.kit.guardrails import Rule, never_skill_rules
 from app.models.base import ReviewState
 from app.models.kit import Experience, Fact, FactStatus, Guardrail, Skill, SkillClaim, Track
+from app.models.search import SkillAlias
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,7 @@ class KitView:
     skills: Mapping[str, SkillView] = field(default_factory=dict)  # casefolded name -> skill
     rules: tuple[Rule, ...] = ()
     track: TrackView | None = None
+    skill_aliases: Mapping[str, str] = field(default_factory=dict)  # casefolded alias -> canonical skill name
 
     def usable_facts(self) -> list[FactView]:
         return [f for f in self.facts.values() if f.usable]
@@ -111,6 +113,7 @@ async def load(session: AsyncSession, *, track_id: object | None = None) -> KitV
     # A guardrail still awaiting review is enforced anyway: a stricter check never hurts.
     guards = (await session.scalars(select(Guardrail).order_by(Guardrail.created_at))).all()
     track = await session.get(Track, track_id) if track_id is not None else None
+    aliases = (await session.scalars(select(SkillAlias))).all()
 
     rules = [rule_from_row(g) for g in guards]
     rules += never_skill_rules(s.name for s in skills if s.claim == SkillClaim.never)
@@ -131,4 +134,5 @@ async def load(session: AsyncSession, *, track_id: object | None = None) -> KitV
         rules=tuple(rules),
         track=TrackView(key=track.key, name=track.name, lead_fact_codes=tuple(track.lead_fact_codes or ()),
                         summary_fact_code=track.summary_fact_code, tone_notes=track.tone_notes) if track else None,
+        skill_aliases={a.alias.strip().casefold(): a.canonical.strip() for a in aliases},
     )

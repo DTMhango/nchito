@@ -139,7 +139,10 @@ class TailoringRequest(Base, Entity):
     request_key: Mapped[str] = mapped_column(String(64), nullable=False,
                                              doc="sha256 of the spec version it starts from and the Kit facts")
     from_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("run.id", ondelete="SET NULL"))
+    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("run.id", ondelete="SET NULL"),
+                                                     doc="the sweep that asked for it (its spend cap applies)")
+    tailoring_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("run.id", ondelete="SET NULL"), doc="this request's own run: history, status and cost")
     status: Mapped[TailoringStatus] = mapped_column(str_enum(TailoringStatus), nullable=False,
                                                     default=TailoringStatus.queued)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -458,6 +461,65 @@ class InterviewRound(Base, Entity):
     notes: Mapped[str | None] = mapped_column(Text)
     thank_you_draft: Mapped[str | None] = mapped_column(Text)
     learnt: Mapped[str | None] = mapped_column(Text)
+    kind: Mapped[str | None] = mapped_column(String(20), doc="screen, technical, panel, final or other")
+    focus: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list, server_default="[]",
+                                             doc="What this round is about (the mock interview targets it)")
+
+
+class InterviewMockSession(Base, Entity):
+    """A mock interview in chat for one pack (optionally one round). Turns are ``InterviewMockTurn`` rows;
+    ``pending`` names the model step still to run when a budget refusal or failure paused it."""
+
+    __tablename__ = "interview_mock_session"
+
+    pack_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("interview_pack.id", ondelete="CASCADE"), index=True)
+    round_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("interview_round.id", ondelete="SET NULL"),
+                                                       index=True)
+    mode: Mapped[str] = mapped_column(String(20), nullable=False)
+    length: Mapped[int] = mapped_column(Integer, nullable=False, doc="Main questions planned")
+    use_pack_questions: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    feedback_each: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    timer_seconds: Mapped[int | None] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, doc="active, paused, failed or done")
+    plan: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
+    pending: Mapped[dict[str, Any] | None] = mapped_column(JSONB, doc="The model step to run on resume")
+    question_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    probes: Mapped[int] = mapped_column(Integer, nullable=False, default=0, doc="Probes asked on this question")
+    estimate_micros: Mapped[int | None] = mapped_column(BigInteger)
+    budget_micros: Mapped[int | None] = mapped_column(BigInteger, doc="Session cap; null when no estimate")
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    feedback: Mapped[dict[str, Any] | None] = mapped_column(JSONB, doc="Final feedback, checked")
+    scores: Mapped[dict[str, int]] = mapped_column(JSONB, nullable=False, default=dict)
+    error: Mapped[str | None] = mapped_column(Text)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+
+
+class InterviewMockTurn(Base, Entity):
+    """One message in a mock interview. ``step_key`` is unique per session, so a resumed or repeated step
+    never writes a turn twice."""
+
+    __tablename__ = "interview_mock_turn"
+    __table_args__ = (
+        UniqueConstraint("session_id", "seq", name="interview_mock_turn_seq"),
+        UniqueConstraint("session_id", "step_key", name="interview_mock_turn_step"),
+    )
+
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("interview_mock_session.id", ondelete="CASCADE"),
+                                                  index=True)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_key: Mapped[str] = mapped_column(String(40), nullable=False)
+    role: Mapped[str] = mapped_column(String(12), nullable=False, doc="interviewer, owner or coach")
+    kind: Mapped[str] = mapped_column(String(12), nullable=False, doc="question, probe, answer, skip or feedback")
+    text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    question_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(30))
+    feedback: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    claims: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list,
+                                                         doc="Statements in an answer not in the Kit")
+    fact_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    model: Mapped[str | None] = mapped_column(String(128))
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
 
 
 class MailClassification(enum.StrEnum):

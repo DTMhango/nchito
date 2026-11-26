@@ -24,6 +24,29 @@ const notFound = (what: string) =>
 
 const find = (id: unknown) => state.apps.find((a) => a.id === String(id))
 
+const REPLY = ["screening", "interview", "offer", "accepted"]
+/**
+ * Insights drill-through, roughly: the mock has no stage history, so "reached" reads the current
+ * stage (the server uses the stage-change events). Date, track, source and market are ignored.
+ */
+function mockReached(a: MockApplications["apps"][number], step: string) {
+  const sent = !!a.applied_at
+  switch (step) {
+    case "sent":
+    case "approved":
+    case "tailored":
+      return sent
+    case "reply":
+      return sent && (REPLY.includes(a.stage) || a.stage === "rejected")
+    case "interview":
+      return ["interview", "offer", "accepted"].includes(a.stage)
+    case "offer":
+      return ["offer", "accepted"].includes(a.stage)
+    default:
+      return true
+  }
+}
+
 /** Application, Today and pending-action endpoints for dev:mock and tests. */
 export const applicationsHandlers = [
   http.get("*/api/applications", ({ request }) => {
@@ -36,11 +59,15 @@ export const applicationsHandlers = [
     const now = Date.now()
     for (const a of state.apps)
       a.snoozed = !!a.snoozed_until && Date.parse(a.snoozed_until) > now
+    const channel = url.searchParams.get("channel")
+    const reached = url.searchParams.get("reached")
     const items = state.apps.filter(
       (a) =>
         !(hide && a.snoozed) &&
         (!stage || a.stage === stage) &&
         (!campaign || a.campaign_id === campaign) &&
+        (!channel || a.channel === channel) &&
+        (!reached || mockReached(a, reached)) &&
         (!q || `${a.employer} ${a.title}`.toLowerCase().includes(q))
     )
     return HttpResponse.json({ items, total: items.length, next_cursor: null })

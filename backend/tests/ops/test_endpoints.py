@@ -88,9 +88,10 @@ async def test_webhook_connection_test_is_signed_and_secret_update_keeps_old_whe
     assert (await owner_client.delete(f"/api/connections/{made['id']}")).status_code == 204
 
 
-async def test_providers_no_stream_manages_stay_501(owner_client) -> None:
-    r = await make(owner_client, "msgraph", {}, {})
-    assert r.status_code == 501
+async def test_s3_needs_its_bucket_settings(owner_client) -> None:
+    # Every provider now has a stream (wave 4 hardening: S3-compatible backups); an incomplete S3 record is refused.
+    r = await make(owner_client, "s3", {}, {})
+    assert r.status_code == 422
 
 
 async def test_drive_oauth_needs_server_credentials(owner_client) -> None:

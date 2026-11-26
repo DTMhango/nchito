@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from email import policy
 from email.message import EmailMessage
@@ -39,6 +39,7 @@ class TransportTimeout(Exception):
 class HttpResult:
     status: int
     data: Any  # parsed JSON when the body is JSON, else text
+    headers: Mapping[str, str] = field(default_factory=dict)  # response headers (Retry-After, ...)
 
 
 class HttpTransport(Protocol):
@@ -66,7 +67,7 @@ class HttpxTransport:
             data: Any = r.json()
         except ValueError:
             data = r.text
-        return HttpResult(r.status_code, data)
+        return HttpResult(r.status_code, data, dict(r.headers))
 
 
 class SmtpRejected(Exception):
@@ -159,6 +160,28 @@ def _content(part: Any) -> str:
         return ""
 
 
+MAX_CALENDAR_PART_BYTES = 256 * 1024
+MAX_CALENDAR_PARTS = 3
+
+
+def _calendar_parts(msg: EmailMessage) -> tuple[bytes, ...]:
+    """The raw bytes of calendar parts (``text/calendar`` or a ``.ics`` attachment), oversize ones dropped."""
+    out: list[bytes] = []
+    for part in msg.walk():
+        name = (part.get_filename() or "").lower()
+        if part.get_content_type() != "text/calendar" and not name.endswith(".ics"):
+            continue
+        try:
+            payload = part.get_payload(decode=True)
+        except (LookupError, UnicodeDecodeError, ValueError):
+            continue
+        if isinstance(payload, bytes) and 0 < len(payload) <= MAX_CALENDAR_PART_BYTES:
+            out.append(payload)
+        if len(out) >= MAX_CALENDAR_PARTS:
+            break
+    return tuple(out)
+
+
 def parse_rfc822(raw: bytes, *, provider_message_id: str | None = None, thread_id: str | None = None,
                  fallback_time: datetime | None = None) -> MailMessage:
     msg = BytesParser(policy=policy.default).parsebytes(raw)
@@ -177,7 +200,7 @@ def parse_rfc822(raw: bytes, *, provider_message_id: str | None = None, thread_i
     if received.tzinfo is None:
         received = received.replace(tzinfo=UTC)
     text, html = _plain_body(msg)
-    return MailMessage(
+    return MailMessage(calendars=_calendar_parts(msg),
         provider_message_id=provider_message_id or message_id, thread_id=thread,
         sender=address_of(str(msg["From"] or "")), to=addresses_of(str(msg["To"] or "")),
         subject=str(msg["Subject"] or ""), received_at=received, body_text=text, headers=headers, body_html=html)

@@ -131,7 +131,8 @@ class EmailChannel:
             mime = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
             attachments.append(Attachment(f.name, mime, content))
         return OutgoingMail(to=list(email.to), cc=list(email.cc), subject=email.subject, body_text=email.body,
-                            attachments=attachments, idempotency_key=request.attempt_id)
+                            attachments=attachments, idempotency_key=request.attempt_id,
+                            thread_id=email.thread_ref)  # a message replies in its thread (hashed in the packet)
 
     async def dispatch(self, request: DispatchRequest) -> DispatchOutcome:
         async with self._sm()() as session:

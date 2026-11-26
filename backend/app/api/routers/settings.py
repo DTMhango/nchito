@@ -12,7 +12,8 @@ from app.api.deps import PrincipalDep, SessionDep
 from app.core.settings import service
 from app.core.settings.registry import GROUPS, REGISTRY
 from app.core.settings.types import SettingValueError
-from app.themes.service import get_theme
+from app.ops.config_rollback import OWN_ENDPOINT
+from app.themes.service import ThemeNeedsReview, check_applicable, get_theme, needs_review
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -115,8 +116,11 @@ async def get_appearance(session: SessionDep) -> Appearance:
 
 @router.put("/appearance", response_model=Appearance, operation_id="settings_put_appearance")
 async def put_appearance(body: Appearance, principal: PrincipalDep, session: SessionDep) -> Appearance:
-    if await get_theme(session, body.theme_id) is None:
+    theme = await get_theme(session, body.theme_id)
+    if theme is None:
         raise HTTPException(422, detail="unknown theme_id")
+    if needs_review(theme) and str(body.theme_id) != str(await service.get_value(session, "appearance.theme_id")):
+        raise HTTPException(422, detail=str(ThemeNeedsReview()))
     changes = {key: getattr(body, field) for field, key in APPEARANCE_KEYS.items()}
     changes["appearance.theme_id"] = str(body.theme_id)
     current = await service.values(session)
@@ -135,11 +139,7 @@ async def get_setting(key: str, _: PrincipalDep, session: SessionDep) -> Setting
     return _out((await service.get_all(session))[key])
 
 
-# Settings with their own endpoint, which enforces what the generic write cannot (the restore lock and the
-# pause effects): an invariant, not a setting.
-OWN_ENDPOINT = {
-    "automation.paused": "use PUT /api/autopilot (and POST /api/autopilot/resume-after-restore after a restore)",
-}
+# Settings with their own endpoint (see ``config_rollback.OWN_ENDPOINT``): an invariant, not a setting.
 
 
 @router.put("/{key}", response_model=SettingOut, operation_id="settings_put",
@@ -152,8 +152,11 @@ async def put_setting(key: str, body: SettingWrite, principal: PrincipalDep, ses
     if key in OWN_ENDPOINT:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=f"{key} cannot be changed here: {OWN_ENDPOINT[key]}")
     try:
-        if key == "appearance.theme_id" and await get_theme(session, str(body.value)) is None:
-            raise SettingValueError("unknown theme")
+        if key == "appearance.theme_id":
+            theme = await get_theme(session, str(body.value))
+            if theme is None:
+                raise SettingValueError("unknown theme")
+            check_applicable(theme)
         await service.set_value(session, key, body.value, actor=principal.actor, reason=body.reason)
     except (SettingValueError, ValueError) as exc:
         raise HTTPException(422, detail=str(exc)) from exc

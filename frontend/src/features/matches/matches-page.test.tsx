@@ -295,18 +295,33 @@ describe("Why? panel and bulk", () => {
     const bar = screen.getByRole("toolbar", { name: "Selected jobs" })
     expect(bar).toHaveTextContent("2 selected")
     await user.click(within(bar).getByRole("button", { name: "Archive" }))
-    const dialog = await screen.findByRole("dialog", {
-      name: "Archive these roles?",
-    })
-    await within(dialog).findByText("2 roles would change.")
+    const dialog = await screen.findByRole("dialog", { name: "Archive" })
+    await user.click(within(dialog).getByRole("button", { name: "Preview" }))
+    await within(dialog).findByText(/2 selected: 2 will change/)
     expect(
       matchesMock.get().jobs.find((j) => j.title === "Analytics Lead")?.triage
     ).toBe("new")
-    await user.click(within(dialog).getByRole("button", { name: "Confirm" }))
+    await user.click(
+      within(dialog).getByRole("button", { name: /Run on 2 items/ })
+    )
     await waitFor(() =>
       expect(
         matchesMock.get().jobs.find((j) => j.title === "Analytics Lead")?.triage
       ).toBe("archived")
     )
+  })
+})
+
+describe("Matches drill-through from Insights", () => {
+  it("narrows by the link's market and clears back to the inbox", async () => {
+    const user = userEvent.setup()
+    const { router } = renderApp("/matches?country=Kenya")
+    const bar = await screen.findByRole("group", {
+      name: "Filters from Insights",
+    })
+    expect(within(bar).getByText("Market: Kenya")).toBeInTheDocument()
+    await user.click(within(bar).getByRole("button", { name: "Clear all" }))
+    await waitFor(() => expect(search(router)).not.toHaveProperty("country"))
+    await ready()
   })
 })

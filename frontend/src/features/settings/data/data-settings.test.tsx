@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import { screen, waitFor, within } from "@testing-library/react"
 import { renderApp, setupUser } from "@/test/render"
 import { aiMockState } from "@/mocks/handlers/ai"
+import { settingRow } from "@/mocks/dataset/settings"
 
 describe("Settings > Connections", () => {
   it("saves a mailbox without ever showing its password", async () => {
@@ -159,6 +160,30 @@ describe("Settings > Data", () => {
     await user.click(screen.getByRole("button", { name: "Back up now" }))
     await waitFor(() => expect(kept()).toBe(3))
     expect(screen.getByText("How to restore")).toBeInTheDocument()
+  })
+
+  it("offers OneDrive and S3 as the backup target", async () => {
+    const user = setupUser()
+    renderApp("/settings/data")
+    const target = await screen.findByRole("combobox", {
+      name: "Backup target",
+    })
+    const options = within(target)
+      .getAllByRole("option")
+      .map((o) => o.getAttribute("value"))
+    expect(options).toEqual(
+      expect.arrayContaining(["local", "s3", "gdrive", "onedrive"])
+    )
+    await user.selectOptions(target, "onedrive")
+    await user.click(screen.getByRole("button", { name: "Save Backup target" }))
+    await waitFor(() =>
+      expect(
+        screen.getByRole("combobox", { name: "Backup target" })
+      ).toHaveValue("onedrive")
+    )
+    await waitFor(() =>
+      expect(settingRow("backups.target")?.value).toBe("onedrive")
+    )
   })
 })
 

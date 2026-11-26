@@ -62,7 +62,9 @@ async def test_backup_and_sweep_age_use_settings_and_the_setup_grace(session) ->
     await session.commit()
     await beat(session, 5)
     # a brand new instance has not missed a backup yet
-    assert comp(await health.detailed(session, NOW), "backup").status == "unknown"
+    fresh = comp(await health.detailed(session, NOW), "backup")
+    assert fresh.status == "unknown" and fresh.detail and fresh.detail.startswith("None yet")
+    assert "old" in fresh.detail and fresh.value is not None
     await run_ok(session, RunKind.backup, hours_ago=40, status=RunStatus.succeeded)
     stale = comp(await health.detailed(session, NOW), "backup")
     assert stale.status == "warn" and "40 h ago" in (stale.detail or "")
@@ -145,6 +147,12 @@ async def test_detail_requires_the_owner(client) -> None:
 # ----- digest ------------------------------------------------------------------------------------
 
 
+def soon() -> datetime:
+    """Just after the real clock: seeded rows are stamped by the database clock, which runs past ``NOW`` (fixed at
+    import) when the suite is long."""
+    return datetime.now(UTC) + timedelta(minutes=1)
+
+
 async def seed_digest_data(session) -> None:
     job = await make_job(session, "Senior Actuary", "Acme Ltd")
     quiet = await make_job(session, "Intern", "Beta Ltd")
@@ -161,7 +169,7 @@ async def seed_digest_data(session) -> None:
 
 async def test_render_digest_lists_matches_needs_you_sent_and_spend(session) -> None:
     await seed_digest_data(session)
-    result = await digest.render_digest(session, since=NOW - timedelta(days=1), until=NOW + timedelta(minutes=1))
+    result = await digest.render_digest(session, since=NOW - timedelta(days=1), until=soon())
     assert result.counts["matches"] == 1 and result.counts["needs_you"] == 1 and result.counts["sent"] == 1
     assert "88  Senior Actuary, Acme Ltd" in result.body and "Intern" not in result.body
     assert "Sign in at Acme" in result.body and "Data Analyst, Gamma Ltd" in result.body
@@ -173,7 +181,7 @@ async def test_generic_detail_level_leaves_names_out_of_the_digest(session) -> N
     await seed_digest_data(session)
     await settings_service.set_many(session, {"notifications.detail_level": "generic"}, actor="test")
     await session.commit()
-    result = await digest.render_digest(session, since=NOW - timedelta(days=1), until=NOW + timedelta(minutes=1))
+    result = await digest.render_digest(session, since=NOW - timedelta(days=1), until=soon())
     assert "Acme" not in result.body and "Needs you: 1" in result.body
 
 
@@ -294,3 +302,18 @@ async def test_tick_runs_every_step_and_isolates_a_failing_one(session, monkeypa
     assert done["collect"] == 1 and done["deliver"] == 1
     assert [m.event_id for m in delivered] == [f"pending:{pa.id}"]
     assert await session.scalar(select(func.count()).select_from(Notification)) == 1
+
+
+async def test_no_backup_yet_is_overdue_once_the_instance_is_older_than_the_window(session) -> None:
+    owner = Owner(email="o@example.com", display_name="O", password_hash="x")
+    session.add(owner)
+    await session.commit()
+    await beat(session, 5)
+    later = NOW + timedelta(hours=100)  # past the default window, and still no backup
+    c = comp(await health.detailed(session, later), "backup")
+    assert c.status == "warn" and c.detail and "None yet" in c.detail and "overdue" in c.detail
+    assert c.value is not None and c.value >= 100
+    await settings_service.set_many(session, {"health.backup_stale_hours": 500}, actor="test")
+    await session.commit()
+    again = comp(await health.detailed(session, later), "backup")
+    assert again.status == "unknown" and "overdue" not in (again.detail or "")

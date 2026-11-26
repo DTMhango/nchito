@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { toast } from "sonner"
@@ -7,7 +8,13 @@ import { PageHeader } from "@/components/page-header"
 import { View } from "@/components/view"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
-import { createRun, runsQuery, sourceKeys, type Run } from "../api"
+import {
+  createRun,
+  runsQuery,
+  sourceKeys,
+  type Run,
+  type RunKind,
+} from "../api"
 import { formatWhen } from "../cron"
 import { useTimezone } from "../shared"
 import { cost, KIND_LABEL, triggerLabel } from "../words"
@@ -19,7 +26,8 @@ export function RunsPage() {
   useRunEvents()
   const qc = useQueryClient()
   const tz = useTimezone()
-  const q = useQuery(runsQuery())
+  const [kind, setKind] = useState<RunKind | "">("")
+  const q = useQuery(runsQuery(kind || undefined))
 
   const start = useMutation({
     mutationFn: (dry: boolean) => createRun({ kind: "sweep", dry_run: dry }),
@@ -58,6 +66,22 @@ export function RunsPage() {
           </>
         }
       />
+
+      <label className="mb-3 flex items-center gap-2 text-sm">
+        Kind
+        <select
+          className="h-8 rounded-md border border-input bg-surface px-2 text-foreground"
+          value={kind}
+          onChange={(e) => setKind(e.target.value as RunKind | "")}
+        >
+          <option value="">All kinds</option>
+          {(Object.keys(KIND_LABEL) as RunKind[]).map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABEL[k]}
+            </option>
+          ))}
+        </select>
+      </label>
 
       {q.isPending ? (
         <Skeleton className="h-64 w-full" />

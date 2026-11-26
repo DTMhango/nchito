@@ -34,6 +34,7 @@ import {
   validateLimit,
   type LimitKey,
 } from "./logic"
+import { PolicyThresholds, previewSettings } from "./policy-thresholds"
 
 const CHANNELS: Channel[] = ["email", "browser", "manual"]
 
@@ -42,6 +43,15 @@ export function PolicyEditor() {
   const campaigns = useQuery(campaignsQuery())
   const settings = useQuery(settingsQuery())
   const [picked, setPicked] = useState<string | null>(null)
+  // Unsaved limit edits, previewed before they are saved.
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const onDraft = (key: string, value: string | null) =>
+    setDrafts((d) => {
+      const next = { ...d }
+      if (value === null) delete next[key]
+      else next[key] = value
+      return next
+    })
   const list = campaigns.data ?? []
   const campaign = list.find((c) => c.id === picked) ?? list[0]
 
@@ -75,6 +85,8 @@ export function PolicyEditor() {
               (settings.data?.["automation.default_mode"]?.value as
                 AutomationMode | undefined) ?? "prepare"
             }
+            previewSettings={previewSettings(drafts, settings.data)}
+            settings={settings.data}
           />
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -82,7 +94,7 @@ export function PolicyEditor() {
           </p>
         )}
       </section>
-      <LimitsPanel settings={settings.data} />
+      <LimitsPanel settings={settings.data} onDraft={onDraft} />
     </div>
   )
 }
@@ -90,9 +102,13 @@ export function PolicyEditor() {
 function CampaignPolicy({
   campaign,
   defaultMode,
+  previewSettings,
+  settings,
 }: {
   campaign: CampaignOut
   defaultMode: AutomationMode
+  previewSettings: Record<string, unknown>
+  settings: Record<string, SettingOut> | undefined
 }) {
   const qc = useQueryClient()
   const ceiling = modeCeiling(campaign)
@@ -190,6 +206,11 @@ function CampaignPolicy({
           })}
         </ul>
       </div>
+      <PolicyThresholds
+        campaign={campaign}
+        settings={previewSettings}
+        current={settings}
+      />
     </div>
   )
 }
@@ -270,8 +291,10 @@ const LIMITS: { title: string; fields: LimitField[] }[] = [
 
 function LimitsPanel({
   settings,
+  onDraft,
 }: {
   settings: Record<string, SettingOut> | undefined
+  onDraft: (key: string, value: string | null) => void
 }) {
   return (
     <section aria-label="Limits" className="grid gap-3">
@@ -297,6 +320,7 @@ function LimitsPanel({
                   field={f}
                   setting={settings[f.key]}
                   all={settings}
+                  onDraft={onDraft}
                 />
               ))}
             </div>
@@ -311,10 +335,12 @@ function LimitRow({
   field,
   setting,
   all,
+  onDraft,
 }: {
   field: LimitField
   setting: SettingOut | undefined
   all: Record<string, SettingOut>
+  onDraft: (key: string, value: string | null) => void
 }) {
   const qc = useQueryClient()
   const [draft, setDraft] = useState<string | null>(null)
@@ -323,6 +349,7 @@ function LimitRow({
     mutationFn: (value: number | string) => putSetting(field.key, value),
     onSuccess: () => {
       setDraft(null)
+      onDraft(field.key, null)
       setError(null)
       void qc.invalidateQueries({ queryKey: apKeys.settings })
       toast.success(`${field.label}: saved for every campaign.`)
@@ -361,6 +388,7 @@ function LimitRow({
           aria-describedby={`${id}-info`}
           onChange={(e) => {
             setDraft(e.target.value)
+            onDraft(field.key, e.target.value)
             setError(null)
           }}
           className="max-w-32"
@@ -380,6 +408,7 @@ function LimitRow({
             variant="ghost"
             onClick={() => {
               setDraft(null)
+              onDraft(field.key, null)
               setError(null)
             }}
           >

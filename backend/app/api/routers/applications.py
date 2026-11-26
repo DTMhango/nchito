@@ -53,7 +53,8 @@ from app.models.applications import (
     TailoringRequest,
 )
 from app.models.search import Assessment, Job
-from app.pipeline import corrections
+from app.ops import insights
+from app.pipeline import bulk, corrections
 from app.pipeline.checks import findings as checks_findings
 from app.pipeline.tailoring import service as tailoring_service
 from app.pipeline.tailoring import studio
@@ -66,6 +67,7 @@ from app.schemas.json_types import (
     PacketContents,
     PacketEmail,
     PacketFile,
+    RecordOrigin,
     SubmittedSnapshot,
 )
 
@@ -95,7 +97,7 @@ class ApplicationSummary(Timestamps):
     snoozed_until: datetime | None = None
     snoozed: bool = Field(default=False, description="Snoozed right now (an imminent deadline overrides a snooze)")
     deadline: date | None = Field(default=None, description="The job's closing date, when dated")
-    origin: Literal["system", "owner", "import"] = "system"
+    origin: RecordOrigin = "system"
     owner_attested: bool = Field(default=False, description="Applied outside Nchito, on the owner's word")
     legacy_fit: int | None = Field(default=None, ge=1, le=5, description="Imported 1-5 fit; not a rubric score")
 
@@ -602,8 +604,20 @@ async def list_applications(
     session: SessionDep, stage: StageT | None = None, campaign_id: uuid.UUID | None = None,
     channel: ChannelT | None = None, q: str | None = None, pinned: bool | None = None,
     hide_snoozed: bool = False, cursor: str | None = None, limit: int = Query(default=100, ge=1, le=500),
+    since: date | None = None, until: date | None = None, track_id: uuid.UUID | None = None,
+    source_id: uuid.UUID | None = None, country: str | None = Query(default=None, max_length=100),
+    reached: insights.DrillAppReached | None = Query(
+        default=None, description="Insights drill-through: the funnel step the roles reached"),
 ) -> Page[ApplicationSummary]:
+    """Applications. ``since``, ``until``, ``track_id``, ``source_id``, ``country`` or ``reached`` switch on the
+    Insights drill-through: the list is exactly the applications the clicked number counted (same filters,
+    same counting rules, ``campaign_id`` and ``channel`` included)."""
     conds = _filters(stage, campaign_id, channel, q, pinned)
+    if any(v is not None for v in (since, until, track_id, source_id, country, reached)):
+        ids = await insights.drill_application_ids(session, insights.InsightFilters(
+            since=since, until=until, campaign_id=campaign_id, track_id=track_id, source_id=source_id,
+            country=country, channel=Channel(channel) if channel else None), reached)
+        conds.append(Application.id.in_(ids))
     if hide_snoozed:
         conds.append(not_(_snoozed_sql(utcnow(), await _imminent_days(session))))
     try:
@@ -644,18 +658,15 @@ async def create_application(body: ApplicationCreate, principal: PrincipalDep,
     job = await session.get(Job, body.job_id)
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="job not found")
-    if job.merged_into_id is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="this job was merged into another; use that one")
-    existing = await stages.blocking_application(session, job.id)
-    if existing is not None:
+    try:  # the one function behind this endpoint and the bulk "assign to campaign" / "queue tailoring"
+        app = await bulk.create_application(session, job, body.campaign_id, actor=principal.actor)
+    except bulk.Refuse as exc:
+        if exc.code == "merged":
+            raise HTTPException(status.HTTP_409_CONFLICT, detail=exc.reason) from exc
+        existing = await stages.blocking_application(session, job.id)
         raise HTTPException(status.HTTP_409_CONFLICT, detail={
-            "code": "duplicate", "reason": f"this job already has an application ({existing.stage.value})",
-            "application_id": str(existing.id)})
-    app = Application(job_id=job.id, campaign_id=body.campaign_id, stage=Stage.shortlisted, origin="owner")
-    session.add(app)
-    await session.flush()
-    await stages.add_event(session, app.id, "created", principal.actor, {"origin": "owner"})
-    await _changed(session, app.id)
+            "code": "duplicate", "reason": exc.reason,
+            "application_id": str(existing.id) if existing else None}) from exc
     return await _detail(session, app.id)
 
 
@@ -873,7 +884,7 @@ async def tailor(application_id: uuid.UUID, principal: PrincipalDep, session: Se
     await session.commit()
     if needs_queue:
         await enqueue(req)
-    return TailorOut(run_id=req.run_id, queued=req.status in tailoring_service.OPEN)
+    return TailorOut(run_id=req.tailoring_run_id, queued=req.status in tailoring_service.OPEN)
 
 
 @router.get("/applications/{application_id}/spec", response_model=SpecStateOut, name="applications_get_spec")

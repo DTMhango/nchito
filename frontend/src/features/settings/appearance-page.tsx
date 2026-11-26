@@ -1,4 +1,5 @@
-import type { ReactNode } from "react"
+import { useRef, type ReactNode } from "react"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   Check,
   Download,
@@ -6,6 +7,7 @@ import {
   Monitor,
   Moon,
   Paintbrush,
+  Pencil,
   Sun,
   Upload,
   X,
@@ -27,6 +29,12 @@ import {
 } from "@/themes"
 import { cn } from "@/lib/utils"
 import { ThemePreview } from "./theme-preview"
+import {
+  downloadJson,
+  exportTheme,
+  fileSlug,
+} from "@/features/theme-studio/api"
+import { useThemeFiles } from "@/features/theme-studio/use-theme-files"
 
 const TOKEN_NAMES = [
   "bg",
@@ -44,6 +52,9 @@ const TOKEN_NAMES = [
 /** Settings, Appearance (DESIGN 10.4): theme gallery and every appearance preference. */
 export function AppearancePage() {
   const { themes, theme, appearance, mode, setAppearance } = useTheme()
+  const navigate = useNavigate()
+  const fileInput = useRef<HTMLInputElement>(null)
+  const files = useThemeFiles()
   const radius = appearance.radius ?? theme.radius
   const fontPx = String(Math.round(14 * appearance.font_scale))
 
@@ -74,8 +85,15 @@ export function AppearancePage() {
                 key={t.id}
                 type="button"
                 aria-pressed={active}
-                aria-label={`${t.name}${active ? ", in use" : ""}`}
+                aria-label={`${t.name}${active ? ", in use" : ""}${t.needs_review ? ", needs review" : ""}`}
                 onClick={() => {
+                  if (t.needs_review) {
+                    void navigate({
+                      to: "/theme-studio/$themeId",
+                      params: { themeId: t.id },
+                    })
+                    return
+                  }
                   setAppearance({ theme_id: t.id })
                   if (!active) toast.success(`${t.name} theme on.`)
                 }}
@@ -93,6 +111,7 @@ export function AppearancePage() {
                 <span className="flex items-center gap-2 font-semibold">
                   {t.name}
                   {active && <Chip tone="primary">In use</Chip>}
+                  {t.needs_review && <Chip tone="warn">Needs review</Chip>}
                 </span>
                 <span className="text-[0.8rem] text-faint">
                   {t.description ? `${t.description} · ` : ""}
@@ -247,7 +266,16 @@ export function AppearancePage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => downloadTheme(theme.id, theme)}
+                onClick={async () => {
+                  try {
+                    downloadJson(
+                      `${fileSlug(theme.name)}.theme.json`,
+                      await exportTheme(theme.id)
+                    )
+                  } catch (e) {
+                    toast.error((e as Error).message)
+                  }
+                }}
               >
                 <Download aria-hidden="true" />
                 Export current
@@ -255,26 +283,46 @@ export function AppearancePage() {
               <Button
                 size="sm"
                 variant="outline"
-                disabled
-                title="Arrives with the theme studio"
+                onClick={() => fileInput.current?.click()}
               >
                 <Upload aria-hidden="true" />
                 Import
               </Button>
+              <input
+                ref={fileInput}
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                aria-label="Theme file to import"
+                tabIndex={-1}
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = ""
+                  if (f) void files.importFile(f)
+                }}
+              />
               <Button
                 size="sm"
                 variant="outline"
-                disabled
-                title="Arrives with the theme studio"
+                onClick={() => void files.buildFrom(theme.id)}
               >
                 <Paintbrush aria-hidden="true" />
                 Build your own
               </Button>
+              <Button size="sm" variant="ghost" asChild>
+                <Link
+                  to="/theme-studio/$themeId"
+                  params={{ themeId: theme.id }}
+                >
+                  <Pencil aria-hidden="true" />
+                  {theme.builtin ? "Open in studio" : "Edit current"}
+                </Link>
+              </Button>
             </div>
             <p className="mt-2.5 flex items-center gap-1.5 text-xs text-faint">
               <Check className="size-3.5" aria-hidden="true" />
-              The theme studio (duplicate, edit with a live contrast check,
-              import tweakcn themes) comes in a later release.
+              Build your own copies the current theme into the studio: live
+              preview, contrast check, undo and history.
             </p>
           </div>
         </div>
@@ -347,16 +395,4 @@ function AccentButton({
       {children}
     </button>
   )
-}
-
-function downloadTheme(id: string, data: unknown) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json",
-  })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = `${id}.theme.json`
-  a.click()
-  URL.revokeObjectURL(url)
 }

@@ -5,7 +5,7 @@
  *   (authed)                              guard: owner exists and signed in
  *     /onboarding?step=                   full-screen set-up guide
  *     (shell)                             AppShell: sidebar, top bar, palette
- *       /today?action= /matches /applications /jobs/$id?tab= /compare?ids= /studio?application=&run= /autopilot
+ *       /today?action= /matches /applications /employers /employers/$key /jobs/$id?tab= /compare?ids= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
  *       /settings/{appearance,ai,connections,notifications,runners,tracking,interview,accounts,sources,data,health,security,activity,history}
@@ -24,6 +24,8 @@ import {
 } from "@tanstack/react-router"
 import { lazy, type ComponentType } from "react"
 import { z } from "zod"
+import { insightsSearchSchema } from "@/features/insights/lib"
+import { appDrillSchema, pickDrill } from "@/features/insights/drill-search"
 import {
   requireNoOwner,
   requireSession,
@@ -63,6 +65,14 @@ const ApplicationsPage = lazyPage(
   () => import("@/features/applications/applications-page"),
   "ApplicationsPage"
 )
+const EmployersPage = lazyPage(
+  () => import("@/features/employers/employers-page"),
+  "EmployersPage"
+)
+const EmployerPage = lazyPage(
+  () => import("@/features/employers/employer-page"),
+  "EmployerPage"
+)
 const JobPage = lazyPage(() => import("@/features/jobs/job-page"), "JobPage")
 const ComparePage = lazyPage(
   () => import("@/features/jobs/compare/compare-page"),
@@ -79,6 +89,14 @@ const AutopilotPage = lazyPage(
 const ApprovalsPage = lazyPage(
   () => import("@/features/approvals/approvals-page"),
   "ApprovalsPage"
+)
+const FollowupsPage = lazyPage(
+  () => import("@/features/followups/followups-page"),
+  "FollowupsPage"
+)
+const WindDownPage = lazyPage(
+  () => import("@/features/winddown/winddown-page"),
+  "WindDownPage"
 )
 const ApprovalReviewPage = lazyPage(
   () => import("@/features/approvals/review-page"),
@@ -123,6 +141,10 @@ const SettingsLayout = lazyPage(
 const AppearancePage = lazyPage(
   () => import("@/features/settings/appearance-page"),
   "AppearancePage"
+)
+const ThemeStudioPage = lazyPage(
+  () => import("@/features/theme-studio/theme-studio-page"),
+  "ThemeStudioPage"
 )
 const AiSettingsPage = lazyPage(
   () => import("@/features/settings/ai/ai-page"),
@@ -255,15 +277,20 @@ const page = <P extends string>(
   })
 
 /** `?action=<pending action id>`: Today opens that decision (the Studio's question links). */
-const todaySearch = z.object({ action: z.string().optional().catch(undefined) })
+const todaySearch = z.object({
+  action: z.string().optional().catch(undefined),
+  /** `?show=upcoming`: open the rest of Today at upcoming interviews (command palette). */
+  show: z.enum(["upcoming"]).optional().catch(undefined),
+})
 const todayRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/today",
   staticData: { title: "Today" },
   validateSearch: todaySearch,
   component: function TodayRoute() {
-    const { action } = todayRoute.useSearch()
-    return <TodayPage focusAction={action} />
+    const { action, show } = todayRoute.useSearch()
+    // Keyed by `show`, so the palette's Upcoming opens the rest of Today even from Today.
+    return <TodayPage key={show} focusAction={action} show={show} />
   },
 })
 const matchesRoute = createRoute({
@@ -284,11 +311,32 @@ const matchesRoute = createRoute({
     )
   },
 })
-const applicationsRoute = page(
-  "/applications",
-  "Applications",
-  ApplicationsPage
-)
+/** Insights links carry their filters (`?campaign_id=&reached=sent`...): the list narrows to them. */
+const applicationsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/applications",
+  staticData: { title: "Applications" },
+  validateSearch: appDrillSchema,
+  component: function ApplicationsRoute() {
+    const search = applicationsRoute.useSearch()
+    const navigate = applicationsRoute.useNavigate()
+    return (
+      <ApplicationsPage
+        drill={pickDrill(search)}
+        onDrill={(next) => void navigate({ search: next ?? {} })}
+      />
+    )
+  },
+})
+const employersRoute = page("/employers", "Employers", EmployersPage)
+const employerRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/employers/$key",
+  staticData: { title: "Employer" },
+  component: function EmployerRoute() {
+    return <EmployerPage employerKey={employerRoute.useParams().key} />
+  },
+})
 const studioRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/studio",
@@ -307,6 +355,8 @@ const studioRoute = createRoute({
 })
 const autopilotRoute = page("/autopilot", "Autopilot", AutopilotPage)
 const approvalsRoute = page("/approvals", "Approvals", ApprovalsPage)
+const followupsRoute = page("/follow-ups", "Follow-ups", FollowupsPage)
+const windDownRoute = page("/wind-down", "Wind down", WindDownPage)
 const approvalReviewRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/approvals/$applicationId",
@@ -346,11 +396,36 @@ const campaignEditorRoute = createRoute({
     return <CampaignEditorPage id={campaignEditorRoute.useParams().id} />
   },
 })
+const themeStudioRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/theme-studio/$themeId",
+  staticData: { title: "Theme studio" },
+  component: function ThemeStudioRoute() {
+    return <ThemeStudioPage themeId={themeStudioRoute.useParams().themeId} />
+  },
+})
 const sourcesRoute = page("/sources", "Sources", SourcesPage)
-const insightsRoute = page("/insights", "Insights", InsightsPage)
+const insightsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/insights",
+  staticData: { title: "Insights" },
+  validateSearch: insightsSearchSchema,
+  component: function InsightsRoute() {
+    const search = insightsRoute.useSearch()
+    const navigate = insightsRoute.useNavigate()
+    return (
+      <InsightsPage
+        search={search}
+        onSearch={(next) => void navigate({ search: next, replace: true })}
+      />
+    )
+  },
+})
 
 const jobSearch = z.object({
   tab: z.enum(JOB_TABS).catch("overview").default("overview"),
+  /** An interview round to prepare (opens the mock interview on it). */
+  round: z.coerce.number().int().min(1).optional().catch(undefined),
 })
 const jobRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -453,6 +528,14 @@ const groupRoutes = [
   groupRoute("interview"),
   groupRoute("accounts"),
   groupRoute("sources"),
+  groupRoute("tailoring"),
+  groupRoute("mail"),
+  groupRoute("followups"),
+  groupRoute("calendar"),
+  groupRoute("insights"),
+  groupRoute("preferences"),
+  groupRoute("bulk"),
+  groupRoute("themes"),
 ] as const
 const ownRoute = (
   path:
@@ -513,12 +596,16 @@ export const routeTree = rootRoute.addChildren([
       todayRoute,
       matchesRoute,
       applicationsRoute,
+      employersRoute,
+      employerRoute,
       jobRoute,
       compareRoute,
       studioRoute,
       autopilotRoute,
       approvalsRoute,
       approvalReviewRoute,
+      followupsRoute,
+      windDownRoute,
       runsRoute,
       runDetailRoute,
       accountsRoute,
@@ -526,6 +613,7 @@ export const routeTree = rootRoute.addChildren([
       kitRoute.addChildren([kitIndex, ...kitChildren]),
       campaignsRoute,
       campaignEditorRoute,
+      themeStudioRoute,
       sourcesRoute,
       insightsRoute,
       settingsRoute.addChildren([

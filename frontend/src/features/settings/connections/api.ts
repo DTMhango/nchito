@@ -1,4 +1,4 @@
-/** Settings > Connections: mail, Drive, Telegram, webhook, search API. Typed from the generated contract. */
+/** Settings > Connections: mail, Drive, OneDrive, Telegram, webhook, search API. Typed from the generated contract. */
 import { queryOptions } from "@tanstack/react-query"
 import { api, unwrap } from "@/lib/api/client"
 import type { components } from "@/lib/api/types"
@@ -15,9 +15,12 @@ export const CONNECTION_PROVIDERS = [
   "gmail",
   "imap_smtp",
   "gdrive",
+  "msgraph",
+  "onedrive",
   "telegram",
   "webhook",
   "search_api",
+  "s3",
 ] as const satisfies readonly Provider[]
 export type ConnectionProvider = (typeof CONNECTION_PROVIDERS)[number]
 
@@ -55,7 +58,8 @@ export const testConnection = (id: string) =>
       params: { path: { connection_id: id } },
     })
   )
-export const oauthStart = (provider: "gmail" | "gdrive") =>
+export type OAuthProvider = "gmail" | "gdrive" | "msgraph" | "onedrive" | "gcalendar"
+export const oauthStart = (provider: OAuthProvider) =>
   unwrap(
     api.POST("/api/connections/oauth/{provider}/start", {
       params: { path: { provider } },

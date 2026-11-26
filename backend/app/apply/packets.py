@@ -25,7 +25,8 @@ from datetime import datetime
 from typing import Any
 from urllib.parse import urlsplit
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, type_coerce
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apply import errors
@@ -47,6 +48,16 @@ from app.schemas.json_types import (
 # Paths whose change the receipt marks as material (18.2: answer, file, recipient, body). Every change,
 # material or not, makes a new packet.
 NON_MATERIAL = frozenset({"job_version", "requisition"})
+
+
+def is_application_packet() -> Any:
+    """SQL clause: the application's own packets, not message packets (wave 4 follow-ups, whose contents carry
+    ``message_kind``). Every query for "the application's packet" uses it."""
+    return ~type_coerce(ApplicationPacket.contents, JSONB).has_key("message_kind")
+
+
+def is_message(packet: ApplicationPacket | None) -> bool:
+    return packet is not None and packet.contents.message_kind is not None
 
 
 class PacketError(Exception):
@@ -193,13 +204,14 @@ async def current(session: AsyncSession, application_id: uuid.UUID) -> Applicati
     """The newest packet that has not been invalidated."""
     return await session.scalar(
         select(ApplicationPacket).where(ApplicationPacket.application_id == application_id,
-                                        ApplicationPacket.invalidated_at.is_(None))
+                                        ApplicationPacket.invalidated_at.is_(None), is_application_packet())
         .order_by(ApplicationPacket.version.desc()).limit(1))
 
 
 async def history(session: AsyncSession, application_id: uuid.UUID) -> list[ApplicationPacket]:
     return list((await session.scalars(select(ApplicationPacket).where(
-        ApplicationPacket.application_id == application_id).order_by(ApplicationPacket.version.desc()))).all())
+        ApplicationPacket.application_id == application_id, is_application_packet())
+        .order_by(ApplicationPacket.version.desc()))).all())
 
 
 def _flatten(value: Any, prefix: str = "") -> dict[str, Any]:
@@ -290,3 +302,47 @@ async def build(session: AsyncSession, app: Application, draft: PacketDraft, *, 
                                "files": [f.sha256 for f in contents.files],
                                "changes": changes if latest else []})
     return BuildResult(packet, True, changes, latest)
+
+
+# ----- message packets (wave 4 follow-ups) -----------------------------------------------------------
+
+
+async def next_version(session: AsyncSession, application_id: uuid.UUID) -> int:
+    return int(await session.scalar(select(func.coalesce(func.max(ApplicationPacket.version), 0)).where(
+        ApplicationPacket.application_id == application_id)) or 0) + 1
+
+
+async def build_message(session: AsyncSession, app: Application, contents: PacketContents,
+                        previous: ApplicationPacket | None, *, actor: str,
+                        now: datetime | None = None) -> BuildResult:
+    """Snapshot a message about ``app`` as an immutable, hashed packet (``contents.message_kind`` set). Same
+    contents as ``previous``: it is returned. Different: a new version, ``previous`` invalidated (its approval
+    and permits go). The application's own packet and approval are never touched."""
+    from app.apply import permits
+
+    if contents.message_kind is None:
+        raise PacketError("a message packet needs its message kind")
+    now = now or utcnow()
+    await session.execute(select(Application.id).where(Application.id == app.id).with_for_update())
+    digest = content_hash(contents)
+    if previous is not None and previous.invalidated_at is None and previous.content_hash == digest:
+        return BuildResult(previous, False, [], None)
+    changes = diff(previous.contents if previous else None, contents)
+    if previous is not None and previous.invalidated_at is None:
+        material = [c["path"] for c in changes if c["material"]]
+        previous.invalidated_at, previous.invalidated_reason = now, f"changed: {', '.join(material) or 'contents'}"
+        await permits.revoke(session, packet_id=previous.id, reason=f"message packet v{previous.version} replaced",
+                             actor=actor, now=now)
+    packet = ApplicationPacket(application_id=app.id, version=await next_version(session, app.id),
+                               content_hash=digest, contents=contents)
+    session.add(packet)
+    await session.flush()
+    await add_event(session, app.id, "message_packet_built", actor, {
+        "version": packet.version, "packet_hash": digest, "message_kind": contents.message_kind,
+        "previous_hash": previous.content_hash if previous else None})
+    await audit.record(session, actor=actor, action="packet.built", subject_type="application", subject_id=app.id,
+                       detail={"packet_id": str(packet.id), "version": packet.version, "packet_hash": digest,
+                               "channel": contents.channel, "message_kind": contents.message_kind,
+                               "recipients": list(contents.email.to) if contents.email else [],
+                               "changes": changes if previous else []})
+    return BuildResult(packet, True, changes, previous)

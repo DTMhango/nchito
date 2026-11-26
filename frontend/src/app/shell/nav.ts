@@ -1,12 +1,17 @@
 import {
   BarChart3,
   Bot,
+  CalendarClock,
+  MessagesSquare,
   Briefcase,
+  Building2,
   Columns3,
   FileCheck2,
   FileText,
   Gauge,
   Inbox,
+  MailCheck,
+  Flag,
   Radio,
   UserRoundCheck,
   Settings,
@@ -53,6 +58,18 @@ export const NAV_MAIN: NavItem[] = [
     keywords: ["pipeline", "board", "stages"],
   },
   {
+    to: "/employers",
+    label: "Employers",
+    icon: Building2,
+    keywords: [
+      "companies",
+      "cooldown",
+      "never apply",
+      "always ask",
+      "conflict",
+    ],
+  },
+  {
     to: "/studio",
     label: "Studio",
     icon: FileText,
@@ -63,6 +80,12 @@ export const NAV_MAIN: NavItem[] = [
     label: "Approvals",
     icon: FileCheck2,
     keywords: ["approve", "packet", "review", "send", "needs you"],
+  },
+  {
+    to: "/follow-ups",
+    label: "Follow-ups",
+    icon: MailCheck,
+    keywords: ["follow up", "reply", "thank you", "messages", "chase"],
   },
   {
     to: "/autopilot",
@@ -111,6 +134,34 @@ export const NAV_SETUP: NavItem[] = [
     icon: BarChart3,
     keywords: ["funnel", "response rate", "spend", "analytics"],
   },
+  {
+    to: "/wind-down",
+    label: "Wind down",
+    icon: Flag,
+    keywords: ["accepted an offer", "stop", "withdraw", "finish", "reopen"],
+  },
+]
+
+/**
+ * Places that live inside a screen rather than in the sidebar, for the command palette. Upcoming
+ * interviews and deadlines sit on Today; a mock interview is on each role's Interview tab, opened
+ * from Today's upcoming interviews.
+ */
+export const PALETTE_PLACES: (NavItem & { search: { show: "upcoming" } })[] = [
+  {
+    to: "/today",
+    search: { show: "upcoming" },
+    label: "Upcoming interviews and deadlines",
+    icon: CalendarClock,
+    keywords: ["calendar", "schedule", "interviews", "deadlines", "coming up"],
+  },
+  {
+    to: "/today",
+    search: { show: "upcoming" },
+    label: "Mock interview",
+    icon: MessagesSquare,
+    keywords: ["practice", "practise", "rehearse", "interview prep"],
+  },
 ]
 
 export const NAV_FOOT: NavItem[] = [
@@ -142,6 +193,14 @@ export const SETTINGS_SECTIONS = [
   { to: "/settings/reconcile", label: "Reconcile" },
   { to: "/settings/tracking", label: "Tracking" },
   { to: "/settings/interview", label: "Interview" },
+  { to: "/settings/tailoring", label: "Tailoring and checks" },
+  { to: "/settings/mail", label: "Mail" },
+  { to: "/settings/followups", label: "Follow-ups and wind-down" },
+  { to: "/settings/calendar", label: "Calendar" },
+  { to: "/settings/insights", label: "Insights" },
+  { to: "/settings/preferences", label: "Preference learning" },
+  { to: "/settings/bulk", label: "Bulk actions" },
+  { to: "/settings/themes", label: "Theme studio" },
   { to: "/settings/sources", label: "Discovery" },
   { to: "/settings/accounts", label: "Portal accounts" },
   { to: "/settings/ai", label: "AI" },

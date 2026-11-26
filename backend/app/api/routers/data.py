@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, Ok, Page, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, Ok, Page
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.core import audit
 from app.core.clock import utcnow
@@ -27,8 +27,10 @@ from app.llm.deps import llm_service
 from app.models.kit import Fact
 from app.models.platform import ConfigKind, ConfigRevision, SettingRevision
 from app.ops import backup as ops_backup
+from app.ops import config_rollback as rollback_lib
 from app.ops import jobs as ops_jobs
 from app.ops import retention as ops_retention
+from app.schemas.json_types import BackupTargetName
 
 router = APIRouter(prefix="/api/data", tags=["data"], dependencies=[RequireOwner],
                    responses=NOT_IMPLEMENTED_RESPONSES)
@@ -81,17 +83,24 @@ class ImportCommitIn(BaseModel):
     exclude_keys: list[str] = Field(default_factory=list)
 
 
+class ThemeRefOut(BaseModel):
+    id: str
+    name: str
+
+
 class ImportCommitOut(BaseModel):
     created: int
     updated: int
     needs_review: int
+    themes_need_review: list[ThemeRefOut] = Field(default_factory=list, description=(
+        "Imported themes whose body text fails WCAG AA: kept, marked needs review, never applied"))
 
 
 class BackupOut(BaseModel):
     id: str
     created_at: datetime
     size_bytes: int
-    target: Literal["local", "s3", "gdrive"]
+    target: BackupTargetName
     encrypted: bool
 
 
@@ -228,12 +237,14 @@ async def import_preview(
         if source == "kit_file":
             parsed = kitfile.parse_kit_zip(data, limits)
             diff = _diff_items(await kitfile.plan(session, parsed.kit))
+            notices += kitfile.theme_notices(parsed.kit)
             kit_zip = data
         elif source in ("old_kit_zip", "free_form"):
             codes, next_no = await _existing_facts(session)
             if source == "old_kit_zip":
                 result = await oldkit.build(data, limits, existing_fact_codes=codes, next_fact_number=next_no,
-                                            llm=llm, use_ai=bool(values["data.old_kit_ai_extraction"]))
+                                            llm=llm, use_ai=bool(values["data.old_kit_ai_extraction"]),
+                                            tracker_headers=values["data.old_kit_tracker_headers"])
             else:
                 name = file.filename or "free-form text"
                 text = office.to_text(name, data, limits) if office.is_office(name) else data.decode(
@@ -271,11 +282,13 @@ async def import_commit(body: ImportCommitIn, session: SessionDep, principal: Pr
     if staged is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="this import has expired; upload it again")
     created = updated = review = 0
+    themes_need_review: list[ThemeRefOut] = []
     try:
         if staged.kit_zip is not None:
             parsed = kitfile.parse_kit_zip(staged.kit_zip, await _limits(session))
             applied = await kitfile.apply(session, parsed, exclude=set(body.exclude_keys), actor=principal.actor)
             created, updated, review = applied.created, applied.updated, applied.needs_review
+            themes_need_review = [ThemeRefOut(id=i, name=n) for i, n in applied.themes_need_review]
         if staged.history_csv is not None and not any(k.startswith("application_history:") for k in body.exclude_keys):
             result = await history.commit(session, history.parse_csv(staged.history_csv), actor=principal.actor)
             created, updated = created + result.created, updated + result.updated
@@ -283,7 +296,8 @@ async def import_commit(body: ImportCommitIn, session: SessionDep, principal: Pr
         raise HTTPException(422, detail=str(exc)) from exc
     await session.flush()
     staging.discard(files_dir, body.import_id)
-    return ImportCommitOut(created=created, updated=updated, needs_review=review)
+    return ImportCommitOut(created=created, updated=updated, needs_review=review,
+                           themes_need_review=themes_need_review)
 
 
 CONFIG_HISTORY_PAGE = 50
@@ -293,7 +307,7 @@ SETTING_KIND = "setting"
 def _backup_rows(info: ops_backup.BackupInfo) -> list[BackupOut]:
     rows = [BackupOut(id=info.id, created_at=info.created_at, size_bytes=info.size_bytes, target="local",
                       encrypted=info.encrypted)]
-    if info.remote_key and info.remote_target in ("gdrive", "s3"):
+    if info.remote_key and info.remote_target in ("gdrive", "onedrive", "s3"):
         rows.append(BackupOut(id=f"{info.id}:{info.remote_target}", created_at=info.created_at,
                               size_bytes=info.size_bytes, target=info.remote_target,  # type: ignore[arg-type]
                               encrypted=info.encrypted))
@@ -359,7 +373,7 @@ async def config_history(session: SessionDep, kind: str | None = None, subject_i
             items.append((r.created_at, r.id, ConfigRevisionOut(
                 id=r.id, kind=SETTING_KIND, subject_id=None, version=r.version, author=r.changed_by,
                 created_at=r.created_at, diff={"key": r.key, "old": r.old_value, "new": r.new_value},
-                rollback_of=None, note=r.reason)))
+                rollback_of=r.rollback_of, note=r.reason)))
     if kind != SETTING_KIND:
         cq = select(ConfigRevision).order_by(ConfigRevision.created_at.desc(), ConfigRevision.id.desc())
         if kind is not None:
@@ -383,8 +397,52 @@ async def config_history(session: SessionDep, kind: str | None = None, subject_i
                                    next_cursor=_cursor_of(page[-1][0], page[-1][1]) if more and page else None)
 
 
+async def _revision_out(session: SessionDep, done: rollback_lib.RolledBack) -> ConfigRevisionOut:
+    if done.kind == SETTING_KIND:
+        r = await session.get(SettingRevision, done.new_id)
+        assert r is not None
+        return ConfigRevisionOut(
+            id=r.id, kind=SETTING_KIND, subject_id=None, version=r.version, author=r.changed_by,
+            created_at=r.created_at, diff={"key": r.key, "old": r.old_value, "new": r.new_value},
+            rollback_of=r.rollback_of, note=r.reason)
+    c = await session.get(ConfigRevision, done.new_id)
+    assert c is not None
+    return ConfigRevisionOut(id=c.id, kind=c.kind.value, subject_id=c.subject_id, version=c.version,
+                             author=c.author, created_at=c.created_at, diff=c.diff, rollback_of=c.rollback_of,
+                             note=c.note)
+
+
 @router.post("/config-history/{revision_id}/rollback", response_model=ConfigRevisionOut,
              name="data_config_rollback")
-async def rollback(revision_id: uuid.UUID, body: RollbackIn) -> ConfigRevisionOut:
-    """Rollback affects future work only."""
-    not_implemented(1, "config")
+async def rollback(revision_id: uuid.UUID, body: RollbackIn, principal: PrincipalDep,
+                   session: SessionDep) -> ConfigRevisionOut:
+    """Restore a revision's value as a NEW revision (history is never edited). Settings go through the settings
+    validators; a setting with its own endpoint (the global pause) and a model route that has not passed a recent
+    test are refused. Rollback affects future work only."""
+    from app.llm import api as llm_api
+
+    async def activate_route(snapshot: dict[str, Any], note: str | None) -> None:
+        values = await settings_service.values(session)
+        if snapshot.get("provider") != values["ai.provider"]:
+            raise rollback_lib.RollbackError(409, "that route belongs to a different provider than the current one")
+        try:
+            await llm_api.activate_route(
+                llm_api.RouteActivateIn(stage=str(snapshot["stage"]), model=str(snapshot["model"]),
+                                        reason=note or "restored an earlier route"), session, principal)
+        except HTTPException as exc:
+            raise rollback_lib.RollbackError(exc.status_code, str(exc.detail)) from exc
+
+    try:
+        srev = await session.get(SettingRevision, revision_id)
+        if srev is not None:
+            done = await rollback_lib.rollback_setting(session, srev, actor=principal.actor, note=body.note)
+        else:
+            crev = await session.get(ConfigRevision, revision_id)
+            if crev is None:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no such revision")
+            done = await rollback_lib.rollback_config(session, crev, actor=principal.actor, note=body.note,
+                                                      route_activator=activate_route)
+    except rollback_lib.RollbackError as exc:
+        await session.rollback()
+        raise HTTPException(exc.status, detail=exc.detail) from exc
+    return await _revision_out(session, done)

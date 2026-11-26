@@ -7,10 +7,10 @@ import {
   queryOptions,
   type QueryClient,
 } from "@tanstack/react-query"
+import type { JobDrill } from "@/features/insights/drill-search"
 import { api, ApiError, unwrap } from "@/lib/api/client"
 import type {
   AppliedMyselfIn,
-  BulkActionIn,
   CampaignRuleIn,
   ConditionSet,
   CustomFacetIn,
@@ -30,6 +30,8 @@ type AnyConditions = never
 
 export type ListParams = {
   conditions: ConditionSet
+  /** Insights drill-through: narrows to the roles the clicked number counted. */
+  drill?: JobDrill
   q?: string
   group_by?: string
   sort?: string
@@ -40,6 +42,7 @@ const PAGE = 100
 
 function listQuery(p: ListParams, cursor?: string, limit = PAGE) {
   return {
+    ...p.drill,
     conditions: JSON.stringify(p.conditions),
     q: p.q?.trim() || undefined,
     group_by: p.group_by || undefined,
@@ -63,8 +66,6 @@ export const patchJob = (id: string, body: JobPatch) =>
   unwrap(
     api.PATCH("/api/jobs/{job_id}", { params: { path: { job_id: id } }, body })
   )
-export const bulkAction = (body: BulkActionIn) =>
-  unwrap(api.POST("/api/jobs/bulk", { body }))
 export const getWhy = (id: string) =>
   unwrap(
     api.GET("/api/jobs/{job_id}/why", { params: { path: { job_id: id } } })

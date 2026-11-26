@@ -9,6 +9,7 @@ import {
   oauthStart,
   updateConnection,
   type Connection,
+  type OAuthProvider,
 } from "./api"
 import { FORMS, type FieldDef } from "./forms"
 
@@ -154,12 +155,16 @@ export function ConnectForm({
 export const GOOGLE_NOT_SET_UP =
   "Set GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET on the server to connect Google."
 
-/** Gmail and Drive sign in at Google, so there is nothing to type here. */
+/** Shown when the server has no Microsoft Entra app (start answers 409). */
+export const MICROSOFT_NOT_SET_UP =
+  "Set MS_OAUTH_CLIENT_ID and MS_OAUTH_CLIENT_SECRET on the server to connect Microsoft."
+
+/** Gmail, Drive, Outlook and OneDrive sign in at the provider, so there is nothing to type here. */
 export function OAuthButton({
   provider,
   label,
 }: {
-  provider: "gmail" | "gdrive"
+  provider: OAuthProvider
   label: string
 }) {
   const start = useMutation({
@@ -179,7 +184,9 @@ export function OAuthButton({
       {start.isError && (
         <p role="alert" className="text-sm text-danger">
           {isApiError(start.error, 409)
-            ? GOOGLE_NOT_SET_UP
+            ? provider === "msgraph" || provider === "onedrive"
+              ? MICROSOFT_NOT_SET_UP
+              : GOOGLE_NOT_SET_UP
             : start.error.message}
         </p>
       )}

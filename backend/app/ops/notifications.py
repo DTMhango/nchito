@@ -54,6 +54,7 @@ GENERIC_TITLES = {
     "health": "Health notice",
     "backup": "Backup notice",
     "digest": "Your digest is ready",
+    "interview_reminder": "An interview is coming up",
 }
 NEEDS_YOU_KINDS = ("pending_action", "pending_action_stale")
 MAX_BODY = 400
@@ -258,26 +259,53 @@ async def _deliver_one(session: AsyncSession, n: Notification, values: dict[str,
     attempts = int(st.get("attempts", 0))
     errors: dict[str, str] = {}
     sent = list(n.channels_sent)
+    sending: dict[str, str] = dict(st.get("sending") or {})
+    uncertain: dict[str, str] = dict(st.get("uncertain") or {})
+    grace = timedelta(minutes=values["notifications.retry_minutes"])
     for channel in channels:
-        if channel in sent:
+        # A "sending" mark with no recorded outcome means a send began and the process may have died before
+        # the result was saved. While it is recent another worker may still be sending: wait. Once it is old
+        # the outcome is unknown, so it is marked uncertain and NEVER resent (a missed message is better
+        # than a duplicate; the owner is told).
+        started = sending.get(channel)
+        if channel not in sent and channel not in uncertain and started:
+            if datetime.fromisoformat(started) + grace > now:
+                result.held += 1
+                return
+            uncertain[channel] = started
+            sending.pop(channel, None)
+            await audit.record(session, actor="system", action="notification.delivery_uncertain",
+                               subject_type="notification", subject_id=n.id,
+                               detail={"kind": n.kind, "channel": channel, "started_at": started})
+    for channel in channels:
+        if channel in sent or channel in uncertain:
             continue
         notifier = await notifier_for(session, channel)
         if notifier is None:
             errors[channel] = "not connected"
             continue
+        # Claim the send durably BEFORE it happens: a crash after the provider accepted it must not lead to a
+        # second send on restart. The message's event_id (the dedupe key) is the provider idempotency key.
+        sending[channel] = now.isoformat()
+        _set_state(n, state="pending", sending=sending, uncertain=uncertain or None)
+        await session.commit()
         try:
             await notifier.send(message)
         except DeliveryError as exc:
+            sending.pop(channel, None)
             errors[channel] = exc.detail[:200]
             if not exc.retryable:
                 attempts = max(attempts, values["notifications.retry_attempts"] - 1)
         except Exception as exc:  # a broken connector must never fail the caller
             log.exception("notifier %s crashed", channel)
             errors[channel] = f"{type(exc).__name__}"
+            sending.pop(channel, None)
         else:
+            sending.pop(channel, None)
             sent.append(channel)
             result.sent += 1
     n.channels_sent = sent
+    _set_state(n, sending=sending or None, uncertain=uncertain or None)
     if not errors:
         _set_state(n, state="done", delivered_at=now.isoformat(), held=None, errors=None)
         return

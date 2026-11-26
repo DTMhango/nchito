@@ -2,6 +2,7 @@
 import { resetAiMock } from "./handlers/ai"
 import { resetAutopilotMock } from "./handlers/autopilot"
 import { resetRunnersMock } from "./handlers/runners"
+import { resetBulkMock } from "./handlers/bulk"
 import { resetApplicationsMock } from "./handlers/applications"
 import { resetDataMock } from "./handlers/data"
 import { resetCampaignMocks } from "./handlers/campaigns"
@@ -12,11 +13,16 @@ import { resetSettingsMock } from "./handlers/settings"
 import { resetSourcesMock } from "./dataset/sources"
 import { resetStudioMock } from "./handlers/studio"
 import { resetW3JobUiMock } from "./handlers/w3-job-ui"
+import { resetCalendarMock } from "./handlers/calendar"
+import { resetPreferencesMock } from "./handlers/preferences"
+import { resetFollowupsMock } from "./handlers/followups"
+import { resetMockInterviewMock } from "./handlers/mock-interview"
 
 export function resetAllMocks() {
   resetSettingsMock()
   resetAiMock()
   resetMatchesMock()
+  resetBulkMock()
   resetCampaignMocks()
   resetApplicationsMock()
   resetAutopilotMock()
@@ -28,4 +34,8 @@ export function resetAllMocks() {
   resetStudioMock()
   resetDataMock()
   resetW3JobUiMock()
+  resetCalendarMock()
+  resetPreferencesMock()
+  resetFollowupsMock()
+  resetMockInterviewMock()
 }
