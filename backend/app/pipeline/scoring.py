@@ -405,7 +405,12 @@ async def score_jobs(session: AsyncSession, run: Run | None, job_ids: Sequence[u
                 job.triage = TRIAGE_BY_VERDICT[post.verdict]
             summary.employers.add(record["employer"])
         await session.flush()
-    await conflicts.resolve_employers(session, summary.employers, now=now)
+    dry = run is not None and run.dry_run
+    ties: list[dict[str, Any]] | None = [] if dry else None
+    await conflicts.resolve_employers(session, summary.employers, now=now, sink=ties)
+    if run is not None and ties:
+        known = (run.config_versions or {}).get("dry_run_choices", [])
+        run.config_versions = {**run.config_versions, "dry_run_choices": [*known, *ties]}
     if run is not None:
         run.counts = {**run.counts, **summary.counts()}
         run.cost_micros = (run.cost_micros or 0) + summary.cost_micros

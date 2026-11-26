@@ -282,6 +282,8 @@ async def _finish_paid(session: AsyncSession, run: Run, campaign: Campaign, job_
     run.config_versions = {**run.config_versions, "job_ids": [str(i) for i in dict.fromkeys(job_ids)]}
     if run.dry_run:
         proposals = await dry_run.propose_actions(session, campaign, job_ids, now=now, limit=MAX_PROPOSED)
+        ties = dry_run.choice_proposals((run.config_versions or {}).get("dry_run_choices", []))
+        proposals = [*ties, *proposals][:MAX_PROPOSED]
         run.config_versions = {**run.config_versions, "proposed_actions": proposals}
     if paid.budget_scope is not None and status in (RunStatus.succeeded, RunStatus.partial):
         values = await settings_service.values(session)

@@ -254,7 +254,14 @@ async def _eligible_entries(session: AsyncSession, jobs: Sequence[Job], settings
     return entries
 
 
-async def _raise_choice(session: AsyncSession, group_key: str, title: str, detail: dict[str, Any]) -> None:
+async def _raise_choice(session: AsyncSession, group_key: str, title: str, detail: dict[str, Any],
+                        sink: list[dict[str, Any]] | None = None) -> None:
+    """Raise a pending choice. In a dry run ``sink`` is given and nothing is written: the tie is collected
+    so the run can report it in its proposed actions."""
+    if sink is not None:
+        if all(item["group_key"] != group_key for item in sink):
+            sink.append({"group_key": group_key, "title": title, "detail": detail})
+        return
     exists = await session.scalar(select(PendingAction.id).where(
         PendingAction.group_key == group_key, PendingAction.status == PendingStatus.open).limit(1))
     if exists is None:
@@ -277,7 +284,8 @@ class GroupOutcome:
 
 async def _resolve_group(session: AsyncSession, key: str, group: list[Job], entries: list[Entry],
                          apps: Sequence[Application], state: EmployerState, settings: Mapping[str, Any],
-                         versions: Mapping[str, int], now: datetime) -> GroupOutcome:
+                         versions: Mapping[str, int], now: datetime,
+                         sink: list[dict[str, Any]] | None = None) -> GroupOutcome:
     rule = settings["matching.conflict_winner"]
     rule_ref = f"matching.conflict_winner={rule} (v{versions.get('matching.conflict_winner', 0)})"
     group_ids = {j.id for j in group}
@@ -327,7 +335,8 @@ async def _resolve_group(session: AsyncSession, key: str, group: list[Job], entr
                                     f"Better role at {entry.job.employer} after applying", {
                                         "kind": "better_role_after_applying", "candidate": _summary(entry),
                                         "application_id": str(anchor_app.id),
-                                        "applied_job_id": str(anchor_app.job_id), "applied_score": locked_score})
+                                        "applied_job_id": str(anchor_app.job_id), "applied_score": locked_score},
+                                    sink)
         return GroupOutcome(None, [e.job.id for e in ordered if e.job.id != anchor_app.job_id], why)
 
     current = next((e for e in ordered if e.job.conflict_state == ConflictState.winner), None)
@@ -341,7 +350,7 @@ async def _resolve_group(session: AsyncSession, key: str, group: list[Job], entr
                                 f"Choose between two roles at {top.job.employer}", {
                                     "kind": "displace_prepared", "current": _summary(current),
                                     "challenger": _summary(top), "application_id": str(prepared.id),
-                                    "rule": rule_ref})
+                                    "rule": rule_ref}, sink)
     winner.assessment.is_conflict_winner = True
     others = [e for e in ordered if e.job.id != winner.job.id]
     runner_up = others[0] if others else None
@@ -388,9 +397,12 @@ async def flag_recruiter_postings(session: AsyncSession, jobs: Sequence[Job], th
                 job.conflict_note = f"{job.conflict_note}; {flag}" if job.conflict_note else flag
 
 
-async def resolve_employers(session: AsyncSession, employers: Iterable[str], *, now: datetime | None = None
-                            ) -> dict[str, list[GroupOutcome]]:
-    """Recompute the conflict groups of these employers (names as on jobs, or canonical)."""
+async def resolve_employers(session: AsyncSession, employers: Iterable[str], *, now: datetime | None = None,
+                            sink: list[dict[str, Any]] | None = None) -> dict[str, list[GroupOutcome]]:
+    """Recompute the conflict groups of these employers (names as on jobs, or canonical).
+
+    ``sink``: pass a list in a dry run; choices the owner would be asked to make are appended to it
+    instead of becoming pending actions."""
     now = now or utcnow()
     states = await settings_service.get_all(session)
     settings = {k: s.value for k, s in states.items()}
@@ -420,7 +432,7 @@ async def resolve_employers(session: AsyncSession, employers: Iterable[str], *, 
             await flag_recruiter_postings(session, jobs, similarity_threshold)
             continue
         groups = conflict_groups(jobs, scope, recruiter_similarity=similarity_threshold)
-        out[key] = [await _resolve_group(session, key, group, entries, apps, state, settings, versions, now)
+        out[key] = [await _resolve_group(session, key, group, entries, apps, state, settings, versions, now, sink)
                     for group in groups]
         await flag_recruiter_postings(session, jobs, similarity_threshold)
     await session.flush()

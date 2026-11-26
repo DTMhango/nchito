@@ -268,3 +268,45 @@ async def test_recruiter_postings_grouped_by_title_and_flagged(session):
     assert conflicts.RECRUITER_FLAG_TAG in r1.tags and "Direct Example" in r1.conflict_note
     assert conflicts.RECRUITER_FLAG_TAG not in r3.tags
     assert (await session.get(Job, direct.id)).conflict_state == ConflictState.winner
+
+
+async def test_dry_run_reports_a_tie_instead_of_raising_a_pending_action(session):
+    from app.models.search import Run, RunKind, RunStatus
+    from app.pipeline import dry_run
+
+    campaign = await add_campaign(session, await add_rubric(session))
+    current = await add_job(session, "Senior Analyst")
+    await scored(session, current, campaign, 80)
+    await resolve(session, current)
+    session.add(Application(job_id=current.id, campaign_id=campaign.id, stage=Stage.ready))
+    await session.flush()
+    challenger = await add_job(session, "Head of Analytics")
+    await scored(session, challenger, campaign, 95)
+
+    sink: list = []
+    await conflicts.resolve_employers(session, {current.canonical_employer}, now=NOW, sink=sink)
+    assert (await session.scalars(select(PendingAction))).all() == []  # a dry run raises nothing
+    assert len(sink) == 1 and sink[0]["detail"]["kind"] == "displace_prepared"
+    proposals = dry_run.choice_proposals(sink)
+    assert proposals[0]["action"] == "ask_owner" and proposals[0]["job_id"] == str(challenger.id)
+
+    # the same through the scoring entry point of a dry-run run: reported on the run, no pending action
+    from app.pipeline import scoring
+    from tests.pipeline.matching.fakes import FakeLLMClient, add_facts, ratings
+
+    await add_facts(session, "F-1", "F-2")
+    campaign2 = await add_campaign(session, await add_rubric(session), name="Second")
+    first = await add_job(session, "Senior Analyst", employer="Dry Example")
+    await scoring.score_jobs(session, None, [first.id], campaign_ids=[campaign2.id], now=NOW,
+                             client=FakeLLMClient(ratings({"skills": 4, "domain": 4})))
+    session.add(Application(job_id=first.id, campaign_id=campaign2.id, stage=Stage.ready))
+    await session.flush()
+    second = await add_job(session, "Head of Analytics", employer="Dry Example")
+    run = Run(kind=RunKind.sweep, trigger="manual", dry_run=True, status=RunStatus.running,
+              campaign_id=campaign2.id)
+    session.add(run)
+    await session.flush()
+    await scoring.score_jobs(session, run, [second.id], now=NOW,
+                             client=FakeLLMClient(ratings({"skills": 5, "domain": 5})))
+    assert (await session.scalars(select(PendingAction))).all() == []
+    assert len(run.config_versions["dry_run_choices"]) == 1
