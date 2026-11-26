@@ -643,3 +643,37 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   `app.connect.mail_sync.apply_proposal(session, action, actor=...)` when the owner approves one.
 - Source connector `alert_email` (config `connection_id`, `senders`). Settings group `mail.*`.
 - Periodic task `mail_check` (system queue, every minute, gated by `mail.check_interval_minutes`).
+
+## Wave 2 integration
+
+- **Migrations** chain linearly: `0007_render` -> `0008_tailoring` -> `0009_apply` -> `0010_email` ->
+  `0011_track_templates` (nullable `track.cv_template` / `track.letter_template`; null uses `documents.*_template`;
+  `TrackIn` and the kit file's `KitTrack` gain both fields).
+- **One Google OAuth client**: env `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` for both Gmail and Drive
+  (`GOOGLE_CLIENT_*` is gone). One `FileStore` default: `app.connect.local_store.default_file_store`.
+- **Email channel** registered built-in (`app.apply.channels.email:factory`): the mailbox whose `from_address` is the
+  packet's sending identity, attachments loaded by `PacketFile.document_id` (`application_document.file_key`, or
+  `vault_document.file_path` for vault files), hash `registry.packet_hash`. `registry.unregister` of a built-in puts
+  its default back. The mail proposal resolver (`mail_stage_proposal`) and an `email` notifier (the owner's own
+  mailbox, idempotency key `notify-<event id>`) are registered.
+- **Checked spec gate** (`app.apply.prepare.spec_gate`, permit gate `spec_checked`): a packet holding generated files
+  (`cv`, `letter`) is built (else 409), approved, permitted and dispatched only while the latest spec version is
+  checked (not stale) and not blocking, and each such file names (`document_id`) an `application_document` of this
+  application rendered from that version (`spec_hash`) with the same sha256.
+- **Pipeline**: after scoring, a real (non-dry) sweep requests tailoring for each role whose verdict is `tailor`,
+  `ask_owner` or `auto_apply` (`app.pipeline.advance.tailor_winners`; held roles never), creating a shortlisted
+  application (`origin = pipeline`) when the role has none. A finished draft whose checks pass is rendered (PDF and
+  text), packed by `app.apply.prepare.prepare_packet` (email when the posting has `apply_email` and a mailbox is
+  connected, body = the letter text, subject = setting `automation.email_subject_template`; else manual with
+  `apply_url`), and handed to `approval.after_packet_built`; `apply_tick` dispatches. Not built (audited
+  `packet.not_built`) while an answer waits for the owner. No `RunKind` for tailoring.
+- **Dispatch** re-checks quiet hours at send time: a due send inside `automation.quiet_hours_*` is deferred to their
+  end (`dispatch.deferred`); unknown quiet hours or time zone cancel it.
+- **Settings API**: `PUT /api/settings/automation.paused` answers 409; only `PUT /api/autopilot` and
+  `POST /api/autopilot/resume-after-restore` change it. `nchito restore --yes` enters paused-for-restore itself
+  (`app.apply.restore.enter`); `nchito restored` repeats that by hand.
+- **Mail**: the classification wording is settings `mail.{rejection,interview,info_request,confirmation,auto_reply,
+  bounce_subject}_phrases` (regular expressions) and `mail.bounce_senders`. `Mailbox.list_messages` returns the
+  oldest `limit` messages since `since`, oldest first; a full page makes the sync ask again from the newest one.
+- **Handoff**: kit file links for rendered documents use `/api/applications/{id}/document-files/{document_id}`;
+  `GET /api/applications/{id}/documents/answers` returns the current packet's answers as text (404 without one).

@@ -113,7 +113,7 @@ Migration: section 13.
 | Database | PostgreSQL 16 | Also holds the queue, audit and ledger |
 | LLM access | LiteLLM behind our own `LLMClient` interface, plus a Claude Code CLI adapter | Anthropic, OpenAI-compatible (OpenRouter, self-hosted Qwen via Ollama/vLLM) with one cost model |
 | Agent gateway | MCP over streamable HTTP (official `mcp` Python SDK), bearer tokens | Any MCP-capable agent can be a runner |
-| Documents | Jinja2 HTML/CSS -> PDF by Playwright Chromium; DOCX by python-docx | Ports the existing builder; no LibreOffice |
+| Documents | PDF by ReportLab (deterministic, no browser); HTML by Jinja2; DOCX by python-docx | Ports the existing builder; no LibreOffice |
 | Frontend | React 19, Vite, TypeScript, Tailwind v4, shadcn/ui, TanStack Router and Query, react-hook-form + zod, dnd-kit, Recharts (shadcn charts), cmdk, Motion, Sonner, Lucide, Fontsource | Component source lives in the repo, so themes reach everything |
 | API types | OpenAPI -> `openapi-typescript` + `openapi-fetch` | One contract, no hand-written client |
 | Tests | pytest + pytest-xdist, Vitest + Testing Library, Playwright for 6 smoke flows | See section 15 |
@@ -556,8 +556,11 @@ submission is never retried automatically.
    "add this to my library" which creates a draft fact for approval).
 5. **Approve:** freezes a version. Applying snapshots the exact files and answers, immutable.
 
-Rendering: one Jinja2 template per document kind produces HTML for the PDF and drives the
-DOCX builder. Templates and their limits are Kit data. Three CV templates ship: Classic
+Rendering: one layout per template (data, not code paths) drives every format. PDFs are
+rendered with ReportLab: deterministic bytes for the same input, and no browser in the image.
+HTML (Jinja2) and DOCX (python-docx) are built from the same document model. Templates and
+their limits are Kit data; a track may name its own CV and letter template, else the
+`documents.*_template` settings apply. Three CV templates ship: Classic
 (the existing layout), Compact, Modern. All are single-column and text-extractable.
 
 ---
