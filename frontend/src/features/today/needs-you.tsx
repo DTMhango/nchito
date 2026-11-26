@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   CheckCircle2,
   ChevronDown,
   FileCheck2,
+  FileDiff,
+  FileWarning,
   HelpCircle,
   KeyRound,
   MailCheck,
@@ -23,16 +25,29 @@ import {
   type DecisionGroup,
   type PendingAction,
 } from "@/features/applications/api"
+import { isHandoff } from "@/features/accounts/logic"
 import { AnswerForm, type AnswerSubmit } from "./answer-form"
-import { actionKit, deadlineText, readDetail, urgency } from "./decisions"
+import {
+  actionKit,
+  changeJobId,
+  changeKind,
+  deadlineText,
+  readDetail,
+  urgency,
+  type KitResolution,
+} from "./decisions"
 
 const TYPE_ICON: Partial<Record<PendingAction["type"], LucideIcon>> = {
   unknown_question: HelpCircle,
   sign_in: KeyRound,
   create_account: KeyRound,
+  captcha: KeyRound,
   approve: FileCheck2,
   confirm_submission: MailCheck,
   declaration: ShieldQuestion,
+  unsupported_form: FileWarning,
+  redirect_off_domain: ShieldQuestion,
+  page_instruction: ShieldQuestion,
 }
 
 /** Refetch everything a resolved decision can change. */
@@ -61,7 +76,7 @@ export function DecisionRow({
   const refresh = useRefreshDecisions()
   const first = group.actions[0]
   const n = group.actions.length
-  const kit = actionKit(first.type, n)
+  const kit = actionKit(first, n)
   const [answering, setAnswering] = useState(
     focused && kit.primary.resolution === "answer"
   )
@@ -80,7 +95,9 @@ export function DecisionRow({
     mutationFn: async (
       body: Parameters<typeof resolveAction>[1]
     ): Promise<void> => {
-      await Promise.all(group.actions.map((a) => resolveAction(a.id, body)))
+      // One continue closes every action sharing the blocker (the backend does it), so send it once.
+      const targets = body.resolution === "continue" ? [first] : group.actions
+      await Promise.all(targets.map((a) => resolveAction(a.id, body)))
     },
     onSuccess: () => {
       refresh()
@@ -96,14 +113,16 @@ export function DecisionRow({
       answer_scope: v.scope,
     })
 
-  const run = (r: (typeof kit)["primary"]["resolution"]) => {
+  const run = (r: KitResolution) => {
     if (r === "answer") setAnswering(true)
-    else if (r !== "link") resolve.mutate({ resolution: r })
+    else if (r !== "link" && r !== "handoff" && r !== "changes")
+      resolve.mutate({ resolution: r })
   }
+  const jobId = changeJobId(first)
 
   const deadline = group.nearest_deadline
   const verb = first.type === "unknown_question" ? "Closes" : "Due"
-  const secondaryIsLink = kit.secondary.resolution === "link"
+  const secondary = kit.secondary
   const primaryIsLink = kit.primary.resolution === "link"
 
   return (
@@ -115,7 +134,9 @@ export function DecisionRow({
     >
       <SeverityItem
         severity={urgency(deadline)}
-        icon={TYPE_ICON[first.type] ?? HelpCircle}
+        icon={
+          changeKind(first) ? FileDiff : (TYPE_ICON[first.type] ?? HelpCircle)
+        }
         title={group.title}
         meta={
           <>
@@ -147,7 +168,17 @@ export function DecisionRow({
                   />
                 </Button>
               )}
-              {secondaryIsLink ? (
+              {isHandoff(first) && kit.primary.resolution !== "handoff" && (
+                <Button asChild variant="ghost" size="sm">
+                  <Link
+                    to="/accounts/handoff/$actionId"
+                    params={{ actionId: first.id }}
+                  >
+                    Details
+                  </Link>
+                </Button>
+              )}
+              {secondary?.resolution === "link" ? (
                 detail.url && (
                   <Button asChild variant="outline" size="sm">
                     <a
@@ -155,23 +186,43 @@ export function DecisionRow({
                       target="_blank"
                       rel="noreferrer noopener"
                     >
-                      {kit.secondary.label}
+                      {secondary.label}
                     </a>
                   </Button>
                 )
-              ) : (
+              ) : secondary ? (
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={resolve.isPending}
-                  onClick={() => run(kit.secondary.resolution)}
+                  onClick={() => run(secondary.resolution)}
                 >
-                  {kit.secondary.label}
+                  {secondary.label}
                 </Button>
-              )}
-              {primaryIsLink &&
-              first.type === "approve" &&
-              first.application_id ? (
+              ) : null}
+              {kit.primary.resolution === "changes" && jobId ? (
+                <Button asChild size="sm">
+                  <Link
+                    to="/jobs/$id"
+                    params={{ id: jobId }}
+                    search={{ tab: "changes" }}
+                  >
+                    {kit.primary.label}
+                  </Link>
+                </Button>
+              ) : kit.primary.resolution === "changes" ? null : kit.primary
+                  .resolution === "handoff" ? (
+                <Button asChild size="sm">
+                  <Link
+                    to="/accounts/handoff/$actionId"
+                    params={{ actionId: first.id }}
+                  >
+                    {kit.primary.label}
+                  </Link>
+                </Button>
+              ) : primaryIsLink &&
+                first.type === "approve" &&
+                first.application_id ? (
                 <Button asChild size="sm">
                   <Link
                     to="/approvals/$applicationId"
@@ -234,6 +285,20 @@ export function NeedsYou({ focusAction }: { focusAction?: string } = {}) {
   const holds = (g: DecisionGroup) =>
     !!focusAction && g.actions.some((a) => a.id === focusAction)
   const missing = !!focusAction && q.isSuccess && !groups.some(holds)
+  // Notifications link blockers to `/today?action=`; their choices live on the handoff page.
+  const navigate = useNavigate()
+  const blocker = focusAction
+    ? groups.flatMap((g) => g.actions).find((a) => a.id === focusAction)
+    : undefined
+  const toHandoff = blocker && isHandoff(blocker) ? blocker.id : null
+  useEffect(() => {
+    if (toHandoff)
+      void navigate({
+        to: "/accounts/handoff/$actionId",
+        params: { actionId: toHandoff },
+        replace: true,
+      })
+  }, [toHandoff, navigate])
   return (
     <section aria-labelledby="needs-title" className="elev py-1.5">
       <div className="flex items-center gap-2.5 px-4.5 pt-2.5 pb-2">

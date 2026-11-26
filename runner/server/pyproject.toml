@@ -1,0 +1,42 @@
+[project]
+name = "nchito-runner"
+version = "0.1.0"
+description = "Nchito server runner: Claude Agent SDK + Playwright worker for account-free application forms"
+requires-python = ">=3.11"
+dependencies = [
+  "claude-agent-sdk>=0.2.189",
+  # The gateway speaks MCP through the official SDK 1.x (stateless streamable HTTP, JSON responses).
+  # 1.30 is the version the gateway runs; <2 keeps one consistent SDK next to the backend's pin.
+  "mcp>=1.30,<2",
+  "playwright>=1.55",
+  "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=1.0", "pytest-xdist>=3.6", "uvicorn>=0.30", "ruff>=0.6"]
+
+[project.scripts]
+nchito-runner = "nchito_runner.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["nchito_runner*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+markers = ["browser: needs Playwright Chromium"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "RUF", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]

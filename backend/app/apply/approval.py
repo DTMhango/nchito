@@ -92,6 +92,13 @@ async def _mark_approved(session: AsyncSession, app: Application, packet: Applic
                            "packet_hash": packet.content_hash, "channel": packet.contents.channel,
                            "automatic": actor == AUTO_APPROVER, "mode": evaluation.decision.mode,
                            "reason": evaluation.reason, "gates": evaluation.gate_results()})
+    if packet.contents.channel == "browser":
+        # A role that needs a portal account asks the owner to sign in now, not at the next accounts tick.
+        from app.apply import accounts
+
+        job = await session.get(Job, app.job_id)
+        if job is not None:
+            await accounts.ensure_for_application(session, app, job, now=now)
 
 
 async def _apply_waivers(session: AsyncSession, app: Application, guardrail_ids: list[uuid.UUID],

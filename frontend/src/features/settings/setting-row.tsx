@@ -140,7 +140,9 @@ export function SettingRow({ setting: s }: { setting: SettingOut }) {
         <label htmlFor={id} className="font-semibold">
           {s.label}
         </label>
-        <p className="text-sm text-muted-foreground">{s.description}</p>
+        <p className="text-sm [overflow-wrap:anywhere] text-muted-foreground">
+          {s.description}
+        </p>
         <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-faint">
           Default: <span className="num">{displayValue(s, s.default)}</span>
           {!s.is_default && <Chip tone="primary">Changed</Chip>}

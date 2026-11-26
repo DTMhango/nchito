@@ -9,9 +9,15 @@ import signal
 
 from app.apply import tasks as apply_tasks  # noqa: F401  (registers dispatch and reconciliation)
 from app.core.db import dispose_engine
+from app.gateway import worker as gateway_worker  # noqa: F401  (registers the gateway tick)
 from app.ops import tasks as ops_tasks  # noqa: F401  (registers the periodic ops tick)
 from app.pipeline import wiring
-from app.worker import mail_tasks, tracking_tasks  # noqa: F401  (registers the periodic tasks)
+from app.worker import (  # noqa: F401  (registers the periodic tasks)
+    accounts_tasks,
+    browser_changes_tasks,
+    mail_tasks,
+    tracking_tasks,
+)
 from app.worker.heartbeat import heartbeat_loop
 from app.worker.queue import RUNS_QUEUE, SYSTEM_QUEUE, queue_app
 

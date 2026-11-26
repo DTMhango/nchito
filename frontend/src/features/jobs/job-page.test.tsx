@@ -49,9 +49,15 @@ describe("job page tabs", () => {
     expect(await screen.findByText("At a glance")).toBeInTheDocument()
   })
 
-  it("shows what a later-wave tab will hold", async () => {
+  it("explains the Interview tab when there is no application yet", async () => {
     renderApp(`/jobs/${WIN}?tab=interview`)
-    expect(await screen.findByText(/Arrives in wave 3/)).toBeInTheDocument()
+    // The pack is per role: without an application it rests on the posting and the Kit only.
+    expect(
+      await screen.findByText(/no application for this role yet/)
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: "Generate the pack" })
+    ).toBeInTheDocument()
   })
 
   it("shows the sentence behind a facet on focus", async () => {

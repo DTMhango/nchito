@@ -109,6 +109,51 @@ def _ld_pay(posting: Mapping[str, Any]) -> str | None:
     return f"{salary.get('currency', '')} {span} per {str(value.get('unitText', 'year')).lower()}".strip()
 
 
+def job_postings(body: str) -> list[dict[str, Any]]:
+    """Every JSON-LD ``JobPosting`` object in a page (a listing page may carry many)."""
+    head = _Head()
+    head.feed(body)
+    head.close()
+    found: list[dict[str, Any]] = []
+    for blob in head.ld:
+        try:
+            data = json.loads(blob)
+        except ValueError:
+            continue
+        found.extend(_all_postings(data))
+    return found
+
+
+def _all_postings(node: Any) -> list[dict[str, Any]]:
+    if isinstance(node, list):
+        return [p for item in node for p in _all_postings(item)]
+    if not isinstance(node, dict):
+        return []
+    kind = node.get("@type")
+    if kind == "JobPosting" or (isinstance(kind, list) and "JobPosting" in kind):
+        return [node]
+    return [p for value in node.values() if isinstance(value, (dict, list)) for p in _all_postings(value)]
+
+
+def posting_to_raw(url: str, posting: Mapping[str, Any], *, fallback_text: str = "", fallback_title: str = "",
+                   employer: str | None = None) -> RawJob:
+    """A JSON-LD ``JobPosting`` as a ``RawJob``; only what the posting states is filled."""
+    org = posting.get("hiringOrganization")
+    stated = org.get("name") if isinstance(org, dict) else org
+    description = html_to_text(str(posting.get("description") or "")) or fallback_text
+    identifier = posting.get("identifier")
+    req = identifier.get("value") if isinstance(identifier, dict) else identifier
+    valid = posting.get("validThrough")
+    return RawJob(
+        source_url=url, title=str(posting.get("title") or fallback_title).strip(),
+        employer=str(stated or employer or UNKNOWN_EMPLOYER).strip(), raw_text=description[:MAX_TEXT_CHARS],
+        apply_url=url, location_raw=_ld_location(posting), posted_at=parse_iso(posting.get("datePosted")),
+        deadline=parse_date(valid) if isinstance(valid, str) else None,
+        requisition_id=str(req) if req else None, pay_text=_ld_pay(posting),
+        remote_hint="remote" if posting.get("jobLocationType") == "TELECOMMUTE" else None,
+        extra={"structured_data": True})
+
+
 def parse_page(url: str, body: str) -> RawJob:
     head = _Head()
     head.feed(body)
@@ -123,20 +168,7 @@ def parse_page(url: str, body: str) -> RawJob:
             break
     text = html_to_text(body)[:MAX_TEXT_CHARS]
     if posting:
-        org = posting.get("hiringOrganization")
-        employer = org.get("name") if isinstance(org, dict) else org
-        description = html_to_text(str(posting.get("description") or "")) or text
-        identifier = posting.get("identifier")
-        req = identifier.get("value") if isinstance(identifier, dict) else identifier
-        valid = posting.get("validThrough")
-        return RawJob(
-            source_url=url, title=str(posting.get("title") or head.title).strip(),
-            employer=str(employer or UNKNOWN_EMPLOYER).strip(), raw_text=description[:MAX_TEXT_CHARS],
-            apply_url=url, location_raw=_ld_location(posting), posted_at=parse_iso(posting.get("datePosted")),
-            deadline=parse_date(valid) if isinstance(valid, str) else None,
-            requisition_id=str(req) if req else None, pay_text=_ld_pay(posting),
-            remote_hint="remote" if posting.get("jobLocationType") == "TELECOMMUTE" else None,
-            extra={"structured_data": True})
+        return posting_to_raw(url, posting, fallback_text=text, fallback_title=head.title)
     title = (head.meta.get("og:title") or head.title or "").strip()
     return RawJob(source_url=url, title=re.sub(r"\s+", " ", title) or url, employer=head.meta.get("og:site_name")
                   or UNKNOWN_EMPLOYER, raw_text=text, apply_url=url, extra={"structured_data": False})

@@ -242,14 +242,19 @@ Schemas: `backend/app/gateway/tools.py`; JSON Schemas for every input and output
 
 | Tool | In | Out |
 |---|---|---|
-| `next_task` | `{kinds?}` | `{task_id \| null, type, instructions, posting_url, checkpoint, rules: {stay_on_domain, max_steps, never[]}}` |
+| `next_task` | `{kinds?, dry_run?}` | `{task_id \| null, type, instructions, posting_url, checkpoint, rules: {stay_on_domain, max_steps, never[]}}` |
 | `get_packet` | `{task_id}` | `{packet_version, packet_hash, destination_domain, fields[], answers[], files[{name, kind, sha256, download_url (short-lived signed), attach_rule}]}` |
 | `find_answer` | `{task_id, question, options?}` | `{outcome: value \| ask_owner \| do_not_answer, value?, select?}` |
 | `save_checkpoint` | `{task_id, state: {step, fields_filled, screenshot_ref, url, data}}` | `{ok, steps_used, steps_left}` |
 | `raise_blocker` | `{task_id, type, detail, url?}` | `{pending_action_id, next: move_on \| wait}` |
-| `request_submit_permit` | `{task_id, summary, entered_answers[], attached_files_sha256[], current_url}` | `{decision: granted \| wait_for_owner \| denied, permit_id?, expires_at?, reason?, changes[]}` |
+| `request_submit_permit` | `{task_id, summary, entered_answers[], attached_files_sha256[], current_url, entered_fields[{key, value}]?}` | `{decision: granted \| wait_for_owner \| denied, permit_id?, expires_at?, reason?, changes[]}` |
 | `report_result` | `{task_id, outcome: submitted \| uncertain \| failed, permit_id?, confirmation_text?, reference?, screenshot_ref?, detail?}` | `{recorded, application_stage}` |
 | `report_jobs` | `{task_id, jobs[{url_visited, title, employer, location?, snippet?}]}` | `{accepted, duplicates}` |
+| `report_check` (wave 3) | `{task_id, status: open \| closed \| unknown, evidence?, screenshot_ref?}` | `{recorded, availability}` |
+| `release_task` (wave 3) | `{task_id, reason}` | `{released, task_status}` |
+| `evidence_upload_url` (wave 3) | `{task_id, content_type: image/png \| image/jpeg \| image/webp \| application/pdf \| text/plain}` | `{upload_url, ref, max_bytes, expires_at}` |
+
+`raise_blocker.type` also accepts `verification_code` (wave 3). See "Wave 3 gateway additions" at the end.
 
 Semantics (DESIGN.md 8.3, 18.1 to 18.3), enforced server-side:
 
@@ -265,6 +270,12 @@ Semantics (DESIGN.md 8.3, 18.1 to 18.3), enforced server-side:
   Editing a material item (answer, file, recipient, body) invalidates the approval. A new
   question met on the form, or an entered answer that differs from the packet, is a packet
   change: `request_submit_permit` returns `wait_for_owner` with `changes`.
+- **Personal fields.** `entered_fields` lists the person, contact and document fields the runner typed or attached,
+  by packet field key (`get_packet` `fields[].key`, e.g. `sending_identity`, `full_name`, `phone`, `link.<name>`,
+  `extra.<name>`; an attached file is `file.<name>` with its sha256). Compared with the packet (ignoring case and
+  spacing): a different value or a key the packet does not hold returns `wait_for_owner` with
+  `changes = ["field '<key>' differs from the packet", ...]` (values never echoed), blocks the task and raises a
+  `field_mismatch` blocker (choices continue, manual handoff, skip). Omitted (older runners): not compared.
 - **Permit.** Issued only after every gate passes again (`pipeline.decisions`, purpose
   `permit`) under a per-employer lock: mode, score, caps, duplicates, conflict group, expiry
   (open within `automation.open_check_max_age_hours`), quiet hours, budget, global pause.
@@ -737,3 +748,256 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
 - **Exit test** (`tests/integration/test_wave2_exit.py`): besides the pipeline path, an API-only path (set and
   confirm the address, prepare, approve and dispatch through the endpoints; one email in the fake mailbox) and a test
   that a posting's unconfirmed address is packed for manual hand-off and never sent automatically.
+
+## Wave 3 interview additions
+
+Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`, `crib`, `prompt`, `practice`,
+`offer`, `export`, `tasks`), router `backend/app/api/routers/interview.py` (the four wave-1 stubs moved here from
+`applications.py`, same paths, names and models). Migration `0013_interview`: `interview_pack` gains `status`
+(`idle|queued|running|paused|done|failed`), `generation`, `pending_sections`, `basis`, `notes`, `estimate_micros`,
+`cost_micros`, `paused_mark`, `error`, `offered_at`, `requested_by`; new tables `interview_section_version`
+(append-only by convention: unique `(pack, section, version)` and `(pack, section, request_key)`) and
+`interview_practice`.
+
+- **Sections** (setting `interview.sections`, in order): `role_brief`, `why_you`, `questions` (categories
+  `behavioural|technical|role|motivation|logistics`), `stories` (STAR, `favourite`), `questions_to_ask`, `gaps`,
+  `pay_sheet` (code only), `crib_sheet` (code only, from the others). Shapes: `app/pipeline/interview/shapes.py`.
+  Every sentence about the owner is a `Claim {text, fact_ids}` and goes through the document checks
+  (`fact_trace`, `claim_drift`, `keep_out`, `guardrails.*`, optional `claim_check`); guardrails see the pack as
+  scope `interview` (rules scoped `everywhere` apply). A section still blocking after
+  `interview.regenerate_attempts` retries is stored `flagged`; the crib sheet omits flagged sections. Retry notes
+  never repeat a keep-out code, figure or quote. The model claim check runs only on text the code checks passed.
+- **Basis** (`pack.basis`): `source = submitted_packet` (packet by `submitted_snapshot.packet_hash`, else the
+  approved packet once gone out; spec version from its CV/letter `document_id` -> `spec_hash`; answers from the
+  packet), else `latest_checked_spec`, else `none`. `posting_changed` compares `contents.job_version` with the job.
+- **Pay sheet**: topics `interview.pay_topics` (`Topic|Question`) matched with `app.kit.answers.match`; only a
+  usable confirmed answer fills `kit_answer`; form answers fill `told_them`; otherwise `status = decide` with
+  `interview.decide_wording`. Never a guessed number. `posting_pay` only when the posting states pay.
+- **Untrusted**: posting, documents sent, answers given, employer mail (subject/sender), application/job/contact
+  notes and practice drafts reach the model only as `DataBlock`s. No web research: `role_brief.research_note`
+  (setting `interview.research_note`).
+- **Budget**: stage `interview`, model per section `interview.model_<section>` and `interview.model_practice`.
+  `POST` stores `estimate_micros` (sum of per-section estimates); each section reserves on its own call.
+  `BudgetExhausted` parks the pack `paused` with `pending_sections`; versions are keyed `gen<n>`, so a resumed or
+  retried task never writes a section twice. Periodic `interview_tick` (system queue, every 5 min) makes offers,
+  defers queued packs and resumes paused ones; task `interview_generate(pack_id)` under lock `interview:<pack id>`.
+- **Offers** (`interview.auto_offer`: `invite_or_stage` default, `stage_only`, `off`; `interview.auto_generate`):
+  one per pack; a `follow_up` pending action with `detail.kind = "interview_pack_offer"` (resolver
+  `app.pipeline.interview.offer:accept_offer` queues the pack), or a queued generation when auto-generate is on.
+- **Endpoints** (`{code, reason}` errors): `GET|POST /api/jobs/{job_id}/interview-pack` (`InterviewGenerateIn
+  {sections?}`, 202, idempotent while open; `InterviewPackOut` gains `status, generation, pending_sections, basis,
+  notes, estimate_micros, cost_micros, error, offered_at, flagged`), `GET .../interview-pack/estimate?sections=`,
+  `POST .../sections/{section}/regenerate` (202; 409 `still_queued`), `PUT .../sections/{section}` `{content}`
+  (owner version, checked; 422 `invalid_section`), `GET .../sections/{section}/versions`,
+  `PUT .../sections/{section}/note` `{note}`, `PUT .../stories/{story_id}/favourite` `{favourite}`,
+  `GET|POST .../practice` (`PracticeIn {question, category?, draft_answer}` -> `PracticeOut`, `status
+  done|paused|failed`), `POST /api/interview-practice/{id}/retry`, `GET .../export?fmt=pdf|docx|txt` (built-in docs
+  template `pack`; header `X-Flagged-Sections`), `GET|POST .../rounds`, `PUT /api/interview-rounds/{id}`.
+  `thank_you_draft` stays null in this wave.
+
+## Wave 3 accounts additions
+
+- **Module `app/apply/accounts.py`.** `needs_account(session, job) -> AccountNeed` (`yes` / `no` / `unknown`; unknown is
+  never "no"), `preferred_runner_kind(session, job)` (`"pc"` or `"server"`; `None` when no account is needed; the
+  runner already holding a session wins), `portal_ref(job)` (key = `<ats>:<tenant host[/site]>`, lower case),
+  `register_blocker(session, *, kind, job, task_id, runner_id, detail)` for the gateway's `raise_blocker`, `tick`,
+  `continue_blocker`, `give_up`.
+- **Blocker convention.** `detail.kind` in `sign_in`, `create_account`, `verification_code`, `captcha`, `assessment`,
+  `declaration`, `unsupported_form`, plus `portal_key`, `portal_url`, `task_id`, `runner_id`, `runner_kind`,
+  `applications[]`, `tasks[]`. The pending action *type* is the nearest existing one (`verification_code` -> `sign_in`,
+  `unsupported_form` -> `assessment`); no enum change. `sign_in` and `create_account` are one open action per tenant
+  (`group_key = portal:<key>`, `application_id` null, every waiting application in `detail.applications`, `deadline` =
+  nearest); the other kinds are one action per task (`group_key = task:<id>`).
+- **Continue.** `owner_actions.continue_task` delegates to `accounts.continue_blocker`: marks the account signed in on
+  the runner, re-checks the posting (open check, deadline), duplicates, employer hold and state per application, requeues
+  each task with `payload.resume`, `resume_runner_token_id`, `resume_runner_kind` and its checkpoint, cancels tasks that
+  must not resume (reasons in `resolution.not_resumed`). A submit permit is still required.
+- **Endpoints** (`/api/portal-accounts`, owner only, audited): `GET` list (`?status=`), `POST`, `GET/PATCH/DELETE /{id}`,
+  `POST /actions/{action_id}/give-up {outcome: manual_handoff|skipped, application_ids?, note?}`, `POST /refresh`.
+  No password or secret field exists; any key containing password, secret, token, pin, otp, cookie or credential is a 422.
+- **Model.** `PortalAccount.notes` (migration `0014_accounts`).
+- **Notifications.** The first message reuses the key `pending:<id>` so `collect` never repeats it; reminders use
+  `portal-account:<id>:r<hours>`. The continue button (`intent=continue`) is added for sign_in, create_account, captcha.
+- **Settings (group `accounts`):** `portals_requiring_account`, `account_free_methods`, `runner_for_account_roles`,
+  `reminder_offsets_hours`, `create_title`, `sign_in_title`. Worker task `portal_accounts_tick` every 10 minutes.
+
+## Wave 3 browser-changes additions
+
+- **Browser channel** (`app/apply/channels/browser.py`, enforcement `instructed`, registered built-in). The permit is
+  consumed when the runner asks for it at Submit, never at task creation: (1) `dispatch.queue(app)` with no
+  `runner_token_id` (the owner's "Let the agent submit", or the worker's `browser.queue_approved_tasks`) creates an
+  `AgentTask` for the approved current packet and takes **no permit**; (2) the gateway claims it with
+  `browser.mark_task_claimed(task_id, token_id=)`; (3) at Submit the gateway calls `dispatch.queue(app,
+  runner_token_id=, agent_task_id=)` (permit requested and consumed, `DispatchAttempt` reserved, one transaction) then
+  `dispatch.run(attempt_id)`, which rechecks every gate and calls `BrowserChannel.dispatch`; an attempt that comes
+  back `handed_off` means **cleared: the runner may click Submit**, `cancelled` means refused; (4) the runner's
+  report goes to `browser.record_result(attempt, "submitted" | "uncertain" | "failed", evidence, task_id=, detail=)`.
+  `BrowserChannel.dispatch` returns `failed` (nothing handed over) unless the attempt's permit is consumed, bound to
+  the same packet hash, and held by a claimed task. `submitted` with `confirmation_page` / `reference` /
+  `confirmation_email` evidence settles as sent; without it, or `uncertain`, the attempt stays uncertain
+  (`submitted_unconfirmed`); `failed` settles as not sent (back to `ready`, never retried automatically). A report
+  with no consumed permit, or before clearance, raises `browser.UnpermittedReport` (code `no_permit`): the gateway
+  suspends the token (18.1). **An open or sent attempt blocks any new task, claim or clearance for that application.**
+  `BrowserChannel.reconcile` asks no runner: it reads the runner's own report on its task, a confirmation email
+  recorded on the application since the attempt started, and a classified confirmation `MailThread`; the watch window
+  and give-up age are `reconcile.confirmation_wait_hours` and `reconcile.check_every_minutes`.
+  `dispatch.queue` gains `agent_task_id`; with `channel == "browser"` and no runner token it returns
+  `status: queued` with no attempt. Worker task `browser_tick` (every 5 min): `queue_approved_tasks`,
+  `expire_stale_tasks`.
+- **Posting change alerts** (`app/pipeline/changes.py`, migration `0015_browser_changes`: tables `job_version`,
+  `job_change`, `job_watch`). `recheck_job` records a `JobChange` (kinds `closed`, `reopened`, `deadline_moved`,
+  `pay_changed`, `requirements_changed`, `apply_method_changed`, `eligibility_changed`, `location_changed`,
+  `wording`; each change has `field`, `before`, `after`, `material`, `summary`). Building a packet stores the
+  posting as the packet saw it, and a change is judged against that. A material change invalidates a current packet
+  (approval cleared, permits revoked) and opens one `follow_up` pending action per application with
+  `detail.kind` `posting_changed` (or `posting_closed`, which leaves the packet; the send gates refuse a closed
+  role); wording does nothing. Roles past `ready` get a `posting_changed` timeline event only. A failed fetch is
+  `unknown`, never `closed`. Worker task `posting_changes_scan` (every 15 min) rechecks the watched roles that are due.
+- **Endpoints:** `GET /api/jobs/{id}/changes` -> `JobChangesOut {job_id, watch, changes[]}`; `GET /api/job-changes
+  ?unacknowledged=true&material_only=false&limit=50` -> `JobChangeOut[]`; `POST /api/job-changes/{id}/acknowledge`.
+- **Compare** `GET /api/jobs/compare/{ids}?campaign_id=` (2 to 4 comma-separated ids; 422 otherwise, 404 for an
+  unknown id). `CompareOut` is reshaped: `{job_ids, jobs[] {id, title, employer, location, availability, campaign_id,
+  campaign_name, score, assessment_state}, rows[] {key, label, group, cells[] {value, state, note, amount_minor,
+  currency}, comparable, note, best_index}, winner_id, winner_reason}`. Cell states: `stated`, `not_stated`,
+  `unknown`, `yes`, `no`, `estimated`, `pass`, `fail`. Pay is normalised per year for year, month and week amounts in
+  one currency; hourly, daily, mixed-currency and unstated pay make the row `comparable: false` with the reason. No
+  model call.
+- **Settings:** `tracking.change_watch_enabled` (true), `tracking.change_watch_stages` (shortlisted, tailoring,
+  ready), `tracking.change_watch_pinned` (true), `tracking.change_check_every_hours` (12),
+  `tracking.change_batch_size` (20), `runners.browser_task_expiry_hours` (24).
+
+## Wave 3 gateway additions
+
+- **Transport.** `/mcp`: stateless streamable HTTP, JSON responses (official `mcp` SDK, low-level server; tool
+  schemas are exactly `app/gateway/tools.py`). `Authorization: Bearer nch_...`: missing, unknown or revoked is 401
+  before MCP; over `runners.calls_per_minute` is 429. A refused call is an MCP tool error whose text is
+  `{"code", "reason"}` (codes include `not_your_task`, `task_not_active`, `lease_expired`, `scope_missing`,
+  `runner_suspended`, `token_revoked`, `not_approved`, `destination_unverified`, `untrusted_site`, `permit_given`,
+  `rate_limited`, `invalid_input`). Python entry point: `app.gateway.service.call(token_id, tool, args)`.
+- **Tokens** (`/api/tokens`): list, create (secret shown once; sha256 stored), revoke (tasks held go back to the
+  queue), reinstate (lifts a suspension; 409 for a revoked token), `GET /api/tokens/runners` (last seen = last
+  gateway call, online within `runners.stale_after_minutes`, current task). Scopes: `gateway:tasks` (apply, check),
+  `gateway:packets` (get_packet, find_answer), `gateway:permits`, `gateway:sweep` (sweep tasks, report_jobs).
+  A suspended token may still report (results, checkpoints, blockers) but gets no tasks, packets, answers or permits.
+- **Tasks.** Claimed with `FOR UPDATE SKIP LOCKED`; a runner holding `runners.max_claimed_tasks` gets its held task
+  back (resume). Lease `runners.task_lease_minutes` from the last call on the task; on expiry the task is requeued
+  with its checkpoint, unless a permit was given (open dispatch attempt): then it is `failed/uncertain` and left to
+  reconciliation. **Resume to the same runner:** a `queued` task whose `payload.resume_runner_token_id` is set is
+  given only to that token (what `owner_actions.continue_task` writes). Routing: `AgentTask.preferred_runner`
+  (`pc` / `server` / null) against the token's `runner_kind`; a form that needs or might need an account is `pc`
+  (`app.apply.accounts.needs_account` when present, else facets and `runners.account_free_portals`); account-free
+  forms follow `runners.route_account_free`. Server tokens get nothing while `runners.server_runner_enabled` is off;
+  apply tasks are not handed out while paused. Hand-out: `gateway_tick` (system queue, every minute) queues one task
+  per ready application whose current packet is approved for `browser`, expires leases, and requeues tasks that
+  waited for an approval once the new packet is approved. Helpers: `tasks.enqueue_apply/enqueue_sweep/enqueue_check`.
+- **Permit through the gateway.** Entered answers are compared with the approved packet: a `never` / `owner_only`
+  answer entered, an unknown file, or a page off the destination domain is `denied` (the off-domain case also raises a
+  `redirect_off_domain` blocker); a new question or changed value builds a new packet version holding the entered
+  values and asks the owner (`wait_for_owner`, task `blocked`). Otherwise `permits.request` (channel `browser`, runner
+  and task bound); a grant writes a `DispatchAttempt` (`reserved`, `started_at` set, permit linked, not consumed) in
+  the same transaction. `report_result(submitted)` consumes the permit (`permits.consume`) and records `sent` with
+  evidence (`reference` or `confirmation_text`) or `unknown` without; no consumable permit = violation (token
+  suspended, `gateway.violation` audit, `health` notification, the submission held `unknown`). `failed` settles the
+  attempt failed and gives the role back; `uncertain` holds it `unknown`.
+- **Dry run** (`next_task {dry_run: true}`): the claim is given back when the task ends or is released, permits are
+  always denied, attempts are not counted, nothing is recorded on the application.
+- **report_check**: `open` / `closed` set `Job.availability` and `last_checked_at`; `closed` without evidence and
+  `unknown` record `unknown` (never closed). **release_task**: back to the queue with its checkpoint; refused once a
+  permit was given. **Evidence**: `evidence_upload_url` returns a signed `PUT /api/gateway/uploads/{signed}` link
+  (one upload, declared type only, at most `runners.evidence_max_kb`, stored untouched under `evidence/<task>/`);
+  `ref` is `evidence:<task id>/<id>`. Packet files: `GET /api/gateway/files/{signed}` (expires after
+  `runners.file_url_minutes`, only while the task is claimed and the file is in the approved packet; sha256 checked).
+- **Releases:** `GET /api/applications/{id}/releases` returns per task `released.given[]` (each `get_packet`:
+  packet hash, fields, answers, files, withheld files) and `entered` (the last permit request).
+- **Pending action types** `unsupported_form`, `redirect_off_domain`, `page_instruction` (migration `0016_gateway`).
+  Blockers carry `detail.released` (what the runner was already given). Sign-in style blockers go through
+  `app.apply.accounts.register_blocker` when that module is present (`app.gateway.accounts_bridge`).
+- **Settings** (`runners.*`): `task_lease_minutes`, `max_claimed_tasks`, `claims_per_hour`, `calls_per_minute`,
+  `file_url_minutes`, `evidence_max_kb`, `route_account_free`, `account_free_portals`, `task_instructions`.
+
+## Wave 3 integration
+
+- **Migrations** chained: `0013_interview` -> `0014_accounts` -> `0015_browser_changes` -> `0016_gateway` ->
+  `0017_search_api` (connection provider `search_api`).
+- **One permit flow for browser applications** (the browser channel's, see "Wave 3 browser-changes additions"). Apply
+  tasks are created only by `dispatch.queue` without a runner token / `browser.queue_approved_tasks`; the gateway's
+  own hand-out (`enqueue_apply`, `hand_out`, `requeue_approved`) is gone and `gateway_tick` only expires leases.
+  `next_task` claims through `browser.mark_task_claimed`; `request_submit_permit` (after comparing what was entered
+  with the packet) calls `dispatch.queue(app, runner_token_id=, agent_task_id=)` + `dispatch.run` and answers
+  `granted` only for a `handed_off` attempt: the permit is **consumed at clearance**, bound to the packet hash and the
+  claimed task. `report_result` goes to `browser.record_result`; `UnpermittedReport` (no cleared attempt) is the
+  violation: audited, runner suspended, alert, held as uncertain. A task blocked by `wait_for_owner` is rebound to the
+  newly approved packet and returned to the same runner by `browser.queue_task`. `permit_id` on `report_result` is
+  optional; when given it must be the cleared attempt's permit.
+- **Routing** `browser.preferred_runner(job)`: `accounts.preferred_runner_kind`, else `runners.route_account_free`.
+  `accounts.assess_need` falls back to the system recognised from the apply link when the posting names none.
+  Setting `runners.account_free_portals` is removed (folded into `accounts.account_free_methods`).
+- **Accounts**: `raise_blocker` calls `accounts.register_blocker` directly (the optional bridge is removed); the
+  action keeps the gateway's detail (`url`, `released`, ...). Per-task blockers are one action per task **and kind**
+  (`group_key = task:<id>:<kind>`): one "continue" never closes a CAPTCHA and a verification code together, and a
+  task stays blocked while another of its blockers is open. `unsupported_form` uses its own pending action type.
+  Approving a browser packet calls `accounts.ensure_for_application` at once.
+- **Pending actions**: `PendingActionOut.type` includes `unsupported_form`, `redirect_off_domain`, `page_instruction`;
+  new `kind` (= `detail.kind`, e.g. `posting_changed`, `posting_closed`, `verification_code`) and list filter
+  `?kind=`.
+- **Gateway**: `find_answer` outcome `skip_role` when `automation.unknown_question = skip_role` (task ended, role
+  skipped, nothing asked or guessed). New tool `get_runner_config` -> `RunnerConfigOut {runner_kind, enabled, model,
+  currency, task_cap_minor, day_cap_minor, task_max_tokens, day_max_tokens, max_steps, lease_minutes,
+  evidence_max_bytes}` (settings `runners.server_day_cap_minor`, `runners.server_task_max_tokens`,
+  `runners.server_day_max_tokens`). Any authenticated `/mcp` request updates `ApiToken.last_used_at`.
+  `POST /api/tokens/{id}/reinstate` takes `ReinstateIn {acknowledged, note?}`; a suspended token needs
+  `acknowledged: true` (422 `acknowledgement_required`), audited with the note.
+- **Sources**: `build_connector(source, transport, extras=)` passes each connector what its constructor takes
+  (`api_key` from the `search_api` connection named by the source's `connection_id` or the first enabled one; the
+  run's `llm`; live `settings`). Connection `search_api`: config `endpoint` + response shape, secret `api_key`
+  (encrypted, masked), `POST /api/connections/{id}/test` runs one search. A posting a sweep sees again goes through
+  `changes.record_changes` (source `sweep`). The permit's `job_version` gate and the dispatch-time source recheck
+  pass a reworded posting and fail a material change.
+- **Interview**: `PUT /api/jobs/{job_id}/interview-pack/stories/{story_id}` `StoryEditIn {title?, requirement?,
+  situation?, task?, action?, result?, base_version?}` -> new checked `stories` version (409 `version_conflict`).
+- **Exit tests** `tests/integration/test_wave3_exit.py` (in-process MCP client, fakes only); the module docstring
+  lists which test covers each 18.6 release gate.
+
+## Wave 3 closing fixes
+
+- **Blocker kind.** Every pending action raised for a runner blocker has `detail.kind` (and so `PendingActionOut.kind`)
+  equal to the exact blocker kind: `sign_in`, `create_account`, `verification_code`, `captcha`, `assessment`,
+  `declaration`, `unsupported_form`, `redirect_off_domain`, `page_instruction` (also `unknown_question`), whether
+  raised by the gateway or by `accounts`; `?kind=` filters on it. Migration `0018_blocker_kind` rewrites old rows whose
+  kind was the generic `blocker`.
+- **Waiting count.** A runner's `sign_in` / `create_account` blocker joins its site's one action even when the posting
+  names no known portal (`accounts.blocker_ref`: the apply link's host, plus the board's first path segment on an
+  applicant-tracking host), so the title counts every application waiting. The first notification
+  (`pending:<id>`) is kept in step (title and body) as roles join or leave.
+- **Owner choices per blocker kind** (`accounts.CHOICES`, invariant): `PendingActionOut.choices` lists them for an open
+  blocker. `sign_in`, `create_account`, `verification_code`, `captcha`, `assessment`, `declaration`: `continue`,
+  `manual_handoff`, `skipped`. `unsupported_form`: `manual_handoff`, `skipped`. `redirect_off_domain`,
+  `page_instruction` (suspicious page; raised through `accounts.register_blocker` like the others):
+  `manual_handoff`, `skipped`, `continue_acknowledged`. `continue` is `POST /api/pending-actions/{id}/resolve
+  {resolution: continue}`; `continue_acknowledged` the same with `acknowledged: true` (`ResolveIn.acknowledged`;
+  without it 422 `{code: acknowledgement_required}`; audited as `pending_action.suspicious_page_acknowledged` with the
+  note). A kind with no continue is 422 (`not_continuable` or "does not resolve"). `manual_handoff` / `skipped` are
+  `POST /api/portal-accounts/actions/{id}/give-up` for every blocker kind.
+- **Runner activity** (read-only, owner only): `GET /api/tokens/{id}/tasks?cursor=&limit=20` (max 100) ->
+  `Page[RunnerTaskOut {task_id, type, status, title, application_id, claimed_at, steps_used, attempts, dry_run,
+  checkpoint, blockers[] {pending_action_id, kind, title, status, raised_at, resolution}, permit_decisions[] {at,
+  decision, reason, changes, permit_id}, result {outcome, detail, reference, confirmation_text, at}, evidence_refs[]}]`,
+  the tasks the runner claimed (audit `gateway.task_claimed`), most recent claim first; 404 for an unknown token
+  (`app/gateway/history.py`). A `wait_for_owner` from the dispatch gates is now audited
+  (`gateway.permit_wait_for_owner`) like the others. `RunnerStatus` gains `current_task_title` (title at employer, or
+  the site) and `current_task_type`.
+- **Reminders on blocker actions**: `PendingActionOut.reminders_sent` and `next_reminder_at` (the widest
+  `accounts.reminder_offsets_hours` offset not yet reminded before the nearest deadline; null when none is left);
+  both null for non-blocker actions.
+- **Web search provider from the connection.** The endpoint, response shape and key of a `web_search` source come
+  only from its Search API connection (`connection_id`, else the first enabled one): `search_api.connection_for` ->
+  `web_search.SearchConnection {endpoint, api_key, shape}`, passed as the connector extra `search_connection` (was
+  `api_key`). A source's config keeps `connection_id`, `query_template` and its limits (`max_queries`,
+  `results_per_query`, `max_leads`); provider keys (`endpoint`, `query_param`, `limit_param`, `key_header`,
+  `key_param`, `result_path`, `url_field`, `title_field`) are dropped by `validate_config` and ignored if stored.
+  `POST /api/sources/{id}/test` now builds the connector with the same extras as a run.
+- **Entered personal fields** (section 8): `request_submit_permit.entered_fields` (`tools.EnteredField {key, value}`),
+  checked after the answer comparison by `submit._field_mismatches` against `release.packet_fields` and the packet's
+  files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
+  The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
+  skill asks for it.

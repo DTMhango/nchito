@@ -11,7 +11,8 @@ from app.gateway.tools import TOOLS, tool_schemas
 from tests.conftest import REPO
 
 TAGS = {"setup", "auth", "settings", "themes", "system", "audit", "events", "kit", "campaigns", "sources", "jobs",
-        "assessments", "applications", "pending_actions", "runs", "connections", "tokens", "insights", "data"}
+        "assessments", "applications", "pending_actions", "runs", "connections", "tokens", "insights", "data",
+        "interview"}
 
 
 @pytest.mark.nodb
@@ -36,13 +37,12 @@ def test_committed_contracts_are_current():
 def test_gateway_tools_have_schemas():
     schemas = tool_schemas()
     assert set(schemas) == {"next_task", "get_packet", "find_answer", "save_checkpoint", "raise_blocker",
-                            "request_submit_permit", "report_result", "report_jobs"} == set(TOOLS)
+                            "request_submit_permit", "report_result", "report_jobs", "report_check",
+                            "release_task", "evidence_upload_url", "get_runner_config"} == set(TOOLS)
     assert "entered_answers" in schemas["request_submit_permit"]["input"]["properties"]
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/jobs/00000000-0000-4000-8000-000000000001/interview-pack"),
-    ("GET", "/api/jobs/compare/00000000-0000-4000-8000-000000000001"),
     ("GET", "/api/insights"),
 ])
 async def test_later_wave_endpoints_answer_501(owner_client, method, path):
@@ -54,3 +54,16 @@ async def test_later_wave_endpoints_answer_501(owner_client, method, path):
 
 async def test_later_wave_endpoints_still_require_owner(client):
     assert (await client.get("/api/kit/facts")).status_code == 401
+
+
+@pytest.mark.nodb
+def test_equal_literals_have_one_spelling():
+    """Literals equal as sets share a typing cache entry, so the first spelling imported wins; the task
+    type is therefore defined once and the OpenAPI enum order cannot depend on import order."""
+    from app.api.routers.connections import RunnerStatus
+    from app.gateway.tools import NextTaskIn
+    from app.schemas.json_types import AgentTaskTypeName
+
+    assert RunnerStatus.model_fields["current_task_type"].annotation.__args__[0] == AgentTaskTypeName
+    assert NextTaskIn.model_json_schema()["properties"]["kinds"]["anyOf"][0]["items"]["enum"] == list(
+        AgentTaskTypeName.__args__)

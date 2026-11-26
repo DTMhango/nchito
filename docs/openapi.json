@@ -7388,7 +7388,7 @@
           "jobs"
         ],
         "summary": "Jobs Compare",
-        "description": "Comma-separated job ids. Wave 3.",
+        "description": "Side by side, 2 to 4 roles (comma-separated ids): facets (three-state), pay (normalised per year where\nthat is sound, else marked not comparable), score by rubric criterion, eligibility gates, employer group,\ndeadline and how to apply. ``campaign_id`` picks whose assessment is shown (default: the best scored one).\nNo model call; unknown stays unknown.",
         "operationId": "jobs_compare",
         "parameters": [
           {
@@ -7398,6 +7398,23 @@
             "schema": {
               "type": "string",
               "title": "Job Ids"
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
             }
           }
         ],
@@ -8643,6 +8660,194 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BackfillEstimate"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/changes": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Changes",
+        "description": "The change history of one posting, newest first, and when it was last scanned.",
+        "operationId": "jobs_changes",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobChangesOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/job-changes": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Job Changes List",
+        "description": "Posting changes across all roles, newest first (the alert feed).",
+        "operationId": "job_changes_list",
+        "parameters": [
+          {
+            "name": "unacknowledged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Unacknowledged"
+            }
+          },
+          {
+            "name": "material_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Material Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobChangeOut"
+                  },
+                  "title": "Response Job Changes List"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/job-changes/{change_id}/acknowledge": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Job Changes Acknowledge",
+        "description": "\"Seen\": clears the alert. Pending actions the change opened stay until the owner resolves them.",
+        "operationId": "job_changes_acknowledge",
+        "parameters": [
+          {
+            "name": "change_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Change Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobChangeOut"
                 }
               }
             }
@@ -11572,6 +11777,7 @@
           "applications"
         ],
         "summary": "Applications Releases",
+        "description": "What each runner task was given (packet, answers, files) and what it reports having entered (18.1).",
         "operationId": "applications_releases",
         "parameters": [
           {
@@ -12035,236 +12241,6 @@
         }
       }
     },
-    "/api/jobs/{job_id}/interview-pack": {
-      "get": {
-        "tags": [
-          "applications"
-        ],
-        "summary": "Interview Pack Get",
-        "operationId": "interview_pack_get",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InterviewPackOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "tags": [
-          "applications"
-        ],
-        "summary": "Interview Pack Generate",
-        "operationId": "interview_pack_generate",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InterviewPackOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/jobs/{job_id}/interview-pack/rounds": {
-      "post": {
-        "tags": [
-          "applications"
-        ],
-        "summary": "Interview Rounds Create",
-        "operationId": "interview_rounds_create",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Job Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InterviewRoundIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InterviewRoundOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/interview-rounds/{round_id}": {
-      "put": {
-        "tags": [
-          "applications"
-        ],
-        "summary": "Interview Rounds Update",
-        "operationId": "interview_rounds_update",
-        "parameters": [
-          {
-            "name": "round_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Round Id"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InterviewRoundIn"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/InterviewRoundOut"
-                }
-              }
-            }
-          },
-          "501": {
-            "description": "Specified; implemented in a later wave",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/autopilot": {
       "get": {
         "tags": [
@@ -12420,7 +12396,7 @@
           "pending_actions"
         ],
         "summary": "Pending Actions List",
-        "description": "Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back.",
+        "description": "Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back. ``kind`` filters on\n``detail.kind`` (e.g. ``posting_changed`` for posting change actions).",
         "operationId": "pending_actions_list",
         "parameters": [
           {
@@ -12458,7 +12434,10 @@
                     "review_import",
                     "conflict_choice",
                     "answer_review_due",
-                    "follow_up"
+                    "follow_up",
+                    "unsupported_form",
+                    "redirect_off_domain",
+                    "page_instruction"
                   ],
                   "type": "string"
                 },
@@ -12467,6 +12446,23 @@
                 }
               ],
               "title": "Type"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 60
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
             }
           },
           {
@@ -12882,6 +12878,303 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal-accounts": {
+      "get": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts List",
+        "operationId": "portal_accounts_list",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "none",
+                    "created",
+                    "signed_in"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PortalAccountOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Create",
+        "operationId": "portal_accounts_create",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalAccountWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAccountOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal-accounts/{account_id}": {
+      "get": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Get",
+        "operationId": "portal_accounts_get",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAccountOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Update",
+        "operationId": "portal_accounts_update",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortalAccountPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAccountOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Delete",
+        "operationId": "portal_accounts_delete",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Account Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal-accounts/actions/{action_id}/give-up": {
+      "post": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Give Up",
+        "description": "The owner cannot or will not get past the blocker: move the waiting applications (default all) to manual\nhandoff or skip them.",
+        "operationId": "portal_accounts_give_up",
+        "parameters": [
+          {
+            "name": "action_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Action Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GiveUpIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GiveUpOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portal-accounts/refresh": {
+      "post": {
+        "tags": [
+          "portal_accounts"
+        ],
+        "summary": "Portal Accounts Refresh",
+        "description": "Run the periodic pass now: raise or join sign-in requests, drop what no longer waits, send due reminders.",
+        "operationId": "portal_accounts_refresh",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshOut"
                 }
               }
             }
@@ -13470,7 +13763,7 @@
           "connections"
         ],
         "summary": "Connections Create",
-        "description": "LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are\nencrypted at rest and only ever returned masked.",
+        "description": "LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are\nencrypted at rest and only ever returned masked. ``search_api``: the web search source's key (secret\n``api_key``; config ``endpoint`` and the response shape).",
         "operationId": "connections_create",
         "requestBody": {
           "content": {
@@ -13852,6 +14145,7 @@
           "tokens"
         ],
         "summary": "Tokens Create",
+        "description": "A runner token: one runner identity of a declared kind. The token itself is shown only in this reply.",
         "operationId": "tokens_create",
         "requestBody": {
           "content": {
@@ -13903,6 +14197,7 @@
           "tokens"
         ],
         "summary": "Tokens Revoke",
+        "description": "Revoke at once: the token is refused from now on and the tasks it held go back to the queue.",
         "operationId": "tokens_revoke",
         "parameters": [
           {
@@ -13956,7 +14251,7 @@
           "tokens"
         ],
         "summary": "Tokens Reinstate",
-        "description": "Lift a suspension (after a submission without a permit was detected).",
+        "description": "Lift a suspension (after a submission without a permit was detected). Needs ``acknowledged: true``;\nthe acknowledgement and note are audited.",
         "operationId": "tokens_reinstate",
         "parameters": [
           {
@@ -13970,6 +14265,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ReinstateIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -13992,14 +14304,7 @@
             }
           },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "acknowledgement_required"
           }
         }
       }
@@ -14010,6 +14315,7 @@
           "tokens"
         ],
         "summary": "Tokens Runner Status",
+        "description": "Each live runner: last seen (its last gateway call), online within ``runners.stale_after_minutes``,\nand the task it holds.",
         "operationId": "tokens_runner_status",
         "responses": {
           "200": {
@@ -14032,6 +14338,88 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tokens/{token_id}/tasks": {
+      "get": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Tokens Runner Tasks",
+        "description": "A runner's recent tasks, most recent claim first (read-only): each with its latest checkpoint, the\nblockers it raised, every permit decision with its reason, and its result with evidence refs.",
+        "operationId": "tokens_runner_tasks",
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Token Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunnerTaskOut_"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -14167,6 +14555,881 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Pack Get",
+        "operationId": "interview_pack_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewPackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Pack Generate",
+        "description": "Queue the pack (or the listed sections). Idempotent while a request is open. The estimate is\nstored on the pack; each section reserves its own spend when it is built.",
+        "operationId": "interview_pack_generate",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/InterviewGenerateIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewPackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/estimate": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Pack Estimate",
+        "operationId": "interview_pack_estimate",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "sections",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sections"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewEstimateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/sections/{section}/regenerate": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Section Regenerate",
+        "description": "A new version of one section (the crib sheet follows); earlier versions stay.",
+        "operationId": "interview_section_regenerate",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "section",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Section"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewPackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/sections/{section}": {
+      "put": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Section Edit",
+        "description": "An owner edit: stored as a new version and checked like a generated one.",
+        "operationId": "interview_section_edit",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "section",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Section"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewSectionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/sections/{section}/versions": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Section Versions",
+        "operationId": "interview_section_versions",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "section",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Section"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InterviewSectionOut"
+                  },
+                  "title": "Response Interview Section Versions"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/sections/{section}/note": {
+      "put": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Section Note",
+        "operationId": "interview_section_note",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "section",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Section"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewNoteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewPackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/stories/{story_id}/favourite": {
+      "put": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Story Favourite",
+        "operationId": "interview_story_favourite",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Story Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FavouriteIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/stories/{story_id}": {
+      "put": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Story Edit",
+        "description": "Rewrite one story (STAR text, title): stored as a new ``stories`` version and checked like any edit. 409\n``version_conflict`` when ``base_version`` is not the current version.",
+        "operationId": "interview_story_edit",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "story_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Story Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoryEditIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/practice": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Practice List",
+        "operationId": "interview_practice_list",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PracticeOut"
+                  },
+                  "title": "Response Interview Practice List"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Practice Create",
+        "description": "Feedback on a draft answer (one budgeted call). A budget refusal stores the attempt ``paused``.",
+        "operationId": "interview_practice_create",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PracticeIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PracticeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-practice/{practice_id}/retry": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Practice Retry",
+        "operationId": "interview_practice_retry",
+        "parameters": [
+          {
+            "name": "practice_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Practice Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PracticeOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/export": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Pack Export",
+        "operationId": "interview_pack_export",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "fmt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "pdf",
+                "docx",
+                "txt"
+              ],
+              "type": "string",
+              "default": "pdf",
+              "title": "Fmt"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/pdf": {},
+              "text/plain; charset=utf-8": {},
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/rounds": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Rounds List",
+        "operationId": "interview_rounds_list",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/InterviewRoundOut"
+                  },
+                  "title": "Response Interview Rounds List"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Rounds Create",
+        "operationId": "interview_rounds_create",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewRoundIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewRoundOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-rounds/{round_id}": {
+      "put": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Rounds Update",
+        "operationId": "interview_rounds_update",
+        "parameters": [
+          {
+            "name": "round_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Round Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InterviewRoundIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewRoundOut"
                 }
               }
             }
@@ -14991,6 +16254,92 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SpendMeter"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gateway/files/{signed}": {
+      "get": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Gateway File",
+        "description": "One packet file for a runner, through a short-lived signed link.",
+        "operationId": "gateway_file",
+        "parameters": [
+          {
+            "name": "signed",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Signed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/octet-stream": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gateway/uploads/{signed}": {
+      "put": {
+        "tags": [
+          "gateway"
+        ],
+        "summary": "Gateway Upload",
+        "description": "One evidence file (screenshot or confirmation) from a runner. Stored as untrusted data.",
+        "operationId": "gateway_upload",
+        "parameters": [
+          {
+            "name": "signed",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Signed"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Gateway Upload"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -18405,6 +19754,163 @@
         ],
         "title": "CheckResult"
       },
+      "CompareCell": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "not_stated",
+              "unknown",
+              "yes",
+              "no",
+              "estimated",
+              "pass",
+              "fail"
+            ],
+            "title": "State"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor",
+            "description": "Pay: the per-year midpoint, when normalised"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "CompareCell"
+      },
+      "CompareJob": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "availability": {
+            "type": "string",
+            "title": "Availability"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id",
+            "description": "The campaign whose assessment is shown"
+          },
+          "campaign_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Name"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "assessment_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessment State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "employer",
+          "availability"
+        ],
+        "title": "CompareJob"
+      },
       "CompareOut": {
         "properties": {
           "job_ids": {
@@ -18415,22 +19921,16 @@
             "type": "array",
             "title": "Job Ids"
           },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/CompareJob"
+            },
+            "type": "array",
+            "title": "Jobs"
+          },
           "rows": {
             "items": {
-              "additionalProperties": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "type": "object"
+              "$ref": "#/components/schemas/CompareRow"
             },
             "type": "array",
             "title": "Rows"
@@ -18445,7 +19945,8 @@
                 "type": "null"
               }
             ],
-            "title": "Winner Id"
+            "title": "Winner Id",
+            "description": "The conflict group's winner when the roles share an employer"
           },
           "winner_reason": {
             "anyOf": [
@@ -18462,11 +19963,81 @@
         "type": "object",
         "required": [
           "job_ids",
+          "jobs",
           "rows",
-          "winner_id",
-          "winner_reason"
+          "winner_id"
         ],
         "title": "CompareOut"
+      },
+      "CompareRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "facets",
+              "pay",
+              "score",
+              "gates",
+              "employer",
+              "timing",
+              "apply"
+            ],
+            "title": "Group"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/CompareCell"
+            },
+            "type": "array",
+            "title": "Cells",
+            "description": "One per job, in the order of ``job_ids``"
+          },
+          "comparable": {
+            "type": "boolean",
+            "title": "Comparable",
+            "description": "False when the roles cannot be ranked on this row; ``note`` says why"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "best_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Index",
+            "description": "Index of the best role on this row, when comparable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "group",
+          "cells",
+          "comparable"
+        ],
+        "title": "CompareRow"
       },
       "Component": {
         "properties": {
@@ -18803,7 +20374,8 @@
               "onedrive",
               "telegram",
               "webhook",
-              "s3"
+              "s3",
+              "search_api"
             ],
             "title": "Provider"
           },
@@ -18908,7 +20480,8 @@
               "onedrive",
               "telegram",
               "webhook",
-              "s3"
+              "s3",
+              "search_api"
             ],
             "title": "Provider"
           },
@@ -21069,6 +22642,63 @@
         ],
         "title": "FactOut"
       },
+      "FavouriteIn": {
+        "properties": {
+          "favourite": {
+            "type": "boolean",
+            "title": "Favourite",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "FavouriteIn"
+      },
+      "FieldChange": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "closed",
+              "reopened",
+              "deadline_moved",
+              "pay_changed",
+              "requirements_changed",
+              "apply_method_changed",
+              "eligibility_changed",
+              "location_changed",
+              "wording"
+            ],
+            "title": "Kind"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "before": {
+            "title": "Before"
+          },
+          "after": {
+            "title": "After"
+          },
+          "material": {
+            "type": "boolean",
+            "title": "Material"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "e.g. \"Work model: remote -> on site\""
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "field",
+          "material",
+          "summary"
+        ],
+        "title": "FieldChange"
+      },
       "FilterResult": {
         "properties": {
           "name": {
@@ -21204,6 +22834,84 @@
         ],
         "title": "GateResult",
         "description": "One gate's result. ``outcome`` is the three-state answer (unknown is never a pass); ``passed`` is\nkept for compatibility and is true only when ``outcome`` is ``pass``."
+      },
+      "GiveUpIn": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "manual_handoff",
+              "skipped"
+            ],
+            "title": "Outcome",
+            "description": "manual_handoff: the owner applies by hand; skipped: the application is skipped"
+          },
+          "application_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Ids",
+            "description": "Default: every waiting application"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "outcome"
+        ],
+        "title": "GiveUpIn"
+      },
+      "GiveUpOut": {
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "handled": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Handled"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining"
+          },
+          "closed": {
+            "type": "boolean",
+            "title": "Closed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "outcome",
+          "handled",
+          "remaining",
+          "closed"
+        ],
+        "title": "GiveUpOut"
       },
       "Group-Input": {
         "properties": {
@@ -22029,6 +23737,72 @@
         ],
         "title": "InsightsOut"
       },
+      "InterviewEstimateOut": {
+        "properties": {
+          "sections": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Sections",
+            "description": "Upper-bound cost per model-built section, micros"
+          },
+          "total_micros": {
+            "type": "integer",
+            "title": "Total Micros"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sections",
+          "total_micros",
+          "currency"
+        ],
+        "title": "InterviewEstimateOut"
+      },
+      "InterviewGenerateIn": {
+        "properties": {
+          "sections": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sections",
+            "description": "Default: every section in interview.sections"
+          }
+        },
+        "type": "object",
+        "title": "InterviewGenerateIn"
+      },
+      "InterviewNoteIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "InterviewNoteIn"
+      },
       "InterviewPackOut": {
         "properties": {
           "id": {
@@ -22066,7 +23840,8 @@
           "sections": {
             "additionalProperties": true,
             "type": "object",
-            "title": "Sections"
+            "title": "Sections",
+            "description": "Section key -> current version: version, origin, status, flagged, fact_ids, content, check_results, model"
           },
           "generated_at": {
             "anyOf": [
@@ -22090,6 +23865,99 @@
               }
             ],
             "title": "Model"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "idle",
+              "queued",
+              "running",
+              "paused",
+              "done",
+              "failed"
+            ],
+            "title": "Status",
+            "default": "idle"
+          },
+          "generation": {
+            "type": "integer",
+            "title": "Generation",
+            "default": 0
+          },
+          "pending_sections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pending Sections"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis",
+            "description": "What the pack was built from: the submitted packet, the latest checked spec, or none"
+          },
+          "notes": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Notes",
+            "description": "Owner notes per section"
+          },
+          "estimate_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Micros"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
+            "default": 0
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "offered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Offered At"
+          },
+          "flagged": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Flagged",
+            "description": "Sections that failed the truth checks"
           }
         },
         "type": "object",
@@ -22286,6 +24154,263 @@
           "thank_you_draft"
         ],
         "title": "InterviewRoundOut"
+      },
+      "InterviewSectionIn": {
+        "properties": {
+          "content": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "InterviewSectionIn"
+      },
+      "InterviewSectionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "section": {
+            "type": "string",
+            "title": "Section"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "generated",
+              "code",
+              "owner"
+            ],
+            "title": "Origin"
+          },
+          "content": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Content"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          },
+          "check_results": {
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            },
+            "type": "array",
+            "title": "Check Results"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "warn",
+              "block"
+            ],
+            "title": "Status"
+          },
+          "flagged": {
+            "type": "boolean",
+            "title": "Flagged"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "section",
+          "version",
+          "origin",
+          "content",
+          "fact_ids",
+          "check_results",
+          "status",
+          "flagged",
+          "model",
+          "created_by"
+        ],
+        "title": "InterviewSectionOut"
+      },
+      "JobChangeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "job_title": {
+            "type": "string",
+            "title": "Job Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Detected At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "material": {
+            "type": "boolean",
+            "title": "Material",
+            "description": "Material changes reassess the role and flag an approved packet"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "acknowledged_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged By"
+          },
+          "application_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Application Ids"
+          },
+          "invalidated_packet_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Invalidated Packet Ids"
+          },
+          "pending_action_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Pending Action Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_id",
+          "job_title",
+          "employer",
+          "detected_at",
+          "source",
+          "material",
+          "kinds",
+          "changes"
+        ],
+        "title": "JobChangeOut"
+      },
+      "JobChangesOut": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "watch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WatchOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the scheduled scan last looked at this role"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/JobChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "changes"
+        ],
+        "title": "JobChangesOut"
       },
       "JobDetail": {
         "properties": {
@@ -24984,6 +27109,45 @@
         ],
         "title": "Page[PendingActionOut]"
       },
+      "Page_PortalAccountOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PortalAccountOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque; pass back as ?cursor="
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[PortalAccountOut]"
+      },
       "Page_ReferenceOut_": {
         "properties": {
           "items": {
@@ -25139,6 +27303,45 @@
           "items"
         ],
         "title": "Page[RunOut]"
+      },
+      "Page_RunnerTaskOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunnerTaskOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque; pass back as ?cursor="
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[RunnerTaskOut]"
       },
       "Page_SavedViewOut_": {
         "properties": {
@@ -25813,7 +28016,10 @@
               "review_import",
               "conflict_choice",
               "answer_review_due",
-              "follow_up"
+              "follow_up",
+              "unsupported_form",
+              "redirect_off_domain",
+              "page_instruction"
             ],
             "title": "Type"
           },
@@ -25944,6 +28150,57 @@
               }
             ],
             "title": "Resolution"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "The exact kind within the type (``detail.kind``): e.g. posting_changed, posting_closed, verification_code"
+          },
+          "reminders_sent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminders Sent",
+            "description": "Blocker actions: reminders sent so far"
+          },
+          "next_reminder_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Reminder At",
+            "description": "Blocker actions with a deadline: when the next reminder is due (accounts.reminder_offsets_hours); null when none is left"
+          },
+          "choices": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "continue_acknowledged",
+                "manual_handoff",
+                "skipped"
+              ]
+            },
+            "type": "array",
+            "title": "Choices",
+            "description": "A runner blocker's owner choices: continue (resolve 'continue'), continue_acknowledged (resolve 'continue' with acknowledged=true), manual_handoff / skipped (POST /api/portal-accounts/actions/{id}/give-up). Empty for other actions."
           }
         },
         "type": "object",
@@ -25962,6 +28219,59 @@
           "status"
         ],
         "title": "PendingActionOut"
+      },
+      "PermitDecisionOut": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "wait_for_owner",
+              "denied"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "permit_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permit Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "decision"
+        ],
+        "title": "PermitDecisionOut"
       },
       "PersonField": {
         "properties": {
@@ -26238,6 +28548,289 @@
         ],
         "title": "PersonalDetailHit"
       },
+      "PortalAccountOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "portal": {
+            "type": "string",
+            "title": "Portal"
+          },
+          "tenant": {
+            "type": "string",
+            "title": "Tenant"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "created",
+              "signed_in"
+            ],
+            "title": "Status"
+          },
+          "signed_in_runner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed In Runner"
+          },
+          "email_used": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Used"
+          },
+          "last_sign_in_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sign In At"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "waiting_applications": {
+            "type": "integer",
+            "title": "Waiting Applications",
+            "description": "Applications waiting on the open sign-in request, if any"
+          },
+          "open_action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Action Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "portal",
+          "tenant",
+          "key",
+          "url",
+          "status",
+          "signed_in_runner",
+          "email_used",
+          "last_sign_in_at",
+          "notes",
+          "waiting_applications"
+        ],
+        "title": "PortalAccountOut"
+      },
+      "PortalAccountPatch": {
+        "properties": {
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "created",
+                  "signed_in"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "signed_in_runner": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed In Runner"
+          },
+          "email_used": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Used"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PortalAccountPatch"
+      },
+      "PortalAccountWrite": {
+        "properties": {
+          "portal": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Portal",
+            "description": "workday, icims, taleo, ..."
+          },
+          "tenant": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Tenant",
+            "description": "Tenant host (and site), e.g. arch.wd5.myworkdayjobs.com/arch"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "created",
+              "signed_in"
+            ],
+            "title": "Status",
+            "default": "none"
+          },
+          "signed_in_runner": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signed In Runner",
+            "description": "pc, server or a runner name"
+          },
+          "email_used": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Used"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "portal",
+          "tenant"
+        ],
+        "title": "PortalAccountWrite"
+      },
       "Positioning": {
         "properties": {
           "type": {
@@ -26257,6 +28850,159 @@
           "instruction"
         ],
         "title": "Positioning"
+      },
+      "PracticeIn": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Question"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "behavioural",
+                  "technical",
+                  "role",
+                  "motivation",
+                  "logistics"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "draft_answer": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Draft Answer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "draft_answer"
+        ],
+        "title": "PracticeIn"
+      },
+      "PracticeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "pack_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pack Id"
+          },
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "draft_answer": {
+            "type": "string",
+            "title": "Draft Answer"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "done",
+              "paused",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback"
+          },
+          "check_results": {
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            },
+            "type": "array",
+            "title": "Check Results"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "pack_id",
+          "question",
+          "category",
+          "draft_answer",
+          "status",
+          "feedback",
+          "check_results",
+          "model",
+          "cost_micros",
+          "error"
+        ],
+        "title": "PracticeOut"
       },
       "PriceIn": {
         "properties": {
@@ -27240,6 +29986,58 @@
         ],
         "title": "Reframe"
       },
+      "RefreshOut": {
+        "properties": {
+          "raised": {
+            "type": "integer",
+            "title": "Raised"
+          },
+          "joined": {
+            "type": "integer",
+            "title": "Joined"
+          },
+          "closed": {
+            "type": "integer",
+            "title": "Closed"
+          },
+          "reminded": {
+            "type": "integer",
+            "title": "Reminded"
+          }
+        },
+        "type": "object",
+        "required": [
+          "raised",
+          "joined",
+          "closed",
+          "reminded"
+        ],
+        "title": "RefreshOut"
+      },
+      "ReinstateIn": {
+        "properties": {
+          "acknowledged": {
+            "type": "boolean",
+            "title": "Acknowledged",
+            "description": "Required (true) to lift a suspension: the owner has read why the runner was paused",
+            "default": false
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "ReinstateIn"
+      },
       "RejectIn": {
         "properties": {
           "reason": {
@@ -27652,6 +30450,12 @@
             ],
             "title": "Reference",
             "description": "confirmed: the employer's reference number, kept as evidence"
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "title": "Acknowledged",
+            "description": "continue on a suspicious-page blocker (redirect_off_domain, page_instruction): the owner confirms they checked the page and it is safe; required there (422 acknowledgement_required), audited",
+            "default": false
           }
         },
         "type": "object",
@@ -28619,6 +31423,34 @@
               }
             ],
             "title": "Current Task Id"
+          },
+          "current_task_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Task Title",
+            "description": "The role (title at employer) or site"
+          },
+          "current_task_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "apply",
+                  "sweep_site",
+                  "check_posting"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Task Type"
           }
         },
         "type": "object",
@@ -28631,6 +31463,125 @@
           "current_task_id"
         ],
         "title": "RunnerStatus"
+      },
+      "RunnerTaskOut": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "The role (title at employer), or the site for a sweep"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "claimed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claimed At",
+            "description": "This runner's latest claim of the task"
+          },
+          "steps_used": {
+            "type": "integer",
+            "title": "Steps Used"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "checkpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/TaskBlockerOut"
+            },
+            "type": "array",
+            "title": "Blockers"
+          },
+          "permit_decisions": {
+            "items": {
+              "$ref": "#/components/schemas/PermitDecisionOut"
+            },
+            "type": "array",
+            "title": "Permit Decisions"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskResultOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs",
+            "description": "Screenshots and files the runner uploaded or cited (``evidence:<task>/<id>``)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "type",
+          "status",
+          "title",
+          "application_id",
+          "claimed_at",
+          "steps_used",
+          "attempts",
+          "dry_run",
+          "checkpoint",
+          "blockers",
+          "permit_decisions",
+          "result",
+          "evidence_refs"
+        ],
+        "title": "RunnerTaskOut"
       },
       "SavedViewBody-Input": {
         "properties": {
@@ -30574,6 +33525,97 @@
         "title": "StageChangeIn",
         "description": "Dragging to `submitted` never creates evidence: use 'I applied myself' instead."
       },
+      "StoryEditIn": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "requirement": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirement"
+          },
+          "situation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Situation"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task"
+          },
+          "action": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          }
+        },
+        "type": "object",
+        "title": "StoryEditIn",
+        "description": "Only the fields given change. ``base_version``: the ``stories`` version the edit was made on."
+      },
       "StructuredLocation": {
         "properties": {
           "country": {
@@ -30747,6 +33789,121 @@
           "queued"
         ],
         "title": "TailorOut"
+      },
+      "TaskBlockerOut": {
+        "properties": {
+          "pending_action_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pending Action Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "raised_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Raised At"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pending_action_id",
+          "kind",
+          "title",
+          "status",
+          "raised_at"
+        ],
+        "title": "TaskBlockerOut"
+      },
+      "TaskResultOut": {
+        "properties": {
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "confirmation_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Text"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "title": "TaskResultOut"
       },
       "TemplateDefaultOut": {
         "properties": {
@@ -32578,6 +35735,42 @@
           "waived_by"
         ],
         "title": "WaiverOut"
+      },
+      "WatchOut": {
+        "properties": {
+          "last_scanned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Scanned At"
+          },
+          "last_result": {
+            "type": "string",
+            "enum": [
+              "unchanged",
+              "changed",
+              "closed",
+              "unknown"
+            ],
+            "title": "Last Result"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "last_scanned_at",
+          "last_result"
+        ],
+        "title": "WatchOut"
       },
       "WatchedEmployerFromUrl": {
         "properties": {

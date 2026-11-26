@@ -24,7 +24,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.json_types import AgentTaskState
+from app.schemas.json_types import AgentTaskState, AgentTaskTypeName
 
 
 class _M(BaseModel):
@@ -35,7 +35,10 @@ class _M(BaseModel):
 
 
 class NextTaskIn(_M):
-    kinds: list[Literal["apply", "sweep_site", "check_posting"]] | None = None
+    kinds: list[AgentTaskTypeName] | None = None
+    dry_run: bool = Field(default=False, description="Rehearsal: the claim is given back when the task ends, "
+                                                      "submit permits are always refused and nothing is recorded "
+                                                      "on the application")
 
 
 class TaskRules(_M):
@@ -51,7 +54,7 @@ class TaskRules(_M):
 
 class NextTaskOut(_M):
     task_id: str | None = Field(description="None when the queue is empty")
-    type: Literal["apply", "sweep_site", "check_posting"] | None = None
+    type: AgentTaskTypeName | None = None
     instructions: str | None = None
     posting_url: str | None = None
     checkpoint: AgentTaskState | None = None
@@ -98,7 +101,9 @@ class FindAnswerIn(_M):
 
 
 class FindAnswerOut(_M):
-    outcome: Literal["value", "ask_owner", "do_not_answer"]
+    outcome: Literal["value", "ask_owner", "do_not_answer", "skip_role"] = Field(
+        description="skip_role: the owner chose to skip roles with unanswerable questions; the task has ended, "
+                    "leave the form unsubmitted and call next_task")
     value: str | None = None
     select: str | None = Field(default=None, description="For do_not_answer: what to select, e.g. 'Prefer not to say'")
 
@@ -119,8 +124,8 @@ class SaveCheckpointOut(_M):
 
 class RaiseBlockerIn(_M):
     task_id: str
-    type: Literal["sign_in", "create_account", "captcha", "assessment", "declaration", "unsupported_form",
-                  "redirect_off_domain", "unknown_question", "page_instruction"]
+    type: Literal["sign_in", "create_account", "verification_code", "captcha", "assessment", "declaration",
+                  "unsupported_form", "redirect_off_domain", "unknown_question", "page_instruction"]
     detail: str
     url: str | None = None
 
@@ -138,12 +143,22 @@ class EnteredAnswer(_M):
     value: str
 
 
+class EnteredField(_M):
+    key: str = Field(description="The packet field key from get_packet fields[] (e.g. full_name, phone, "
+                                 "sending_identity, link.<name>), or file.<name> for an attached packet file")
+    value: str = Field(description="What was typed; for file.<name>, the attached file's sha256")
+
+
 class RequestPermitIn(_M):
     task_id: str
     summary: str
     entered_answers: list[EnteredAnswer]
     attached_files_sha256: list[str]
     current_url: str
+    entered_fields: list[EnteredField] | None = Field(
+        default=None, description="The person, contact and document fields typed or attached, by packet field key. "
+                                  "Compared with the packet: a difference asks the owner (wait_for_owner, the "
+                                  "differing keys in changes). Omitted: not compared (older runners).")
 
 
 class RequestPermitOut(_M):
@@ -190,6 +205,63 @@ class ReportJobsOut(_M):
     duplicates: int
 
 
+# ----- wave 3 additions: report_check / release_task / evidence_upload_url ------------------
+
+
+class ReportCheckIn(_M):
+    task_id: str
+    status: Literal["open", "closed", "unknown"] = Field(
+        description="A check that failed or could not tell is unknown, never closed")
+    evidence: str | None = Field(default=None, description="What on the page showed it (text, as data)")
+    screenshot_ref: str | None = None
+
+
+class ReportCheckOut(_M):
+    recorded: bool
+    availability: Literal["open", "closed", "unknown"]
+
+
+class ReleaseTaskIn(_M):
+    task_id: str
+    reason: str
+
+
+class ReleaseTaskOut(_M):
+    released: bool
+    task_status: str
+
+
+class EvidenceUploadIn(_M):
+    task_id: str
+    content_type: Literal["image/png", "image/jpeg", "image/webp", "application/pdf", "text/plain"]
+
+
+class EvidenceUploadOut(_M):
+    upload_url: str = Field(description="PUT the raw bytes here (short-lived signed URL, one upload)")
+    ref: str = Field(description="Use as screenshot_ref in save_checkpoint and report_result")
+    max_bytes: int
+    expires_at: str
+
+
+class GetRunnerConfigIn(_M):
+    pass
+
+
+class RunnerConfigOut(_M):
+    runner_kind: Literal["pc", "server"]
+    enabled: bool = Field(description="False: this runner gets no tasks (a server runner while it is switched off, "
+                                      "or a suspended runner)")
+    model: str = Field(description="The model the server runner drives the browser with (ai.model_browser_agent)")
+    currency: str
+    task_cap_minor: int = Field(description="Most one task may cost (budget.agent_task_ceiling_minor)")
+    day_cap_minor: int = Field(description="Most this runner may spend in a day (runners.server_day_cap_minor)")
+    task_max_tokens: int
+    day_max_tokens: int
+    max_steps: int = Field(description="automation.agent_max_steps; the server also enforces it")
+    lease_minutes: int = Field(description="A claimed task is lost after this long without a call on it")
+    evidence_max_bytes: int
+
+
 TOOLS: dict[str, tuple[type[BaseModel], type[BaseModel], str]] = {
     "next_task": (NextTaskIn, NextTaskOut, "Claim the next task for this runner."),
     "get_packet": (GetPacketIn, GetPacketOut, "Field values, answers and signed file URLs for this task's form."),
@@ -200,6 +272,12 @@ TOOLS: dict[str, tuple[type[BaseModel], type[BaseModel], str]] = {
                               "Call immediately before Submit with what was actually entered."),
     "report_result": (ReportResultIn, ReportResultOut, "Report submitted / uncertain / failed with evidence."),
     "report_jobs": (ReportJobsIn, ReportJobsOut, "Sweep tasks: postings found, with the URL actually visited."),
+    "report_check": (ReportCheckIn, ReportCheckOut, "Check tasks: is the posting open, closed or unknown."),
+    "release_task": (ReleaseTaskIn, ReleaseTaskOut, "Give a claimed task back to the queue (from its checkpoint)."),
+    "evidence_upload_url": (EvidenceUploadIn, EvidenceUploadOut,
+                            "A short-lived URL to upload a screenshot or confirmation; returns its reference."),
+    "get_runner_config": (GetRunnerConfigIn, RunnerConfigOut,
+                          "This runner's budget caps, model and limits, as set by the owner."),
 }
 
 

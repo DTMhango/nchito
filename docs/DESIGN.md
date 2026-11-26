@@ -913,6 +913,17 @@ Damage limits for browser runners, since the permit is not a lock there:
 - **Record of release.** The Application tab lists what the runner was given and what it
   reports having entered, so after any stop the owner can see what already left.
 - **Bounded work.** Each agent task has a maximum number of steps and a cost ceiling.
+- **One permit flow, consumed at clearance (wave 3 decision).** For a browser application the
+  approved packet first becomes a runner *task* (no permit). When the runner reaches Submit it
+  asks for a permit; the server requests it (every gate), consumes it together with the
+  dispatch attempt, rechecks every gate at dispatch and only then clears that runner's claimed
+  task. The permit is bound to the packet hash and the task. The runner's report settles the
+  attempt (evidence: sent; none or "uncertain": reconciled, never resent; "failed": not sent).
+  A submission reported with no cleared attempt is the violation above. Un-pausing a runner
+  paused for a violation needs the owner's explicit, audited acknowledgement.
+- **Wording is not a change.** The permit's posting-version gate follows the material-change
+  rule of 18.4: a reworded posting passes; a material change (or one that cannot be judged)
+  fails.
 
 ### 18.2 The application packet
 

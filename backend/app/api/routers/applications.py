@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.apply import approval, autopilot, stages
 from app.apply import dispatch as apply_dispatch
@@ -471,29 +471,6 @@ class MailThreadOut(Timestamps):
 class MailThreadLink(BaseModel):
     application_id: uuid.UUID | None
     classification: MailClassT | None = None
-
-
-class InterviewPackOut(Timestamps):
-    job_id: uuid.UUID
-    application_id: uuid.UUID | None
-    sections: dict[str, Any]
-    generated_at: datetime | None
-    model: str | None
-
-
-class InterviewRoundIn(ApiModel):
-    round_number: int = Field(ge=1)
-    scheduled_at: datetime | None = None
-    format: str | None = None
-    interviewers: list[str] = Field(default_factory=list)
-    checklist: list[str] = Field(default_factory=list)
-    notes: str | None = None
-    learnt: str | None = None
-
-
-class InterviewRoundOut(InterviewRoundIn, Timestamps):
-    pack_id: uuid.UUID
-    thank_you_draft: str | None
 
 
 # ----- helpers --------------------------------------------------------------------------------------
@@ -1259,8 +1236,15 @@ async def mark_submitted(application_id: uuid.UUID, body: MarkSubmittedIn, princ
 
 @router.get("/applications/{application_id}/releases", response_model=list[ReleaseRecord],
             name="applications_releases")
-async def releases(application_id: uuid.UUID) -> list[ReleaseRecord]:
-    not_implemented(3, "gateway")
+async def releases(application_id: uuid.UUID, session: SessionDep) -> list[ReleaseRecord]:
+    """What each runner task was given (packet, answers, files) and what it reports having entered (18.1)."""
+    from app.models.applications import AgentTask
+
+    await _load(session, application_id)
+    tasks = (await session.scalars(select(AgentTask).where(AgentTask.application_id == application_id)
+                                   .order_by(AgentTask.created_at))).all()
+    return [ReleaseRecord(agent_task_id=t.id, released={"given": (t.released or {}).get("given") or []},
+                          entered=(t.released or {}).get("entered") or {}) for t in tasks if t.released]
 
 
 # ----- contacts, mail, interview --------------------------------------------------------------
@@ -1372,28 +1356,6 @@ async def link_mail_thread(thread_id: uuid.UUID, body: MailThreadLink, session: 
     await session.flush()
     await session.refresh(thread)
     return MailThreadOut.model_validate(thread)
-
-
-@router.get("/jobs/{job_id}/interview-pack", response_model=InterviewPackOut, name="interview_pack_get")
-async def interview_pack(job_id: uuid.UUID) -> InterviewPackOut:
-    not_implemented(3, "interview")
-
-
-@router.post("/jobs/{job_id}/interview-pack", response_model=InterviewPackOut,
-             status_code=status.HTTP_202_ACCEPTED, name="interview_pack_generate")
-async def generate_interview_pack(job_id: uuid.UUID) -> InterviewPackOut:
-    not_implemented(3, "interview")
-
-
-@router.post("/jobs/{job_id}/interview-pack/rounds", response_model=InterviewRoundOut,
-             status_code=status.HTTP_201_CREATED, name="interview_rounds_create")
-async def create_round(job_id: uuid.UUID, body: InterviewRoundIn) -> InterviewRoundOut:
-    not_implemented(3, "interview")
-
-
-@router.put("/interview-rounds/{round_id}", response_model=InterviewRoundOut, name="interview_rounds_update")
-async def update_round(round_id: uuid.UUID, body: InterviewRoundIn) -> InterviewRoundOut:
-    not_implemented(3, "interview")
 
 
 # ----- global pause (top bar) -----------------------------------------------------------------

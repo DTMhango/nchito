@@ -5,10 +5,10 @@
  *   (authed)                              guard: owner exists and signed in
  *     /onboarding?step=                   full-screen set-up guide
  *     (shell)                             AppShell: sidebar, top bar, palette
- *       /today?action= /matches /applications /jobs/$id?tab= /studio?application=&run= /autopilot
+ *       /today?action= /matches /applications /jobs/$id?tab= /compare?ids= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
- *       /settings/{appearance,ai,connections,notifications,runners,data,health,security,activity,history}
+ *       /settings/{appearance,ai,connections,notifications,runners,tracking,interview,accounts,sources,data,health,security,activity,history}
  *       /dev/components                   dev builds only
  *
  * To add a screen: write the page in src/features/<area>/, add a createRoute below under
@@ -35,6 +35,7 @@ import { SetupPage } from "@/features/auth/setup-page"
 import { SignInPage } from "@/features/auth/sign-in-page"
 import { matchesSearchSchema } from "@/features/matches/filters"
 import { JOB_TABS } from "@/features/jobs/job-tabs"
+import { compareSearchSchema } from "@/features/jobs/compare/api"
 import { studioSearchSchema } from "@/features/studio/search"
 import type { SettingsPageKey } from "@/features/settings/settings-group-page"
 import { OnboardingPage } from "@/features/onboarding/onboarding-page"
@@ -63,6 +64,10 @@ const ApplicationsPage = lazyPage(
   "ApplicationsPage"
 )
 const JobPage = lazyPage(() => import("@/features/jobs/job-page"), "JobPage")
+const ComparePage = lazyPage(
+  () => import("@/features/jobs/compare/compare-page"),
+  "ComparePage"
+)
 const StudioPage = lazyPage(
   () => import("@/features/studio/studio-page"),
   "StudioPage"
@@ -115,10 +120,6 @@ const SettingsLayout = lazyPage(
   () => import("@/features/settings/settings-pages"),
   "SettingsLayout"
 )
-const SettingsSection = lazyPage(
-  () => import("@/features/settings/settings-pages"),
-  "SettingsSection"
-)
 const AppearancePage = lazyPage(
   () => import("@/features/settings/appearance-page"),
   "AppearancePage"
@@ -142,6 +143,18 @@ const HistoryPage = lazyPage(
 const ConnectionsPage = lazyPage(
   () => import("@/features/settings/connections/connections-page"),
   "ConnectionsPage"
+)
+const RunnersPage = lazyPage(
+  () => import("@/features/settings/runners/runners-page"),
+  "RunnersPage"
+)
+const AccountsPage = lazyPage(
+  () => import("@/features/accounts/accounts-page"),
+  "AccountsPage"
+)
+const HandoffPage = lazyPage(
+  () => import("@/features/accounts/handoff-page"),
+  "HandoffPage"
 )
 const DataPage = lazyPage(
   () => import("@/features/settings/data/data-page"),
@@ -315,6 +328,15 @@ const runDetailRoute = createRoute({
     return <RunDetailPage runId={runDetailRoute.useParams().runId} />
   },
 })
+const accountsRoute = page("/accounts", "Portal accounts", AccountsPage)
+const handoffRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/accounts/handoff/$actionId",
+  staticData: { title: "Sign-in handoff" },
+  component: function HandoffRoute() {
+    return <HandoffPage actionId={handoffRoute.useParams().actionId} />
+  },
+})
 const campaignsRoute = page("/campaigns", "Campaigns", CampaignsPage)
 const campaignEditorRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -339,6 +361,25 @@ const jobRoute = createRoute({
     const { id } = jobRoute.useParams()
     const { tab } = jobRoute.useSearch()
     return <JobPage id={id} tab={tab} />
+  },
+})
+
+const compareRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/compare",
+  staticData: { title: "Compare roles" },
+  validateSearch: compareSearchSchema,
+  component: function CompareRoute() {
+    const { ids } = compareRoute.useSearch()
+    const navigate = compareRoute.useNavigate()
+    return (
+      <ComparePage
+        ids={ids}
+        onIds={(next) =>
+          void navigate({ search: { ids: next }, replace: true })
+        }
+      />
+    )
   },
 })
 
@@ -394,7 +435,6 @@ const appearanceRoute = createRoute({
   staticData: { title: "Appearance" },
   component: AppearancePage,
 })
-type SettingsKey = "runners"
 const groupRoute = (path: SettingsPageKey) =>
   createRoute({
     getParentRoute: () => settingsRoute,
@@ -409,6 +449,10 @@ const groupRoutes = [
   groupRoute("documents"),
   groupRoute("retention"),
   groupRoute("reconcile"),
+  groupRoute("tracking"),
+  groupRoute("interview"),
+  groupRoute("accounts"),
+  groupRoute("sources"),
 ] as const
 const ownRoute = (
   path:
@@ -418,6 +462,7 @@ const ownRoute = (
     | "connections"
     | "data"
     | "notifications"
+    | "runners"
     | "health",
   C: ComponentType
 ) =>
@@ -433,21 +478,16 @@ const ownRoutes = [
   ownRoute("connections", ConnectionsPage),
   ownRoute("data", DataPage),
   ownRoute("notifications", NotificationsPage),
+  ownRoute("runners", RunnersPage),
   ownRoute("health", HealthPanel),
 ] as const
-const settingsChild = (path: SettingsKey) =>
-  createRoute({
-    getParentRoute: () => settingsRoute,
-    path,
-    component: () => <SettingsSection section={path} />,
-  })
 const aiRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: "ai",
   staticData: { title: "AI" },
   component: AiSettingsPage,
 })
-const settingsChildren = [aiRoute, settingsChild("runners")] as const
+const settingsChildren = [aiRoute] as const
 
 // ---- dev ----
 const devComponentsRoute = createRoute({
@@ -474,12 +514,15 @@ export const routeTree = rootRoute.addChildren([
       matchesRoute,
       applicationsRoute,
       jobRoute,
+      compareRoute,
       studioRoute,
       autopilotRoute,
       approvalsRoute,
       approvalReviewRoute,
       runsRoute,
       runDetailRoute,
+      accountsRoute,
+      handoffRoute,
       kitRoute.addChildren([kitIndex, ...kitChildren]),
       campaignsRoute,
       campaignEditorRoute,

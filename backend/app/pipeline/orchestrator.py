@@ -50,7 +50,7 @@ from app.models.search import (
     Source,
     WatchedEmployer,
 )
-from app.pipeline import dedupe, dry_run, normalise
+from app.pipeline import changes, dedupe, dry_run, normalise
 from app.pipeline.runs import handler_for, register
 from app.schemas.json_types import RateLimit, SourceHealth, SourceRunResult
 from app.sources.base import RawJob, SearchContext, SourceConnector
@@ -78,12 +78,25 @@ class IntakeDeps:
     clock: Clock = field(default_factory=SystemClock)
     source_timeout_seconds: float = 300.0
 
-    def connector_for(self, source: Source) -> SourceConnector:
+    def connector_for(self, source: Source, extras: dict[str, Any] | None = None) -> SourceConnector:
         if self.source_factory is not None:
             return self.source_factory(source)
         if self.transport is None:
             self.transport = HttpxFetcher()
-        return build_connector(source, self.transport)
+        return build_connector(source, self.transport, extras=extras)
+
+
+async def connector_extras(session: AsyncSession, source: Source, llm: LLMClient | None,
+                           values: dict[str, Any]) -> dict[str, Any]:
+    """What a connector needs besides its fetcher: the live settings, the run's AI client (careers pages, budget
+    capped by the connector's own setting) and, for web search, its Search API connection (endpoint, response
+    shape and key)."""
+    from app.connect import search_api
+
+    extras: dict[str, Any] = {"settings": values, "llm": llm}
+    if source.connector == "web_search":
+        extras["search_connection"] = await search_api.connection_for(session, source)
+    return extras
 
 
 DEPS = IntakeDeps()
@@ -166,10 +179,10 @@ def _context(campaign: Campaign, config: dict[str, Any]) -> SearchContext:
 
 
 async def _search_one(source: Source, config: dict[str, Any], campaign: Campaign, since: datetime | None,
-                      deps: IntakeDeps) -> _Found:
+                      deps: IntakeDeps, extras: dict[str, Any] | None = None) -> _Found:
     connector: SourceConnector | None = None
     try:
-        connector = deps.connector_for(source)
+        connector = deps.connector_for(source, extras)
         config = connector.validate_config(config) if source.connector != "manual" else config
         jobs = await asyncio.wait_for(connector.search(_context(campaign, config), since),
                                       timeout=deps.source_timeout_seconds)
@@ -249,6 +262,18 @@ async def _extract_job(session: AsyncSession, job: Job, norm: normalise.Normalis
     counts["extract_cached" if extraction.cached else "extracted"] += 1
     if extraction.usage:
         paid.cost += extraction.usage.cost_micros
+
+
+async def _note_changes(session: AsyncSession, job: Job, before: tuple[dict[str, Any], Availability] | None,
+                        now: datetime, counts: Counter[str]) -> None:
+    """A posting seen again by a sweep feeds change detection (18.4): compared with the version last stored
+    (the one a packet saw, or the last recheck). Material changes invalidate packets; wording does nothing."""
+    if before is None:
+        return
+    change = await changes.record_changes(session, job, before=before[0], availability_before=before[1],
+                                          actor="system", source="sweep", now=now)
+    if change is not None:
+        counts["posting_changes"] += 1
 
 
 def _since(campaign: Campaign, source: Source, overlap_days: int) -> datetime | None:
@@ -340,12 +365,14 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
     counts: Counter[str] = Counter({k: 0 for k in STAGE_KEYS})
     await _progress(session, run, "search", counts)
 
+    paid = _Paid(None if deps.llm_factory is None else await deps.llm_factory(session, run))
+    values = await settings_service.values(session)
+    extras = {s.id: await connector_extras(session, s, paid.llm, values) for s in sources}
     found = await asyncio.gather(*[
-        _search_one(s, effective_config(s, watched), campaign, windows[s.id], deps) for s in sources])
+        _search_one(s, effective_config(s, watched), campaign, windows[s.id], deps, extras[s.id]) for s in sources])
     if await _cancelled(session, run):
         return RunStatus.cancelled
 
-    paid = _Paid(None if deps.llm_factory is None else await deps.llm_factory(session, run))
     aliases = await normalise.load_skill_aliases(session)
     handoff: list[uuid.UUID] = []
     results: list[SourceRunResult] = []
@@ -373,13 +400,17 @@ async def run_sweep(session: AsyncSession, run: Run, deps: IntakeDeps | None = N
             if result.flagged_repost:
                 await audit.record(session, actor="system", action="job.reposted_changed", subject_type="job",
                                    subject_id=job.id, detail={"run_id": str(run.id)})
+            seen_again = result.outcome != dedupe.Outcome.new and not run.dry_run
+            before = (changes.snapshot_of(job), job.availability) if seen_again else None
             if result.outcome == dedupe.Outcome.suppressed:
+                await _note_changes(session, job, before, started, counts)
                 continue
             needs_model = result.outcome in (dedupe.Outcome.new, dedupe.Outcome.reposted) \
                 or normalise.PENDING_TAG in job.tags
             if needs_model:
                 await _extract_job(session, job, norm, paid, aliases, counts)
                 counts["tagged"] += len(normalise.apply_tag_rules(job, tag_rules))
+            await _note_changes(session, job, before, started, counts)
             if needs_model or result.outcome == dedupe.Outcome.new or run.dry_run:
                 handoff.append(job.id)
             if needs_model or result.outcome == dedupe.Outcome.new:

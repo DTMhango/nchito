@@ -501,6 +501,10 @@ export type ChoiceKind =
   | "choose"
   | "review"
   | "proposal"
+  /** A link to `/accounts/handoff/$id`, where the blocker's own choices are. */
+  | "handoff"
+  /** A link to the job's Changes tab (`kind` posting_changed / posting_closed). */
+  | "changes"
   | "none"
 
 export type PendingKindInfo = {
@@ -550,17 +554,38 @@ export const PENDING_KINDS: Record<PendingAction["type"], PendingKindInfo> = {
   assessment: {
     label: "Assessment",
     waiting: "The employer wants a test or assessment done by you.",
-    kind: "continue",
-    primary: "I've done it, continue",
-    resolution: "continue",
+    kind: "handoff",
+    primary: "Choose what to do",
   },
   declaration: {
     label: "Declaration",
     waiting:
       "A declaration needs your own answer. It is never filled in for you.",
-    kind: "answer",
-    primary: "Save declaration",
-    resolution: "answered",
+    kind: "handoff",
+    primary: "Choose what to do",
+  },
+  unsupported_form: {
+    label: "Form it cannot use",
+    waiting:
+      "The form is one the agent cannot fill in. Apply yourself, or skip the role.",
+    kind: "handoff",
+    primary: "Apply myself or skip",
+  },
+  redirect_off_domain: {
+    label: "Left the site",
+    waiting:
+      "The form sent the runner off the employer's site, so it stopped. Any unused submit permit was withdrawn.",
+    kind: "confirm",
+    primary: "I've looked at it, close it",
+    resolution: "dismissed",
+  },
+  page_instruction: {
+    label: "Page asked for more",
+    waiting:
+      "The page asked for something outside the application, so the runner stopped. It never acts on what a page asks.",
+    kind: "confirm",
+    primary: "I've looked at it, close it",
+    resolution: "dismissed",
   },
   confirm_submission: {
     label: "Confirm it arrived",
@@ -575,7 +600,7 @@ export const PENDING_KINDS: Record<PendingAction["type"], PendingKindInfo> = {
     waiting: "Imported data needs a look before it counts.",
     kind: "confirm",
     primary: "Looks right",
-    resolution: "confirmed",
+    resolution: "dismissed",
   },
   conflict_choice: {
     label: "Choose a role",
@@ -590,14 +615,14 @@ export const PENDING_KINDS: Record<PendingAction["type"], PendingKindInfo> = {
     waiting: "A saved answer is due for a check.",
     kind: "confirm",
     primary: "Still correct",
-    resolution: "confirmed",
+    resolution: "dismissed",
   },
   follow_up: {
     label: "Follow up",
     waiting: "No reply yet. A nudge may help.",
     kind: "confirm",
     primary: "Done",
-    resolution: "confirmed",
+    resolution: "dismissed",
   },
 }
 
@@ -630,6 +655,26 @@ export function pendingInfo(action: Pick<PendingAction, "type" | "detail">) {
       resolution: "approved",
     } satisfies PendingKindInfo
   }
+  if (d.kind === "posting_changed" || d.kind === "posting_closed")
+    return {
+      label: d.kind === "posting_closed" ? "Posting closed" : "Posting changed",
+      waiting:
+        d.kind === "posting_closed"
+          ? "The posting was taken down after you applied. See what was recorded."
+          : "The posting changed after you applied. See what changed.",
+      kind: "changes",
+      primary:
+        d.kind === "posting_closed" ? "See the closure" : "See what changed",
+    } satisfies PendingKindInfo
+  if (action.type === "sign_in" && d.kind === "verification_code")
+    return {
+      label: "Verification code",
+      waiting:
+        "The portal sent a verification code. Enter it in the runner's browser.",
+      kind: "continue",
+      primary: "I entered the code, continue",
+      resolution: "continue",
+    } satisfies PendingKindInfo
   return PENDING_KINDS[action.type]
 }
 

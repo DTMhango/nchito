@@ -16,6 +16,7 @@ from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Timestamps
 from app.api.crud_db import add_db_crud
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.core import audit
+from app.core.settings import service as settings_service
 from app.models.search import EmployerAlias, Source, SourceAccess, TrustedSite, WatchedEmployer
 from app.pipeline import orchestrator
 from app.schemas.json_types import RateLimit, SourceHealth
@@ -196,7 +197,8 @@ async def test_source(item_id: uuid.UUID, session: SessionDep) -> SourceTestOut:
     config = effective_config(source, watched)
     deps = orchestrator.DEPS
     try:
-        connector = deps.connector_for(source)
+        values = await settings_service.values(session)
+        connector = deps.connector_for(source, await orchestrator.connector_extras(session, source, None, values))
         if source.connector != "manual":
             config = connector.validate_config(config)
         ctx = SearchContext(campaign_id="test", titles=[], keywords=[], locations=[], source_config=config)

@@ -314,14 +314,19 @@ export const handoffQuery = (id: string) =>
   })
 
 // ---- pending actions ----
-export const pendingQuery = () =>
+/** Open pending actions; `kind` narrows to one exact blocker kind (`?kind=`). */
+export const pendingQuery = (kind: string | null = null) =>
   queryOptions({
-    queryKey: apKeys.pending,
+    queryKey: kind ? [...apKeys.pending, kind] : apKeys.pending,
     queryFn: async () =>
       (
         await unwrap(
           api.GET("/api/pending-actions", {
-            params: { query: { status: "open", limit: 200 } },
+            params: {
+              query: kind
+                ? { status: "open", limit: 200, kind }
+                : { status: "open", limit: 200 },
+            },
           })
         )
       ).items,

@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, Page, Timestamps
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.apply import owner_actions, resolvers, stages
+from app.apply import accounts, owner_actions, resolvers, stages
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.events import publish
@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/pending-actions", tags=["pending_actions"], depe
 
 PendingType = Literal["approve", "sign_in", "create_account", "captcha", "unknown_question", "assessment",
                       "declaration", "confirm_submission", "review_import", "conflict_choice", "answer_review_due",
-                      "follow_up"]
+                      "follow_up", "unsupported_form", "redirect_off_domain", "page_instruction"]
 ScopeT = Literal["this_application", "this_employer", "this_country", "all_matching"]
 StatusT = Literal["open", "resolved", "dismissed", "expired"]
 
@@ -55,6 +55,17 @@ class PendingActionOut(Timestamps):
     employer: str | None = None
     job_title: str | None = None
     resolution: dict[str, Any] | None = None
+    kind: str | None = Field(default=None, description="The exact kind within the type (``detail.kind``): e.g. "
+                                                       "posting_changed, posting_closed, verification_code")
+    reminders_sent: int | None = Field(default=None, description="Blocker actions: reminders sent so far")
+    next_reminder_at: datetime | None = Field(default=None, description=(
+        "Blocker actions with a deadline: when the next reminder is due (accounts.reminder_offsets_hours); null "
+        "when none is left"))
+    choices: list[Literal["continue", "continue_acknowledged", "manual_handoff", "skipped"]] = Field(
+        default_factory=list, description=(
+            "A runner blocker's owner choices: continue (resolve 'continue'), continue_acknowledged (resolve "
+            "'continue' with acknowledged=true), manual_handoff / skipped (POST /api/portal-accounts/actions/{id}"
+            "/give-up). Empty for other actions."))
 
 
 class DecisionGroup(BaseModel):
@@ -78,6 +89,9 @@ class ResolveIn(BaseModel):
     note: str | None = None
     reference: str | None = Field(default=None, max_length=200,
                                   description="confirmed: the employer's reference number, kept as evidence")
+    acknowledged: bool = Field(default=False, description=(
+        "continue on a suspicious-page blocker (redirect_off_domain, page_instruction): the owner confirms they "
+        "checked the page and it is safe; required there (422 acknowledgement_required), audited"))
 
 
 class DismissIn(BaseModel):
@@ -120,15 +134,19 @@ async def _outs(session: AsyncSession, actions: list[PendingAction]) -> list[Pen
     now = utcnow()
     days = await _imminent_days(session)
     ctx = await _context(session, actions)
+    offsets = [int(h) for h in await settings_service.get_value(session, "accounts.reminder_offsets_hours")]
     out = []
     for a in actions:
         employer, title = ctx.get(a.application_id, (None, None)) if a.application_id else (None, None)
+        reminders = accounts.reminder_schedule(a, offsets)
         out.append(PendingActionOut(
             id=a.id, created_at=a.created_at, updated_at=a.updated_at, type=a.type.value,
             application_id=a.application_id, agent_task_id=a.agent_task_id, group_key=a.group_key, title=a.title,
             detail=a.detail, checkpoint=a.checkpoint, deadline=a.deadline, status=a.status.value,
             snoozed_until=a.snoozed_until, snoozed=_is_snoozed(a, now, days), employer=employer, job_title=title,
-            resolution=a.resolution))
+            resolution=a.resolution, kind=(a.detail or {}).get("kind"),
+            choices=accounts.choices_for(a), reminders_sent=reminders[0] if reminders else None,
+            next_reminder_at=reminders[1] if reminders else None))  # type: ignore[arg-type]
     return out
 
 
@@ -189,12 +207,16 @@ def _group_title(actions: list[PendingAction]) -> str:
 
 @router.get("", response_model=Page[PendingActionOut], name="pending_actions_list")
 async def list_pending(session: SessionDep, status: StatusT = "open", type: PendingType | None = None,
+                       kind: str | None = Query(default=None, max_length=60),
                        include_snoozed: bool = False, cursor: str | None = None,
                        limit: int = Query(default=100, ge=1, le=500)) -> Page[PendingActionOut]:
-    """Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back."""
+    """Soonest deadline first, then oldest. Snoozed actions stay hidden until they come back. ``kind`` filters on
+    ``detail.kind`` (e.g. ``posting_changed`` for posting change actions)."""
     stmt = select(PendingAction).where(PendingAction.status == PendingStatus(status))
     if type:
         stmt = stmt.where(PendingAction.type == PendingActionType(type))
+    if kind:
+        stmt = stmt.where(PendingAction.detail["kind"].astext == kind)
     rows = list(await session.scalars(stmt.order_by(PendingAction.deadline.asc().nulls_last(),
                                                     PendingAction.created_at, PendingAction.id)))
     if status == "open" and not include_snoozed:
@@ -396,7 +418,8 @@ async def resolve(action_id: uuid.UUID, body: ResolveIn, principal: PrincipalDep
             await owner_actions.choose(session, action, body.chosen_job_id, actor=principal.actor, note=body.note)
         elif body.resolution == "continue" and kind in owner_actions.CONTINUABLE:
             _require_open(action)
-            await owner_actions.continue_task(session, action, actor=principal.actor, note=body.note)
+            await owner_actions.continue_task(session, action, actor=principal.actor, note=body.note,
+                                              acknowledged=body.acknowledged)
         elif body.resolution == "confirmed" and kind == PendingActionType.confirm_submission:
             _require_open(action)
             await owner_actions.confirm_submission(session, action, actor=principal.actor,
@@ -404,7 +427,8 @@ async def resolve(action_id: uuid.UUID, body: ResolveIn, principal: PrincipalDep
         else:
             raise HTTPException(422, detail=f"'{body.resolution}' does not resolve a {kind.value} action")
     except owner_actions.ResolveError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        detail: Any = {"code": exc.code, "reason": exc.message} if exc.code else exc.message
+        raise HTTPException(exc.status, detail=detail) from exc
     except stages.IllegalTransition as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=exc.reason) from exc
     await publish(session, "pending_action.resolved", {"pending_action_id": str(action.id)})

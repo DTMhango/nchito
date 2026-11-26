@@ -14,6 +14,7 @@ import {
   updateSource,
   type Source,
 } from "./api"
+import { AddSourceDialog } from "./add-source-dialog"
 import { SourceDrawer } from "./source-drawer"
 import { HealthDot } from "./shared"
 import { ACCESS_LABEL, ago, plainError } from "./words"
@@ -121,6 +122,9 @@ export function SourceList() {
 
   return (
     <>
+      <div className="mb-3 flex justify-end">
+        <AddSourceDialog />
+      </div>
       <DataTable
         columns={columns}
         rows={q.data}
@@ -130,7 +134,7 @@ export function SourceList() {
           <EmptyState
             icon={Radio}
             title="No sources yet"
-            description="Sources are added by the system as connectors are installed."
+            description="Board sources appear as you watch employers. Add a careers page, web search or JobSpy source above."
           />
         }
       />

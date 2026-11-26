@@ -1,4 +1,5 @@
 import { render } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import type { ReactNode } from "react"
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
@@ -41,4 +42,14 @@ export function renderWithTheme(
       </QueryClientProvider>
     ),
   }
+}
+
+/**
+ * A user-event instance for form-filling tests. `delay: null` drops the macrotask user-event
+ * otherwise waits between keystrokes; each keystroke still runs in act() and re-renders. A
+ * test typing ~80 characters into a whole-app render spends ~40% less time, which keeps it
+ * well inside the test timeout when the full suite runs on every core.
+ */
+export function setupUser() {
+  return userEvent.setup({ delay: null })
 }

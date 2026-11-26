@@ -21,9 +21,22 @@ const SECURITY = ["ssl", "starttls", "none"] as const
 /** The server refuses a shorter webhook signing secret. */
 export const WEBHOOK_SECRET_MIN = 16
 
+export type FormDef = {
+  cta: string
+  fields: FieldDef[]
+  /** A cross-field check the server also makes; returns the problem in plain words. */
+  check?: (values: Record<string, string>) => string | null
+}
+
+/** The search provider takes its key in a header or in a query parameter, never both. */
+export const checkSearchApi = (v: Record<string, string>) =>
+  v.key_header?.trim() && v.key_param?.trim()
+    ? "Give the key as a header or as a query parameter, not both."
+    : null
+
 export const FORMS: Record<
   Exclude<ConnectionProvider, "gmail" | "gdrive">,
-  { cta: string; fields: FieldDef[] }
+  FormDef
 > = {
   imap_smtp: {
     cta: "Connect mailbox",
@@ -141,6 +154,78 @@ export const FORMS: Record<
         type: "password",
         minLength: WEBHOOK_SECRET_MIN,
         help: `At least ${WEBHOOK_SECRET_MIN} characters. Each message is signed with it so you can check it came from here. Encrypted and never shown again.`,
+      },
+    ],
+  },
+  search_api: {
+    cta: "Connect search API",
+    check: checkSearchApi,
+    fields: [
+      {
+        name: "endpoint",
+        label: "Search address",
+        to: "config",
+        type: "url",
+        placeholder: "https://search.example.com/v1/search",
+        help: "Where searches are sent (a GET request that answers in JSON).",
+      },
+      {
+        name: "api_key",
+        label: "API key",
+        to: "secret",
+        type: "password",
+        help: "Encrypted and never shown again; only a masked end of it is shown.",
+      },
+      {
+        name: "key_header",
+        label: "Key header",
+        to: "config",
+        optional: true,
+        placeholder: "X-API-Key",
+        help: "The request header the key goes in. Use this or the key parameter, not both.",
+      },
+      {
+        name: "key_param",
+        label: "Key parameter",
+        to: "config",
+        optional: true,
+        help: "The query parameter the key goes in, when the provider wants it in the address.",
+      },
+      {
+        name: "query_param",
+        label: "Search phrase parameter",
+        to: "config",
+        optional: true,
+        help: "The query parameter that carries the search phrase. Empty: the server default.",
+      },
+      {
+        name: "limit_param",
+        label: "Result count parameter",
+        to: "config",
+        optional: true,
+        help: "The query parameter for how many results to return. Empty when the provider has none.",
+      },
+      {
+        name: "result_path",
+        label: "Result list path",
+        to: "config",
+        optional: true,
+        placeholder: "data.items",
+        help: "Dotted path to the list of results in the answer. Empty: the server default.",
+      },
+      {
+        name: "url_field",
+        label: "Link field",
+        to: "config",
+        optional: true,
+        help: "The field of one result that holds its link. Empty: the server default.",
+      },
+      {
+        name: "title_field",
+        label: "Title field",
+        to: "config",
+        optional: true,
+        help: "The field of one result that holds its title. Empty: the server default.",
       },
     ],
   },

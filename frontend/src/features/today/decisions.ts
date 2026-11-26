@@ -3,6 +3,19 @@ import type {
   AnswerScope,
   ResolveIn,
 } from "@/features/applications/api"
+import {
+  blockerKind,
+  choicesOf,
+  continueRule,
+  isHandoff,
+  type BlockerKind,
+} from "@/features/accounts/logic"
+
+/** The handoff link of a blocker whose choices are on its handoff page, worded by kind. */
+const HANDOFF_LABEL: Partial<Record<BlockerKind, string>> = {
+  redirect_off_domain: "See where it went",
+  page_instruction: "See what the page asked",
+}
 
 export const SCOPE_OPTIONS: {
   value: AnswerScope
@@ -51,38 +64,84 @@ export function readDetail(action: PendingAction): ActionDetail {
       ? d.options.filter((o): o is string => typeof o === "string")
       : undefined,
     material: d.material === true,
-    url: str(d.url),
+    url: str(d.url) ?? str(d.portal_url),
     employer: str(d.employer),
     role: str(d.role),
   }
 }
 
-export type ActionKit = {
-  /** How the primary button resolves, or "answer" to open the inline form, or "link". */
-  primary: {
-    label: string
-    resolution: ResolveIn["resolution"] | "answer" | "link"
-  }
-  secondary: { label: string; resolution: ResolveIn["resolution"] | "link" }
+/** Pending-action kinds (`kind` = `detail.kind`) for posting changes, shown on the job's Changes tab. */
+export const CHANGE_KINDS = ["posting_changed", "posting_closed"] as const
+export type ChangeKind = (typeof CHANGE_KINDS)[number]
+
+export const changeKind = (action: PendingAction): ChangeKind | null => {
+  const k = action.kind ?? (action.detail as Record<string, unknown>).kind
+  return (CHANGE_KINDS as readonly unknown[]).includes(k)
+    ? (k as ChangeKind)
+    : null
 }
 
-/** Primary and secondary action for a group, by the type of its first action. */
-export function actionKit(
-  type: PendingAction["type"],
-  count: number
-): ActionKit {
+/** The job a change action is about (`detail.job_id`). */
+export const changeJobId = (action: PendingAction): string | null => {
+  const j = (action.detail as Record<string, unknown>).job_id
+  return typeof j === "string" && j ? j : null
+}
+
+/**
+ * How a button acts: a resolve body the backend accepts for the type, the inline answer form,
+ * or a link: "link" (portal / approval / studio), "handoff" (`/accounts/handoff/$id`),
+ * "changes" (the job's Changes tab).
+ */
+export type KitResolution =
+  ResolveIn["resolution"] | "answer" | "link" | "handoff" | "changes"
+
+export type ActionKit = {
+  primary: { label: string; resolution: KitResolution }
+  secondary: { label: string; resolution: KitResolution } | null
+}
+
+/**
+ * Primary and secondary action for a group, from its first action. Only resolutions the backend
+ * accepts are offered: for a runner blocker, `continue` when its `choices` list it (other choices
+ * are on the handoff page); `answered` for questions, `confirmed` for confirm_submission,
+ * `dismissed` for everything else.
+ */
+export function actionKit(action: PendingAction, count: number): ActionKit {
   const these = count > 1 ? "these roles" : "this role"
-  switch (type) {
+  const change = changeKind(action)
+  if (change)
+    return {
+      primary: {
+        label:
+          change === "posting_closed" ? "See the closure" : "See what changed",
+        resolution: "changes",
+      },
+      secondary: { label: "Dismiss", resolution: "dismissed" },
+    }
+  // A runner blocker: the buttons follow the server's choices (`choices`), never the type.
+  if (action.type !== "unknown_question" && isHandoff(action)) {
+    const rule = continueRule(action)
+    if (rule)
+      return {
+        primary: { label: rule.label, resolution: "continue" },
+        secondary: { label: "Open portal", resolution: "link" },
+      }
+    const kind = blockerKind(action)
+    return {
+      primary: {
+        label:
+          (kind && HANDOFF_LABEL[kind]) ??
+          (choicesOf(action).length ? "Choose what to do" : "See the details"),
+        resolution: "handoff",
+      },
+      secondary: null,
+    }
+  }
+  switch (action.type) {
     case "unknown_question":
       return {
         primary: { label: "Answer", resolution: "answer" },
         secondary: { label: `Skip ${these}`, resolution: "dismissed" },
-      }
-    case "sign_in":
-    case "create_account":
-      return {
-        primary: { label: "I've signed in", resolution: "continue" },
-        secondary: { label: "Open portal", resolution: "link" },
       }
     case "approve":
       return {
@@ -96,8 +155,8 @@ export function actionKit(
       }
     default:
       return {
-        primary: { label: "Done", resolution: "continue" },
-        secondary: { label: "Dismiss", resolution: "dismissed" },
+        primary: { label: "Done", resolution: "dismissed" },
+        secondary: null,
       }
   }
 }

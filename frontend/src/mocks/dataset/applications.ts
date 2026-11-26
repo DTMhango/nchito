@@ -217,6 +217,10 @@ export function seedApplications(): MockApplications {
     employer: app?.employer ?? null,
     job_title: app?.title ?? null,
     resolution: null,
+    kind: typeof detail.kind === "string" ? detail.kind : null,
+    reminders_sent: null,
+    next_reminder_at: null,
+    choices: [],
   })
 
   const workRights = [
@@ -337,9 +341,18 @@ export function groupActions(actions: PendingAction[]): DecisionGroup[] {
         n > 1 ? `One work-rights answer affects ${count} roles` : first.title
       consequence = `${n > 1 ? "These applications stay" : "This application stays"} paused until you answer.`
     } else if (first.type === "sign_in") {
+      // One open sign-in per portal tenant: the waiting applications are in its detail.
+      const waiting = list.reduce(
+        (sum, a) =>
+          sum +
+          (Array.isArray(a.detail.applications)
+            ? a.detail.applications.length
+            : 1),
+        0
+      )
       title =
-        n > 1
-          ? `Signing in to this portal unlocks ${count} applications`
+        waiting > 1
+          ? `Signing in to this portal unlocks ${words[waiting] ?? String(waiting)} applications`
           : first.title
       consequence = "The agent can't continue on this portal without you."
     } else if (first.type === "approve") {

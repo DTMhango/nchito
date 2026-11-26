@@ -296,6 +296,8 @@ export function seedAutopilot(): MockAutopilot {
         last_seen_at: ago(0.01),
         online: true,
         current_task_id: null,
+        current_task_title: null,
+        current_task_type: null,
       },
       {
         token_id: uuid("c", 2),
@@ -304,6 +306,8 @@ export function seedAutopilot(): MockAutopilot {
         last_seen_at: ago(2),
         online: false,
         current_task_id: null,
+        current_task_title: null,
+        current_task_type: null,
       },
     ],
   }
@@ -447,5 +451,9 @@ export function mailProposalFor(app: ApplicationSummary): PendingAction {
     employer: app.employer,
     job_title: app.title,
     resolution: null,
+    kind: "mail_stage_proposal",
+    reminders_sent: null,
+    next_reminder_at: null,
+    choices: [],
   }
 }

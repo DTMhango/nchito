@@ -164,6 +164,25 @@ async def _answers(session: AsyncSession, packet: ApplicationPacket) -> Check:
     return "pass", "every answer comes from a confirmed automatic answer"
 
 
+async def _job_version(session: AsyncSession, job: Job, packet: ApplicationPacket) -> Check:
+    """The posting has not changed *materially* since the packet was built (the rule of ``pipeline.changes``): a
+    reworded posting passes; a material change, or a change that cannot be judged (no stored version of what the
+    packet saw), fails. Unknown is not yes."""
+    from app.pipeline import changes
+
+    seen = packet.contents.job_version
+    if seen in (None, job.content_hash):
+        return ("pass", "posting unchanged since the packet was built")
+    baseline = await changes.version_for(session, job.id, seen, at=packet.created_at)
+    if baseline is None:
+        return ("fail", "the posting changed since the packet was built")
+    found = changes.diff(baseline, changes.snapshot_of(job))
+    if changes.is_material(found):
+        return ("fail", "the posting changed since the packet was built: "
+                + "; ".join(c["summary"] for c in found if c["material"]))
+    return ("pass", "the posting was only reworded since the packet was built")
+
+
 async def _recipient(session: AsyncSession, job: Job, to: list[str]) -> Check:
     """An email goes only to the role's usable address (confirmed by the owner, or on a trusted domain)."""
     from app.apply import target
@@ -253,9 +272,7 @@ async def evaluate(session: AsyncSession, app: Application, packet: ApplicationP
         bound = packet.contents.channel
         checks["channel_bound"] = (("pass", f"channel {channel}") if bound == channel
                                    else ("fail", f"packet is for {bound}, not {channel}"))
-        checks["job_version"] = (("pass", "posting unchanged since the packet was built")
-                                 if packet.contents.job_version in (None, job.content_hash)
-                                 else ("fail", "the posting changed since the packet was built"))
+        checks["job_version"] = await _job_version(session, job, packet)
         dest = packet.contents.destination
         checks["destination_verified"] = (("pass", f"{dest.domain} is the posting's own") if dest.verified
                                           else ("unknown", f"{dest.domain} is not confirmed as the posting's", True))

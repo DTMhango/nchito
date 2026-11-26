@@ -20,6 +20,7 @@ from app.schemas.json_types import TemplateLimits
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 DocKind = Literal["cv", "letter"]
+ModelKind = Literal["cv", "letter", "pack"]  # pack: the interview pack export (not an application document)
 Fmt = Literal["pdf", "docx", "txt", "html"]
 FontFamily = Literal["sans", "serif"]
 CV_SECTIONS = ("summary", "competencies", "experience", "skills", "education")
@@ -54,7 +55,7 @@ class TemplateDef(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     key: str
-    kind: DocKind
+    kind: ModelKind
     name: str
     layout: TemplateLayout
     section_order: list[str]
@@ -124,3 +125,15 @@ def resolve_template(key: str, kind: DocKind, row: Template | None = None) -> Te
 # Built-in templates leave limits empty so the documents.* settings apply; only the per-role bullet
 # cap has no setting, and no built-in imposes one.
 _BUILTIN_LIMITS: dict[str, TemplateLimits] = {}
+
+
+# The interview pack export: a plain, readable layout with no page limit. Not an application
+# document, so it is not offered as a CV or letter template and has no owner override.
+PACK_KEY = "pack"
+_PACK_LAYOUT = TemplateLayout(font="sans", base_pt=10.5, name_pt=18, heading_pt=12.5, margin_mm=18,
+                              line_height=1.3, upper_headings=False, heading_rule=True, accent="#1F4E79")
+
+
+def pack_template() -> TemplateDef:
+    return TemplateDef(key=PACK_KEY, kind="pack", name="Interview pack", layout=_PACK_LAYOUT, section_order=[],
+                       limits=TemplateLimits(), html=_html_source("pack"))

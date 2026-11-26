@@ -1,13 +1,9 @@
 import { screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { beforeEach, describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import { renderApp } from "@/test/render"
-import {
-  applicationsMock,
-  resetApplicationsMock,
-} from "@/mocks/handlers/applications"
-
-beforeEach(() => resetApplicationsMock())
+import { applicationsMock } from "@/mocks/handlers/applications"
+import { ACTION } from "@/mocks/dataset/runners"
 
 const open = () => applicationsMock().actions.filter((a) => a.status === "open")
 
@@ -25,9 +21,10 @@ describe("Today: Needs you", () => {
         "Signing in to this portal unlocks two applications"
       )
     ).toBeInTheDocument()
-    // 4 questions + 2 sign-ins + approve + confirm collapse to 4 decisions.
-    expect(open().length).toBe(8)
-    expect(within(needs).getByText("4")).toBeInTheDocument()
+    // 4 questions + 1 tenant sign-in + approve + confirm + mail proposal + 7 wave 3 actions
+    // collapse to 12 decisions.
+    expect(open().length).toBe(15)
+    expect(within(needs).getByText("12")).toBeInTheDocument()
     expect(within(needs).getAllByText(/paused until you answer/i).length).toBe(
       1
     )
@@ -101,7 +98,7 @@ describe("Today: Needs you", () => {
     const user = userEvent.setup()
     renderApp("/today")
     const bell = await screen.findByRole("button", {
-      name: /notifications, 8 waiting/i,
+      name: /notifications, 15 waiting/i,
     })
     await user.click(bell)
     expect(
@@ -109,5 +106,92 @@ describe("Today: Needs you", () => {
         selector: "span",
       })
     ).toBeInTheDocument()
+  })
+
+  it("links a posting change to the job's Changes tab and dismisses it", async () => {
+    const user = userEvent.setup()
+    renderApp("/today")
+    const needs = await screen.findByRole("region", { name: "Needs you" })
+    const link = await within(needs).findByRole("link", {
+      name: "See what changed",
+    })
+    const changed = open().find((a) => a.id === ACTION.changed)!
+    expect(link).toHaveAttribute(
+      "href",
+      `/jobs/${String(changed.detail.job_id)}?tab=changes`
+    )
+    const row = link.closest("[class]")!.parentElement!
+    await user.click(within(row).getByRole("button", { name: "Dismiss" }))
+    await waitFor(() => expect(changed.status).toBe("dismissed"))
+  })
+
+  it("gives the blocker kinds their own labels and only the choices the server lists", async () => {
+    renderApp("/today")
+    const needs = await screen.findByRole("region", { name: "Needs you" })
+    expect(
+      await within(needs).findByRole("link", { name: "See where it went" })
+    ).toHaveAttribute("href", `/accounts/handoff/${ACTION.offDomain}`)
+    expect(
+      within(needs).getByRole("link", { name: "See what the page asked" })
+    ).toHaveAttribute("href", `/accounts/handoff/${ACTION.pageAsked}`)
+    expect(
+      within(needs).getByRole("link", { name: "Choose what to do" })
+    ).toHaveAttribute("href", `/accounts/handoff/${ACTION.unsupported}`)
+    expect(
+      within(needs).getByRole("button", {
+        name: "I entered the code, continue",
+      })
+    ).toBeInTheDocument()
+    // A field mismatch lists continue: carried on from Today with the generic label.
+    expect(
+      within(needs).getByRole("button", { name: "I've done it, continue" })
+    ).toBeInTheDocument()
+    // A suspicious page is never closed or continued from Today: its choices are on the handoff.
+    expect(within(needs).queryByRole("button", { name: "Close it" })).toBeNull()
+  })
+
+  it("continues a portal sign-in once, for every waiting application", async () => {
+    const user = userEvent.setup()
+    renderApp("/today")
+    const needs = await screen.findByRole("region", { name: "Needs you" })
+    await user.click(
+      await within(needs).findByRole("button", {
+        name: "I've signed in, continue",
+      })
+    )
+    const signIn = applicationsMock().actions.find(
+      (a) => a.id === ACTION.signIn
+    )!
+    await waitFor(() => expect(signIn.status).toBe("resolved"))
+    expect(signIn.resolution).toMatchObject({
+      resolution: "continue",
+      resumed_tasks: expect.arrayContaining([expect.any(String)]),
+    })
+    // The CAPTCHA on another task is not touched.
+    expect(
+      applicationsMock().actions.find((a) => a.id === ACTION.captcha)!.status
+    ).toBe("open")
+  })
+
+  it("bell items open the handoff, the Changes tab or Today", async () => {
+    const user = userEvent.setup()
+    renderApp("/today")
+    await user.click(
+      await screen.findByRole("button", { name: /notifications, 15 waiting/i })
+    )
+    const links = await screen.findAllByRole("link")
+    const hrefs = links.map((l) => l.getAttribute("href") ?? "")
+    expect(hrefs).toContain(`/accounts/handoff/${ACTION.signIn}`)
+    expect(hrefs.some((h) => h.includes("?tab=changes"))).toBe(true)
+    expect(hrefs.some((h) => h.startsWith("/today?action="))).toBe(true)
+  })
+
+  it("sends a notification's /today?action= link for a blocker to its handoff page", async () => {
+    const { router } = renderApp(`/today?action=${ACTION.captcha}`)
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/accounts/handoff/${ACTION.captcha}`
+      )
+    )
   })
 })

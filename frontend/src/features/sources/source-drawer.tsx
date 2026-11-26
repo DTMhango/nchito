@@ -23,6 +23,20 @@ import {
   type Source,
   type SourceTest,
 } from "./api"
+import {
+  ConnectorFields,
+  JobSpyNotInstalled,
+  useSearchConnections,
+  useSourceSettings,
+} from "./connector-form"
+import {
+  buildConfig,
+  CONNECTOR_INFO,
+  draftFromConfig,
+  isNewConnector,
+  isNotInstalled,
+  type Draft,
+} from "./connectors"
 import { HealthDot } from "./shared"
 import { ACCESS_LABEL, ACTION_LABEL, ago, plainError } from "./words"
 
@@ -71,6 +85,13 @@ function DrawerBody({
   )
   const [enabled, setEnabled] = useState(source.enabled ?? true)
   const [result, setResult] = useState<SourceTest | null>(null)
+  const kind = isNewConnector(source.connector) ? source.connector : null
+  const [draft, setDraft] = useState<Draft | null>(() =>
+    kind ? draftFromConfig(kind, source.config) : null
+  )
+  const [problem, setProblem] = useState<string | null>(null)
+  const settings = useSourceSettings()
+  const connections = useSearchConnections()
 
   const rpmN = Number(rpm)
   const burstN = Number(burst)
@@ -83,8 +104,16 @@ function DrawerBody({
     (maxAgeN !== null && (!Number.isInteger(maxAgeN) || maxAgeN < 1))
 
   const save = useMutation({
-    mutationFn: () => {
-      const config: Record<string, unknown> = { ...source.config }
+    mutationFn: (built: Record<string, unknown> | null) => {
+      const config: Record<string, unknown> = built ?? { ...source.config }
+      if (built)
+        return updateSource(source.id, {
+          ...toSourceInput(source),
+          config,
+          rate_limit: { requests_per_minute: rpmN, burst: burstN },
+          permitted_actions: [...actions],
+          enabled,
+        })
       const kw = keywords
         .split(",")
         .map((k) => k.trim())
@@ -106,8 +135,16 @@ function DrawerBody({
       toast.success(`Saved ${source.name}`)
       onClose()
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => setProblem(e.message),
   })
+
+  const submit = () => {
+    if (!kind || !draft) return save.mutate(null)
+    const built = buildConfig(kind, draft, settings, connections, source.config)
+    if (!built.ok) return setProblem(built.error)
+    setProblem(null)
+    save.mutate(built.config)
+  }
 
   const test = useMutation({
     mutationFn: () => testSource(source.id),
@@ -155,31 +192,40 @@ function DrawerBody({
           />
         </div>
 
-        <fieldset className="grid gap-3">
-          <legend className="mb-1 eyebrow">Search settings</legend>
-          <div className="grid gap-1.5">
-            <Label htmlFor="src-keywords">Keywords</Label>
-            <Input
-              id="src-keywords"
-              value={keywords}
-              onChange={(e) => setKeywords(e.target.value)}
-              placeholder="actuarial, reinsurance"
-            />
-            <p className="text-xs text-muted-foreground">
-              Comma separated. Leave empty to use each campaign's own search.
+        {kind && draft ? (
+          <section aria-label="Source settings" className="grid gap-3">
+            <p className="text-sm text-muted-foreground">
+              {CONNECTOR_INFO[kind].blurb}
             </p>
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="src-age">Ignore postings older than (days)</Label>
-            <Input
-              id="src-age"
-              inputMode="numeric"
-              value={maxAge}
-              onChange={(e) => setMaxAge(e.target.value)}
-              aria-invalid={maxAgeN !== null && !(maxAgeN >= 1)}
-            />
-          </div>
-        </fieldset>
+            <ConnectorFields kind={kind} draft={draft} onChange={setDraft} />
+          </section>
+        ) : (
+          <fieldset className="grid gap-3">
+            <legend className="mb-1 eyebrow">Search settings</legend>
+            <div className="grid gap-1.5">
+              <Label htmlFor="src-keywords">Keywords</Label>
+              <Input
+                id="src-keywords"
+                value={keywords}
+                onChange={(e) => setKeywords(e.target.value)}
+                placeholder="actuarial, reinsurance"
+              />
+              <p className="text-xs text-muted-foreground">
+                Comma separated. Leave empty to use each campaign's own search.
+              </p>
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="src-age">Ignore postings older than (days)</Label>
+              <Input
+                id="src-age"
+                inputMode="numeric"
+                value={maxAge}
+                onChange={(e) => setMaxAge(e.target.value)}
+                aria-invalid={maxAgeN !== null && !(maxAgeN >= 1)}
+              />
+            </div>
+          </fieldset>
+        )}
 
         <fieldset className="grid gap-3">
           <legend className="mb-1 eyebrow">Rate limit</legend>
@@ -265,9 +311,13 @@ function DrawerBody({
                     <XCircle className="size-4" aria-hidden="true" />
                     The test failed
                   </span>
-                  <span className="text-muted-foreground">
-                    {plainError(result.error)}
-                  </span>
+                  {isNotInstalled(result.error) ? (
+                    <JobSpyNotInstalled />
+                  ) : (
+                    <span className="text-muted-foreground">
+                      {plainError(result.error)}
+                    </span>
+                  )}
                 </>
               )}
             </div>
@@ -275,11 +325,13 @@ function DrawerBody({
         </section>
       </div>
 
+      {problem && (
+        <p role="alert" className="px-4 text-sm text-danger">
+          {problem}
+        </p>
+      )}
       <SheetFooter>
-        <Button
-          onClick={() => save.mutate()}
-          disabled={invalid || save.isPending}
-        >
+        <Button onClick={submit} disabled={invalid || save.isPending}>
           {save.isPending ? "Saving..." : "Save settings"}
         </Button>
         <Button variant="ghost" onClick={onClose}>

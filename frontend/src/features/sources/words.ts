@@ -1,6 +1,7 @@
 import { formatCost, microsOf } from "@/lib/cost"
 import type { ChipTone } from "@/components/chip"
 import type { Source, RunKind, RunStatus } from "./api"
+import { JOBSPY_INSTALL } from "./connectors"
 
 /** Plain-words labels, kept in one place so wording is easy to change. */
 
@@ -98,6 +99,12 @@ export const triggerLabel = (t: string) =>
 export function plainError(raw: string | null | undefined): string {
   if (!raw) return ""
   const t = raw.toLowerCase()
+  if (/not installed/.test(t))
+    return `JobSpy is not installed on this server. Whoever runs it adds the optional extra (${JOBSPY_INSTALL}).`
+  if (/switched off/.test(t))
+    return "JobSpy is switched off. Turn it on under Discovery settings."
+  if (/no api key/.test(t))
+    return "Web search has no key. Add a Search API connection in Settings, Connections."
   if (/\b429\b|rate.?limit|too many requests/.test(t))
     return "The site asked us to slow down. The next run will go slower."
   if (/\b401\b|\b403\b|forbidden|unauthori[sz]ed/.test(t))

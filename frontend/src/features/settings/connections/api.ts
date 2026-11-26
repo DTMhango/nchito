@@ -1,4 +1,4 @@
-/** Settings > Connections: mail, Drive, Telegram, webhook. Typed from the generated contract. */
+/** Settings > Connections: mail, Drive, Telegram, webhook, search API. Typed from the generated contract. */
 import { queryOptions } from "@tanstack/react-query"
 import { api, unwrap } from "@/lib/api/client"
 import type { components } from "@/lib/api/types"
@@ -17,6 +17,7 @@ export const CONNECTION_PROVIDERS = [
   "gdrive",
   "telegram",
   "webhook",
+  "search_api",
 ] as const satisfies readonly Provider[]
 export type ConnectionProvider = (typeof CONNECTION_PROVIDERS)[number]
 

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { Chip } from "@/components/chip"
 import { SectionHeader } from "@/components/page-header"
+import { currentTaskText } from "@/features/settings/runners/logic"
 import { runnersQuery } from "./api"
 import { CHANNEL_RULES, ENFORCEMENT } from "./logic"
 
@@ -55,6 +56,11 @@ export function ChannelsPanel() {
                 {r.runner_kind === "pc" ? "your PC" : "server"} ·{" "}
                 {seen(r.last_seen_at)}
               </span>
+              {r.current_task_id && (
+                <span className="text-muted-foreground">
+                  {currentTaskText(r)}
+                </span>
+              )}
             </li>
           ))}
         </ul>

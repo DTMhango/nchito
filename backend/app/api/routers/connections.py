@@ -6,25 +6,28 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, Page, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.connect import mail_connections
+from app.connect import mail_connections, search_api
 from app.connect import records as ops_records
 from app.connect.mailbox import MailError
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.crypto import mask
+from app.gateway import auth as gateway_auth
+from app.gateway import history
 from app.llm import checks, provider_records
 from app.llm.deps import llm_service
 from app.llm.money import micros_to_minor
 from app.llm.service import LLMService
-from app.models.platform import Connection
+from app.models.platform import ApiToken, Connection
+from app.schemas.json_types import AgentTaskTypeName
 
 connections_router = APIRouter(prefix="/api/connections", tags=["connections"], dependencies=[RequireOwner],
                                responses=NOT_IMPLEMENTED_RESPONSES)
@@ -32,7 +35,7 @@ tokens_router = APIRouter(prefix="/api/tokens", tags=["tokens"], dependencies=[R
                           responses=NOT_IMPLEMENTED_RESPONSES)
 
 ProviderT = Literal["anthropic", "openai_compatible", "gmail", "imap_smtp", "gdrive", "msgraph", "onedrive",
-                    "telegram", "webhook", "s3"]
+                    "telegram", "webhook", "s3", "search_api"]
 
 
 class ConnectionOut(Timestamps):
@@ -101,6 +104,8 @@ class RunnerStatus(BaseModel):
     last_seen_at: datetime | None
     online: bool
     current_task_id: uuid.UUID | None
+    current_task_title: str | None = Field(default=None, description="The role (title at employer) or site")
+    current_task_type: AgentTaskTypeName | None = None
 
 
 def _out(conn: Connection) -> ConnectionOut:
@@ -124,7 +129,7 @@ async def _get_llm(session: AsyncSession, connection_id: uuid.UUID) -> Connectio
     if conn is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="connection not found")
     if not (provider_records.is_llm(conn.provider.value) or mail_connections.is_mail(conn.provider.value)
-            or ops_records.is_ops(conn.provider.value)):
+            or ops_records.is_ops(conn.provider.value) or search_api.is_search(conn.provider.value)):
         not_implemented(2, "connect")
     return conn
 
@@ -139,7 +144,16 @@ async def list_connections(session: SessionDep) -> list[ConnectionOut]:
                          name="connections_create")
 async def create_connection(body: ConnectionCreate, session: SessionDep, principal: PrincipalDep) -> ConnectionOut:
     """LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are
-    encrypted at rest and only ever returned masked."""
+    encrypted at rest and only ever returned masked. ``search_api``: the web search source's key (secret
+    ``api_key``; config ``endpoint`` and the response shape)."""
+    if search_api.is_search(body.provider):
+        try:
+            conn = await search_api.create(session, label=body.label, config=body.config, secrets=body.secrets,
+                                           actor=principal.actor)
+        except ValueError as exc:
+            raise HTTPException(422, detail=str(exc)) from exc
+        await session.refresh(conn)
+        return _out(conn)
     if ops_records.is_ops(body.provider):
         try:
             conn = await ops_records.create(session, provider=body.provider, label=body.label, config=body.config,
@@ -166,6 +180,14 @@ async def update_connection(connection_id: uuid.UUID, body: ConnectionUpdate, se
                             principal: PrincipalDep) -> ConnectionOut:
     """Omitted fields stay; a blank secret value keeps the stored one."""
     conn = await _get_llm(session, connection_id)
+    if search_api.is_search(conn.provider.value):
+        try:
+            await search_api.update(session, conn, label=body.label, config=body.config, secrets=body.secrets,
+                                    enabled=body.enabled, actor=principal.actor)
+        except ValueError as exc:
+            raise HTTPException(422, detail=str(exc)) from exc
+        await session.refresh(conn)
+        return _out(conn)
     if ops_records.is_ops(conn.provider.value):
         try:
             await ops_records.update(session, conn, label=body.label, config=body.config, secrets_in=body.secrets,
@@ -200,6 +222,13 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
     conn = await _get_llm(session, connection_id)
     if ops_records.is_ops(conn.provider.value):
         ok, detail = await ops_records.run_test(session, conn)
+        return ConnectionTestOut(ok=ok, detail=detail)
+    if search_api.is_search(conn.provider.value):
+        ok, detail = await search_api.run_test(conn)
+        conn.health = "ok" if ok else "failing"
+        conn.last_checked_at = utcnow()
+        await audit.record(session, actor=principal.actor, action="connection.tested", subject_type="connection",
+                           subject_id=conn.id, detail={"provider": conn.provider.value, "ok": ok})
         return ConnectionTestOut(ok=ok, detail=detail)
     if mail_connections.is_mail(conn.provider.value):
         ok, detail = await mail_connections.test(conn)
@@ -252,27 +281,106 @@ async def oauth_callback(provider: Literal["gmail", "gdrive", "msgraph", "onedri
     not_implemented(2, "connect")
 
 
+def _token_out(t: ApiToken) -> TokenOut:
+    return TokenOut(id=t.id, created_at=t.created_at, updated_at=t.updated_at, name=t.name, prefix=t.prefix,
+                    scopes=list(t.scopes), runner_kind=t.runner_kind,  # type: ignore[arg-type]
+                    last_used_at=t.last_used_at, revoked_at=t.revoked_at, suspended_at=t.suspended_at,
+                    suspended_reason=t.suspended_reason)
+
+
+async def _token(session: AsyncSession, token_id: uuid.UUID) -> ApiToken:
+    token = await session.get(ApiToken, token_id, with_for_update=True)
+    if token is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="token not found")
+    return token
+
+
 @tokens_router.get("", response_model=list[TokenOut], name="tokens_list")
-async def list_tokens() -> list[TokenOut]:
-    not_implemented(3, "gateway")
+async def list_tokens(session: SessionDep) -> list[TokenOut]:
+    rows = await session.scalars(select(ApiToken).order_by(ApiToken.revoked_at.is_not(None), ApiToken.created_at))
+    return [_token_out(t) for t in rows.all()]
 
 
 @tokens_router.post("", response_model=TokenCreated, status_code=status.HTTP_201_CREATED, name="tokens_create")
-async def create_token(body: TokenCreate) -> TokenCreated:
-    not_implemented(3, "gateway")
+async def create_token(body: TokenCreate, session: SessionDep, principal: PrincipalDep) -> TokenCreated:
+    """A runner token: one runner identity of a declared kind. The token itself is shown only in this reply."""
+    try:
+        made = await gateway_auth.create(session, name=body.name, runner_kind=body.runner_kind,
+                                         scopes=list(body.scopes), by=principal.actor)
+    except ValueError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    await session.refresh(made.row)
+    return TokenCreated(**_token_out(made.row).model_dump(), token=made.secret)
 
 
 @tokens_router.post("/{token_id}/revoke", response_model=TokenOut, name="tokens_revoke")
-async def revoke_token(token_id: uuid.UUID) -> TokenOut:
-    not_implemented(3, "gateway")
+async def revoke_token(token_id: uuid.UUID, session: SessionDep, principal: PrincipalDep) -> TokenOut:
+    """Revoke at once: the token is refused from now on and the tasks it held go back to the queue."""
+    token = await _token(session, token_id)
+    await gateway_auth.revoke(session, token, by=principal.actor, now=utcnow())
+    await session.refresh(token)
+    return _token_out(token)
 
 
-@tokens_router.post("/{token_id}/reinstate", response_model=TokenOut, name="tokens_reinstate")
-async def reinstate_token(token_id: uuid.UUID) -> TokenOut:
-    """Lift a suspension (after a submission without a permit was detected)."""
-    not_implemented(3, "gateway")
+class ReinstateIn(BaseModel):
+    acknowledged: bool = Field(default=False, description="Required (true) to lift a suspension: the owner has "
+                                                          "read why the runner was paused")
+    note: str | None = Field(default=None, max_length=2000)
+
+
+@tokens_router.post("/{token_id}/reinstate", response_model=TokenOut, name="tokens_reinstate",
+                    responses={422: {"description": "acknowledgement_required"}})
+async def reinstate_token(token_id: uuid.UUID, session: SessionDep, principal: PrincipalDep,
+                          body: ReinstateIn | None = None) -> TokenOut:
+    """Lift a suspension (after a submission without a permit was detected). Needs ``acknowledged: true``;
+    the acknowledgement and note are audited."""
+    token = await _token(session, token_id)
+    if token.suspended_at is not None and not (body and body.acknowledged):
+        raise HTTPException(422, detail={"code": "acknowledgement_required",
+                                         "reason": "confirm you have read why this runner was paused"})
+    try:
+        await gateway_auth.reinstate(session, token, by=principal.actor, note=body.note if body else None)
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    await session.refresh(token)
+    return _token_out(token)
 
 
 @tokens_router.get("/runners", response_model=list[RunnerStatus], name="tokens_runner_status")
-async def runner_status() -> list[RunnerStatus]:
-    not_implemented(3, "gateway")
+async def runner_status(session: SessionDep) -> list[RunnerStatus]:
+    """Each live runner: last seen (its last gateway call), online within ``runners.stale_after_minutes``,
+    and the task it holds."""
+    from datetime import timedelta
+
+    from app.core.settings import service as settings_service
+    from app.models.applications import AgentTask, AgentTaskStatus
+
+    stale = int(await settings_service.get_value(session, "runners.stale_after_minutes"))
+    now = utcnow()
+    out = []
+    for t in (await session.scalars(select(ApiToken).where(ApiToken.revoked_at.is_(None))
+                                    .order_by(ApiToken.created_at))).all():
+        current = await session.scalar(select(AgentTask).where(
+            AgentTask.claimed_by_token_id == t.id, AgentTask.status == AgentTaskStatus.claimed)
+            .order_by(AgentTask.claimed_at).limit(1))
+        seen = t.last_used_at
+        out.append(RunnerStatus(token_id=t.id, name=t.name, runner_kind=t.runner_kind,  # type: ignore[arg-type]
+                                last_seen_at=seen, online=bool(seen and seen > now - timedelta(minutes=stale)
+                                                                and t.suspended_at is None),
+                                current_task_id=current.id if current else None,
+                                current_task_title=await history.task_title(session, current) if current else None,
+                                current_task_type=current.type.value if current else None))  # type: ignore[arg-type]
+    return out
+
+
+@tokens_router.get("/{token_id}/tasks", response_model=Page[history.RunnerTaskOut], name="tokens_runner_tasks")
+async def runner_tasks(token_id: uuid.UUID, session: SessionDep, cursor: str | None = None,
+                       limit: int = Query(default=20, ge=1, le=100)) -> Page[history.RunnerTaskOut]:
+    """A runner's recent tasks, most recent claim first (read-only): each with its latest checkpoint, the
+    blockers it raised, every permit decision with its reason, and its result with evidence refs."""
+    if await session.get(ApiToken, token_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="token not found")
+    offset = int(cursor) if cursor and cursor.isdigit() else 0
+    items, total = await history.runner_tasks(session, token_id, offset=offset, limit=limit)
+    return Page[history.RunnerTaskOut](items=items, total=total,
+                                       next_cursor=str(offset + limit) if offset + limit < total else None)

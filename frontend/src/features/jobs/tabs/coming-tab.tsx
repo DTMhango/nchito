@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import { FileText, MessagesSquare, type LucideIcon } from "lucide-react"
+import { FileText, type LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/chip"
 import { EmptyState } from "@/components/empty-state"
@@ -22,18 +22,6 @@ const COMING = {
       "The CV and letter as sent",
       "Attachments, with their checksums",
       "A link to open the draft in the Studio",
-    ],
-  },
-  interview: {
-    icon: MessagesSquare,
-    wave: 3,
-    title: "Interview pack",
-    body: "Built when the stage becomes interview, or on request, from the posting, what you sent and your approved facts.",
-    items: [
-      "Role and company briefs, with sources",
-      "Likely questions with answers built from your facts",
-      "Your gaps, and what you told them on the form",
-      "Pay position, questions to ask, and one entry per round",
     ],
   },
 } as const satisfies Record<string, Coming>

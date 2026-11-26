@@ -47,6 +47,8 @@ const noContent = async (
 export const listSources = async () =>
   (await unwrap(gen.GET("/api/sources", { params: { query: { limit: 200 } } })))
     .items
+export const createSource = (body: SourceInput) =>
+  unwrap(gen.POST("/api/sources", { body }))
 export const updateSource = (id: string, body: SourceInput) =>
   unwrap(
     gen.PUT("/api/sources/{item_id}", {

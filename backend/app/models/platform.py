@@ -202,6 +202,7 @@ class ConnectionProvider(enum.StrEnum):
     telegram = "telegram"
     webhook = "webhook"
     s3 = "s3"
+    search_api = "search_api"  # the web search source's provider key (wave 3)
 
 
 class Connection(Base, Entity):
