@@ -26,10 +26,11 @@ from app.schemas.json_types import PacketContents, PacketFile
 
 
 class HandoffError(Exception):
-    def __init__(self, message: str, status: int = 409) -> None:
+    def __init__(self, message: str, status: int = 409, code: str = "refused") -> None:
         super().__init__(message)
         self.message = message
         self.status = status
+        self.code = code  # app.apply.errors.CODES
 
 
 @dataclass
@@ -75,7 +76,7 @@ def _steps(contents: PacketContents, posting_url: str | None, files: list[str]) 
 async def kit(session: AsyncSession, app: Application) -> HandoffKit:
     packet = await packets.current(session, app.id)
     if packet is None:
-        raise HandoffError("no packet has been built", 404)
+        raise HandoffError("no packet has been built", 404, "no_packet")
     contents = packet.contents
     job = await session.get(Job, app.job_id)
     posting_url = contents.destination.url if not contents.destination.url.startswith("mailto:") else (
@@ -107,15 +108,18 @@ async def mark_submitted(session: AsyncSession, app: Application, *, reference: 
     if attempt is None:
         packet = await packets.current(session, app.id)
         if packet is None or app.approved_packet_id != packet.id:
-            raise HandoffError("nothing approved is waiting to be submitted: use 'I applied myself' instead")
+            raise HandoffError("nothing approved is waiting to be submitted: use 'I applied myself' instead",
+                               code="nothing_to_submit")
         if packet.contents.channel != "manual":
-            raise HandoffError(f"this packet is for the {packet.contents.channel} channel; it is sent by the system")
+            raise HandoffError(f"this packet is for the {packet.contents.channel} channel; it is sent by the system",
+                               code="system_channel")
         queued = await dispatch.queue(session, app.id, actor=actor, now=now)
         if not queued.queued or queued.attempt is None:
-            raise HandoffError(f"not allowed now: {queued.reason}")
+            raise HandoffError(f"not allowed now: {queued.reason}", code=queued.code or "refused")
         attempt = queued.attempt
     elif attempt.status == DispatchStatus.reserved and attempt.started_at is None \
             and attempt.channel.value != "manual":
-        raise HandoffError("this send is still queued for the system; cancel it first if you sent it yourself")
+        raise HandoffError("this send is still queued for the system; cancel it first if you sent it yourself",
+                           code="still_queued")
     await outcomes.settle_sent_by_owner(session, attempt, reference=reference, note=note, actor=actor, now=now)
     return attempt

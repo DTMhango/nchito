@@ -60,6 +60,13 @@ class PermitResult:
     def granted(self) -> bool:
         return self.status == "granted"
 
+    @property
+    def code(self) -> str | None:
+        """The machine code of a refusal (``app.apply.errors``); None when granted."""
+        from app.apply import errors
+
+        return None if self.granted else errors.for_permit_reason(self.reason, (str(g.get("gate")) for g in self.gates))
+
 
 async def lock_permits(session: AsyncSession) -> None:
     """The transaction-scoped lock every permit decision (and the pause) takes."""

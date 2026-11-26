@@ -24,7 +24,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.apply import gates, packets, policy, stages
+from app.apply import errors, gates, packets, policy, stages
 from app.core import audit
 from app.core.clock import utcnow
 from app.kit import waivers
@@ -45,11 +45,13 @@ APPROVABLE_STAGES = frozenset({Stage.shortlisted, Stage.tailoring, Stage.ready})
 
 
 class ApprovalError(Exception):
-    def __init__(self, message: str, status: int = 409, detail: dict[str, Any] | None = None) -> None:
+    def __init__(self, message: str, status: int = 409, detail: dict[str, Any] | None = None,
+                 code: str = "refused") -> None:
         super().__init__(message)
         self.message = message
         self.status = status
         self.detail = detail or {}
+        self.code = code  # app.apply.errors.CODES
 
 
 @dataclass
@@ -97,14 +99,14 @@ async def _apply_waivers(session: AsyncSession, app: Application, guardrail_ids:
     if not guardrail_ids:
         return
     if not (reason or "").strip():
-        raise ApprovalError("a reason is required to waive a guardrail", 422)
+        raise ApprovalError("a reason is required to waive a guardrail", 422, code="waiver_reason_required")
     already = await waivers.waived_ids(session, app.id)
     for gid in guardrail_ids:
         if str(gid) in already:
             continue
         guardrail = await session.get(Guardrail, gid)
         if guardrail is None:
-            raise ApprovalError(f"guardrail {gid} not found", 404)
+            raise ApprovalError(f"guardrail {gid} not found", 404, code="not_found")
         try:
             await waivers.create(session, guardrail, app.id, reason or "", actor=actor)
         except waivers.WaiverError as exc:
@@ -122,15 +124,16 @@ async def approve(session: AsyncSession, app: Application, *, packet_version: in
     now = now or utcnow()
     await session.execute(select(Application.id).where(Application.id == app.id).with_for_update())
     if app.stage not in APPROVABLE_STAGES:
-        raise ApprovalError(f"an application in {app.stage.value} cannot be approved")
+        raise ApprovalError(f"an application in {app.stage.value} cannot be approved", code="illegal_stage")
     packet = await packets.current(session, app.id)
     if packet is None:
-        raise ApprovalError("no packet has been built for this application")
+        raise ApprovalError("no packet has been built for this application", code="no_packet")
     if packet.version != packet_version or packet.content_hash != packet_hash:
         raise ApprovalError("the packet changed since you looked at it; review the new version", detail={
-            "current_version": packet.version, "current_hash": packet.content_hash})
+            "current_version": packet.version, "current_hash": packet.content_hash}, code="packet_superseded")
     if packet.contents.channel != channel:
-        raise ApprovalError(f"this packet is for the {packet.contents.channel} channel, not {channel}")
+        raise ApprovalError(f"this packet is for the {packet.contents.channel} channel, not {channel}",
+                            code="channel_mismatch")
     await _apply_waivers(session, app, waiver_ids or [], waiver_reason, actor)
     evaluation = await gates.evaluate(session, app, packet, channel=channel, approval="owner",
                                       packet_hash=packet_hash, for_approval=True, now=now)
@@ -138,7 +141,8 @@ async def approve(session: AsyncSession, app: Application, *, packet_version: in
         await audit.record(session, actor=actor, action="application.approval_refused", subject_type="application",
                            subject_id=app.id, detail={"packet_hash": packet_hash, "reason": evaluation.reason,
                                                       "gates": evaluation.gate_results()})
-        raise ApprovalError(evaluation.reason, detail={"gates": evaluation.gate_results()})
+        raise ApprovalError(evaluation.reason, detail={"gates": evaluation.gate_results()},
+                            code=errors.for_evaluation(evaluation))
     await _mark_approved(session, app, packet, actor=actor, evaluation=evaluation, now=now)
     return ApprovalOutcome(True, "granted", evaluation.reason, evaluation.gate_results())
 
@@ -209,7 +213,7 @@ async def reject(session: AsyncSession, app: Application, *, actor: str, reason:
     """The owner says no: the role is skipped and the next role in its employer group is promoted."""
     now = now or utcnow()
     if app.stage not in APPROVABLE_STAGES:
-        raise ApprovalError(f"an application in {app.stage.value} cannot be rejected")
+        raise ApprovalError(f"an application in {app.stage.value} cannot be rejected", code="illegal_stage")
     packet = await packets.current(session, app.id)
     if packet is not None:
         await packets.invalidate(session, app, packet, f"rejected by the owner{f': {reason}' if reason else ''}",
@@ -232,9 +236,9 @@ async def request_changes(session: AsyncSession, app: Application, *, actor: str
     """The owner wants something changed: the packet is retired and the application goes back to tailoring."""
     now = now or utcnow()
     if not note.strip():
-        raise ApprovalError("say what should change", 422)
+        raise ApprovalError("say what should change", 422, code="note_required")
     if app.stage not in APPROVABLE_STAGES:
-        raise ApprovalError(f"an application in {app.stage.value} cannot be changed now")
+        raise ApprovalError(f"an application in {app.stage.value} cannot be changed now", code="illegal_stage")
     packet = await packets.current(session, app.id)
     if packet is not None:
         await packets.invalidate(session, app, packet, f"changes requested: {note}", actor=actor, now=now)

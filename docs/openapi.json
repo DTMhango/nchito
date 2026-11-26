@@ -16494,6 +16494,18 @@
               }
             ],
             "title": "Pending Action Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Why not approved: a machine code (CONTRACTS, wave 2 send-flow); None when approved"
           }
         },
         "type": "object",
@@ -19531,6 +19543,18 @@
               }
             ],
             "title": "Pending Action Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Why not queued: a machine code (CONTRACTS, wave 2 send-flow)"
           }
         },
         "type": "object",

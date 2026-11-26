@@ -39,10 +39,11 @@ FINAL_STATUSES = frozenset(set(DispatchStatus) - OPEN_STATUSES)
 
 
 class OutcomeError(Exception):
-    def __init__(self, message: str, status: int = 409) -> None:
+    def __init__(self, message: str, status: int = 409, code: str = "already_settled") -> None:
         super().__init__(message)
         self.message = message
         self.status = status
+        self.code = code  # app.apply.errors.CODES
 
 
 def is_uncertain(attempt: DispatchAttempt) -> bool:
@@ -55,7 +56,7 @@ async def lock_application(session: AsyncSession, application_id: uuid.UUID) -> 
     app = await session.scalar(select(Application).where(Application.id == application_id).with_for_update()
                                .execution_options(populate_existing=True))
     if app is None:
-        raise OutcomeError("application not found", 404)
+        raise OutcomeError("application not found", 404, "not_found")
     return app
 
 
@@ -109,8 +110,11 @@ async def close_confirmations(session: AsyncSession, app_id: uuid.UUID, resoluti
 async def cancel(session: AsyncSession, attempt: DispatchAttempt, app: Application, reason: str, *, actor: str,
                  now: datetime, gates: list[dict[str, Any]] | None = None) -> None:
     """Cancel an attempt nothing was handed to yet. The application goes back to ``ready``."""
+    if attempt.status in FINAL_STATUSES:
+        raise OutcomeError(f"this send is already {attempt.status.value}")
     if attempt.status != DispatchStatus.reserved or attempt.started_at is not None:
-        raise OutcomeError("already handed to the channel: it cannot be recalled, only reconciled")
+        raise OutcomeError("already handed to the channel: it cannot be recalled, only reconciled",
+                           code="already_handed_over")
     attempt.status, attempt.error, attempt.outcome_at = DispatchStatus.cancelled, reason, now
     await session.flush()
     await _log(session, attempt, "dispatch.cancelled", actor, reason=reason, gates=gates or [])

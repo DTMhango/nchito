@@ -70,7 +70,7 @@ async def check(session: AsyncSession, attempt: DispatchAttempt, *, actor: str =
     """Ask the channel once. Returns ``sent``, ``not_sent`` or ``waiting``."""
     now = now or utcnow()
     if not outcomes.is_uncertain(attempt):
-        raise outcomes.OutcomeError(f"this send is {attempt.status.value}, not uncertain")
+        raise outcomes.OutcomeError(f"this send is {attempt.status.value}, not uncertain", code="not_uncertain")
     try:
         channel = await registry.get(session, attempt.channel.value)
         outcome = await channel.reconcile(str(attempt.id))
@@ -131,7 +131,7 @@ async def decide(session: AsyncSession, attempt: DispatchAttempt, decision: Owne
     if attempt.status not in outcomes.OPEN_STATUSES:
         raise outcomes.OutcomeError(f"this send is already {attempt.status.value}")
     if attempt.status == DispatchStatus.reserved and attempt.started_at is None:
-        raise outcomes.OutcomeError("this send has not started; cancel it instead")
+        raise outcomes.OutcomeError("this send has not started; cancel it instead", code="not_started")
     if decision == "sent":
         await outcomes.settle_sent_by_owner(session, attempt, reference=reference, note=note, actor=actor, now=now)
         return "sent"

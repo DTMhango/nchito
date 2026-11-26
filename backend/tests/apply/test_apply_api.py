@@ -45,7 +45,7 @@ async def test_build_receipt_approve(owner_client):
     assert all(g["passed"] == (g["outcome"] == "pass") for g in receipt["gates"])
     bad = await owner_client.post(f"/api/applications/{app_id}/approve", json={
         "packet_version": 1, "packet_hash": "0" * 64, "channel": "email"})
-    assert bad.status_code == 409 and bad.json()["detail"]["code"] == "approval_refused"
+    assert bad.status_code == 409 and bad.json()["detail"]["code"] == "packet_superseded"
     ok = await owner_client.post(f"/api/applications/{app_id}/approve", json={
         "packet_version": packet["version"], "packet_hash": packet["content_hash"], "channel": "email"})
     assert ok.status_code == 200, ok.text

@@ -71,10 +71,11 @@ def set_open_checker(checker: OpenChecker | None) -> None:
 
 
 class DispatchError(Exception):
-    def __init__(self, message: str, status: int = 409) -> None:
+    def __init__(self, message: str, status: int = 409, code: str = "refused") -> None:
         super().__init__(message)
         self.message = message
         self.status = status
+        self.code = code  # app.apply.errors.CODES
 
 
 @dataclass
@@ -84,6 +85,7 @@ class QueueResult:
     attempt: DispatchAttempt | None = None
     gates: list[dict[str, Any]] = field(default_factory=list)
     pending_action_id: uuid.UUID | None = None
+    code: str | None = None  # app.apply.errors.CODES, when not queued
 
     @property
     def queued(self) -> bool:
@@ -114,10 +116,10 @@ def quiet_hours_end(values: dict[str, Any], now: datetime) -> datetime | str | N
     return ends
 
 
-async def _refused(session: AsyncSession, app: Application, reason: str, actor: str) -> QueueResult:
+async def _refused(session: AsyncSession, app: Application, reason: str, actor: str, code: str) -> QueueResult:
     await audit.record(session, actor=actor, action="dispatch.refused", subject_type="application",
-                       subject_id=app.id, detail={"reason": reason})
-    return QueueResult("denied", reason)
+                       subject_id=app.id, detail={"reason": reason, "code": code})
+    return QueueResult("denied", reason, code=code)
 
 
 async def failed_count(session: AsyncSession, app_id: uuid.UUID, packet_hash: str) -> int:
@@ -144,18 +146,20 @@ async def queue(session: AsyncSession, application_id: uuid.UUID, *, actor: str 
     now = now or utcnow()
     app = await session.get(Application, application_id)
     if app is None:
-        raise DispatchError("application not found", 404)
+        raise DispatchError("application not found", 404, "not_found")
     packet = await packets.current(session, app.id)
     if packet is None:
-        return await _refused(session, app, "no current packet", actor)
+        return await _refused(session, app, "no current packet", actor, "no_packet")
     channel = packet.contents.channel or (app.channel.value if app.channel else None)
     if channel is None or not registry.is_available(channel):
-        return await _refused(session, app, f"no {channel or 'channel'} channel is available in this build", actor)
+        return await _refused(session, app, f"no {channel or 'channel'} channel is available in this build", actor,
+                              "channel_unavailable")
     if automatic_retry:
         limit = int(await settings_service.get_value(session, "automation.dispatch_max_retries"))
         failures = await failed_count(session, app.id, packet.content_hash)
         if failures > limit:
-            return await _refused(session, app, f"send failed {failures} time(s); retry limit is {limit}", actor)
+            return await _refused(session, app, f"send failed {failures} time(s); retry limit is {limit}", actor,
+                                  "retry_limit")
     job = await session.get(Job, app.job_id)
     assert job is not None
     await _fresh_open_check(session, packet, job, now)
@@ -164,9 +168,9 @@ async def queue(session: AsyncSession, application_id: uuid.UUID, *, actor: str 
                                    runner_token_id=runner_token_id, actor=actor, now=now)
     if result.status == "wait_for_owner":
         action = await approval.request_owner_approval(session, app, packet, result.reason)
-        return QueueResult("wait_for_owner", result.reason, None, result.gates, action.id)
+        return QueueResult("wait_for_owner", result.reason, None, result.gates, action.id, result.code)
     if not result.granted or result.permit is None:
-        return QueueResult("denied", result.reason, None, result.gates)
+        return QueueResult("denied", result.reason, None, result.gates, code=result.code)
     permit = await permits.consume(session, result.permit.id, packet_hash=packet.content_hash, channel=channel,
                                    runner_token_id=runner_token_id, actor=actor, now=now)
     delay = 0

@@ -28,6 +28,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.apply import errors
 from app.apply.stages import add_event
 from app.core import audit
 from app.core.clock import utcnow
@@ -49,10 +50,11 @@ NON_MATERIAL = frozenset({"job_version", "requisition"})
 
 
 class PacketError(Exception):
-    def __init__(self, message: str, status: int = 422) -> None:
+    def __init__(self, message: str, status: int = 422, code: str = "invalid_packet") -> None:
         super().__init__(message)
         self.message = message
         self.status = status
+        self.code = code  # app.apply.errors.CODES
 
 
 @dataclass
@@ -251,7 +253,7 @@ async def build(session: AsyncSession, app: Application, draft: PacketDraft, *, 
 
     outcome, reason = await prepare.spec_gate(session, app, list(contents.files))
     if outcome != "pass":
-        raise PacketError(f"cannot build a packet: {reason}", 409)
+        raise PacketError(f"cannot build a packet: {reason}", 409, errors.for_spec(reason))
     digest = content_hash(contents)
     latest = await current(session, app.id)
     if latest is not None and latest.content_hash == digest:

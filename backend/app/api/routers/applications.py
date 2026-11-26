@@ -19,6 +19,7 @@ from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timest
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.apply import approval, autopilot, stages
 from app.apply import dispatch as apply_dispatch
+from app.apply import errors as apply_errors
 from app.apply import handoff as apply_handoff
 from app.apply import outcomes as apply_outcomes
 from app.apply import packets as apply_packets
@@ -307,6 +308,8 @@ class ApprovalStatusOut(BaseModel):
     status: Literal["granted", "wait_for_owner", "denied"]
     reason: str
     pending_action_id: uuid.UUID | None = None
+    code: str | None = Field(default=None, description="Why not approved: a machine code (CONTRACTS, wave 2 "
+                                                       "send-flow); None when approved")
 
 
 class PacketBuildOut(BaseModel):
@@ -361,6 +364,7 @@ class DispatchCreateOut(BaseModel):
     dispatch: DispatchOut | None = None
     gates: list[GateResult] = Field(default_factory=list)
     pending_action_id: uuid.UUID | None = None
+    code: str | None = Field(default=None, description="Why not queued: a machine code (CONTRACTS, wave 2 send-flow)")
 
 
 class ReconcileIn(BaseModel):
@@ -935,7 +939,19 @@ def _packet_out(p: ApplicationPacket) -> PacketOut:
 
 
 def _approval_error(exc: approval.ApprovalError) -> HTTPException:
-    return HTTPException(exc.status, detail={"code": "approval_refused", "reason": exc.message, **exc.detail})
+    return HTTPException(exc.status, detail={"code": exc.code, "reason": exc.message, **exc.detail})
+
+
+def _coded(exc: Any) -> HTTPException:
+    """``{code, reason}`` for an apply-layer refusal (``app.apply.errors``)."""
+    return HTTPException(exc.status, detail=apply_errors.detail(exc.code, exc.message))
+
+
+def _approval_status(outcome: approval.ApprovalOutcome) -> ApprovalStatusOut:
+    code = None if outcome.approved else apply_errors.for_permit_reason(
+        outcome.reason, (str(g.get("gate")) for g in outcome.gates))
+    return ApprovalStatusOut(approved=outcome.approved, status=outcome.status, reason=outcome.reason,  # type: ignore[arg-type]
+                             pending_action_id=outcome.pending_action_id, code=code)
 
 
 @router.get("/applications/{application_id}/packets", response_model=list[PacketOut], name="applications_packets")
@@ -965,8 +981,8 @@ async def build_packet(application_id: uuid.UUID, body: PacketBuildIn, principal
     approval when every gate passes, an approval request when the mode lets the system apply."""
     app = await _load(session, application_id)
     if app.stage not in approval.APPROVABLE_STAGES:
-        raise HTTPException(status.HTTP_409_CONFLICT,
-                            detail=f"an application in {app.stage.value} cannot be repacked")
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=apply_errors.detail(
+            "illegal_stage", f"an application in {app.stage.value} cannot be repacked"))
     draft = apply_packets.PacketDraft(
         channel=body.channel, destination_url=body.destination_url or "", sending_identity=body.sending_identity,
         answers=[apply_packets.DraftAnswer(question=a.question, value=a.value, answer_id=a.answer_id)
@@ -976,16 +992,14 @@ async def build_packet(application_id: uuid.UUID, body: PacketBuildIn, principal
     try:
         built = await apply_packets.build(session, app, draft, actor=principal.actor)
     except apply_packets.PacketError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        raise _coded(exc) from exc
     outcome = await approval.after_packet_built(session, app, built.packet) if built.created else None
     await _changed(session, app.id)
     await session.refresh(built.packet)
     return PacketBuildOut(
         packet=_packet_out(built.packet), created=built.created,
         changes=[PacketChange(**c) for c in built.changes] if built.previous else [],
-        approval=None if outcome is None else ApprovalStatusOut(
-            approved=outcome.approved, status=outcome.status, reason=outcome.reason,  # type: ignore[arg-type]
-            pending_action_id=outcome.pending_action_id))
+        approval=None if outcome is None else _approval_status(outcome))
 
 
 @router.get("/applications/{application_id}/receipt", response_model=ReceiptOut, name="applications_receipt")
@@ -1090,7 +1104,7 @@ async def create_dispatch(application_id: uuid.UUID, body: DispatchCreateIn, pri
     try:
         result = await apply_dispatch.queue(session, application_id, actor=principal.actor)
     except apply_dispatch.DispatchError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        raise _coded(exc) from exc
     attempt = result.attempt
     if attempt is not None and attempt.channel == Channel.manual:
         attempt_id = attempt.id
@@ -1102,7 +1116,8 @@ async def create_dispatch(application_id: uuid.UUID, body: DispatchCreateIn, pri
     await _changed(session, application_id)
     return DispatchCreateOut(status=result.status, reason=result.reason,  # type: ignore[arg-type]
                              dispatch=_dispatch_out(attempt) if attempt else None,
-                             gates=[GateResult(**g) for g in result.gates], pending_action_id=result.pending_action_id)
+                             gates=[GateResult(**g) for g in result.gates], pending_action_id=result.pending_action_id,
+                             code=result.code)
 
 
 @router.post("/applications/{application_id}/dispatches/{dispatch_id}/cancel", response_model=DispatchOut,
@@ -1116,7 +1131,7 @@ async def cancel_dispatch(application_id: uuid.UUID, dispatch_id: uuid.UUID, pri
         await apply_outcomes.cancel(session, attempt, app, "cancelled by the owner", actor=principal.actor,
                                     now=utcnow())
     except apply_outcomes.OutcomeError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        raise _coded(exc) from exc
     await _changed(session, application_id)
     await session.refresh(attempt)
     return _dispatch_out(attempt)
@@ -1133,7 +1148,7 @@ async def reconcile_dispatch(application_id: uuid.UUID, dispatch_id: uuid.UUID, 
         result = await apply_reconcile.decide(session, attempt, body.decision, actor=principal.actor,
                                               reference=body.reference, note=body.note)
     except apply_outcomes.OutcomeError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        raise _coded(exc) from exc
     await _changed(session, application_id)
     await session.refresh(attempt)
     return ReconcileOut(result=result, dispatch=_dispatch_out(attempt))  # type: ignore[arg-type]
@@ -1147,7 +1162,7 @@ async def manual_handoff(application_id: uuid.UUID, session: SessionDep) -> Manu
     try:
         built = await apply_handoff.kit(session, app)
     except apply_handoff.HandoffError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        raise _coded(exc) from exc
     return ManualHandoffOut(posting_url=built.posting_url, files=built.files, answers=built.answers,
                             remaining_steps=built.remaining_steps)
 
@@ -1164,9 +1179,9 @@ async def mark_submitted(application_id: uuid.UUID, body: MarkSubmittedIn, princ
         await apply_handoff.mark_submitted(session, app, reference=body.reference, note=body.note,
                                            actor=principal.actor)
     except apply_handoff.HandoffError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        raise _coded(exc) from exc
     except apply_outcomes.OutcomeError as exc:
-        raise HTTPException(exc.status, detail=exc.message) from exc
+        raise _coded(exc) from exc
     await _changed(session, app.id)
     return await _detail(session, app.id)
 

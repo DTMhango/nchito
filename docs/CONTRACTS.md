@@ -696,3 +696,16 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   `unknown`, settled only by an owner approval, so an automatic approval never sends to an unconfirmed address.
   `prepare_packet` picks email only for a usable address with a connected mailbox; otherwise manual (to `apply_url`,
   or `mailto:<address>` when the posting gives only an address).
+- **Error codes** (`app/apply/errors.py`, one list `CODES`): every 409/422 the packet build, prepare, approve, reject,
+  request-changes, dispatch, cancel, reconcile, handoff and mark-submitted endpoints raise is
+  `{"detail": {"code", "reason", ...}}` (FastAPI's own request-validation 422 list is unchanged). Clients switch on
+  `code`, never on `reason`. Codes include `no_spec`, `check_stale`, `check_blocking`, `document_not_rendered`,
+  `answers_waiting`, `no_destination`, `no_identity`, `invalid_packet`, `no_packet`, `packet_superseded`,
+  `packet_changed`, `channel_mismatch`, `illegal_stage`, `not_approved`, `mode_not_allowed`, `excluded`,
+  `held_by_conflict`, `employer_cooldown`, `paused`, `quiet_hours`, `cap_reached`, `budget`, `duplicate`,
+  `permit_outstanding`, `posting_changed`, `role_closed`, `deadline_passed`, `email_unconfirmed`,
+  `destination_unverified`, `untrusted_site`, `answers_not_automatic`, `already_handed_over`, `already_settled`,
+  `not_uncertain`, `not_started`, `still_queued`, `nothing_to_submit`, `system_channel`; anything else is `refused`.
+  A gate refusal takes its first blocking gate's code (`GATE_CODES`). The approve refusal's code was
+  `approval_refused` for every case; it is now the specific code (the `gates` list is still attached).
+  `DispatchCreateOut.code` and `ApprovalStatusOut.code` carry the same codes for a 200 that did not queue or approve.
