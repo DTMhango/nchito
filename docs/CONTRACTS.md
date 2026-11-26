@@ -809,7 +809,7 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
 - **Endpoints** (`/api/portal-accounts`, owner only, audited): `GET` list (`?status=`), `POST`, `GET/PATCH/DELETE /{id}`,
   `POST /actions/{action_id}/give-up {outcome: manual_handoff|skipped, application_ids?, note?}`, `POST /refresh`.
   No password or secret field exists; any key containing password, secret, token, pin, otp, cookie or credential is a 422.
-- **Model.** `PortalAccount.notes` (migration `0013_accounts`).
+- **Model.** `PortalAccount.notes` (migration `0014_accounts`).
 - **Notifications.** The first message reuses the key `pending:<id>` so `collect` never repeats it; reminders use
   `portal-account:<id>:r<hours>`. The continue button (`intent=continue`) is added for sign_in, create_account, captcha.
 - **Settings (group `accounts`):** `portals_requiring_account`, `account_free_methods`, `runner_for_account_roles`,
@@ -838,7 +838,7 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   `dispatch.queue` gains `agent_task_id`; with `channel == "browser"` and no runner token it returns
   `status: queued` with no attempt. Worker task `browser_tick` (every 5 min): `queue_approved_tasks`,
   `expire_stale_tasks`.
-- **Posting change alerts** (`app/pipeline/changes.py`, migration `0013_browser_changes`: tables `job_version`,
+- **Posting change alerts** (`app/pipeline/changes.py`, migration `0015_browser_changes`: tables `job_version`,
   `job_change`, `job_watch`). `recheck_job` records a `JobChange` (kinds `closed`, `reopened`, `deadline_moved`,
   `pay_changed`, `requirements_changed`, `apply_method_changed`, `eligibility_changed`, `location_changed`,
   `wording`; each change has `field`, `before`, `after`, `material`, `summary`). Building a packet stores the
@@ -903,7 +903,7 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   `runners.file_url_minutes`, only while the task is claimed and the file is in the approved packet; sha256 checked).
 - **Releases:** `GET /api/applications/{id}/releases` returns per task `released.given[]` (each `get_packet`:
   packet hash, fields, answers, files, withheld files) and `entered` (the last permit request).
-- **Pending action types** `unsupported_form`, `redirect_off_domain`, `page_instruction` (migration `0013_gateway`).
+- **Pending action types** `unsupported_form`, `redirect_off_domain`, `page_instruction` (migration `0016_gateway`).
   Blockers carry `detail.released` (what the runner was already given). Sign-in style blockers go through
   `app.apply.accounts.register_blocker` when that module is present (`app.gateway.accounts_bridge`).
 - **Settings** (`runners.*`): `task_lease_minutes`, `max_claimed_tasks`, `claims_per_hour`, `calls_per_minute`,

@@ -1,7 +1,7 @@
 """Posting change tracking: job versions, detected changes, watch bookkeeping
 
-Revision ID: 0013_browser_changes
-Revises: 0012_apply_email
+Revision ID: 0015_browser_changes
+Revises: 0014_accounts
 Create Date: 2026-11-27 09:00:00
 """
 from collections.abc import Sequence
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = '0013_browser_changes'
-down_revision: str | None = '0012_apply_email'
+revision: str = '0015_browser_changes'
+down_revision: str | None = '0014_accounts'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
