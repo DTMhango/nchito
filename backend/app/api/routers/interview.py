@@ -342,7 +342,7 @@ async def practice_retry(practice_id: uuid.UUID, principal: PrincipalDep, sessio
         raise _not_found("practice answer")
     if row.status == "done":
         await session.refresh(row)
-    return PracticeOut.model_validate(row)
+        return PracticeOut.model_validate(row)
     pack = await session.get(InterviewPack, row.pack_id)
     assert pack is not None
     try:
