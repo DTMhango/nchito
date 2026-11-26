@@ -72,6 +72,10 @@ async def test_autopilot_pause_and_resume(owner_client, session):
     assert (await owner_client.get("/api/autopilot")).json()["paused"] is True
     setting = (await owner_client.get("/api/settings/automation.paused")).json()
     assert setting["value"] is True
+    # The generic settings API cannot flip the pause: only the autopilot endpoints, which enforce the restore lock.
+    r = await owner_client.put("/api/settings/automation.paused", json={"value": False})
+    assert r.status_code == 409 and "/api/autopilot" in r.json()["detail"]
+    assert (await owner_client.get("/api/autopilot")).json()["paused"] is True
 
     resumed = (await owner_client.put("/api/autopilot", json={"paused": False})).json()
     assert resumed["paused"] is False and resumed["paused_at"] is None
