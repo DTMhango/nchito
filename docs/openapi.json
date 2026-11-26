@@ -3097,6 +3097,67 @@
         }
       }
     },
+    "/api/kit/answers/{item_id}/usage": {
+      "get": {
+        "tags": [
+          "kit"
+        ],
+        "summary": "Kit Answers Usage",
+        "description": "Open applications (before submission) whose packet or pending actions use this answer.",
+        "operationId": "kit_answers_usage",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnswerUseOut"
+                  },
+                  "title": "Response Kit Answers Usage"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such answer"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/kit/templates": {
       "get": {
         "tags": [
@@ -7113,7 +7174,7 @@
           "jobs"
         ],
         "summary": "Jobs Recheck",
-        "description": "Needs the source connectors' open check (sources stream); then ``conflicts.on_job_changed``.",
+        "description": "Re-read the posting through its source. A failed check is ``unknown``, never ``closed``. A\nmaterial change (text, title, pay, deadline, apply link, place) is re-extracted and reassessed.",
         "operationId": "jobs_recheck",
         "parameters": [
           {
@@ -7133,7 +7194,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JobDetail"
+                  "$ref": "#/components/schemas/RecheckOut"
                 }
               }
             }
@@ -14045,6 +14106,50 @@
           "canonical"
         ],
         "title": "AnswerPatterns"
+      },
+      "AnswerUseOut": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "job_title": {
+            "type": "string",
+            "title": "Job Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "via": {
+            "type": "string",
+            "enum": [
+              "packet",
+              "pending_action"
+            ],
+            "title": "Via"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "job_id",
+          "job_title",
+          "employer",
+          "stage",
+          "via"
+        ],
+        "title": "AnswerUseOut"
       },
       "Appearance": {
         "properties": {
@@ -24316,6 +24421,67 @@
         ],
         "title": "ReceiptOut",
         "description": "The approval receipt (18.2): the one screen the owner approves from."
+      },
+      "RecheckOut": {
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/JobDetail"
+          },
+          "availability_before": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "unknown"
+            ],
+            "title": "Availability Before"
+          },
+          "availability_after": {
+            "type": "string",
+            "enum": [
+              "open",
+              "closed",
+              "unknown"
+            ],
+            "title": "Availability After"
+          },
+          "content_changed": {
+            "type": "boolean",
+            "title": "Content Changed"
+          },
+          "changed_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changed Fields"
+          },
+          "reassessed": {
+            "type": "boolean",
+            "title": "Reassessed",
+            "default": false
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Why nothing was re-read, when that is so"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job",
+          "availability_before",
+          "availability_after",
+          "content_changed"
+        ],
+        "title": "RecheckOut"
       },
       "ReferenceIn": {
         "properties": {

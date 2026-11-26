@@ -5,7 +5,7 @@ runtime and they reference the models passed in (same reason as ``app/api/crud.p
 """
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
@@ -34,6 +34,17 @@ class Resource:
     order_by: tuple[Any, ...] = field(default_factory=tuple)
     subject: Callable[[Any], str] = lambda row: str(row.id)
     delete: Callable[[AsyncSession, Any], Any] | None = None  # replaces a hard delete (e.g. retire)
+    # Fields computed per row for the response (e.g. how many applications use an answer): rows -> {id: fields}.
+    computed: Callable[[AsyncSession, list[Any]], Awaitable[dict[Any, dict[str, Any]]]] | None = None
+
+
+async def render(session: AsyncSession, res: Resource, rows: list[Any]) -> list[Any]:
+    extras = await res.computed(session, rows) if res.computed else {}
+    out = []
+    for row in rows:
+        item = res.model_out.model_validate(row)
+        out.append(item.model_copy(update=extras[row.id]) if row.id in extras else item)
+    return out
 
 
 async def flush_or_409(session: AsyncSession, message: str) -> None:
@@ -65,7 +76,7 @@ async def page_of(session: AsyncSession, res: Resource, stmt: Select[Any], curso
     rows = (await session.scalars(stmt.order_by(*res.order_by, res.model.id).offset(offset).limit(limit + 1))).all()
     more = len(rows) > limit
     return Page[res.model_out](  # type: ignore[name-defined]
-        items=[res.model_out.model_validate(r) for r in rows[:limit]],
+        items=await render(session, res, list(rows[:limit])),
         total=total,
         next_cursor=str(offset + limit) if more else None,
     )
@@ -99,7 +110,7 @@ def add_kit_crud(
 
     if "get" in ops:
         async def get_item(item_id: uuid.UUID, session: SessionDep) -> model_out:  # type: ignore[valid-type]
-            return model_out.model_validate(await load(session, res, item_id))
+            return (await render(session, res, [await load(session, res, item_id)]))[0]
 
         router.add_api_route(f"{path}/{{item_id}}", get_item, methods=["GET"], response_model=model_out,
                              name=f"{name}_get", dependencies=deps)
@@ -116,7 +127,7 @@ def add_kit_crud(
             await session.refresh(row)
             await audit.record(session, actor=principal.actor, action=f"kit.{res.entity}.created",
                                subject_type=res.entity, subject_id=row.id, detail={"label": res.subject(row)})
-            return model_out.model_validate(row)
+            return (await render(session, res, [row]))[0]
 
         router.add_api_route(path, create_item, methods=["POST"], response_model=model_out,
                              status_code=status.HTTP_201_CREATED, name=f"{name}_create", dependencies=deps)
@@ -139,7 +150,7 @@ def add_kit_crud(
             await audit.record(session, actor=principal.actor, action=f"kit.{res.entity}.updated",
                                subject_type=res.entity, subject_id=row.id,
                                detail={"label": res.subject(row), "fields": changed})
-            return model_out.model_validate(row)
+            return (await render(session, res, [row]))[0]
 
         router.add_api_route(f"{path}/{{item_id}}", update_item, methods=["PUT"], response_model=model_out,
                              name=f"{name}_update", dependencies=deps)

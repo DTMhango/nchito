@@ -22,6 +22,7 @@ from app.core.config import get_config
 from app.core.settings import service as settings_service
 from app.kit import answers as answer_matcher
 from app.kit import crud, guardrails, service, vault
+from app.kit import usage as answer_usage
 from app.kit.crud import Resource, add_kit_crud
 from app.llm import prompts as prompt_registry
 from app.models.base import Origin, ReviewState
@@ -384,9 +385,33 @@ add_kit_crud(router, "/tracks", "kit_tracks",
 add_kit_crud(router, "/guardrails", "kit_guardrails",
              _res("guardrail", Guardrail, GuardrailIn, GuardrailOut, to_columns=_guardrail_columns,
                   order_by=(Guardrail.created_at,), subject=lambda r: r.name))
+async def _answer_extra(session: AsyncSession, rows: list[Answer]) -> dict[uuid.UUID, dict[str, int]]:
+    used = await answer_usage.counts(session, [r.id for r in rows])
+    return {r.id: {"pending_applications_using": used.get(r.id, 0)} for r in rows}
+
+
 add_kit_crud(router, "/answers", "kit_answers",
              _res("answer", Answer, AnswerIn, AnswerOut, order_by=(Answer.created_at,),
-                  subject=lambda r: r.patterns.canonical))
+                  subject=lambda r: r.patterns.canonical, computed=_answer_extra))
+
+
+class AnswerUseOut(BaseModel):
+    application_id: uuid.UUID
+    job_id: uuid.UUID
+    job_title: str
+    employer: str
+    stage: str
+    via: Literal["packet", "pending_action"]
+
+
+@router.get("/answers/{item_id}/usage", response_model=list[AnswerUseOut], name="kit_answers_usage",
+            responses={404: {"description": "No such answer"}})
+async def answer_uses(item_id: uuid.UUID, session: SessionDep) -> list[AnswerUseOut]:
+    """Open applications (before submission) whose packet or pending actions use this answer."""
+    if await session.get(Answer, item_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="answer not found")
+    uses = (await answer_usage.uses_of(session, [item_id])).get(item_id, [])
+    return [AnswerUseOut(**vars(u)) for u in uses]
 add_kit_crud(router, "/templates", "kit_templates",
              _res("template", Template, TemplateIn, TemplateOut, order_by=(Template.kind, Template.key),
                   delete=_drop_template, subject=lambda r: r.key))
