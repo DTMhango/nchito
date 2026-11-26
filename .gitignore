@@ -26,3 +26,6 @@ dist/
 
 # Local agent worktrees
 .claude/
+
+# server runner
+runner/server/*.egg-info/

@@ -71,7 +71,33 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  # Optional server runner (DESIGN.md 8.3, Runner B). OFF by default: start with
+  #   docker compose --profile runner up -d runner
+  # It spends Anthropic API tokens, so it has its own budget line (RUNNER_*_MAX_*). It exits with a
+  # clear error if RUNNER_TOKEN or RUNNER_ANTHROPIC_API_KEY is empty.
+  runner:
+    profiles: ["runner"]
+    build: ./runner/server
+    restart: unless-stopped
+    environment:
+      NCHITO_MCP_URL: ${RUNNER_MCP_URL:-http://web:8000/mcp}
+      NCHITO_RUNNER_TOKEN: ${RUNNER_TOKEN:-}
+      ANTHROPIC_API_KEY: ${RUNNER_ANTHROPIC_API_KEY:-}
+      RUNNER_MODEL: ${RUNNER_MODEL:-claude-sonnet-5-5}
+      RUNNER_TASK_MAX_COST_USD: ${RUNNER_TASK_MAX_COST_USD:-1.0}
+      RUNNER_DAY_MAX_COST_USD: ${RUNNER_DAY_MAX_COST_USD:-10.0}
+      RUNNER_TASK_MAX_TOKENS: ${RUNNER_TASK_MAX_TOKENS:-600000}
+      RUNNER_DAY_MAX_TOKENS: ${RUNNER_DAY_MAX_TOKENS:-6000000}
+      RUNNER_POLL_SECONDS: ${RUNNER_POLL_SECONDS:-30}
+    volumes:
+      - runner_data:/data
+    shm_size: "1gb"
+    stop_grace_period: 60s
+    depends_on:
+      - web
+
 volumes:
+  runner_data:
   pgdata:
   files:
   backups:
