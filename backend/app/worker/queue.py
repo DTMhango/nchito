@@ -105,4 +105,5 @@ async def scheduler_tick(timestamp: int) -> None:
 
 
 # Stream task modules register themselves on ``queue_app`` when imported.
+from app.pipeline.interview import tasks as _interview_tasks  # noqa: E402, F401
 from app.pipeline.tailoring import tasks as _tailoring_tasks  # noqa: E402, F401

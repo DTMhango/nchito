@@ -473,29 +473,6 @@ class MailThreadLink(BaseModel):
     classification: MailClassT | None = None
 
 
-class InterviewPackOut(Timestamps):
-    job_id: uuid.UUID
-    application_id: uuid.UUID | None
-    sections: dict[str, Any]
-    generated_at: datetime | None
-    model: str | None
-
-
-class InterviewRoundIn(ApiModel):
-    round_number: int = Field(ge=1)
-    scheduled_at: datetime | None = None
-    format: str | None = None
-    interviewers: list[str] = Field(default_factory=list)
-    checklist: list[str] = Field(default_factory=list)
-    notes: str | None = None
-    learnt: str | None = None
-
-
-class InterviewRoundOut(InterviewRoundIn, Timestamps):
-    pack_id: uuid.UUID
-    thank_you_draft: str | None
-
-
 # ----- helpers --------------------------------------------------------------------------------------
 
 
@@ -1372,28 +1349,6 @@ async def link_mail_thread(thread_id: uuid.UUID, body: MailThreadLink, session: 
     await session.flush()
     await session.refresh(thread)
     return MailThreadOut.model_validate(thread)
-
-
-@router.get("/jobs/{job_id}/interview-pack", response_model=InterviewPackOut, name="interview_pack_get")
-async def interview_pack(job_id: uuid.UUID) -> InterviewPackOut:
-    not_implemented(3, "interview")
-
-
-@router.post("/jobs/{job_id}/interview-pack", response_model=InterviewPackOut,
-             status_code=status.HTTP_202_ACCEPTED, name="interview_pack_generate")
-async def generate_interview_pack(job_id: uuid.UUID) -> InterviewPackOut:
-    not_implemented(3, "interview")
-
-
-@router.post("/jobs/{job_id}/interview-pack/rounds", response_model=InterviewRoundOut,
-             status_code=status.HTTP_201_CREATED, name="interview_rounds_create")
-async def create_round(job_id: uuid.UUID, body: InterviewRoundIn) -> InterviewRoundOut:
-    not_implemented(3, "interview")
-
-
-@router.put("/interview-rounds/{round_id}", response_model=InterviewRoundOut, name="interview_rounds_update")
-async def update_round(round_id: uuid.UUID, body: InterviewRoundIn) -> InterviewRoundOut:
-    not_implemented(3, "interview")
 
 
 # ----- global pause (top bar) -----------------------------------------------------------------

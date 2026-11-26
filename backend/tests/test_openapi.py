@@ -11,7 +11,8 @@ from app.gateway.tools import TOOLS, tool_schemas
 from tests.conftest import REPO
 
 TAGS = {"setup", "auth", "settings", "themes", "system", "audit", "events", "kit", "campaigns", "sources", "jobs",
-        "assessments", "applications", "pending_actions", "runs", "connections", "tokens", "insights", "data"}
+        "assessments", "applications", "pending_actions", "runs", "connections", "tokens", "insights", "data",
+        "interview"}
 
 
 @pytest.mark.nodb
@@ -41,7 +42,6 @@ def test_gateway_tools_have_schemas():
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/jobs/00000000-0000-4000-8000-000000000001/interview-pack"),
     ("GET", "/api/jobs/compare/00000000-0000-4000-8000-000000000001"),
     ("GET", "/api/insights"),
 ])
