@@ -6,6 +6,10 @@ import { server } from "@/test/server"
 import { db } from "@/mocks/db"
 import { BUILTIN_THEMES } from "@/themes"
 
+// Values the owner types into the studio (test input, not colours this app paints).
+const TYPED_PRIMARY = "#5A2D82" // colour-lint-ignore: test input typed into a colour field
+const LOW_CONTRAST_TEXT = "#C8C8C8" // colour-lint-ignore: test input typed into a colour field
+
 /** An owner theme in the mock backend (a copy of Copperbelt), with its first revision. */
 function seedOwnerTheme(id = "mine") {
   const { id: _id, builtin: _b, ...body } = BUILTIN_THEMES[0]
@@ -50,10 +54,10 @@ describe("Theme studio", () => {
     const field = await screen.findByRole("textbox", {
       name: "Primary (primary)",
     })
-    fireEvent.change(field, { target: { value: "#5A2D82" } })
+    fireEvent.change(field, { target: { value: TYPED_PRIMARY } })
     const preview = screen.getByTestId("studio-preview")
     await waitFor(() =>
-      expect(preview.style.getPropertyValue("--t-primary")).toBe("#5A2D82")
+      expect(preview.style.getPropertyValue("--t-primary")).toBe(TYPED_PRIMARY)
     )
     expect(root.style.getPropertyValue("--t-primary")).toBe(before)
 
@@ -62,7 +66,7 @@ describe("Theme studio", () => {
     await screen.findByText("Theme saved.")
     await user.click(screen.getByRole("button", { name: /Use this theme/ }))
     await waitFor(() =>
-      expect(root.style.getPropertyValue("--t-primary")).toBe("#5A2D82")
+      expect(root.style.getPropertyValue("--t-primary")).toBe(TYPED_PRIMARY)
     )
   })
 
@@ -82,7 +86,7 @@ describe("Theme studio", () => {
       ).getByRole("radio", { name: /Light/ })
     )
     const text = await textTab(user)
-    fireEvent.change(text, { target: { value: "#C8C8C8" } })
+    fireEvent.change(text, { target: { value: LOW_CONTRAST_TEXT } })
     const alert = await screen.findByText(/Body text is below WCAG AA/)
     expect(alert).toBeInTheDocument()
     const save = screen.getByRole("button", { name: /^Save$/ })
@@ -110,7 +114,7 @@ describe("Theme studio", () => {
       ).getByRole("radio", { name: /Light/ })
     )
     const text = await textTab(user)
-    fireEvent.change(text, { target: { value: "#C8C8C8" } })
+    fireEvent.change(text, { target: { value: LOW_CONTRAST_TEXT } })
     const fixes = await screen.findAllByRole("button", {
       name: /^Use #[0-9A-F]{6} for Text in light mode/,
     })
