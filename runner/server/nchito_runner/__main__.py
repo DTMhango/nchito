@@ -18,14 +18,15 @@ from .worker import Runner
 async def _amain(cfg: RunnerConfig) -> None:
     budget = Budget(cfg.state_dir / "budget.json",
                     Caps(cfg.task_max_cost_usd, cfg.day_max_cost_usd, cfg.task_max_tokens, cfg.day_max_tokens))
-    runner = Runner(cfg, McpGateway(cfg.mcp_url, cfg.token), ClaudeSdkDriver(cfg.model), budget)
+    runner = Runner(cfg, McpGateway(cfg.mcp_url, cfg.token), ClaudeSdkDriver(), budget)
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
             loop.add_signal_handler(sig, runner.stop.set)
         except NotImplementedError:  # Windows
             signal.signal(sig, lambda *_: loop.call_soon_threadsafe(runner.stop.set))
-    logging.getLogger("nchito_runner").info("runner up: model=%s url=%s", cfg.model, cfg.mcp_url)
+    logging.getLogger("nchito_runner").info("runner up: url=%s kinds=%s dry_run=%s", cfg.mcp_url,
+                                            ",".join(cfg.task_kinds), cfg.dry_run)
     await runner.run_forever()
 
 

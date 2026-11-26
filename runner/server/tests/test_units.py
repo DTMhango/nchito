@@ -9,9 +9,10 @@ import pytest
 
 from nchito_runner.budget import Budget, BudgetExhausted, Caps
 from nchito_runner.config import ConfigError, RunnerConfig
-from nchito_runner.gateway import GatewayError, McpGateway
+from nchito_runner.gateway import EXPECTED_TOOLS, GatewayError, McpGateway
 from nchito_runner.guard import ElementInfo, Guard, RailViolation
 from nchito_runner.untrusted import wrap_untrusted
+from nchito_runner.worker import owner_caps
 
 NOW = datetime(2026, 11, 26, 12, 0, tzinfo=UTC)
 
@@ -60,6 +61,16 @@ def test_passport_number_is_not_a_password():
     (ElementInfo(tag="input", type="submit", value="Go"), True),
     (ElementInfo(tag="button", type="submit", text="Send"), True),
     (ElementInfo(tag="button", type="", in_form=True, text="Next"), True),  # default button in a form submits
+    # multi-step: a submit-type Next is a step only when the page shows more steps follow
+    (ElementInfo(tag="button", type="", in_form=True, text="Next", step_current=1, step_total=3), False),
+    (ElementInfo(tag="button", type="submit", in_form=True, text="Continue", hidden_required=2), False),
+    (ElementInfo(tag="input", type="submit", in_form=True, value="Save and continue", step_current=2, step_total=4), False),
+    (ElementInfo(tag="button", type="", in_form=True, text="Continue", step_current=2, step_total=2), True),  # last step
+    (ElementInfo(tag="button", type="", in_form=True, text="Continue", step_current=3, step_total=2,
+                 hidden_required=1), True),  # a step indicator wins over hidden fields, and it says nothing follows
+    (ElementInfo(tag="button", type="submit", in_form=True, text="Next", hidden_required=0), True),  # unsure: submit
+    (ElementInfo(tag="button", type="submit", in_form=True, text="Submit and continue", hidden_required=3), True),
+    (ElementInfo(tag="button", type="submit", in_form=True, text="Send", step_current=1, step_total=2), True),
     (ElementInfo(tag="button", type="button", text="Next"), False),
     (ElementInfo(tag="button", type="button", text="Submit application"), True),
     (ElementInfo(tag="div", role="button", text="Submit"), True),
@@ -68,6 +79,30 @@ def test_passport_number_is_not_a_password():
 ])
 def test_submit_detection(el, expected):
     assert Guard.is_submit_control(el) is expected
+
+
+@pytest.mark.parametrize("url", [
+    "https://nchito.example.com/api/gateway/files/abc.def-ghi",
+    "http://localhost:8000/api/gateway/files/abc.def-ghi",
+    "https://nchito.example.com/sub/api/gateway/files/abc.def-ghi",
+])
+def test_packet_files_come_only_from_the_gateway(url):
+    assert Guard.gateway_file_url(url, "http://web:8000", "/api/gateway/files/") == \
+        "http://web:8000/api/gateway/files/abc.def-ghi"
+
+
+@pytest.mark.parametrize("url", [
+    "https://evil.example.net/cv.pdf",
+    "https://nchito.example.com/api/gateway/uploads/abc",  # an upload link is not a file link
+    "https://nchito.example.com/api/gateway/files/",
+    "https://nchito.example.com/api/gateway/files/a/b",
+    "https://nchito.example.com/api/gateway/files/abc?redirect=https://evil.example.net",
+    "file:///api/gateway/files/abc",
+])
+def test_other_file_links_refused(url):
+    with pytest.raises(RailViolation) as e:
+        Guard.gateway_file_url(url, "http://web:8000", "/api/gateway/files/")
+    assert e.value.kind == "download_not_gateway"
 
 
 def test_permit_rules():
@@ -171,16 +206,27 @@ def test_zero_cap_means_no_spend(tmp_path):
 
 
 # ----- config ---------------------------------------------------------------------------------------
+BASE_ENV = {"NCHITO_URL": "http://web:8000/", "NCHITO_RUNNER_TOKEN": "nch_x"}
+
+
 def test_config_defaults_and_overrides():
-    cfg = RunnerConfig.from_env({"NCHITO_MCP_URL": "http://x/mcp", "NCHITO_RUNNER_TOKEN": "t"})
-    assert cfg.model == "claude-sonnet-5-5" and cfg.headless and cfg.task_max_cost_usd == 1.0
-    cfg = RunnerConfig.from_env({"NCHITO_MCP_URL": "http://x/mcp", "NCHITO_RUNNER_TOKEN": "t", "RUNNER_MODEL": "claude-opus-5-5",
-                                 "RUNNER_TASK_MAX_COST_USD": "0.25", "RUNNER_DAY_MAX_TOKENS": "1000", "RUNNER_HEADLESS": "0"})
-    assert (cfg.model, cfg.task_max_cost_usd, cfg.day_max_tokens, cfg.headless) == ("claude-opus-5-5", 0.25, 1000, False)
+    cfg = RunnerConfig.from_env(BASE_ENV)
+    assert cfg.mcp_url == "http://web:8000/mcp" and cfg.headless and cfg.task_max_cost_usd == 1.0
+    assert cfg.task_kinds == ("apply", "check_posting") and not cfg.dry_run
+    cfg = RunnerConfig.from_env({**BASE_ENV, "RUNNER_TASK_MAX_COST_USD": "0.25", "RUNNER_DAY_MAX_TOKENS": "1000",
+                                 "RUNNER_HEADLESS": "0", "RUNNER_DRY_RUN": "1", "RUNNER_TASK_KINDS": "check_posting"})
+    assert (cfg.task_max_cost_usd, cfg.day_max_tokens, cfg.headless, cfg.dry_run, cfg.task_kinds) == \
+        (0.25, 1000, False, True, ("check_posting",))
 
 
-@pytest.mark.parametrize("env", [{}, {"NCHITO_MCP_URL": "u"}, {"NCHITO_MCP_URL": "u", "NCHITO_RUNNER_TOKEN": "t", "RUNNER_DAY_MAX_COST_USD": "abc"},
-                                 {"NCHITO_MCP_URL": "u", "NCHITO_RUNNER_TOKEN": "t", "RUNNER_DAY_MAX_COST_USD": "-1"}])
+@pytest.mark.parametrize("env", [
+    {}, {"NCHITO_URL": "http://web:8000"}, {"NCHITO_RUNNER_TOKEN": "nch_x"},
+    {**BASE_ENV, "NCHITO_RUNNER_TOKEN": "not-a-token"},
+    {**BASE_ENV, "NCHITO_URL": "http://web:8000/mcp"},  # the instance address, not the endpoint
+    {**BASE_ENV, "NCHITO_URL": "web:8000"},
+    {**BASE_ENV, "RUNNER_DAY_MAX_COST_USD": "abc"}, {**BASE_ENV, "RUNNER_DAY_MAX_COST_USD": "-1"},
+    {**BASE_ENV, "RUNNER_DRY_RUN": "maybe"}, {**BASE_ENV, "RUNNER_TASK_KINDS": "apply,sweep_site"},
+])
 def test_config_errors(env):
     with pytest.raises(ConfigError):
         RunnerConfig.from_env(env)
@@ -197,9 +243,31 @@ async def test_gateway_bearer_and_call(fake, gw_url):
         task = await gw.call("next_task", {"kinds": ["apply"]})
         assert task["task_id"] == "t1" and task["rules"]["stay_on_domain"] == "127.0.0.1"
         await gw.ping()
-        assert await gw.has_tool("report_result") and not await gw.has_tool("release_task")
+        with pytest.raises(GatewayError) as e:  # a refusal carries the gateway's code
+            await gw.call("get_packet", {"task_id": "not-mine"})
+        assert e.value.code == "not_your_task"
     finally:
         await gw.close()
+
+
+async def test_fake_gateway_mirrors_the_real_tool_list(fake, gw_url):
+    from tests.fake_gateway import TOKEN
+
+    gw = McpGateway(gw_url, TOKEN)
+    try:
+        assert sorted(await gw.list_tools()) == sorted(EXPECTED_TOOLS)
+    finally:
+        await gw.close()
+
+
+def test_owner_caps_tighten_but_never_loosen(tmp_path):
+    b = Budget(tmp_path / "b.json", Caps(1.0, 10.0, 600, 6000))
+    server = {"currency": "USD", "task_cap_minor": 50, "day_cap_minor": 5000, "task_max_tokens": 900,
+              "day_max_tokens": 100}
+    b.limit_to(owner_caps(server, b.ceiling))
+    assert (b.caps.task_cost_usd, b.caps.day_cost_usd, b.caps.task_tokens, b.caps.day_tokens) == (0.5, 10.0, 600, 100)
+    b.limit_to(owner_caps({**server, "currency": "ZMW", "task_cap_minor": 1}, b.ceiling))  # ZMW cannot be compared
+    assert (b.caps.task_cost_usd, b.caps.day_cost_usd) == (1.0, 10.0)
 
 
 async def test_gateway_rejects_bad_token(fake, gw_url):
@@ -235,3 +303,10 @@ async def test_sdk_tools_are_exactly_the_toolbox_and_nothing_else(tmp_path):
         assert "RESUMING" not in prompt
     finally:
         await box.aclose()
+    check = Toolbox(TaskState("t2", "https://jobs.example.com/a", 10, task_type="check_posting"), None, None,  # type: ignore[arg-type]
+                    guard(), Budget(tmp_path / "c.json", Caps(1, 1, 1, 1)))
+    try:  # a check task can read and report, never type, upload or ask for a permit
+        assert set(check.tools) == {"open_url", "snapshot", "click", "press_key", "save_checkpoint", "raise_blocker",
+                                    "report_check"}
+    finally:
+        await check.aclose()

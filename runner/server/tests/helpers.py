@@ -12,6 +12,7 @@ from typing import Any
 from nchito_runner.budget import Budget, Caps
 from nchito_runner.config import RunnerConfig
 from nchito_runner.toolbox import Toolbox
+from tests.fake_gateway import files_url
 from tests.webfixtures import CV_BYTES
 
 Script = Callable[[Toolbox, dict[str, Any]], Awaitable[None]]
@@ -68,7 +69,7 @@ def ref(snapshot: str, *, name: str | None = None, type: str | None = None, text
 
 
 def make_cfg(tmp: Path, url: str, token: str, **kw: Any) -> RunnerConfig:
-    base = dict(mcp_url=url, token=token, profile_dir=tmp / "profile", state_dir=tmp / "state", headless=True,
+    base = dict(nchito_url=url.removesuffix("/mcp"), token=token, profile_dir=tmp / "profile", state_dir=tmp / "state", headless=True,
                 poll_seconds=0.05, heartbeat_seconds=0.05)
     base.update(kw)
     return RunnerConfig(**base)
@@ -80,12 +81,13 @@ def make_budget(cfg: RunnerConfig) -> Budget:
 
 
 def packet(web_base: str, *, with_file: bool = True) -> dict[str, Any]:
+    """Files are named by the gateway's signed links on its public host; the fake serves ``f-cv`` (see conftest)."""
     files = []
     if with_file:
         files.append({"name": "cv.pdf", "kind": "cv", "sha256": hashlib.sha256(CV_BYTES).hexdigest(),
-                      "download_url": f"{web_base}/files/cv.pdf", "attach_rule": "always"})
+                      "download_url": files_url("f-cv"), "attach_rule": "always"})
         files.append({"name": "passport.pdf", "kind": "vault", "sha256": "0" * 64,
-                      "download_url": f"{web_base}/files/passport.pdf", "attach_rule": "never"})
+                      "download_url": files_url("f-passport"), "attach_rule": "never"})
     return {"packet_version": 1, "packet_hash": "h" * 64, "destination_domain": "127.0.0.1",
             "fields": [{"key": "first_name", "label": "First name", "value": "Test"},
                        {"key": "last_name", "label": "Last name", "value": "Applicant"},
