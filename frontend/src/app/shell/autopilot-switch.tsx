@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils"
 const EMPTY: AutopilotState = {
   paused: false,
   paused_at: null,
+  paused_by: null,
+  reason: null,
   summary: { cancelled: [], paused: [], already_out: [] },
 }
 

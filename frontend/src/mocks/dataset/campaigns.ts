@@ -43,6 +43,8 @@ export const tracks: Track[] = [
     lead_fact_codes: [],
     summary_fact_code: null,
     tone_notes: null,
+    cv_template: null,
+    letter_template: null,
   } as Track,
   {
     ...meta,
@@ -57,6 +59,8 @@ export const tracks: Track[] = [
     lead_fact_codes: [],
     summary_fact_code: null,
     tone_notes: null,
+    cv_template: null,
+    letter_template: null,
   } as Track,
 ]
 

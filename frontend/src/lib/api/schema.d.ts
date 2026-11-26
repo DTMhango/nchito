@@ -382,6 +382,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live
+         * @description Liveness: the process answers. Touches nothing, so a database outage does not restart the web tier.
+         */
+        get: operations["health_live"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description Readiness: the database answers and is migrated. A stale worker does not make the web tier unready.
+         */
+        get: operations["health_ready"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/detail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Detail
+         * @description Worker heartbeat age, last successful sweep and backup, disk, queue depth, per-connection status.
+         */
+        get: operations["health_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/kit/person": {
         parameters: {
             query?: never;
@@ -2163,7 +2223,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applications Tailor */
+        /**
+         * Applications Tailor
+         * @description Queue a tailored draft. Idempotent per spec version and Kit facts: asking again returns the same
+         *     request (``queued`` is false once it is done).
+         */
         post: operations["applications_tailor"];
         delete?: never;
         options?: never;
@@ -2178,7 +2242,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Applications Get Spec */
+        get: operations["applications_get_spec"];
         /**
          * Applications Put Spec
          * @description Owner edits; re-runs the checks; invalidates an approved packet if material.
@@ -2200,8 +2265,51 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applications Check */
+        /**
+         * Applications Check
+         * @description Re-run every check on the latest spec version, including the model claim check when enabled.
+         */
         post: operations["applications_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Applications Documents
+         * @description Every file rendered for this application (newest first), including ones from earlier spec versions.
+         */
+        get: operations["applications_documents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/documents/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Applications Render Documents
+         * @description Render the current spec. The same spec and template return the files already stored (no new rows).
+         */
+        post: operations["applications_render_documents"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2215,8 +2323,33 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Applications Document */
+        /**
+         * Applications Document
+         * @description Download the current spec's document, rendering it first when it is not stored yet.
+         *
+         *     Warnings travel in the ``X-Render-Warnings`` header as a count; the render endpoint lists them.
+         */
         get: operations["applications_document"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/document-files/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Applications Document File
+         * @description Download a stored file exactly as rendered (what a packet's hash refers to), whatever the spec says now.
+         */
+        get: operations["applications_document_file"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2232,10 +2365,39 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Applications Packets */
+        /**
+         * Applications Packets
+         * @description Every packet version, newest first (invalidated ones say why).
+         */
         get: operations["applications_packets"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/packet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Applications Packet Get
+         * @description The current packet: exactly what would be sent.
+         */
+        get: operations["applications_packet_get"];
+        put?: never;
+        /**
+         * Applications Packet Build
+         * @description Snapshot what would be sent. Identical contents return the current packet; any change makes a new
+         *     version and invalidates the old one and its approval. Then the automation policy runs: automatic
+         *     approval when every gate passes, an approval request when the mode lets the system apply.
+         */
+        post: operations["applications_packet_build"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2249,7 +2411,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Applications Receipt */
+        /**
+         * Applications Receipt
+         * @description The approval receipt for the current packet, with the gates an approval would check.
+         */
         get: operations["applications_receipt"];
         put?: never;
         post?: never;
@@ -2268,8 +2433,53 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applications Approve */
+        /**
+         * Applications Approve
+         * @description Approve exactly this packet (version and hash) for this channel. Refused (409, with the gates) when
+         *     the packet changed, the role is excluded or held in its employer group, a document check blocks, or
+         *     the mode does not let the system apply.
+         */
         post: operations["applications_approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Applications Reject
+         * @description Say no at approval: the role is skipped and the next role in its employer group is promoted.
+         */
+        post: operations["applications_reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/request-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Applications Request Changes
+         * @description Retire the packet and send the application back to tailoring with a note.
+         */
+        post: operations["applications_request_changes"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2283,10 +2493,20 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Applications Dispatches */
+        /**
+         * Applications Dispatches
+         * @description Every dispatch attempt, newest first: what was reserved, handed over, sent (with evidence), failed,
+         *     cancelled or is uncertain.
+         */
         get: operations["applications_dispatches"];
         put?: never;
-        post?: never;
+        /**
+         * Applications Dispatch Create
+         * @description Send the current approved packet: a submit permit (every gate), then the attempt, in one transaction.
+         *     Email waits ``automation.email_send_delay_minutes`` (cancellable) and is sent by the worker; the manual
+         *     channel hands the kit to the owner at once.
+         */
+        post: operations["applications_dispatch_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2302,8 +2522,32 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applications Cancel Dispatch */
+        /**
+         * Applications Cancel Dispatch
+         * @description Cancel a queued send before it is handed to its channel (during the send delay).
+         */
         post: operations["applications_cancel_dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/applications/{application_id}/dispatches/{dispatch_id}/reconcile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Applications Reconcile Dispatch
+         * @description Settle an uncertain send: ask its channel now, or say it went out (with the reference) or did not.
+         *     An uncertain send is never resent automatically.
+         */
+        post: operations["applications_reconcile_dispatch"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2317,7 +2561,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Applications Manual Handoff */
+        /**
+         * Applications Manual Handoff
+         * @description The manual handoff kit for the current packet: posting link, files, answers sheet, remaining steps.
+         */
         get: operations["applications_manual_handoff"];
         put?: never;
         post?: never;
@@ -2336,7 +2583,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Applications Mark Submitted */
+        /**
+         * Applications Mark Submitted
+         * @description The owner submitted it: closes the open send (manual hand-off, or an uncertain one) as sent with the
+         *     owner's evidence, or sends the approved manual packet through permit and attempt first. Duplicate
+         *     protection then holds exactly as after an automatic send.
+         */
         post: operations["applications_mark_submitted"];
         delete?: never;
         options?: never;
@@ -2422,7 +2674,11 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Mail Threads Link */
+        /**
+         * Mail Threads Link
+         * @description The owner settles a review: link the thread to an application (or unlink it) and/or fix its kind.
+         *     Linking applies the same proposal rules as an automatic match, but never silently changes a stage.
+         */
         put: operations["mail_threads_link"];
         post?: never;
         delete?: never;
@@ -2498,9 +2754,30 @@ export interface paths {
         /**
          * Autopilot Set
          * @description Pause stops every new outward action at once and cancels queued sends; the response
-         *     lists what was cancelled, paused, and already out. Resume clears the pause. Audited.
+         *     lists what was cancelled, paused, and already out. Resume clears the pause (409 while paused for a
+         *     restore: use resume-after-restore). Audited.
          */
         put: operations["autopilot_set"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/autopilot/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Autopilot Restore State
+         * @description Paused for a restore from backup: what is still to reconcile before sending can resume (18.3).
+         */
+        get: operations["autopilot_restore_state"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2519,7 +2796,8 @@ export interface paths {
         put?: never;
         /**
          * Autopilot Resume After Restore
-         * @description A restored instance starts paused and reconciles its outbox first (18.3).
+         * @description A restored instance starts paused and reconciles its outbox first (18.3). Refused (409, with the
+         *     outstanding dispatch ids) until every send in flight at backup time is settled.
          */
         post: operations["autopilot_resume_after_restore"];
         delete?: never;
@@ -2651,8 +2929,13 @@ export interface paths {
         put?: never;
         /**
          * Pending Actions Resolve
-         * @description 'I've signed in, continue' returns the task to the same runner (8.4). Wave 2 (apply) handles the
-         *     types that need a runner; dismissing and answering an unknown question work now.
+         * @description Settle a decision: ``dismissed``; ``answered`` (unknown question); ``approved`` (approve the packet the
+         *     action names, if it is still current); ``chosen`` (conflict choice, with ``chosen_job_id``); ``continue``
+         *     ('I've signed in, continue': the task returns to the same runner, 8.4). ``confirmed``
+         *     (``confirm_submission``): the uncertain send went out; settles it as sent with the owner's evidence
+         *     (``reference`` if given). ``approved`` on an action whose ``detail.kind`` is a registered proposal (for
+         *     example ``mail_stage_proposal``) applies that proposal; 501 when its module is not in this build. To
+         *     say an uncertain send did not go out, use the dispatch's ``reconcile`` (``not_sent``).
          */
         post: operations["pending_actions_resolve"];
         delete?: never;
@@ -2768,7 +3051,8 @@ export interface paths {
         put?: never;
         /**
          * Connections Create
-         * @description LLM providers (wave 1). Keys are encrypted at rest and only ever returned masked.
+         * @description LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are
+         *     encrypted at rest and only ever returned masked.
          */
         post: operations["connections_create"];
         delete?: never;
@@ -2971,7 +3255,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Data Export Preview */
+        /**
+         * Data Export Preview
+         * @description What would be exported. A share setup is scanned for personal details first (18.5).
+         */
         post: operations["data_export_preview"];
         delete?: never;
         options?: never;
@@ -2996,6 +3283,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data/exports/{export_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Data Export Download */
+        get: operations["data_export_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data/onboarding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Data Onboarding
+         * @description Which wizard steps are done, computed from the data (13).
+         */
+        get: operations["data_onboarding"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data/import": {
         parameters: {
             query?: never;
@@ -3007,7 +3331,7 @@ export interface paths {
         put?: never;
         /**
          * Data Import Preview
-         * @description Validate and diff; nothing is written until commit. Imported items land as needs_review.
+         * @description Validate and diff; nothing is written to the database until commit. Imported items land as needs_review.
          */
         post: operations["data_import_preview"];
         delete?: never;
@@ -3025,7 +3349,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Data Import Commit */
+        /**
+         * Data Import Commit
+         * @description Apply a previewed import in one transaction (everything or nothing). Re-validates the staged bytes.
+         */
         post: operations["data_import_commit"];
         delete?: never;
         options?: never;
@@ -3040,10 +3367,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Data Backups List */
+        /**
+         * Data Backups List
+         * @description Backups on this server (newest first), plus the copy in the remote store where one was made.
+         */
         get: operations["data_backups_list"];
         put?: never;
-        /** Data Backups Create */
+        /**
+         * Data Backups Create
+         * @description Back up now (the same job as the nightly one). Returns when the archive is written.
+         */
         post: operations["data_backups_create"];
         delete?: never;
         options?: never;
@@ -3060,7 +3393,11 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Data Retention Run */
+        /**
+         * Data Retention Run
+         * @description Run retention now: role text and archive rules, old notifications, temp files, surplus backups.
+         *     Duplicate-protection history, the audit and applications are never deleted.
+         */
         post: operations["data_retention_run"];
         delete?: never;
         options?: never;
@@ -3075,7 +3412,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Data Config History */
+        /**
+         * Data Config History
+         * @description Versioned configuration changes, newest first: rules, prompts, rubrics, routing, automation policy
+         *     (``kind`` = their kinds) and every settings change (``kind=setting``).
+         */
         get: operations["data_config_history"];
         put?: never;
         post?: never;
@@ -3764,6 +4105,20 @@ export interface components {
              */
             files?: string[];
         };
+        /** ApprovalStatusOut */
+        ApprovalStatusOut: {
+            /** Approved */
+            approved: boolean;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "granted" | "wait_for_owner" | "denied";
+            /** Reason */
+            reason: string;
+            /** Pending Action Id */
+            pending_action_id: string | null;
+        };
         /** ApproveIn */
         ApproveIn: {
             /** Packet Version */
@@ -3932,6 +4287,16 @@ export interface components {
             paused: boolean;
             /** Paused At */
             paused_at: string | null;
+            /**
+             * Paused By
+             * @description Who paused (owner, system or a runner name)
+             */
+            paused_by: string | null;
+            /**
+             * Reason
+             * @description Why it was paused, as given
+             */
+            reason: string | null;
             /** @description What the last pause did. Empty until something has been queued */
             summary: components["schemas"]["PauseSummary"];
         };
@@ -3939,6 +4304,8 @@ export interface components {
         AutopilotWrite: {
             /** Paused */
             paused: boolean;
+            /** Reason */
+            reason?: string | null;
         };
         /**
          * BackfillEstimate
@@ -4427,6 +4794,22 @@ export interface components {
             /** Winner Reason */
             winner_reason: string | null;
         };
+        /** Component */
+        Component: {
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "warn" | "down" | "unknown";
+            /** Detail */
+            detail: string | null;
+            /** At */
+            at: string | null;
+            /** Value */
+            value: number | null;
+        };
         /**
          * ConditionResult
          * @description Explanation tree for the "Why?" panel.
@@ -4546,6 +4929,24 @@ export interface components {
             secrets?: {
                 [key: string]: string;
             };
+        };
+        /** ConnectionHealth */
+        ConnectionHealth: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Provider */
+            provider: string;
+            /** Label */
+            label: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Health */
+            health: string;
+            /** Last Checked At */
+            last_checked_at: string | null;
         };
         /** ConnectionOut */
         ConnectionOut: {
@@ -4784,6 +5185,31 @@ export interface components {
             /** Actions */
             actions: components["schemas"]["PendingActionOut"][];
         };
+        /** DetailedHealth */
+        DetailedHealth: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "down";
+            /** Version */
+            version: string;
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+            /** Components */
+            components: components["schemas"]["Component"][];
+            queue: components["schemas"]["QueueDepth"];
+            /** Connections */
+            connections: components["schemas"]["ConnectionHealth"][];
+            /**
+             * Workers
+             * @default []
+             */
+            workers: components["schemas"]["WorkerHealth"][];
+        };
         /** DetectIn */
         DetectIn: {
             /**
@@ -4807,6 +5233,26 @@ export interface components {
         DismissIn: {
             /** Note */
             note?: string | null;
+        };
+        /**
+         * DispatchCreateIn
+         * @description Queue the current approved packet now (permit, then the attempt; email waits the send delay).
+         */
+        DispatchCreateIn: Record<string, never>;
+        /** DispatchCreateOut */
+        DispatchCreateOut: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "queued" | "wait_for_owner" | "denied";
+            /** Reason */
+            reason: string;
+            dispatch: components["schemas"]["DispatchOut"] | null;
+            /** Gates */
+            gates: components["schemas"]["GateResult"][];
+            /** Pending Action Id */
+            pending_action_id: string | null;
         };
         /** DispatchOut */
         DispatchOut: {
@@ -4852,6 +5298,110 @@ export interface components {
             gate_results: components["schemas"]["GateResult"][];
             /** Error */
             error: string | null;
+            /**
+             * Started At
+             * @description Handed to the channel (in flight from here)
+             */
+            started_at: string | null;
+            evidence: components["schemas"]["Evidence"] | null;
+            /**
+             * Uncertain
+             * @description Handed over with no final outcome: reconcile, never resend
+             * @default false
+             */
+            uncertain: boolean;
+            /**
+             * Reconcile Attempts
+             * @default 0
+             */
+            reconcile_attempts: number;
+            /** Last Reconciled At */
+            last_reconciled_at: string | null;
+        };
+        /** DocumentOut */
+        DocumentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "cv" | "letter";
+            /**
+             * Fmt
+             * @enum {string}
+             */
+            fmt: "pdf" | "docx" | "txt" | "html";
+            /** Template Key */
+            template_key: string;
+            /**
+             * Spec Hash
+             * @description sha256 of the canonical spec this file was rendered from
+             */
+            spec_hash: string;
+            /**
+             * Content Hash
+             * @description sha256 of the stored file; packets bind to this
+             */
+            content_hash: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Mime Type */
+            mime_type: string;
+            /** Page Count */
+            page_count: number | null;
+            /** Warnings */
+            warnings: components["schemas"]["RenderWarning"][];
+        };
+        /**
+         * DraftAnswer
+         * @description A screening question and what the answer bank says about it (5.4). Only ``outcome == "value"``
+         *     carries an answer; ``ask_owner`` raised a pending action, ``do_not_answer`` is a ``never`` answer.
+         */
+        DraftAnswer: {
+            /** Question */
+            question: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "value" | "ask_owner" | "do_not_answer";
+            /** Value */
+            value: string | null;
+            /** Select */
+            select: string | null;
+            /** Answer Id */
+            answer_id: string | null;
+            /**
+             * Material
+             * @default false
+             */
+            material: boolean;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /** Pending Action Id */
+            pending_action_id: string | null;
         };
         /** DryRunOut */
         DryRunOut: {
@@ -5071,6 +5621,12 @@ export interface components {
              * @enum {string}
              */
             kind: "share_setup" | "personal_backup";
+            /**
+             * Acknowledge Personal Details
+             * @description Share setup only: export even though the preview found personal details
+             * @default false
+             */
+            acknowledge_personal_details?: boolean;
         };
         /** ExportOut */
         ExportOut: {
@@ -5257,7 +5813,11 @@ export interface components {
             /** Count */
             count: number;
         };
-        /** GateResult */
+        /**
+         * GateResult
+         * @description One gate's result. ``outcome`` is the three-state answer (unknown is never a pass); ``passed`` is
+         *     kept for compatibility and is true only when ``outcome`` is ``pass``.
+         */
         GateResult: {
             /** Gate */
             gate: string;
@@ -5265,6 +5825,8 @@ export interface components {
             passed: boolean;
             /** Detail */
             detail: string | null;
+            /** Outcome */
+            outcome: ("pass" | "fail" | "unknown") | null;
         };
         /** Group */
         "Group-Input": {
@@ -5939,6 +6501,14 @@ export interface components {
             /** Paragraphs */
             paragraphs?: number | null;
         };
+        /** Live */
+        Live: {
+            /**
+             * Alive
+             * @default true
+             */
+            alive: boolean;
+        };
         /** LocationRule */
         LocationRule: {
             /** Place */
@@ -5966,7 +6536,7 @@ export interface components {
             /** Application Id */
             application_id: string | null;
             /** Classification */
-            classification?: ("confirmation" | "rejection" | "interview" | "other") | null;
+            classification?: ("confirmation" | "rejection" | "interview" | "information_request" | "other") | null;
         };
         /** MailThreadOut */
         MailThreadOut: {
@@ -5993,11 +6563,15 @@ export interface components {
              * Classification
              * @enum {string}
              */
-            classification: "confirmation" | "rejection" | "interview" | "other";
+            classification: "confirmation" | "rejection" | "interview" | "information_request" | "other";
             /** Match Confidence */
             match_confidence: number | null;
             /** Needs Review */
             needs_review: boolean;
+            /** Sender */
+            sender: string | null;
+            /** Last Message At */
+            last_message_at: string | null;
         };
         /** ManualHandoffOut */
         ManualHandoffOut: {
@@ -6005,7 +6579,7 @@ export interface components {
             posting_url: string | null;
             /**
              * Files
-             * @description Signed download URLs for the final PDFs
+             * @description Download links for the final files (behind the owner's session), or the share links the packet records
              */
             files: string[];
             /** Answers */
@@ -6090,6 +6664,29 @@ export interface components {
             /** Fields */
             fields: string[];
         };
+        /** OnboardingOut */
+        OnboardingOut: {
+            /** Steps */
+            steps: components["schemas"]["OnboardingStepOut"][];
+            /** Complete */
+            complete: boolean;
+            /**
+             * Next Step
+             * @description Key of the first step not done, or null
+             */
+            next_step: string | null;
+        };
+        /** OnboardingStepOut */
+        OnboardingStepOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Done */
+            done: boolean;
+            /** Detail */
+            detail: string;
+        };
         /** Override */
         Override: {
             /** By */
@@ -6139,6 +6736,66 @@ export interface components {
              */
             material: boolean;
         };
+        /**
+         * PacketAnswerIn
+         * @description An answer from the bank (``answer_id``: value and materiality are read from the bank) or typed for
+         *     this packet only (``value``; counted as material).
+         */
+        PacketAnswerIn: {
+            /** Question */
+            question: string;
+            /** Answer Id */
+            answer_id?: string | null;
+            /** Value */
+            value?: string | null;
+        };
+        /**
+         * PacketBuildIn
+         * @description What would be sent. The server sets the destination domain, ``verified`` and ``trusted``, the
+         *     requisition (from the job unless given) and the job version.
+         */
+        PacketBuildIn: {
+            /**
+             * Channel
+             * @enum {string}
+             */
+            channel: "email" | "browser" | "manual";
+            /**
+             * Destination Url
+             * @description Apply URL (browser, manual)
+             */
+            destination_url?: string | null;
+            /**
+             * Sending Identity
+             * @description Mailbox or name the application is sent as
+             */
+            sending_identity: string;
+            /** Answers */
+            answers?: components["schemas"]["PacketAnswerIn"][];
+            email?: components["schemas"]["PacketEmail"] | null;
+            /** Files */
+            files?: components["schemas"]["PacketFile"][];
+            /** Link Permissions */
+            link_permissions?: string[];
+            /** Requisition */
+            requisition?: string | null;
+        };
+        /** PacketBuildOut */
+        PacketBuildOut: {
+            packet: components["schemas"]["PacketOut"];
+            /**
+             * Created
+             * @description False when the contents were identical to the current packet
+             */
+            created: boolean;
+            /**
+             * Changes
+             * @description What changed from the previous version
+             */
+            changes: components["schemas"]["PacketChange"][];
+            /** @description What the automation policy did with the new packet (None: nothing to do) */
+            approval: components["schemas"]["ApprovalStatusOut"] | null;
+        };
         /** PacketChange */
         PacketChange: {
             /** Path */
@@ -6167,6 +6824,16 @@ export interface components {
             files: components["schemas"]["PacketFile"][];
             /** Link Permissions */
             link_permissions: string[];
+            /**
+             * Channel
+             * @description The channel this packet is sent through
+             */
+            channel: ("email" | "browser" | "manual") | null;
+            /**
+             * Job Version
+             * @description Content hash of the job as it was packed
+             */
+            job_version: string | null;
         };
         /** PacketDestination */
         PacketDestination: {
@@ -6190,7 +6857,7 @@ export interface components {
             /** To */
             to: string[];
             /** Cc */
-            cc: string[];
+            cc?: string[];
             /** Subject */
             subject: string;
             /** Body */
@@ -6208,9 +6875,9 @@ export interface components {
             /** Sha256 */
             sha256: string;
             /** Document Id */
-            document_id: string | null;
+            document_id?: string | null;
             /** Share Link */
-            share_link: string | null;
+            share_link?: string | null;
         };
         /** PacketOut */
         PacketOut: {
@@ -6950,6 +7617,24 @@ export interface components {
             /** Score */
             score: number | null;
         };
+        /** QueueDepth */
+        QueueDepth: {
+            /**
+             * Waiting
+             * @default 0
+             */
+            waiting: number;
+            /**
+             * Running
+             * @default 0
+             */
+            running: number;
+            /**
+             * Failed
+             * @default 0
+             */
+            failed: number;
+        };
         /**
          * RangeFilter
          * @description Numeric range on a facet (years asked, pay, posted age). ``not_stated`` says what a
@@ -6986,6 +7671,15 @@ export interface components {
              * @default 5
              */
             burst?: number;
+        };
+        /** Ready */
+        Ready: {
+            /** Ready */
+            ready: boolean;
+            /** Database */
+            database: boolean;
+            /** Migrated */
+            migrated: boolean;
         };
         /**
          * ReceiptOut
@@ -7049,6 +7743,28 @@ export interface components {
              * @description Why nothing was re-read, when that is so
              */
             note: string | null;
+        };
+        /** ReconcileIn */
+        ReconcileIn: {
+            /**
+             * Decision
+             * @description check: ask the channel now; sent: it went out (reference kept as evidence); not_sent: it never left (the role goes back to ready; nothing is resent automatically)
+             * @enum {string}
+             */
+            decision: "check" | "sent" | "not_sent";
+            /** Reference */
+            reference?: string | null;
+            /** Note */
+            note?: string | null;
+        };
+        /** ReconcileOut */
+        ReconcileOut: {
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "sent" | "not_sent" | "waiting";
+            dispatch: components["schemas"]["DispatchOut"];
         };
         /** ReferenceIn */
         ReferenceIn: {
@@ -7137,6 +7853,11 @@ export interface components {
             /** Over */
             over: string;
         };
+        /** RejectIn */
+        RejectIn: {
+            /** Reason */
+            reason?: string | null;
+        };
         /** ReleaseHeldIn */
         ReleaseHeldIn: {
             /** Reason */
@@ -7160,6 +7881,53 @@ export interface components {
             entered: {
                 [key: string]: unknown;
             };
+        };
+        /** RenderIn */
+        RenderIn: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "cv" | "letter";
+            /**
+             * Template Key
+             * @description Template key; default from the documents settings
+             */
+            template_key?: string | null;
+            /** Formats */
+            formats?: ("pdf" | "docx" | "txt" | "html")[];
+        };
+        /** RenderOut */
+        RenderOut: {
+            /** Documents */
+            documents: components["schemas"]["DocumentOut"][];
+            /**
+             * Warnings
+             * @description Page limit, overflow and omission notices for the Studio
+             */
+            warnings: components["schemas"]["RenderWarning"][];
+        };
+        /** RenderWarning */
+        RenderWarning: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Detail */
+            detail: {
+                [key: string]: number | string;
+            };
+            /**
+             * Severity
+             * @default warn
+             * @constant
+             */
+            severity: "warn";
+        };
+        /** RequestChangesIn */
+        RequestChangesIn: {
+            /** Note */
+            note: string;
         };
         /** RequireWording */
         RequireWording: {
@@ -7234,8 +8002,37 @@ export interface components {
             answer_scope?: ("this_application" | "this_employer" | "this_country" | "all_matching") | null;
             /** Chosen Application Id */
             chosen_application_id?: string | null;
+            /**
+             * Chosen Job Id
+             * @description conflict_choice: the role chosen (one of the two in the action's detail)
+             */
+            chosen_job_id?: string | null;
             /** Note */
             note?: string | null;
+            /**
+             * Reference
+             * @description confirmed: the employer's reference number, kept as evidence
+             */
+            reference?: string | null;
+        };
+        /** RestoreStateOut */
+        RestoreStateOut: {
+            /** Active */
+            active: boolean;
+            /** Entered At */
+            entered_at: string | null;
+            /** Backup Taken At */
+            backup_taken_at: string | null;
+            /**
+             * Outstanding
+             * @description Sends from before the backup still to reconcile
+             */
+            outstanding: components["schemas"]["DispatchOut"][];
+            /**
+             * Held Application Ids
+             * @description Approvals withdrawn at restore, to approve again
+             */
+            held_application_ids: string[];
         };
         /** ReviewDecision */
         ReviewDecision: {
@@ -8154,9 +8951,79 @@ export interface components {
             /** Fact Ids */
             fact_ids?: string[];
         };
+        /**
+         * SpecStateOut
+         * @description The Studio's view of the documents: the spec, its checks and whether they still apply.
+         */
+        SpecStateOut: {
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Version
+             * @description Spec version shown; null before the first draft
+             */
+            version: number | null;
+            /** Origin */
+            origin: ("tailor" | "owner") | null;
+            /** Content Hash */
+            content_hash: string | null;
+            spec: components["schemas"]["ApplicationSpec-Output"];
+            /** Check Results */
+            check_results: components["schemas"]["CheckResult"][];
+            /**
+             * Checked
+             * @description The stored checks ran on exactly this content and these Kit facts
+             */
+            checked: boolean;
+            /**
+             * Status
+             * @description Worst stored result (an unwaived block is block)
+             */
+            status: ("pass" | "warn" | "block") | null;
+            /** Stale Reasons */
+            stale_reasons: string[];
+            /**
+             * Answers
+             * @description Screening questions and what the answer bank says
+             */
+            answers: components["schemas"]["DraftAnswer"][];
+            /** Tailoring */
+            tailoring: ("queued" | "running" | "paused" | "done" | "failed") | null;
+            /** Tailoring Error */
+            tailoring_error: string | null;
+            /** Versions */
+            versions: components["schemas"]["SpecVersionSummary"][];
+        };
         /** SpecUpdate */
         SpecUpdate: {
             spec: components["schemas"]["ApplicationSpec-Input"];
+        };
+        /** SpecVersionSummary */
+        SpecVersionSummary: {
+            /** Version */
+            version: number;
+            /**
+             * Origin
+             * @enum {string}
+             */
+            origin: "tailor" | "owner";
+            /** Content Hash */
+            content_hash: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Created By */
+            created_by: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pass" | "warn" | "block";
         };
         /** SpendBucket */
         SpendBucket: {
@@ -8787,6 +9654,16 @@ export interface components {
             summary_fact_code?: string | null;
             /** Tone Notes */
             tone_notes?: string | null;
+            /**
+             * Cv Template
+             * @description CV template key for this track; null uses the documents setting
+             */
+            cv_template?: string | null;
+            /**
+             * Letter Template
+             * @description Letter template key; null uses the documents setting
+             */
+            letter_template?: string | null;
         };
         /** TrackOut */
         TrackOut: {
@@ -8834,6 +9711,16 @@ export interface components {
             summary_fact_code: string | null;
             /** Tone Notes */
             tone_notes: string | null;
+            /**
+             * Cv Template
+             * @description CV template key for this track; null uses the documents setting
+             */
+            cv_template: string | null;
+            /**
+             * Letter Template
+             * @description Letter template key; null uses the documents setting
+             */
+            letter_template: string | null;
         };
         /** TrustedSiteIn */
         TrustedSiteIn: {
@@ -9760,6 +10647,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description Changed only by its own endpoint */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Invalid value */
             422: {
                 headers: {
@@ -10045,6 +10939,75 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": unknown;
+                };
+            };
+        };
+    };
+    health_live: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Live"];
+                };
+            };
+        };
+    };
+    health_ready: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ready"];
+                };
+            };
+            /** @description Database down or not migrated */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Ready"];
+                };
+            };
+        };
+    };
+    health_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailedHealth"];
                 };
             };
         };
@@ -16361,6 +17324,55 @@ export interface operations {
                     "application/json": components["schemas"]["TailorOut"];
                 };
             };
+            /** @description The application can no longer be tailored */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_get_spec: {
+        parameters: {
+            query?: {
+                version?: number | null;
+            };
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpecStateOut"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -16405,6 +17417,13 @@ export interface operations {
                     "application/json": components["schemas"]["ApplicationDetail"];
                 };
             };
+            /** @description The documents can no longer be edited */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -16445,6 +17464,97 @@ export interface operations {
                     "application/json": components["schemas"]["CheckResult"][];
                 };
             };
+            /** @description There is no draft to check */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_documents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_render_documents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenderIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RenderOut"];
+                };
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -16468,7 +17578,9 @@ export interface operations {
     applications_document: {
         parameters: {
             query?: {
-                fmt?: "pdf" | "docx" | "html";
+                fmt?: "pdf" | "docx" | "txt" | "html";
+                /** @description Template key */
+                template?: string | null;
             };
             header?: never;
             path: {
@@ -16488,6 +17600,49 @@ export interface operations {
                     "application/json": unknown;
                     "application/pdf": unknown;
                     "text/html": unknown;
+                    "text/plain": unknown;
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_document_file: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -16529,6 +17684,104 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["PacketOut"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_packet_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PacketOut"];
+                };
+            };
+            /** @description No current packet */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_packet_build: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PacketBuildIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PacketBuildOut"];
+                };
+            };
+            /** @description The application has gone out */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -16641,6 +17894,108 @@ export interface operations {
             };
         };
     };
+    applications_reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationDetail"];
+                };
+            };
+            /** @description Cannot be rejected now */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_request_changes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RequestChangesIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApplicationDetail"];
+                };
+            };
+            /** @description Cannot be changed now */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
     applications_dispatches: {
         parameters: {
             query?: never;
@@ -16659,6 +18014,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DispatchOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_dispatch_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispatchCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DispatchCreateOut"];
                 };
             };
             /** @description Validation Error */
@@ -16701,6 +18100,65 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DispatchOut"];
                 };
+            };
+            /** @description Already handed over */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    applications_reconcile_dispatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                application_id: string;
+                dispatch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReconcileIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReconcileOut"];
+                };
+            };
+            /** @description Not uncertain */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -16785,6 +18243,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ApplicationDetail"];
                 };
+            };
+            /** @description Nothing approved to submit */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -17018,6 +18483,7 @@ export interface operations {
                 application_id?: string | null;
                 needs_review?: boolean | null;
                 cursor?: string | null;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -17337,6 +18803,35 @@ export interface operations {
             };
         };
     };
+    autopilot_restore_state: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RestoreStateOut"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
     autopilot_resume_after_restore: {
         parameters: {
             query?: never;
@@ -17354,6 +18849,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Ok"];
                 };
+            };
+            /** @description Sends from before the backup are not reconciled yet */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Specified; implemented in a later wave */
             501: {
@@ -18646,6 +20148,13 @@ export interface operations {
                     "application/json": components["schemas"]["ExportOut"];
                 };
             };
+            /** @description Personal details found in a share setup */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -18653,6 +20162,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    data_export_download: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                export_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown or expired export */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Specified; implemented in a later wave */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorOut"];
+                };
+            };
+        };
+    };
+    data_onboarding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingOut"];
                 };
             };
             /** @description Specified; implemented in a later wave */
@@ -18688,14 +20271,19 @@ export interface operations {
                     "application/json": components["schemas"]["app__api__routers__data__ImportPreviewOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Upload too large */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not importable */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
             /** @description Specified; implemented in a later wave */
             501: {
@@ -18730,14 +20318,19 @@ export interface operations {
                     "application/json": components["schemas"]["ImportCommitOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unknown or expired import */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not importable */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
+                content?: never;
             };
             /** @description Specified; implemented in a later wave */
             501: {
