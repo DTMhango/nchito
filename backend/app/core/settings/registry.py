@@ -61,6 +61,7 @@ GROUPS: dict[str, str] = {
     "accounts": "Portal accounts",
     "data": "Data import and export",
     "sources": "Discovery sources",
+    "preferences": "Preference learning",
 }
 
 AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
@@ -819,6 +820,40 @@ _add("sources.search.query_template", "string", "Web search phrase",
      "{title} {location} job vacancy apply", "{title} careers {location}", str,
      validators=(_query_template_check, max_length(200)), invalid_example="jobs for {role}",
      has_invalid_example=True)
+
+
+# ----- preference learning (wave 4 feedback stream) ---------------------------------------
+_int("preferences.min_evidence", "Evidence needed for a suggestion",
+     "How many thumbs (or outcomes) must agree before a rubric change is suggested.", 3, 5, 1, 50)
+_add("preferences.min_rating_gap", "float", "Criterion disagreement",
+     "How far apart (in 0-5 rating points) liked and disliked roles must sit on a criterion before its "
+     "weight is suggested to change.", 1.0, 1.5, float, minimum=0.1, maximum=5.0, invalid_example=6.0,
+     has_invalid_example=True)
+_int("preferences.reweight_step", "Reweight step", "Weight points moved between two criteria per suggestion.",
+     5, 10, 1, 50, "points")
+_int("preferences.penalty_points", "Suggested penalty", "Points of a suggested penalty for a disliked pattern.",
+     10, 15, 1, 100, "points")
+_int("preferences.bonus_points", "Suggested bonus", "Points of a suggested bonus for a liked pattern.",
+     5, 10, 1, 100, "points")
+_int("preferences.exclude_min_evidence", "Evidence needed to suggest an exclusion",
+     "Thumbs down (with none up) on one pattern before excluding it is suggested.", 6, 10, 2, 100)
+_int("preferences.backtest_days", "Suggestion backtest window",
+     "Roles found in this many recent days are replayed to show a suggestion's effect.", 30, 60, 1, 365, "days")
+_int("preferences.analysis_every_hours", "Suggestion analysis interval",
+     "How often new feedback is turned into suggestions automatically (0: only on demand).", 24, 12, 0, 720,
+     "hours")
+_int("preferences.note_max_length", "Feedback note length", "Longest free-text reason kept with a thumb.",
+     500, 1000, 50, 5000, "characters")
+_int("preferences.evidence_notes_shown", "Notes shown as evidence",
+     "How many of the owner's own notes a suggestion quotes as evidence.", 5, 10, 0, 50)
+_int("preferences.preview_days", "Policy preview window", "Recent days of roles a policy preview replays.",
+     30, 14, 1, 365, "days")
+_int("preferences.preview_max_jobs", "Policy preview size", "Most roles one policy preview replays.",
+     500, 1000, 10, 5000)
+_int("preferences.histogram_bin", "Score histogram bin", "Width of one bar in the score histogram.", 5, 10, 1, 25,
+     "points")
+_int("preferences.preview_changes_shown", "Changed roles listed", "How many changed roles a preview lists.",
+     50, 100, 5, 500)
 
 
 REGISTRY: dict[str, SettingDef] = {d.key: d for d in _DEFS}

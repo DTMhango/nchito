@@ -355,12 +355,30 @@ export const campaignHandlers = [
   http.put("*/api/rubrics/:id", async ({ params, request }) => {
     const idx = rubrics.findIndex((x) => x.id === params.id)
     if (idx < 0) return notFound("Rubric")
-    if (rubrics[idx].status !== "draft")
-      return HttpResponse.json(
-        { detail: "Only a draft can be edited. Start a new draft." },
-        { status: 409 }
-      )
     const b = (await request.json()) as { name: string; body: RubricBody }
+    // As the backend: editing an active or retired version creates a new draft version.
+    if (rubrics[idx].status !== "draft") {
+      const src = rubrics[idx]
+      const version =
+        Math.max(
+          ...rubrics
+            .filter((r) => r.family === src.family)
+            .map((r) => r.version)
+        ) + 1
+      const now = new Date().toISOString()
+      const r = {
+        ...src,
+        id: crypto.randomUUID(),
+        created_at: now,
+        updated_at: now,
+        name: b.name,
+        body: b.body as Rubric["body"],
+        version,
+        status: "draft",
+      } as Rubric
+      rubrics.push(r)
+      return HttpResponse.json(r)
+    }
     rubrics[idx] = {
       ...rubrics[idx],
       name: b.name,
@@ -405,3 +423,4 @@ export const campaignHandlers = [
 
 /** Read access for tests. */
 export const campaignsMock = { get: () => campaigns }
+export const rubricsMock = { get: () => rubrics }

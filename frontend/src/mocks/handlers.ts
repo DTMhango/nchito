@@ -21,6 +21,7 @@ import { studioHandlers } from "./handlers/studio"
 import { autopilotHandlers } from "./handlers/autopilot"
 import { w3JobUiHandlers } from "./handlers/w3-job-ui"
 import { runnersHandlers } from "./handlers/runners"
+import { preferencesHandlers } from "./handlers/preferences"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -39,6 +40,8 @@ export const handlers = [
   ...autopilotHandlers,
   // Wave 3 job page: interview pack, compare, posting changes (before the generic /api/jobs/:id).
   ...w3JobUiHandlers,
+  // Wave 4 feedback: thumbs, preference suggestions, policy preview.
+  ...preferencesHandlers,
   // Data, non-AI connections and health: before the AI handlers (they fall through for LLM providers).
   ...dataHandlers,
   ...kitHandlers,

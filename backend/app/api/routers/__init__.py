@@ -18,6 +18,7 @@ from app.api.routers import (
     kit,
     pending_actions,
     portal_accounts,
+    preferences,
     runs,
     settings,
     sources,
@@ -49,5 +50,6 @@ ALL_ROUTERS: list[APIRouter] = [
     insights.router,
     interview.router,
     data.router,
+    preferences.router,
     llm_api.router,
 ]

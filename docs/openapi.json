@@ -12650,7 +12650,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DismissIn"
+                "$ref": "#/components/schemas/app__api__routers__preferences__DismissIn"
               }
             }
           }
@@ -15984,6 +15984,699 @@
         }
       }
     },
+    "/api/jobs/{job_id}/feedback": {
+      "put": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Feedback Put",
+        "description": "Thumbs up or down on a match, with optional reasons. Stored as evidence; no score changes.",
+        "operationId": "feedback_put",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FeedbackIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Feedback For Job",
+        "operationId": "feedback_for_job",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/FeedbackOut"
+                  },
+                  "title": "Response Feedback For Job"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Feedback Withdraw",
+        "operationId": "feedback_withdraw",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences/feedback": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Feedback List",
+        "operationId": "feedback_list",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "verdict",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "up",
+                    "down"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Verdict"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_FeedbackOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences/summary": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Preferences Summary",
+        "description": "Counts of the evidence, open suggestions and owner-only notes for one campaign. Reads only.",
+        "operationId": "preferences_summary",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreferencesSummaryOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences/analyse": {
+      "post": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Preferences Analyse",
+        "description": "Turn the campaign's feedback and outcomes into suggestions now (also runs periodically).",
+        "operationId": "preferences_analyse",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalyseIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalyseOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences/suggestions": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Suggestions List",
+        "operationId": "suggestions_list",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "open",
+                    "accepted",
+                    "dismissed",
+                    "superseded"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "open",
+              "title": "Status"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SuggestionOut_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences/suggestions/{item_id}": {
+      "get": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Suggestions Get",
+        "operationId": "suggestions_get",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences/suggestions/{item_id}/backtest": {
+      "post": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Suggestions Backtest",
+        "description": "Replay the suggestion (or an edit of it) over recent roles. No model calls; nothing is saved.",
+        "operationId": "suggestions_backtest",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionEditIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionBacktest"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/preferences/suggestions/{item_id}/accept": {
+      "post": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Suggestions Accept",
+        "description": "Apply it as suggested or as edited. A rubric change creates a new rubric version. Audited.",
+        "operationId": "suggestions_accept",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already decided, or the rubric moved on"
+          },
+          "422": {
+            "description": "The (edited) change is owner-only ground"
+          }
+        }
+      }
+    },
+    "/api/preferences/suggestions/{item_id}/dismiss": {
+      "post": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Suggestions Dismiss",
+        "description": "Not raised again for the same evidence.",
+        "operationId": "suggestions_dismiss",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__api__routers__preferences__DismissIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already decided"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/policy-preview": {
+      "post": {
+        "tags": [
+          "preferences"
+        ],
+        "summary": "Campaigns Policy Preview",
+        "description": "What a policy change would do to recent roles, through the decision table. Writes nothing.",
+        "operationId": "campaigns_policy_preview",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyPreviewIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyPreviewOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/ai/routing": {
       "get": {
         "tags": [
@@ -16350,6 +17043,65 @@
   },
   "components": {
     "schemas": {
+      "AcceptIn": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ReweightChange"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PenaltyChange-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BonusChange-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TagRuleChange-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SavedViewChange-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TightenChange-Input"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "add_bonus": "#/components/schemas/BonusChange-Input",
+                    "add_penalty": "#/components/schemas/PenaltyChange-Input",
+                    "add_saved_view": "#/components/schemas/SavedViewChange-Input",
+                    "add_tag_rule": "#/components/schemas/TagRuleChange-Input",
+                    "reweight_criterion": "#/components/schemas/ReweightChange",
+                    "tighten_filter": "#/components/schemas/TightenChange-Input"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change",
+            "description": "The owner's edit; default: as suggested"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "AcceptIn"
+      },
       "AgentTaskState": {
         "properties": {
           "step": {
@@ -16456,6 +17208,60 @@
           "canonical"
         ],
         "title": "AliasOut"
+      },
+      "AnalyseIn": {
+        "properties": {
+          "campaign_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Campaign Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campaign_id"
+        ],
+        "title": "AnalyseIn"
+      },
+      "AnalyseOut": {
+        "properties": {
+          "created": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionOut"
+            },
+            "type": "array",
+            "title": "Created"
+          },
+          "kept": {
+            "type": "integer",
+            "title": "Kept",
+            "description": "Suggestions already raised (or dismissed) for the same evidence"
+          },
+          "up": {
+            "type": "integer",
+            "title": "Up"
+          },
+          "down": {
+            "type": "integer",
+            "title": "Down"
+          },
+          "owner_only": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerOnlyNoteOut"
+            },
+            "type": "array",
+            "title": "Owner Only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "kept",
+          "up",
+          "down",
+          "owner_only"
+        ],
+        "title": "AnalyseOut"
       },
       "AnswerMatchIn": {
         "properties": {
@@ -18545,6 +19351,62 @@
         "title": "BackfillEstimate",
         "description": "Without ``confirm``: jobs to answer and the estimate. With it: jobs answered and the spend."
       },
+      "BacktestChangeRow": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "old_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Old Score"
+          },
+          "new_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Score"
+          },
+          "old_verdict": {
+            "type": "string",
+            "title": "Old Verdict"
+          },
+          "new_verdict": {
+            "type": "string",
+            "title": "New Verdict"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "title",
+          "employer",
+          "old_verdict",
+          "new_verdict"
+        ],
+        "title": "BacktestChangeRow"
+      },
       "BacktestEstimateOut": {
         "properties": {
           "jobs": {
@@ -18950,6 +19812,74 @@
           "doc_type"
         ],
         "title": "Body_kit_vault_upload"
+      },
+      "BonusChange-Input": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_bonus",
+            "title": "Kind",
+            "default": "add_bonus"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "points": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Points"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "points",
+          "conditions"
+        ],
+        "title": "BonusChange",
+        "description": "A campaign bonus rule (raises the effective score of matching roles)."
+      },
+      "BonusChange-Output": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_bonus",
+            "title": "Kind",
+            "default": "add_bonus"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "points": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Points"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "points",
+          "conditions"
+        ],
+        "title": "BonusChange",
+        "description": "A campaign bonus rule (raises the effective score of matching roles)."
       },
       "BulkActionIn": {
         "properties": {
@@ -21178,23 +22108,6 @@
         ],
         "title": "DetectOut"
       },
-      "DismissIn": {
-        "properties": {
-          "note": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Note"
-          }
-        },
-        "type": "object",
-        "title": "DismissIn"
-      },
       "DispatchCreateIn": {
         "properties": {},
         "type": "object",
@@ -22652,6 +23565,200 @@
         },
         "type": "object",
         "title": "FavouriteIn"
+      },
+      "FeedbackIn": {
+        "properties": {
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id",
+            "description": "The match's campaign; default: the campaign that scored the role highest"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Verdict"
+          },
+          "reasons": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "too_junior",
+                "too_senior",
+                "wrong_stack",
+                "pay",
+                "location",
+                "employer_type",
+                "commute_remote",
+                "more_like_this"
+              ]
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note",
+            "description": "Free text; kept as evidence, never an instruction"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict"
+        ],
+        "title": "FeedbackIn"
+      },
+      "FeedbackOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "up",
+              "down"
+            ],
+            "title": "Verdict"
+          },
+          "reasons": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "too_junior",
+                "too_senior",
+                "wrong_stack",
+                "pay",
+                "location",
+                "employer_type",
+                "commute_remote",
+                "more_like_this"
+              ]
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "score_at": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score At"
+          },
+          "rubric_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric Version"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "employer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Employer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "job_id",
+          "campaign_id",
+          "verdict",
+          "reasons",
+          "note",
+          "score_at",
+          "rubric_version",
+          "actor"
+        ],
+        "title": "FeedbackOut"
       },
       "FieldChange": {
         "properties": {
@@ -25999,6 +27106,37 @@
         ],
         "title": "OwnerCreate"
       },
+      "OwnerOnlyNoteOut": {
+        "properties": {
+          "area": {
+            "type": "string",
+            "title": "Area"
+          },
+          "down": {
+            "type": "integer",
+            "title": "Down"
+          },
+          "feedback_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Feedback Ids"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "area",
+          "down",
+          "feedback_ids",
+          "message"
+        ],
+        "title": "OwnerOnlyNoteOut"
+      },
       "PacketAnswer": {
         "properties": {
           "question": {
@@ -26992,6 +28130,45 @@
         ],
         "title": "Page[FactOut]"
       },
+      "Page_FeedbackOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque; pass back as ?cursor="
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[FeedbackOut]"
+      },
       "Page_GuardrailOut_": {
         "properties": {
           "items": {
@@ -27538,6 +28715,45 @@
         ],
         "title": "Page[SourceOut]"
       },
+      "Page_SuggestionOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SuggestionOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque; pass back as ?cursor="
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[SuggestionOut]"
+      },
       "Page_TagRuleOut_": {
         "properties": {
           "items": {
@@ -27984,6 +29200,74 @@
           "state"
         ],
         "title": "PayOut"
+      },
+      "PenaltyChange-Input": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_penalty",
+            "title": "Kind",
+            "default": "add_penalty"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "points": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Points"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "points",
+          "conditions"
+        ],
+        "title": "PenaltyChange",
+        "description": "A rubric penalty (a new rubric version)."
+      },
+      "PenaltyChange-Output": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_penalty",
+            "title": "Kind",
+            "default": "add_penalty"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "points": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Points"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "points",
+          "conditions"
+        ],
+        "title": "PenaltyChange",
+        "description": "A rubric penalty (a new rubric version)."
       },
       "PendingActionOut": {
         "properties": {
@@ -28548,6 +29832,158 @@
         ],
         "title": "PersonalDetailHit"
       },
+      "PolicyPreviewIn": {
+        "properties": {
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days",
+            "description": "Window of recent roles; default preferences.preview_days"
+          },
+          "automation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AutomationPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "thresholds": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RubricThresholds"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Rubric thresholds to try"
+          },
+          "criteria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CampaignCriteria-Input"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unknown_data_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UnknownDataPolicy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "settings": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Settings",
+            "description": "Autopilot limits and global thresholds to try (caps, quiet hours, thresholds)"
+          }
+        },
+        "type": "object",
+        "title": "PolicyPreviewIn"
+      },
+      "PolicyPreviewOut": {
+        "properties": {
+          "campaign_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Campaign Id"
+          },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
+          },
+          "jobs": {
+            "type": "integer",
+            "title": "Jobs"
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/PreviewThresholds"
+          },
+          "baseline_thresholds": {
+            "$ref": "#/components/schemas/PreviewThresholds"
+          },
+          "histogram": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewBin"
+            },
+            "type": "array",
+            "title": "Histogram"
+          },
+          "unscored": {
+            "type": "integer",
+            "title": "Unscored"
+          },
+          "line": {
+            "$ref": "#/components/schemas/PreviewLine"
+          },
+          "baseline_line": {
+            "$ref": "#/components/schemas/PreviewLine"
+          },
+          "run_now": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Run Now",
+            "description": "Dry-run actions for a run right now, by action"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "changes_total": {
+            "type": "integer",
+            "title": "Changes Total"
+          },
+          "unknowns": {
+            "items": {
+              "$ref": "#/components/schemas/PreviewUnknown"
+            },
+            "type": "array",
+            "title": "Unknowns"
+          },
+          "caps": {
+            "$ref": "#/components/schemas/PreviewCaps"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campaign_id",
+          "window_days",
+          "jobs",
+          "thresholds",
+          "baseline_thresholds",
+          "histogram",
+          "unscored",
+          "line",
+          "baseline_line",
+          "run_now",
+          "changes",
+          "changes_total",
+          "unknowns",
+          "caps"
+        ],
+        "title": "PolicyPreviewOut"
+      },
       "PortalAccountOut": {
         "properties": {
           "id": {
@@ -29003,6 +30439,286 @@
           "error"
         ],
         "title": "PracticeOut"
+      },
+      "PreferencesSummaryOut": {
+        "properties": {
+          "campaign_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Campaign Id"
+          },
+          "up": {
+            "type": "integer",
+            "title": "Up"
+          },
+          "down": {
+            "type": "integer",
+            "title": "Down"
+          },
+          "open_suggestions": {
+            "type": "integer",
+            "title": "Open Suggestions"
+          },
+          "owner_only": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerOnlyNoteOut"
+            },
+            "type": "array",
+            "title": "Owner Only"
+          },
+          "last_analysed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Analysed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campaign_id",
+          "up",
+          "down",
+          "open_suggestions",
+          "owner_only",
+          "last_analysed_at"
+        ],
+        "title": "PreferencesSummaryOut"
+      },
+      "PreviewBin": {
+        "properties": {
+          "start": {
+            "type": "integer",
+            "title": "Start"
+          },
+          "end": {
+            "type": "integer",
+            "title": "End"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "count"
+        ],
+        "title": "PreviewBin"
+      },
+      "PreviewCaps": {
+        "properties": {
+          "daily_cap": {
+            "type": "integer",
+            "title": "Daily Cap"
+          },
+          "weekly_cap": {
+            "type": "integer",
+            "title": "Weekly Cap"
+          },
+          "sent_today": {
+            "type": "integer",
+            "title": "Sent Today"
+          },
+          "sent_week": {
+            "type": "integer",
+            "title": "Sent Week"
+          },
+          "run_now_would_send": {
+            "type": "integer",
+            "title": "Run Now Would Send"
+          },
+          "quiet_hours": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quiet Hours"
+          },
+          "quiet_now": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quiet Now"
+          },
+          "needs_open_check": {
+            "type": "integer",
+            "title": "Needs Open Check"
+          }
+        },
+        "type": "object",
+        "required": [
+          "daily_cap",
+          "weekly_cap",
+          "sent_today",
+          "sent_week",
+          "run_now_would_send",
+          "quiet_hours",
+          "quiet_now",
+          "needs_open_check"
+        ],
+        "title": "PreviewCaps"
+      },
+      "PreviewChange": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "before": {
+            "type": "string",
+            "title": "Before"
+          },
+          "after": {
+            "type": "string",
+            "title": "After"
+          },
+          "change": {
+            "type": "string",
+            "title": "Change",
+            "description": "newly_automatic, newly_blocked or changed"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "title",
+          "employer",
+          "score",
+          "before",
+          "after",
+          "change",
+          "reasons"
+        ],
+        "title": "PreviewChange"
+      },
+      "PreviewLine": {
+        "properties": {
+          "would_apply": {
+            "type": "integer",
+            "title": "Would Apply",
+            "description": "Roles that would have gone automatically in the window, caps applied"
+          },
+          "by_channel": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Channel"
+          },
+          "held": {
+            "type": "integer",
+            "title": "Held",
+            "description": "Runner-ups held by their employer group"
+          },
+          "capped": {
+            "type": "integer",
+            "title": "Capped",
+            "description": "Qualifying roles the daily or weekly cap would have held back"
+          },
+          "qualifying": {
+            "type": "integer",
+            "title": "Qualifying"
+          }
+        },
+        "type": "object",
+        "required": [
+          "would_apply",
+          "by_channel",
+          "held",
+          "capped",
+          "qualifying"
+        ],
+        "title": "PreviewLine"
+      },
+      "PreviewThresholds": {
+        "properties": {
+          "shortlist": {
+            "type": "integer",
+            "title": "Shortlist"
+          },
+          "tailor": {
+            "type": "integer",
+            "title": "Tailor"
+          },
+          "auto_apply": {
+            "type": "integer",
+            "title": "Auto Apply"
+          }
+        },
+        "type": "object",
+        "required": [
+          "shortlist",
+          "tailor",
+          "auto_apply"
+        ],
+        "title": "PreviewThresholds"
+      },
+      "PreviewUnknown": {
+        "properties": {
+          "gate": {
+            "type": "string",
+            "title": "Gate"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "gate",
+          "count",
+          "message"
+        ],
+        "title": "PreviewUnknown"
       },
       "PriceIn": {
         "properties": {
@@ -30601,6 +32317,30 @@
         ],
         "title": "ReviewItem"
       },
+      "ReweightChange": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "reweight_criterion",
+            "title": "Kind",
+            "default": "reweight_criterion"
+          },
+          "weights": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Weights"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "weights"
+        ],
+        "title": "ReweightChange",
+        "description": "New weights for the rubric's criteria (same names, summing to 100): a new rubric version."
+      },
       "RollbackIn": {
         "properties": {
           "note": {
@@ -31656,6 +33396,58 @@
         "additionalProperties": false,
         "type": "object",
         "title": "SavedViewBody"
+      },
+      "SavedViewChange-Input": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_saved_view",
+            "title": "Kind",
+            "default": "add_saved_view"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "conditions"
+        ],
+        "title": "SavedViewChange"
+      },
+      "SavedViewChange-Output": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_saved_view",
+            "title": "Kind",
+            "default": "add_saved_view"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "conditions"
+        ],
+        "title": "SavedViewChange"
       },
       "SavedViewIn": {
         "properties": {
@@ -33702,6 +35494,381 @@
         ],
         "title": "SubmittedSnapshot"
       },
+      "SuggestionBacktest": {
+        "properties": {
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days"
+          },
+          "jobs": {
+            "type": "integer",
+            "title": "Jobs"
+          },
+          "matched": {
+            "type": "integer",
+            "title": "Matched",
+            "description": "Recent roles the change's conditions match",
+            "default": 0
+          },
+          "newly_pass": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestChangeRow"
+            },
+            "type": "array",
+            "title": "Newly Pass"
+          },
+          "newly_drop": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestChangeRow"
+            },
+            "type": "array",
+            "title": "Newly Drop"
+          },
+          "excluded_past_applications": {
+            "items": {
+              "$ref": "#/components/schemas/BacktestChangeRow"
+            },
+            "type": "array",
+            "title": "Excluded Past Applications"
+          },
+          "score_changed": {
+            "type": "integer",
+            "title": "Score Changed",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "window_days",
+          "jobs"
+        ],
+        "title": "SuggestionBacktest",
+        "description": "The change replayed over recent roles with the decision table (no model calls)."
+      },
+      "SuggestionEditIn": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ReweightChange"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PenaltyChange-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BonusChange-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TagRuleChange-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SavedViewChange-Input"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TightenChange-Input"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "add_bonus": "#/components/schemas/BonusChange-Input",
+                    "add_penalty": "#/components/schemas/PenaltyChange-Input",
+                    "add_saved_view": "#/components/schemas/SavedViewChange-Input",
+                    "add_tag_rule": "#/components/schemas/TagRuleChange-Input",
+                    "reweight_criterion": "#/components/schemas/ReweightChange",
+                    "tighten_filter": "#/components/schemas/TightenChange-Input"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change",
+            "description": "The owner's edit; default: as suggested"
+          }
+        },
+        "type": "object",
+        "title": "SuggestionEditIn"
+      },
+      "SuggestionEvidence": {
+        "properties": {
+          "up": {
+            "type": "integer",
+            "title": "Up",
+            "default": 0
+          },
+          "down": {
+            "type": "integer",
+            "title": "Down",
+            "default": 0
+          },
+          "feedback_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Feedback Ids"
+          },
+          "application_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Application Ids"
+          },
+          "reasons": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Reasons"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "SuggestionEvidence",
+        "description": "What a suggestion rests on: owner feedback and real outcomes, counted and listed."
+      },
+      "SuggestionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "campaign_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Campaign Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reweight_criterion",
+              "add_penalty",
+              "add_bonus",
+              "add_tag_rule",
+              "add_saved_view",
+              "tighten_filter"
+            ],
+            "title": "Kind"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "change": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ReweightChange"
+              },
+              {
+                "$ref": "#/components/schemas/PenaltyChange-Output"
+              },
+              {
+                "$ref": "#/components/schemas/BonusChange-Output"
+              },
+              {
+                "$ref": "#/components/schemas/TagRuleChange-Output"
+              },
+              {
+                "$ref": "#/components/schemas/SavedViewChange-Output"
+              },
+              {
+                "$ref": "#/components/schemas/TightenChange-Output"
+              }
+            ],
+            "title": "Change",
+            "discriminator": {
+              "propertyName": "kind",
+              "mapping": {
+                "add_bonus": "#/components/schemas/BonusChange-Output",
+                "add_penalty": "#/components/schemas/PenaltyChange-Output",
+                "add_saved_view": "#/components/schemas/SavedViewChange-Output",
+                "add_tag_rule": "#/components/schemas/TagRuleChange-Output",
+                "reweight_criterion": "#/components/schemas/ReweightChange",
+                "tighten_filter": "#/components/schemas/TightenChange-Output"
+              }
+            }
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/SuggestionEvidence"
+          },
+          "backtest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SuggestionBacktest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rubric_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rubric Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "accepted",
+              "dismissed",
+              "superseded"
+            ],
+            "title": "Status"
+          },
+          "decided_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided By"
+          },
+          "decided_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decided At"
+          },
+          "decision_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Note"
+          },
+          "result": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Result"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "campaign_id",
+          "kind",
+          "target",
+          "title",
+          "change",
+          "evidence",
+          "backtest",
+          "rubric_id",
+          "status",
+          "decided_by",
+          "decided_at",
+          "decision_note",
+          "result"
+        ],
+        "title": "SuggestionOut"
+      },
+      "TagRuleChange-Input": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_tag_rule",
+            "title": "Kind",
+            "default": "add_tag_rule"
+          },
+          "tag": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Tag"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tag",
+          "conditions"
+        ],
+        "title": "TagRuleChange"
+      },
+      "TagRuleChange-Output": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "add_tag_rule",
+            "title": "Kind",
+            "default": "add_tag_rule"
+          },
+          "tag": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Tag"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tag",
+          "conditions"
+        ],
+        "title": "TagRuleChange"
+      },
       "TagRuleIn": {
         "properties": {
           "tag": {
@@ -34459,6 +36626,60 @@
           "builtin"
         ],
         "title": "ThemeOut"
+      },
+      "TightenChange-Input": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "tighten_filter",
+            "title": "Kind",
+            "default": "tighten_filter"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Input"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "conditions"
+        ],
+        "title": "TightenChange",
+        "description": "A campaign exclusion rule: only ever narrows what the campaign matches."
+      },
+      "TightenChange-Output": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "tighten_filter",
+            "title": "Kind",
+            "default": "tighten_filter"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "conditions": {
+            "$ref": "#/components/schemas/ConditionSet-Output"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reason",
+          "conditions"
+        ],
+        "title": "TightenChange",
+        "description": "A campaign exclusion rule: only ever narrows what the campaign matches."
       },
       "TimelineEvent": {
         "properties": {
@@ -36327,6 +38548,23 @@
           "answer_value"
         ],
         "title": "AnswerIn"
+      },
+      "app__api__routers__preferences__DismissIn": {
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "title": "DismissIn"
       }
     }
   }

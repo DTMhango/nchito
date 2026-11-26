@@ -476,3 +476,96 @@ class AgentTaskState(Shape):
 AgentTaskTypeName = Literal["apply", "sweep_site", "check_posting"]
 
 JsonDict = dict[str, Any]
+
+
+# ----- Preference feedback and suggestions (wave 4 feedback stream) ------------------------
+
+FeedbackVerdict = Literal["up", "down"]
+FeedbackReason = Literal["too_junior", "too_senior", "wrong_stack", "pay", "location", "employer_type",
+                         "commute_remote", "more_like_this"]
+SuggestionKind = Literal["reweight_criterion", "add_penalty", "add_bonus", "add_tag_rule", "add_saved_view",
+                         "tighten_filter"]
+SuggestionStatus = Literal["open", "accepted", "dismissed", "superseded"]
+
+
+class ReweightChange(Shape):
+    """New weights for the rubric's criteria (same names, summing to 100): a new rubric version."""
+
+    kind: Literal["reweight_criterion"] = "reweight_criterion"
+    weights: dict[str, int]
+
+
+class PenaltyChange(Shape):
+    """A rubric penalty (a new rubric version)."""
+
+    kind: Literal["add_penalty"] = "add_penalty"
+    name: str = Field(min_length=1, max_length=120)
+    points: int = Field(ge=1, le=100)
+    conditions: ConditionSet
+
+
+class BonusChange(Shape):
+    """A campaign bonus rule (raises the effective score of matching roles)."""
+
+    kind: Literal["add_bonus"] = "add_bonus"
+    reason: str = Field(min_length=1, max_length=200)
+    points: int = Field(ge=1, le=100)
+    conditions: ConditionSet
+
+
+class TagRuleChange(Shape):
+    kind: Literal["add_tag_rule"] = "add_tag_rule"
+    tag: str = Field(min_length=1, max_length=60)
+    conditions: ConditionSet
+
+
+class SavedViewChange(Shape):
+    kind: Literal["add_saved_view"] = "add_saved_view"
+    name: str = Field(min_length=1, max_length=120)
+    conditions: ConditionSet
+
+
+class TightenChange(Shape):
+    """A campaign exclusion rule: only ever narrows what the campaign matches."""
+
+    kind: Literal["tighten_filter"] = "tighten_filter"
+    reason: str = Field(min_length=1, max_length=200)
+    conditions: ConditionSet
+
+
+SuggestionChange = Annotated[ReweightChange | PenaltyChange | BonusChange | TagRuleChange | SavedViewChange
+                             | TightenChange, Field(discriminator="kind")]
+
+
+class SuggestionEvidence(Shape):
+    """What a suggestion rests on: owner feedback and real outcomes, counted and listed."""
+
+    up: int = 0
+    down: int = 0
+    feedback_ids: list[str] = Field(default_factory=list)
+    application_ids: list[str] = Field(default_factory=list)
+    reasons: dict[str, int] = Field(default_factory=dict)
+    notes: list[str] = Field(default_factory=list)
+    summary: str = ""
+
+
+class BacktestChangeRow(Shape):
+    job_id: str
+    title: str
+    employer: str
+    old_score: int | None = None
+    new_score: int | None = None
+    old_verdict: str
+    new_verdict: str
+
+
+class SuggestionBacktest(Shape):
+    """The change replayed over recent roles with the decision table (no model calls)."""
+
+    window_days: int
+    jobs: int
+    matched: int = Field(default=0, description="Recent roles the change's conditions match")
+    newly_pass: list[BacktestChangeRow] = Field(default_factory=list)
+    newly_drop: list[BacktestChangeRow] = Field(default_factory=list)
+    excluded_past_applications: list[BacktestChangeRow] = Field(default_factory=list)
+    score_changed: int = 0

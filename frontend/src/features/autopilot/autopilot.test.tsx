@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event"
 import { renderApp } from "@/test/render"
 import { applicationsMock } from "@/mocks/handlers/applications"
 import { autopilotMock, enterRestoreMock } from "@/mocks/handlers/autopilot"
+import { rubricsMock } from "@/mocks/handlers/campaigns"
+import { preferencesMock } from "@/mocks/handlers/preferences"
 import {
   approvalStanding,
   autoVerdict,
@@ -667,5 +669,44 @@ describe("handoff, pending actions and trusted sites", () => {
     await waitFor(() =>
       expect(screen.queryByText("careers.example.com")).not.toBeInTheDocument()
     )
+  })
+})
+
+describe("score lines in the policy editor", () => {
+  it("previews a lower auto-apply line with an unsaved cap, then saves it as a new rubric version", async () => {
+    const user = userEvent.setup()
+    renderApp("/autopilot")
+    const auto = await screen.findByRole("slider", {
+      name: "Auto-apply threshold",
+    })
+    await waitFor(() => expect(auto).toHaveAttribute("aria-valuenow", "85"))
+
+    // An unsaved daily cap is previewed before it is saved.
+    const cap = await screen.findByLabelText("Applications a day, at most")
+    await user.clear(cap)
+    await user.type(cap, "1")
+    await waitFor(() =>
+      expect(
+        preferencesMock.get().requests.previews.at(-1)?.settings
+      ).toMatchObject({ "automation.daily_cap": 1 })
+    )
+
+    auto.focus()
+    await user.keyboard("{ArrowLeft}")
+    await user.click(
+      await screen.findByRole("button", { name: "Save thresholds" })
+    )
+    expect(
+      await screen.findByText(
+        "Rubric version 2 is now active with these lines."
+      )
+    ).toBeInTheDocument()
+    const active = rubricsMock
+      .get()
+      .find((r) => r.version === 2 && r.status === "active")!
+    expect(active.body.thresholds).toMatchObject({
+      tailor: 70,
+      auto_apply: 84,
+    })
   })
 })

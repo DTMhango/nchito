@@ -1001,3 +1001,40 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
   The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
   skill asks for it.
+
+## Wave 4 feedback additions
+
+- **Tables (`0019_feedback`, `app/models/preferences.py`).** `preference_feedback` (one row per job + campaign:
+  `verdict` up/down, `reasons` chips, `note`, `score_at`, `rubric_version`, `actor`) and `preference_suggestion`
+  (`kind`, `target`, `title`, `change` = `SuggestionChange`, `evidence` = `SuggestionEvidence`, `backtest` =
+  `SuggestionBacktest`, `evidence_key` unique per campaign, `rubric_id`, `status` open/accepted/dismissed/superseded,
+  decision fields, `result`). Shared Literals in `json_types`: `FeedbackVerdict`, `FeedbackReason`, `SuggestionKind`,
+  `SuggestionStatus`.
+- **Feedback is evidence only**: nothing writes an assessment or rubric. `PUT/GET/DELETE /api/jobs/{id}/feedback`,
+  `GET /api/preferences/feedback`. Audited `preference.feedback` / `preference.feedback_withdrawn` (the note is not
+  copied into the audit).
+- **Suggestions** (`app/pipeline/preferences.py`): deterministic analysis of thumbs plus outcomes (screening,
+  interview, offer, accepted = liked; skipped = disliked). Kinds: `reweight_criterion` (new rubric version),
+  `add_penalty` (rubric penalty, new rubric version), `add_bonus` (campaign bonus rule), `add_tag_rule`,
+  `add_saved_view`, `tighten_filter` (campaign exclude rule). Rules are only appended (marks `rules` unconfirmed like any
+  owner-added rule). `guard` (invariant, not settings) refuses conditions on pay, location/countries, level/seniority,
+  work rights/visa, relocation, text filters, and reweighting a criterion whose name mentions those; applied at
+  generation and at acceptance (edited or not, 422). Reasons about seniority/pay/location become owner-only notes.
+  Backtest: recent roles (`preferences.backtest_days`) replayed through `decide` with stored ratings re-weighed (no model
+  calls): `newly_pass`, `newly_drop`, `excluded_past_applications`, `score_changed`, `matched`. Endpoints:
+  `GET /api/preferences/summary`, `POST /api/preferences/analyse`, `GET /api/preferences/suggestions[/{id}]`,
+  `POST .../{id}/backtest|accept|dismiss` (409 when decided or, for a reweight, when the rubric moved on). Dismissed
+  suggestions are not raised again for the same evidence; newer evidence supersedes an open one. Periodic pass:
+  `preferences_tick` (hourly, at most once per `preferences.analysis_every_hours` per campaign, only when evidence
+  changed). Audited `preferences.analysed`, `preference.suggestion_accepted|dismissed`, `rubric.activated`,
+  `campaign.rule_added`.
+- **Policy preview** (`app/pipeline/policy_preview.py`, `POST /api/campaigns/{id}/policy-preview`): proposal of
+  `automation`, `thresholds`, `criteria`, `unknown_data_policy`, `settings` (caps, quiet hours, default mode, global
+  thresholds only). Same order and counters as `dry_run.propose_actions` (a test holds them equal). Line = roles whose
+  mode is auto_apply and whose every automation gate passes except send-time ones (caps, quiet hours, pause, budget,
+  open-check), then caps applied day by day; split by channel (email / browser / other), held runner-ups apart.
+  Returns histogram, thresholds, changes (newly_automatic / newly_blocked / changed, with gate reasons), unknowns,
+  caps. Writes nothing.
+- **Settings** (group `preferences`): `min_evidence`, `min_rating_gap`, `reweight_step`, `penalty_points`,
+  `bonus_points`, `exclude_min_evidence`, `backtest_days`, `analysis_every_hours`, `note_max_length`,
+  `evidence_notes_shown`, `preview_days`, `preview_max_jobs`, `histogram_bin`, `preview_changes_shown`.
