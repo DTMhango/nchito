@@ -112,6 +112,33 @@ packets, permits, dispatch attempts, the audit, sightings, the ledger or the vau
 before and after and rolls back if any row went missing. Run it now with Settings, Data, or
 `POST /api/data/retention/run`.
 
+## Local runner
+
+The PC runner is Claude Code with the Claude in Chrome extension, working the gateway queue in your own Chrome
+(DESIGN 8.3). The kit is `runner/local/`.
+
+1. Prerequisites: Claude Code signed in with your Claude subscription (`/login`, not an API key), Google Chrome with
+   the Claude extension signed in to the same account, and `/chrome` run once in Claude Code.
+2. In Nchito, Settings, Runners: create a runner token (shown once).
+3. Install (copies the skill to `%USERPROFILE%\.claude\skills\nchito-queue`, config and scripts to
+   `%USERPROFILE%\.nchito-runner`, saves `NCHITO_URL` and the token as user environment variables, never in a file):
+   `powershell -NoProfile -ExecutionPolicy Bypass -File runner\local\install.ps1 -Url https://<instance> -SetToken`
+   (bash: `runner/local/install.sh`, with both variables already exported).
+4. Open a new terminal. Self-check (config, `/api/health/live`, token against `/mcp`):
+   `powershell -File "$env:USERPROFILE\.nchito-runner\check.ps1"`.
+5. First run, a dry run (reads one form, types nothing, requests no permit):
+   `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.nchito-runner\start.ps1" -Arguments dry-run`.
+   The task stays claimed by the runner until the gateway releases it.
+6. Work the queue (one line): `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.nchito-runner\start.ps1"`.
+   It stops when the queue is empty. `-Arguments "max=5"` limits a run.
+7. Unattended: `runner/local/UNATTENDED.md` (spike report). Recommended: a sign-in Task Scheduler entry that keeps a
+   visible `/loop` session open, registered with `%USERPROFILE%\.nchito-runner\scheduled\register-task.ps1`
+   (`-Remove` to undo). The PC must stay awake and signed in.
+
+The runner never types passwords, creates accounts, solves CAPTCHAs or enters codes: those arrive as pending actions
+(sign in, then "I've signed in, continue"). Logs: `%USERPROFILE%\.nchito-runner\logs`; packet files and screenshots:
+`...\work`. To stop it at once, pause Autopilot or revoke the runner token; then close the window.
+
 ## Notifications, digest and health alerts
 
 Channels: Telegram (bot token from BotFather and your chat id), a signed webhook, and email (mail stream). Add them
