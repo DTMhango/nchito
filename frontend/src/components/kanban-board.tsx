@@ -149,7 +149,7 @@ export function KanbanBoard<T>({
         role="list"
         aria-label="Stages"
         className={cn(
-          "grid auto-cols-[minmax(236px,1fr)] grid-flow-col items-start gap-3 overflow-x-auto pb-3",
+          "relative grid auto-cols-[minmax(236px,1fr)] grid-flow-col items-start gap-3 overflow-x-auto pb-3",
           className
         )}
       >

@@ -5,6 +5,7 @@
  */
 import { delay, http, HttpResponse } from "msw"
 import { db } from "@/mocks/db"
+import type { RecheckResult } from "@/lib/api/pending"
 import type {
   AppliedMyselfIn,
   AssessmentOut,
@@ -510,7 +511,16 @@ export const matchesHandlers = [
     const j = findJob(String(params.id))
     if (!j) return notFound("Job")
     j.last_checked_at = now()
-    return HttpResponse.json(detail(j))
+    const result: RecheckResult = {
+      job: detail(j),
+      availability_before: j.availability,
+      availability_after: j.availability,
+      content_changed: false,
+      changed_fields: [],
+      reassessed: false,
+      note: null,
+    }
+    return HttpResponse.json(result)
   }),
 
   // ---- assessments, rubric, facts ----
