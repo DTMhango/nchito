@@ -10,7 +10,6 @@ import {
 import { api, ApiError, unwrap } from "@/lib/api/client"
 import type {
   AppliedMyselfIn,
-  BulkActionIn,
   CampaignRuleIn,
   ConditionSet,
   CustomFacetIn,
@@ -63,8 +62,6 @@ export const patchJob = (id: string, body: JobPatch) =>
   unwrap(
     api.PATCH("/api/jobs/{job_id}", { params: { path: { job_id: id } }, body })
   )
-export const bulkAction = (body: BulkActionIn) =>
-  unwrap(api.POST("/api/jobs/bulk", { body }))
 export const getWhy = (id: string) =>
   unwrap(
     api.GET("/api/jobs/{job_id}/why", { params: { path: { job_id: id } } })

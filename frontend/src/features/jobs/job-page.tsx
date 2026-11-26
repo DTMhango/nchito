@@ -23,6 +23,7 @@ import { toast } from "sonner"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/chip"
+import { JobEmployerChip } from "@/features/employers/employer-chip"
 import { EmptyState } from "@/components/empty-state"
 import { ScoreRing } from "@/components/score-ring"
 import { StagePill } from "@/components/stage-pill"
@@ -207,6 +208,7 @@ function JobHeader({ job }: { job: JobDetail }) {
               <Chip tone="line">{TRIAGE_LABEL[job.triage]}</Chip>
             )}
             {job.conflict_state === "held" && <Chip tone="warn">Held</Chip>}
+            <JobEmployerChip jobId={job.id} />
             <span>
               Deadline:{" "}
               <b className="text-foreground">{deadlineText(job.deadline)}</b>

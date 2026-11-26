@@ -2,6 +2,7 @@ import {
   BarChart3,
   Bot,
   Briefcase,
+  Building2,
   Columns3,
   FileCheck2,
   FileText,
@@ -51,6 +52,18 @@ export const NAV_MAIN: NavItem[] = [
     icon: Columns3,
     phone: true,
     keywords: ["pipeline", "board", "stages"],
+  },
+  {
+    to: "/employers",
+    label: "Employers",
+    icon: Building2,
+    keywords: [
+      "companies",
+      "cooldown",
+      "never apply",
+      "always ask",
+      "conflict",
+    ],
   },
   {
     to: "/studio",

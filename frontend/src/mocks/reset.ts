@@ -2,6 +2,7 @@
 import { resetAiMock } from "./handlers/ai"
 import { resetAutopilotMock } from "./handlers/autopilot"
 import { resetRunnersMock } from "./handlers/runners"
+import { resetBulkMock } from "./handlers/bulk"
 import { resetApplicationsMock } from "./handlers/applications"
 import { resetDataMock } from "./handlers/data"
 import { resetCampaignMocks } from "./handlers/campaigns"
@@ -19,6 +20,7 @@ export function resetAllMocks() {
   resetSettingsMock()
   resetAiMock()
   resetMatchesMock()
+  resetBulkMock()
   resetCampaignMocks()
   resetApplicationsMock()
   resetAutopilotMock()

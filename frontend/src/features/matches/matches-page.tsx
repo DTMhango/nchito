@@ -32,7 +32,10 @@ import {
   recheckJob,
   viewsQuery,
 } from "./api"
-import { BulkBar, BulkDialog, type BulkKind } from "./bulk"
+import { BulkDialog } from "@/features/bulk/bulk-dialog"
+import type { BulkAction } from "@/features/bulk/api"
+import { useEmployerChips } from "@/features/employers/api"
+import { BulkBar, RescoreDialog, type BulkKind } from "./bulk"
 import { CorrectionDialog, type Correction } from "./corrections"
 import { FilterBar } from "./filter-bar"
 import {
@@ -47,7 +50,7 @@ import { JobList, type JobListHandle } from "./job-list"
 import { ShortcutSheet, useMatchesKeys } from "./shortcuts"
 import { TagsManager } from "./tags-manager"
 import type { JobPatch, SavedViewOut } from "./types"
-import { useJobList, useTabCounts } from "./use-job-list"
+import { listParams, useJobList, useTabCounts } from "./use-job-list"
 import { CampaignRuleDialog, ViewActions, ViewsRail } from "./views"
 
 export type MatchesPageProps = {
@@ -101,6 +104,7 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
       }
     return ids
   }, [list.rows])
+  const chips = useEmployerChips(jobIds)
   const selectedId = search.job ?? (isPhone ? null : (jobIds[0] ?? null))
   const listRef = useRef<JobListHandle>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -366,6 +370,7 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
             rows={list.rows}
             selectedId={selectedId}
             checked={checked}
+            chips={chips}
             onOpen={open}
             onToggle={toggle}
             onToggleGroup={list.toggleGroup}
@@ -480,8 +485,30 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
         catalog={catalog}
       />
       <BulkDialog
-        key={bulk ?? "closed"}
-        kind={bulk}
+        key={bulk && bulk !== "rescore" ? bulk : "closed"}
+        open={!!bulk && bulk !== "rescore"}
+        subject="jobs"
+        scope={{
+          ids: [...checked],
+          view: {
+            count: counts[search.tab] ?? null,
+            selection: {
+              conditions: JSON.stringify(listParams(search).conditions),
+              q: search.q?.trim() || undefined,
+            },
+          },
+        }}
+        initialAction={
+          bulk && bulk !== "rescore" && bulk !== "more"
+            ? (bulk as BulkAction)
+            : undefined
+        }
+        onOpenChange={(o) => !o && setBulk(null)}
+        onDone={() => setChecked(new Set())}
+      />
+      <RescoreDialog
+        key={bulk === "rescore" ? "open" : "closed"}
+        open={bulk === "rescore"}
         ids={[...checked]}
         onOpenChange={(o) => !o && setBulk(null)}
         onDone={() => setChecked(new Set())}

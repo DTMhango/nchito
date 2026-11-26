@@ -1,7 +1,14 @@
 import { useId, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { Archive, Columns3, RefreshCw, Tag, X } from "lucide-react"
+import {
+  Archive,
+  Columns3,
+  MoreHorizontal,
+  RefreshCw,
+  Tag,
+  X,
+} from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,12 +19,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { bulkAction, campaignsQuery, invalidateJobs, rescore } from "./api"
+import { campaignsQuery, invalidateJobs, rescore } from "./api"
 import { plural } from "./format"
-import type { BulkAction } from "./types"
 
-export type BulkKind = "skip" | "archive" | "tag" | "untag" | "rescore"
+/** What the bar opens: a preset action in the shared bulk dialog, "more" for its picker, or rescoring. */
+export type BulkKind = "skip" | "archive" | "tag" | "untag" | "more" | "rescore"
 
 type BulkBarProps = {
   ids: string[]
@@ -54,6 +60,10 @@ export function BulkBar({ ids, onClear, onAction }: BulkBarProps) {
       <Button variant="outline" size="xs" onClick={() => onAction("untag")}>
         Remove tag
       </Button>
+      <Button variant="outline" size="xs" onClick={() => onAction("more")}>
+        <MoreHorizontal data-icon="inline-start" aria-hidden="true" />
+        More actions
+      </Button>
       <Button variant="outline" size="xs" onClick={() => onAction("rescore")}>
         <RefreshCw data-icon="inline-start" aria-hidden="true" />
         Rescore
@@ -83,71 +93,29 @@ export function BulkBar({ ids, onClear, onAction }: BulkBarProps) {
   )
 }
 
-const TITLES: Record<BulkKind, string> = {
-  skip: "Skip these roles?",
-  archive: "Archive these roles?",
-  tag: "Tag these roles",
-  untag: "Remove a tag from these roles",
-  rescore: "Rescore these roles",
-}
-
-/** Preview, then confirm, a bulk action over the selection. */
-export function BulkDialog({
-  kind,
+/** Rescore the selected roles against a campaign (a scoring job, not a bulk operation). */
+export function RescoreDialog({
+  open,
   ids,
   onOpenChange,
   onDone,
 }: {
-  kind: BulkKind | null
+  open: boolean
   ids: string[]
   onOpenChange: (open: boolean) => void
   onDone: () => void
 }) {
   const qc = useQueryClient()
   const id = useId()
-  const [tag, setTag] = useState("")
-  const [committedTag, setCommittedTag] = useState("")
   const [campaignId, setCampaignId] = useState("")
-  const open = kind !== null
-  const isTag = kind === "tag" || kind === "untag"
-  const action = (kind === "rescore" ? null : kind) as BulkAction | null
-  const ready = !!action && (!isTag || !!committedTag)
-
-  const preview = useQuery({
-    queryKey: ["matches", "bulk-preview", action, committedTag, ids],
-    queryFn: () =>
-      bulkAction({
-        job_ids: ids,
-        action: action as BulkAction,
-        tag: isTag ? committedTag : null,
-        preview: true,
-      }),
-    enabled: open && ready,
-    gcTime: 0,
-  })
-  const campaigns = useQuery({
-    ...campaignsQuery(),
-    enabled: kind === "rescore",
-  })
-  const chosenCampaign = campaignId || campaigns.data?.items[0]?.id || ""
-
+  const campaigns = useQuery({ ...campaignsQuery(), enabled: open })
+  const chosen = campaignId || campaigns.data?.items[0]?.id || ""
   const run = useMutation({
-    mutationFn: async () => {
-      if (kind === "rescore") return rescore(ids, chosenCampaign)
-      return bulkAction({
-        job_ids: ids,
-        action: action as BulkAction,
-        tag: isTag ? committedTag : null,
-        preview: false,
-      })
-    },
-    onSuccess: (res) => {
-      if (kind === "rescore")
-        toast.success(
-          `Rescoring ${plural(ids.length, "role")}. New scores land in the list when done.`
-        )
-      else if (res && "affected" in res)
-        toast.success(`Done: ${plural(res.affected, "role")} changed.`)
+    mutationFn: () => rescore(ids, chosen),
+    onSuccess: () => {
+      toast.success(
+        `Rescoring ${plural(ids.length, "role")}. New scores land in the list when done.`
+      )
       invalidateJobs(qc)
       onDone()
       onOpenChange(false)
@@ -155,105 +123,45 @@ export function BulkDialog({
     onError: (e) =>
       toast.error(e instanceof Error ? e.message : "That did not work."),
   })
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="gap-4 pop-surface p-5 sm:max-w-[480px]">
         <DialogHeader>
           <DialogTitle className="heading text-md">
-            {kind ? TITLES[kind] : ""}
+            Rescore these roles
           </DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
             {plural(ids.length, "role")} selected. Nothing changes until you
             confirm.
           </DialogDescription>
         </DialogHeader>
-
-        {isTag && (
-          <form
-            className="flex items-end gap-2"
-            onSubmit={(e) => {
-              e.preventDefault()
-              setCommittedTag(tag.trim().toLowerCase())
-            }}
+        <div className="grid gap-1.5">
+          <label htmlFor={`${id}-c`} className="eyebrow">
+            Score against campaign
+          </label>
+          <select
+            id={`${id}-c`}
+            className="h-8 rounded-md border border-border bg-surface px-2 text-sm"
+            value={chosen}
+            onChange={(e) => setCampaignId(e.target.value)}
           >
-            <div className="grid flex-1 gap-1.5">
-              <label htmlFor={id} className="eyebrow">
-                Tag
-              </label>
-              <Input
-                id={id}
-                autoFocus
-                value={tag}
-                onChange={(e) => setTag(e.target.value)}
-              />
-            </div>
-            <Button type="submit" variant="outline" disabled={!tag.trim()}>
-              Preview
-            </Button>
-          </form>
-        )}
-
-        {kind === "rescore" && (
-          <div className="grid gap-1.5">
-            <label htmlFor={`${id}-c`} className="eyebrow">
-              Score against campaign
-            </label>
-            <select
-              id={`${id}-c`}
-              className="h-8 rounded-md border border-border bg-surface px-2 text-sm"
-              value={chosenCampaign}
-              onChange={(e) => setCampaignId(e.target.value)}
-            >
-              {(campaigns.data?.items ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-sm text-muted-foreground">
-              Each role is scored again with the campaign's current rubric.
-              Scoring uses the model budget.
-            </p>
-          </div>
-        )}
-
-        {ready && (
-          <div className="grid gap-2" aria-live="polite">
-            {preview.isLoading ? (
-              <p className="text-sm text-faint">
-                Working out what would change…
-              </p>
-            ) : preview.data ? (
-              <>
-                <p className="text-sm font-semibold">
-                  {plural(preview.data.affected, "role")} would change.
-                </p>
-                <ul className="max-h-56 overflow-y-auto rounded-sm bg-sunken p-3 text-sm">
-                  {preview.data.detail.map((d) => (
-                    <li key={d} className="py-0.5">
-                      {d}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            ) : (
-              <p className="text-sm text-danger">The preview did not load.</p>
-            )}
-          </div>
-        )}
-
+            {(campaigns.data?.items ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <p className="text-sm text-muted-foreground">
+            Each role is scored again with the campaign's current rubric.
+            Scoring uses the model budget.
+          </p>
+        </div>
         <DialogFooter className="gap-2">
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
           <Button
-            disabled={
-              run.isPending ||
-              (kind === "rescore"
-                ? !chosenCampaign
-                : !preview.data || preview.data.affected === 0)
-            }
+            disabled={run.isPending || !chosen}
             onClick={() => run.mutate()}
           >
             Confirm

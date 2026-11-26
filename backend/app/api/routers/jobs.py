@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Page, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Page, Timestamps
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.apply import target as apply_target
 from app.core import audit
@@ -39,8 +39,8 @@ from app.models.search import (
     SkillAlias,
     TagRule,
 )
+from app.pipeline import bulk, conflicts, custom_facets, filters, normalise, scoring
 from app.pipeline import compare as compare_roles
-from app.pipeline import conflicts, custom_facets, filters, normalise, scoring
 from app.pipeline.capture import CaptureError, capture
 from app.pipeline.compare import CompareOut
 from app.pipeline.decisions import decide
@@ -200,20 +200,6 @@ class CaptureIn(BaseModel):
 class CaptureOut(BaseModel):
     id: uuid.UUID = Field(description="The new job's id")
     status: Literal["queued"] = Field(description="Queued for the pipeline (normalise, dedupe, score: wave 1)")
-
-
-class BulkActionIn(BaseModel):
-    job_ids: list[uuid.UUID] = Field(min_length=1, max_length=500)
-    action: Literal["skip", "archive", "shortlist", "tag", "untag", "pin", "unpin", "snooze"]
-    tag: str | None = None
-    until: datetime | None = None
-    preview: bool = True
-
-
-class BulkActionOut(BaseModel):
-    affected: int
-    preview: bool
-    detail: list[str]
 
 
 class AppliedMyselfIn(BaseModel):
@@ -461,14 +447,7 @@ async def get_job(job_id: uuid.UUID, session: SessionDep) -> JobDetail:
 async def patch_job(job_id: uuid.UUID, body: JobPatch, session: SessionDep, principal: PrincipalDep) -> JobDetail:
     """Triage, pin, snooze, notes and manual tags. Skipping a conflict winner promotes the next role."""
     job = await _job(session, job_id)
-    changes = body.model_dump(exclude_unset=True)
-    for key, value in changes.items():
-        setattr(job, key, value)
-    await session.flush()
-    if "triage" in changes:
-        await conflicts.on_job_changed(session, job)
-    await audit.record(session, actor=principal.actor, action="job.updated", subject_type="job", subject_id=job.id,
-                       detail={k: str(v) for k, v in changes.items()})
+    await bulk.patch_job_fields(session, job, body.model_dump(exclude_unset=True), actor=principal.actor)
     return await job_detail(session, job)
 
 
@@ -520,11 +499,6 @@ async def capture_job(body: CaptureIn, principal: PrincipalDep, session: Session
     await session.commit()  # the worker must find the stub when it picks the job up
     await enqueue(job.id)
     return CaptureOut(id=job.id, status="queued")
-
-
-@router.post("/jobs/bulk", response_model=BulkActionOut, name="jobs_bulk")
-async def bulk_action(body: BulkActionIn) -> BulkActionOut:
-    not_implemented(4, AREA)
 
 
 def _value(ref: Any) -> str:

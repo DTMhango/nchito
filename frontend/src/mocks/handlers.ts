@@ -23,6 +23,7 @@ import { insightsHandlers } from "./handlers/insights"
 import { themesHandlers } from "./handlers/themes"
 import { calendarHandlers } from "./handlers/calendar"
 import { preferencesHandlers } from "./handlers/preferences"
+import { bulkHandlers } from "./handlers/bulk"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -43,6 +44,8 @@ export const handlers = [
   ...calendarHandlers,
   // Wave 4 feedback: thumbs, preference suggestions, policy preview.
   ...preferencesHandlers,
+  // Wave 4 bulk actions and employers (their own paths; no overlap).
+  ...bulkHandlers,
   // Data, non-AI connections and health: before the AI handlers (they fall through for LLM providers).
   ...dataHandlers,
   ...kitHandlers,

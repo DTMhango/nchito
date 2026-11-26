@@ -1,6 +1,8 @@
 import { memo } from "react"
 import { Pin, Scale } from "lucide-react"
 import { Chip } from "@/components/chip"
+import { EmployerChip } from "@/features/employers/employer-chip"
+import type { EmployerChip as ChipData } from "@/features/employers/api"
 import { ScoreRing } from "@/components/score-ring"
 import { cn } from "@/lib/utils"
 import {
@@ -16,6 +18,7 @@ type JobRowProps = {
   selected: boolean
   checked: boolean
   selecting: boolean
+  employerChip?: ChipData
   onOpen: (id: string) => void
   onToggle: (id: string, range: boolean) => void
 }
@@ -26,6 +29,7 @@ export const JobRow = memo(function JobRow({
   selected,
   checked,
   selecting,
+  employerChip,
   onOpen,
   onToggle,
 }: JobRowProps) {
@@ -114,6 +118,7 @@ export const JobRow = memo(function JobRow({
           {job.conflict_state === "released" && (
             <Chip tone="info">Released</Chip>
           )}
+          <EmployerChip chip={employerChip} />
           {job.tags.map((t) => (
             <Chip key={t} tone="accent">
               {t}

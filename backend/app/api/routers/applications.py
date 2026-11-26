@@ -53,7 +53,7 @@ from app.models.applications import (
     TailoringRequest,
 )
 from app.models.search import Assessment, Job
-from app.pipeline import corrections
+from app.pipeline import bulk, corrections
 from app.pipeline.checks import findings as checks_findings
 from app.pipeline.tailoring import service as tailoring_service
 from app.pipeline.tailoring import studio
@@ -644,18 +644,15 @@ async def create_application(body: ApplicationCreate, principal: PrincipalDep,
     job = await session.get(Job, body.job_id)
     if job is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="job not found")
-    if job.merged_into_id is not None:
-        raise HTTPException(status.HTTP_409_CONFLICT, detail="this job was merged into another; use that one")
-    existing = await stages.blocking_application(session, job.id)
-    if existing is not None:
+    try:  # the one function behind this endpoint and the bulk "assign to campaign" / "queue tailoring"
+        app = await bulk.create_application(session, job, body.campaign_id, actor=principal.actor)
+    except bulk.Refuse as exc:
+        if exc.code == "merged":
+            raise HTTPException(status.HTTP_409_CONFLICT, detail=exc.reason) from exc
+        existing = await stages.blocking_application(session, job.id)
         raise HTTPException(status.HTTP_409_CONFLICT, detail={
-            "code": "duplicate", "reason": f"this job already has an application ({existing.stage.value})",
-            "application_id": str(existing.id)})
-    app = Application(job_id=job.id, campaign_id=body.campaign_id, stage=Stage.shortlisted, origin="owner")
-    session.add(app)
-    await session.flush()
-    await stages.add_event(session, app.id, "created", principal.actor, {"origin": "owner"})
-    await _changed(session, app.id)
+            "code": "duplicate", "reason": exc.reason,
+            "application_id": str(existing.id) if existing else None}) from exc
     return await _detail(session, app.id)
 
 

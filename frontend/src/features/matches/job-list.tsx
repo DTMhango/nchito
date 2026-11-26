@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useRef, type Ref } from "react"
 import { observeElementRect, useVirtualizer } from "@tanstack/react-virtual"
 import { ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { EmployerChip } from "@/features/employers/api"
 import { valueLabel } from "./filters"
 import { JobRow } from "./job-row"
 import type { ListRow } from "./use-job-list"
@@ -14,6 +15,7 @@ type JobListProps = {
   rows: ListRow[]
   selectedId: string | null
   checked: ReadonlySet<string>
+  chips?: Record<string, EmployerChip>
   onOpen: (id: string) => void
   onToggle: (id: string, range: boolean) => void
   onToggleGroup: (value: string) => void
@@ -28,6 +30,7 @@ export function JobList({
   rows,
   selectedId,
   checked,
+  chips,
   onOpen,
   onToggle,
   onToggleGroup,
@@ -94,6 +97,7 @@ export function JobList({
                   selected={row.job.id === selectedId}
                   checked={checked.has(row.job.id)}
                   selecting={selecting}
+                  employerChip={chips?.[row.job.id]}
                   onOpen={onOpen}
                   onToggle={onToggle}
                 />
