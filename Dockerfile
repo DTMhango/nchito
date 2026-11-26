@@ -26,12 +26,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     SPA_DIR=/app/static \
-    FILES_DIR=/data/files
+    FILES_DIR=/data/files \
+    BACKUP_DIR=/data/backups
+
+# pg_dump / pg_restore / psql for backups: the client must match the server (postgres:16), which Debian's own
+# package does not, so it comes from the PostgreSQL apt repository.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    && . /etc/os-release \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $VERSION_CODENAME-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends postgresql-client-16 \
+    && apt-get purge -y --auto-remove curl gnupg && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY backend/pyproject.toml backend/alembic.ini ./
 COPY backend/app ./app
-RUN pip install . && useradd --create-home --uid 10001 nchito && mkdir -p /data/files && chown -R nchito /data
+RUN pip install . && useradd --create-home --uid 10001 nchito && mkdir -p /data/files /data/backups && chown -R nchito /data
 COPY --from=spa /build/dist /app/static
 
 USER nchito
