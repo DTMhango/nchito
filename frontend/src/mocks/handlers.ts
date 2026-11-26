@@ -22,6 +22,7 @@ import { runnersHandlers } from "./handlers/runners"
 import { insightsHandlers } from "./handlers/insights"
 import { themesHandlers } from "./handlers/themes"
 import { calendarHandlers } from "./handlers/calendar"
+import { preferencesHandlers } from "./handlers/preferences"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -40,6 +41,8 @@ export const handlers = [
   ...w3JobUiHandlers,
   // Wave 4 calendar: events, upcoming, the feed and the Google Calendar toggle (before the connections handlers).
   ...calendarHandlers,
+  // Wave 4 feedback: thumbs, preference suggestions, policy preview.
+  ...preferencesHandlers,
   // Data, non-AI connections and health: before the AI handlers (they fall through for LLM providers).
   ...dataHandlers,
   ...kitHandlers,

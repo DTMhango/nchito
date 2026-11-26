@@ -49,6 +49,7 @@ from app.models.platform import (
     ThemeRevision,
     WorkerHeartbeat,
 )
+from app.models.preferences import PreferenceFeedback, PreferenceSuggestion
 from app.models.search import (
     Assessment,
     Campaign,
@@ -77,7 +78,8 @@ __all__ = [
     "InterviewPack", "InterviewRound", "Job", "JobChange", "JobSighting", "JobVersion", "JobWatch",
     "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread", "Notification",
     "Owner",
-    "PayEstimate", "PendingAction", "Person", "PortalAccount", "Prompt", "Reference", "Rubric", "Run",
+    "PayEstimate", "PendingAction", "Person", "PortalAccount", "PreferenceFeedback", "PreferenceSuggestion",
+    "Prompt", "Reference", "Rubric", "Run",
     "SavedView", "Schedule", "Setting", "SettingRevision", "Skill", "SkillAlias", "Source", "SubmitPermit",
     "TagRule", "Template", "Theme", "ThemeRevision", "Track", "TrustedSite", "VaultDocument", "WatchedEmployer",
     "WorkerHeartbeat",
