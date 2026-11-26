@@ -723,3 +723,7 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   built-ins in shipped order, then the owner's Kit templates (a Kit row with a built-in key overrides it), limits
   as a render applies them (the template's, else `documents.*`). The Studio picker reads this; the frontend keeps no
   list of its own.
+- **Deferred sends**: `DispatchOut` gains `deferred_reason: "quiet_hours" | null` and `deferred_until` (the attempt's
+  `send_after`) while a reserved, not yet started attempt has been postponed by the send-time quiet-hours check
+  (`dispatch.deferred`, whose detail now carries `code`). The UI reads these, not the timeline.
+- **Studio answers**: an `ask_owner` `DraftAnswer` carries its `pending_action_id`; the Studio links to that action.

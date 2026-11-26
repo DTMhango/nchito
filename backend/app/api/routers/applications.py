@@ -372,6 +372,9 @@ class DispatchOut(Timestamps):
     uncertain: bool = Field(default=False, description="Handed over with no final outcome: reconcile, never resend")
     reconcile_attempts: int = 0
     last_reconciled_at: datetime | None = None
+    deferred_reason: Literal["quiet_hours"] | None = Field(
+        default=None, description="Queued but postponed by the send-time check (quiet hours); null otherwise")
+    deferred_until: datetime | None = Field(default=None, description="When a deferred send becomes due again")
 
 
 class DispatchCreateIn(BaseModel):
@@ -1118,8 +1121,22 @@ async def request_changes(application_id: uuid.UUID, body: RequestChangesIn, pri
     return await _detail(session, app.id)
 
 
-def _dispatch_out(a: DispatchAttempt) -> DispatchOut:
-    return DispatchOut(id=a.id, created_at=a.created_at, updated_at=a.updated_at, application_id=a.application_id,
+async def _deferrals(session: AsyncSession, attempts: list[DispatchAttempt]) -> dict[str, str]:
+    """Attempts still waiting after a send-time deferral, and why (from their ``dispatch_deferred`` events)."""
+    waiting = {str(a.id): a for a in attempts if a.status.value == "reserved" and a.started_at is None}
+    if not waiting:
+        return {}
+    events = await session.scalars(select(ApplicationEvent).where(
+        ApplicationEvent.application_id.in_({a.application_id for a in waiting.values()}),
+        ApplicationEvent.kind == "dispatch_deferred"))
+    return {str(e.detail.get("attempt_id")): str(e.detail.get("code") or "quiet_hours") for e in events
+            if str(e.detail.get("attempt_id")) in waiting}
+
+
+def _dispatch_out(a: DispatchAttempt, deferred: dict[str, str] | None = None) -> DispatchOut:
+    reason = (deferred or {}).get(str(a.id))
+    return DispatchOut(deferred_reason=reason, deferred_until=a.send_after if reason else None,  # type: ignore[arg-type]
+                       id=a.id, created_at=a.created_at, updated_at=a.updated_at, application_id=a.application_id,
                        packet_hash=a.packet_hash, channel=a.channel.value, status=a.status.value,
                        send_after=a.send_after, provider_message_id=a.provider_message_id, outcome_at=a.outcome_at,
                        gate_results=a.gate_results, error=a.error, started_at=a.started_at, evidence=a.evidence,
@@ -1142,7 +1159,9 @@ async def dispatches(application_id: uuid.UUID, session: SessionDep) -> list[Dis
     await _load(session, application_id)
     rows = await session.scalars(select(DispatchAttempt).where(DispatchAttempt.application_id == application_id)
                                  .order_by(DispatchAttempt.created_at.desc()))
-    return [_dispatch_out(a) for a in rows]
+    attempts = list(rows)
+    deferred = await _deferrals(session, attempts)
+    return [_dispatch_out(a, deferred) for a in attempts]
 
 
 @router.post("/applications/{application_id}/dispatches", response_model=DispatchCreateOut,

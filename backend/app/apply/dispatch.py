@@ -287,7 +287,7 @@ async def run(session: AsyncSession, attempt_id: uuid.UUID, *, now: datetime | N
         if isinstance(resume_at, datetime):  # granted before quiet hours, due inside them: wait, do not send
             attempt.send_after = resume_at
             await outcomes._log(session, attempt, "dispatch.deferred", "system", reason="quiet hours",
-                                send_after=resume_at.isoformat())
+                                code="quiet_hours", send_after=resume_at.isoformat())
             await session.commit()
             return None
     app = await outcomes.lock_application(session, attempt.application_id)

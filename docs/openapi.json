@@ -19839,6 +19839,32 @@
               }
             ],
             "title": "Last Reconciled At"
+          },
+          "deferred_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "quiet_hours"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deferred Reason",
+            "description": "Queued but postponed by the send-time check (quiet hours); null otherwise"
+          },
+          "deferred_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deferred Until",
+            "description": "When a deferred send becomes due again"
           }
         },
         "type": "object",
