@@ -773,8 +773,24 @@ async def send_reminders(session: AsyncSession, now: datetime) -> int:
         action.detail = {**action.detail, "reminded_offset": offset}
         if await _notify(session, action, now, key=f"portal-account:{action.id}:r{offset}", reminder=True):
             sent += 1
+            action.detail = {**action.detail, "reminders_sent": int(action.detail.get("reminders_sent") or 0) + 1,
+                             "last_reminded_at": now.isoformat()}
     await session.flush()
     return sent
+
+
+def reminder_schedule(action: PendingAction, offsets: list[int]) -> tuple[int, datetime | None] | None:
+    """(reminders sent, when the next is due) for an open blocker action with a deadline; ``None`` otherwise.
+    The next is the widest offset not yet reminded; a time already past is due at the next tick."""
+    if not _is_account_action(action):
+        return None
+    d = action.detail or {}
+    sent = int(d.get("reminders_sent") or 0)
+    if action.status != PendingStatus.open or action.deadline is None:
+        return sent, None
+    done = d.get("reminded_offset")
+    pending = [int(h) for h in offsets if done is None or int(h) < int(done)]
+    return sent, (action.deadline - timedelta(hours=max(pending)) if pending else None)
 
 
 async def tick(session: AsyncSession, now: datetime | None = None) -> TickResult:

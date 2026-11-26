@@ -57,6 +57,10 @@ class PendingActionOut(Timestamps):
     resolution: dict[str, Any] | None = None
     kind: str | None = Field(default=None, description="The exact kind within the type (``detail.kind``): e.g. "
                                                        "posting_changed, posting_closed, verification_code")
+    reminders_sent: int | None = Field(default=None, description="Blocker actions: reminders sent so far")
+    next_reminder_at: datetime | None = Field(default=None, description=(
+        "Blocker actions with a deadline: when the next reminder is due (accounts.reminder_offsets_hours); null "
+        "when none is left"))
     choices: list[Literal["continue", "continue_acknowledged", "manual_handoff", "skipped"]] = Field(
         default_factory=list, description=(
             "A runner blocker's owner choices: continue (resolve 'continue'), continue_acknowledged (resolve "
@@ -130,16 +134,19 @@ async def _outs(session: AsyncSession, actions: list[PendingAction]) -> list[Pen
     now = utcnow()
     days = await _imminent_days(session)
     ctx = await _context(session, actions)
+    offsets = [int(h) for h in await settings_service.get_value(session, "accounts.reminder_offsets_hours")]
     out = []
     for a in actions:
         employer, title = ctx.get(a.application_id, (None, None)) if a.application_id else (None, None)
+        reminders = accounts.reminder_schedule(a, offsets)
         out.append(PendingActionOut(
             id=a.id, created_at=a.created_at, updated_at=a.updated_at, type=a.type.value,
             application_id=a.application_id, agent_task_id=a.agent_task_id, group_key=a.group_key, title=a.title,
             detail=a.detail, checkpoint=a.checkpoint, deadline=a.deadline, status=a.status.value,
             snoozed_until=a.snoozed_until, snoozed=_is_snoozed(a, now, days), employer=employer, job_title=title,
             resolution=a.resolution, kind=(a.detail or {}).get("kind"),
-            choices=accounts.choices_for(a)))  # type: ignore[arg-type]
+            choices=accounts.choices_for(a), reminders_sent=reminders[0] if reminders else None,
+            next_reminder_at=reminders[1] if reminders else None))  # type: ignore[arg-type]
     return out
 
 

@@ -972,3 +972,14 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   without it 422 `{code: acknowledgement_required}`; audited as `pending_action.suspicious_page_acknowledged` with the
   note). A kind with no continue is 422 (`not_continuable` or "does not resolve"). `manual_handoff` / `skipped` are
   `POST /api/portal-accounts/actions/{id}/give-up` for every blocker kind.
+- **Runner activity** (read-only, owner only): `GET /api/tokens/{id}/tasks?cursor=&limit=20` (max 100) ->
+  `Page[RunnerTaskOut {task_id, type, status, title, application_id, claimed_at, steps_used, attempts, dry_run,
+  checkpoint, blockers[] {pending_action_id, kind, title, status, raised_at, resolution}, permit_decisions[] {at,
+  decision, reason, changes, permit_id}, result {outcome, detail, reference, confirmation_text, at}, evidence_refs[]}]`,
+  the tasks the runner claimed (audit `gateway.task_claimed`), most recent claim first; 404 for an unknown token
+  (`app/gateway/history.py`). A `wait_for_owner` from the dispatch gates is now audited
+  (`gateway.permit_wait_for_owner`) like the others. `RunnerStatus` gains `current_task_title` (title at employer, or
+  the site) and `current_task_type`.
+- **Reminders on blocker actions**: `PendingActionOut.reminders_sent` and `next_reminder_at` (the widest
+  `accounts.reminder_offsets_hours` offset not yet reminded before the nearest deadline; null when none is left);
+  both null for non-blocker actions.

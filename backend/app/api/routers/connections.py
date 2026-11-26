@@ -6,13 +6,13 @@ import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, Page, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.connect import mail_connections, search_api
 from app.connect import records as ops_records
@@ -21,6 +21,7 @@ from app.core import audit
 from app.core.clock import utcnow
 from app.core.crypto import mask
 from app.gateway import auth as gateway_auth
+from app.gateway import history
 from app.llm import checks, provider_records
 from app.llm.deps import llm_service
 from app.llm.money import micros_to_minor
@@ -102,6 +103,8 @@ class RunnerStatus(BaseModel):
     last_seen_at: datetime | None
     online: bool
     current_task_id: uuid.UUID | None
+    current_task_title: str | None = Field(default=None, description="The role (title at employer) or site")
+    current_task_type: Literal["apply", "check_posting", "sweep_site"] | None = None
 
 
 def _out(conn: Connection) -> ConnectionOut:
@@ -356,12 +359,27 @@ async def runner_status(session: SessionDep) -> list[RunnerStatus]:
     out = []
     for t in (await session.scalars(select(ApiToken).where(ApiToken.revoked_at.is_(None))
                                     .order_by(ApiToken.created_at))).all():
-        current = await session.scalar(select(AgentTask.id).where(
+        current = await session.scalar(select(AgentTask).where(
             AgentTask.claimed_by_token_id == t.id, AgentTask.status == AgentTaskStatus.claimed)
             .order_by(AgentTask.claimed_at).limit(1))
         seen = t.last_used_at
         out.append(RunnerStatus(token_id=t.id, name=t.name, runner_kind=t.runner_kind,  # type: ignore[arg-type]
                                 last_seen_at=seen, online=bool(seen and seen > now - timedelta(minutes=stale)
                                                                 and t.suspended_at is None),
-                                current_task_id=current))
+                                current_task_id=current.id if current else None,
+                                current_task_title=await history.task_title(session, current) if current else None,
+                                current_task_type=current.type.value if current else None))  # type: ignore[arg-type]
     return out
+
+
+@tokens_router.get("/{token_id}/tasks", response_model=Page[history.RunnerTaskOut], name="tokens_runner_tasks")
+async def runner_tasks(token_id: uuid.UUID, session: SessionDep, cursor: str | None = None,
+                       limit: int = Query(default=20, ge=1, le=100)) -> Page[history.RunnerTaskOut]:
+    """A runner's recent tasks, most recent claim first (read-only): each with its latest checkpoint, the
+    blockers it raised, every permit decision with its reason, and its result with evidence refs."""
+    if await session.get(ApiToken, token_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="token not found")
+    offset = int(cursor) if cursor and cursor.isdigit() else 0
+    items, total = await history.runner_tasks(session, token_id, offset=offset, limit=limit)
+    return Page[history.RunnerTaskOut](items=items, total=total,
+                                       next_cursor=str(offset + limit) if offset + limit < total else None)

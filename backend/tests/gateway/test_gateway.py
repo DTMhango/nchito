@@ -586,3 +586,47 @@ async def test_unsupported_form_cannot_be_continued(owner_client):
     r = await owner_client.post(f"/api/pending-actions/{action_id}/resolve", json={"resolution": "continue"})
     assert r.status_code == 422
     assert (await load(AgentTask, uuid.UUID(task_id))).status == AgentTaskStatus.blocked
+
+
+# ----- runner activity (read-only) ---------------------------------------------------------------------
+
+
+async def test_runner_task_history_and_current_task_title(owner_client):
+    w = await world()
+    blocked = await claim(w.runner_a)
+    r = await owner_client.get("/api/tokens/runners")
+    current = next(x for x in r.json() if x["token_id"] == str(w.runner_a))
+    assert current["current_task_id"] == blocked and current["current_task_title"] == "Data Analyst at Acme Example"
+    assert current["current_task_type"] == "apply"
+    await call(w.runner_a, "save_checkpoint", task_id=blocked,
+               state={"step": "contact details", "fields_filled": ["full_name"], "url": URL})
+    await call(w.runner_a, "get_packet", task_id=blocked)
+    await permit(w.runner_a, blocked, url="https://elsewhere.example.org/form")  # denied, redirect blocker
+    await approved_app(employer="Beta Example")
+    sent = await claim(w.runner_a)
+    await call(w.runner_a, "get_packet", task_id=sent)
+    granted = await permit(w.runner_a, sent)
+    assert granted["decision"] == "granted"
+    await call(w.runner_a, "report_result", task_id=sent, outcome="submitted", reference="REF-9",
+               screenshot_ref=f"evidence:{sent}/ev_shot")
+
+    r = await owner_client.get(f"/api/tokens/{w.runner_a}/tasks")
+    assert r.status_code == 200
+    page = r.json()
+    assert page["total"] == 2 and [t["task_id"] for t in page["items"]] == [sent, blocked]
+    done, stopped = page["items"]
+    assert done["title"] == "Data Analyst at Beta Example" and done["result"]["reference"] == "REF-9"
+    assert done["result"]["outcome"] == "submitted" and done["evidence_refs"] == [f"evidence:{sent}/ev_shot"]
+    assert [p["decision"] for p in done["permit_decisions"]] == ["granted"]
+    assert done["permit_decisions"][0]["permit_id"] == granted["permit_id"]
+    assert stopped["checkpoint"]["step"] == "contact details"
+    assert [b["kind"] for b in stopped["blockers"]] == ["redirect_off_domain"]
+    (decision,) = stopped["permit_decisions"]
+    assert decision["decision"] == "denied" and "elsewhere.example.org" in decision["reason"]
+
+    r = await owner_client.get(f"/api/tokens/{w.runner_a}/tasks", params={"limit": 1})
+    assert [t["task_id"] for t in r.json()["items"]] == [sent] and r.json()["next_cursor"] == "1"
+    r = await owner_client.get(f"/api/tokens/{w.runner_a}/tasks", params={"limit": 1, "cursor": "1"})
+    assert [t["task_id"] for t in r.json()["items"]] == [blocked] and r.json()["next_cursor"] is None
+    assert (await owner_client.get(f"/api/tokens/{w.runner_b}/tasks")).json()["items"] == []
+    assert (await owner_client.get(f"/api/tokens/{uuid.uuid4()}/tasks")).status_code == 404

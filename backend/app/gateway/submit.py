@@ -187,6 +187,8 @@ async def request_submit_permit(session: AsyncSession, token: ApiToken, body: Re
         task.status = AgentTaskStatus.blocked
         task.payload = {**task.payload, "waiting_for": "approval",
                         "approval_action_id": str(queued.pending_action_id) if queued.pending_action_id else None}
+        await audit.record(session, actor=actor, action="gateway.permit_wait_for_owner", subject_type="agent_task",
+                           subject_id=task.id, detail={"reason": queued.reason, "changes": [], **entered})
         return RequestPermitOut(decision="wait_for_owner", reason=queued.reason)
     if not queued.queued or queued.attempt is None:
         return await refuse(queued.reason)

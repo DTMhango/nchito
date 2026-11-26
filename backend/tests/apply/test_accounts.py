@@ -473,3 +473,34 @@ async def test_approving_a_browser_packet_raises_the_sign_in_request_at_once(ses
     actions = await open_actions(session)  # no accounts tick needed
     assert len(actions) == 1 and actions[0].detail["kind"] == "create_account"
     assert actions[0].detail["applications"][0]["application_id"] == str(app.id)
+
+
+async def test_sign_in_action_shows_reminders_sent_and_the_next_one(session, owner_client):
+    campaign = await setup_campaign(session)
+    await role(session, campaign, deadline=DEADLINE)
+    await channels_on(session)
+    await accounts.tick(session, DEADLINE_AT - timedelta(hours=100))
+    await session.commit()
+    (action,) = await open_actions(session)
+
+    async def shown() -> dict:
+        r = await owner_client.get(f"/api/pending-actions/{action.id}")
+        assert r.status_code == 200
+        return r.json()
+
+    first = await shown()
+    assert first["reminders_sent"] == 0
+    assert datetime.fromisoformat(first["next_reminder_at"]) == DEADLINE_AT - timedelta(hours=72)
+    await accounts.tick(session, DEADLINE_AT - timedelta(hours=70))
+    await session.commit()
+    second = await shown()
+    assert second["reminders_sent"] == 1
+    assert datetime.fromisoformat(second["next_reminder_at"]) == DEADLINE_AT - timedelta(hours=24)
+    await settings_service.set_value(session, "accounts.reminder_offsets_hours", [48, 12], actor="test")
+    await session.commit()
+    assert datetime.fromisoformat((await shown())["next_reminder_at"]) == DEADLINE_AT - timedelta(hours=48)
+    for before in (47, 11):
+        await accounts.tick(session, DEADLINE_AT - timedelta(hours=before))
+        await session.commit()
+    last = await shown()
+    assert last["reminders_sent"] == 3 and last["next_reminder_at"] is None
