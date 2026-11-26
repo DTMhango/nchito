@@ -76,6 +76,9 @@ class Campaign(Base, Entity):
     paused_until: Mapped[date | None] = mapped_column(Date)
     preferred_seniority: Mapped[str | None] = mapped_column(String(60))
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    unconfirmed_items: Mapped[list[str]] = mapped_column(
+        ARRAY(String(40)), nullable=False, default=list,
+        doc="Criteria groups still to confirm (pay_floors, locations, ...); confirmed only when empty")
     last_sweep_checkpoint: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
