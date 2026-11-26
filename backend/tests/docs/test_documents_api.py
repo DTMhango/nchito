@@ -187,10 +187,22 @@ async def test_unknown_template_and_wrong_kind_are_404(owner_client, session, st
     assert (await owner_client.get(f"/api/applications/{app.id}/document-files/{missing}")).status_code == 404
 
 
-async def test_answers_sheet_stays_with_the_apply_stream(owner_client, session, store):
+async def test_answers_sheet_comes_from_the_current_packet(owner_client, session, store):
+    from app.apply import packets
+    from app.schemas.json_types import PacketEmail
+
     app = await _setup(session)
     r = await owner_client.get(f"/api/applications/{app.id}/documents/answers")
-    assert r.status_code == 501
+    assert r.status_code == 404  # no packet yet
+    draft = packets.PacketDraft(channel="manual", destination_url="https://careers.example.com/apply",
+                                sending_identity="me@example.com",
+                                answers=[packets.DraftAnswer(question="Notice period", value="One month")],
+                                email=PacketEmail(to=["hr@example.com"], subject="s", body="b"))
+    await packets.build(session, app, draft, actor="owner")
+    await session.commit()
+    r = await owner_client.get(f"/api/applications/{app.id}/documents/answers")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/plain")
+    assert "Notice period" + chr(10) + "One month" in r.text
 
 
 async def test_missing_file_is_restored_from_the_same_bytes(owner_client, session, store):

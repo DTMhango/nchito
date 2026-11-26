@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import Field
 from sqlalchemy import select
 
-from app.api.common import ApiModel, Timestamps, not_implemented
+from app.api.common import ApiModel, Timestamps
 from app.api.deps import PrincipalDep, SessionDep
 from app.connect.filestore import FileStore
 from app.connect.local_store import default_file_store
@@ -98,9 +98,15 @@ async def document(application_id: uuid.UUID, kind: Literal["cv", "letter", "ans
 
     Warnings travel in the ``X-Render-Warnings`` header as a count; the render endpoint lists them.
     """
-    if kind == "answers":
-        not_implemented(2, "apply")  # the answers sheet is built from the packet by the apply stream
     app = await _load(session, application_id)
+    if kind == "answers":  # from the current packet, exactly what would be sent
+        from app.apply import handoff, packets
+
+        packet = await packets.current(session, app.id)
+        if packet is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no packet has been built")
+        return Response(handoff.answers_sheet(packet.contents).encode("utf-8"), media_type="text/plain",
+                        headers={"Content-Disposition": f'attachment; filename="answers-{app.id}.txt"'})
     try:
         p = await service.prepare(session, app, kind, template)
         result = await service.render(session, store, app, p, fmt, actor=principal.actor)

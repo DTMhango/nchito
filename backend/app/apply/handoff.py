@@ -46,6 +46,8 @@ def _file_url(app: Application, f: PacketFile) -> str | None:
         return f.share_link
     if f.kind == "vault" and f.document_id:
         return f"/api/kit/vault/{f.document_id}/download"
+    if f.kind in ("cv", "letter") and f.document_id:  # the exact rendered file the packet's hash names
+        return f"/api/applications/{app.id}/document-files/{f.document_id}"
     if f.kind in ("cv", "letter"):
         return f"/api/applications/{app.id}/documents/{f.kind}?fmt=pdf"
     return None
@@ -82,6 +84,13 @@ async def kit(session: AsyncSession, app: Application) -> HandoffKit:
     answers = [{"question": a.question, "value": a.value} for a in contents.answers]
     return HandoffKit(posting_url=posting_url, files=files, answers=answers,
                       remaining_steps=_steps(contents, posting_url, files))
+
+
+def answers_sheet(contents: PacketContents) -> str:
+    """The packet's answers as a plain copyable sheet (the ``kind=answers`` document)."""
+    if not contents.answers:
+        return "This application has no form answers.\n"
+    return "\n".join(f"{a.question}\n{a.value or ''}\n" for a in contents.answers)
 
 
 async def _open_attempt(session: AsyncSession, app_id: uuid.UUID) -> DispatchAttempt | None:

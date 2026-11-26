@@ -5,7 +5,10 @@ Installed once per process (``install``): the worker calls it at start-up, the w
 
 - Intake gets ``LLMService`` per run (``for_run``), so every paid call reserves in the budget
   ledger before the call, reconciles after, and honours the per-run cap.
-- A sweep runs dedupe -> normalise -> filters -> score: scoring is the orchestrator's score hook.
+- A sweep runs dedupe -> normalise -> filters -> score: scoring is the orchestrator's score hook. In a real
+  (non-dry) run the hook then requests tailoring for each employer's winner (``advance.tailor_winners``);
+  a finished draft whose checks pass is rendered and packed (``advance.after_tailored``), the policy
+  approves or asks, and ``apply_tick`` dispatches.
 - Scoring, backtests and custom facets get ``LLMService``; corrections re-evaluate conflict
   groups with ``conflicts.resolve_employers``.
 """
@@ -13,13 +16,16 @@ Installed once per process (``install``): the worker calls it at start-up, the w
 from __future__ import annotations
 
 import uuid
+from collections.abc import Awaitable, Callable
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.clock import utcnow
 from app.llm.client import LLMClient
 from app.llm.service import LLMService
+from app.models.applications import TailoringRequest
 from app.models.search import Run
-from app.pipeline import conflicts, corrections, orchestrator, scoring
+from app.pipeline import advance, conflicts, corrections, orchestrator, scoring
 
 
 async def llm_for(session: AsyncSession, run: Run | None = None) -> LLMClient:
@@ -36,7 +42,28 @@ async def score_hook(session: AsyncSession, run: Run, job_ids: list[uuid.UUID],
     run, so the outcome only carries the budget state."""
     summary = await scoring.score_jobs(session, run, job_ids, client=llm, paid=llm is not None)
     scope = summary.budget_scope if summary.parked else None
+    if not run.dry_run:  # a dry run only proposes; a real run moves each employer's winner on to tailoring
+        requests = await advance.tailor_winners(session, run, job_ids, now=utcnow())
+        if requests:
+            await session.commit()  # the requests must exist before a worker picks them up
+            for request in requests:
+                await _tailor_enqueue(request)
     return orchestrator.ScoreOutcome(cost_micros=0, budget_scope=scope)
+
+
+async def _default_tailor_enqueue(request: TailoringRequest) -> None:
+    from app.pipeline.tailoring import tasks
+
+    await tasks.enqueue(request)
+
+
+_tailor_enqueue: Callable[[TailoringRequest], Awaitable[None]] = _default_tailor_enqueue
+
+
+def set_tailor_enqueuer(fn: Callable[[TailoringRequest], Awaitable[None]] | None) -> None:
+    """Replace how a run queues tailoring (tests run it in place)."""
+    global _tailor_enqueue
+    _tailor_enqueue = fn or _default_tailor_enqueue
 
 
 def install() -> None:

@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_sessionmaker
 from app.llm.client import LLMClient
 from app.llm.service import LLMService
-from app.models.applications import Application, TailoringRequest
+from app.models.applications import Application, TailoringRequest, TailoringStatus
 from app.pipeline.tailoring import service
 from app.worker.queue import RUNS_QUEUE, SYSTEM_QUEUE, queue_app
 
@@ -54,6 +54,11 @@ async def tailor_application(request_id: str) -> None:
             return
         status = await service.process(session, client_for(req), req.id)
         await session.commit()
+        if status == TailoringStatus.done:
+            from app.pipeline import advance  # render, pack, then the approval policy
+
+            await advance.after_tailored(session, req.application_id)
+            await session.commit()
     log.info("tailoring request %s: %s", request_id, status.value)
 
 
