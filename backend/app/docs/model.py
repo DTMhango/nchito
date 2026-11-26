@@ -54,7 +54,7 @@ class Section(BaseModel):
 
 
 class DocModel(BaseModel):
-    kind: Literal["cv", "letter"]
+    kind: Literal["cv", "letter", "pack"]
     name: str = ""
     contact: list[str] = Field(default_factory=list)
     headline: str | None = None
