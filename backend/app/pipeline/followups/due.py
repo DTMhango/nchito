@@ -137,10 +137,22 @@ async def due_list(session: AsyncSession, *, now: datetime | None = None, horizo
     return sorted(items, key=lambda i: i.due_at)
 
 
+# Open actions that already ask the owner to follow up with the employer: the follow-up due reminder and the
+# calendar's after-interview follow-up are the same thing, so one is never added beside the other. (The
+# calendar's debrief question and event proposals are other things and do not count.)
+EMPLOYER_FOLLOW_UP_KINDS = ("followup_due", "interview_follow_up")
+
+
+async def open_employer_follow_up(session: AsyncSession, app_id: uuid.UUID) -> PendingAction | None:
+    """The open 'follow up with the employer' action of an application, from either source, or None."""
+    rows = (await session.scalars(select(PendingAction).where(
+        PendingAction.application_id == app_id, PendingAction.type == PendingActionType.follow_up,
+        PendingAction.status == PendingStatus.open).order_by(PendingAction.created_at))).all()
+    return next((a for a in rows if (a.detail or {}).get("kind") in EMPLOYER_FOLLOW_UP_KINDS), None)
+
+
 async def _open_action(session: AsyncSession, app: Application, job: Job, row: FollowupDue) -> PendingAction:
-    existing = await session.scalar(select(PendingAction).where(
-        PendingAction.application_id == app.id, PendingAction.type == PendingActionType.follow_up,
-        PendingAction.status == PendingStatus.open).limit(1))
+    existing = await open_employer_follow_up(session, app.id)
     if existing is not None:
         return existing
     action = PendingAction(type=PendingActionType.follow_up, application_id=app.id, group_key="follow_up_due",

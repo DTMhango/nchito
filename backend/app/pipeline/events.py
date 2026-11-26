@@ -394,6 +394,12 @@ async def debrief(session: AsyncSession, event: InterviewEvent, *, outcome: str,
 
 async def _follow_up(session: AsyncSession, event: InterviewEvent, app: Application, next_step: str,
                      now: datetime) -> uuid.UUID:
+    from app.pipeline.followups.due import open_employer_follow_up
+
+    # The follow-up due list may already be asking for the same follow-up: one reminder, not two.
+    existing = await open_employer_follow_up(session, app.id)
+    if existing is not None:
+        return existing.id
     days = int(await settings_service.get_value(session, "calendar.followup_days"))
     job = await session.get(Job, app.job_id)
     who = f"{job.employer} ({job.title})" if job else "this application"
