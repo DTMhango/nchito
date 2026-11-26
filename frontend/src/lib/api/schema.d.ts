@@ -3680,6 +3680,200 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/interview-pack/mock-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Mock List */
+        get: operations["interview_mock_list"];
+        put?: never;
+        /**
+         * Interview Mock Start
+         * @description Start a session and ask the first question. A budget refusal stores it paused (resume it later).
+         */
+        post: operations["interview_mock_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/interview-pack/mock-sessions/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interview Mock Estimate
+         * @description What a session would cost at most, shown before it starts.
+         */
+        get: operations["interview_mock_estimate"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/interview-pack/mock-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Mock Progress */
+        get: operations["interview_mock_progress"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Mock Get */
+        get: operations["interview_mock_get"];
+        put?: never;
+        post?: never;
+        /** Interview Mock Delete */
+        delete: operations["interview_mock_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Answer
+         * @description Answer (or skip) the open question; the interviewer replies with a probe, the next question or, after the
+         *     last one, the final feedback. 409 not_your_turn when the session is not waiting for an answer.
+         */
+        post: operations["interview_mock_answer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Finish
+         * @description I'm done: end now and get feedback on what was answered.
+         */
+        post: operations["interview_mock_finish"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Resume
+         * @description Run the step a budget pause or failure left pending; nothing already written is written again.
+         */
+        post: operations["interview_mock_resume"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Mock Export */
+        get: operations["interview_mock_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/turns/{turn_id}/claims/{claim_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Claim
+         * @description Something you said that is not in your Kit: add it as a draft fact (reviewed in the library) or dismiss.
+         */
+        post: operations["interview_mock_claim"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-mock/{session_id}/turns/{turn_id}/story": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Mock Save Story
+         * @description Save an answer, in your words, to the pack's story bank, linked to the facts it rests on (checked).
+         */
+        post: operations["interview_mock_save_story"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data/export/preview": {
         parameters: {
             query?: never;
@@ -6929,10 +7123,23 @@ export interface components {
             interviewers?: string[];
             /** Checklist */
             checklist?: string[];
-            /** Notes */
+            /**
+             * Notes
+             * @description The owner's notes, including pasted interviewer notes
+             */
             notes?: string | null;
             /** Learnt */
             learnt?: string | null;
+            /**
+             * Kind
+             * @description Screen, technical, panel, final or other
+             */
+            kind?: ("screen" | "technical" | "panel" | "final" | "other") | null;
+            /**
+             * Focus
+             * @description What this round concentrates on
+             */
+            focus?: string[];
         };
         /** InterviewRoundOut */
         InterviewRoundOut: {
@@ -6961,10 +7168,23 @@ export interface components {
             interviewers: string[];
             /** Checklist */
             checklist: string[];
-            /** Notes */
+            /**
+             * Notes
+             * @description The owner's notes, including pasted interviewer notes
+             */
             notes: string | null;
             /** Learnt */
             learnt: string | null;
+            /**
+             * Kind
+             * @description Screen, technical, panel, final or other
+             */
+            kind: ("screen" | "technical" | "panel" | "final" | "other") | null;
+            /**
+             * Focus
+             * @description What this round concentrates on
+             */
+            focus: string[];
             /**
              * Pack Id
              * Format: uuid
@@ -7499,6 +7719,282 @@ export interface components {
         MergeIn: {
             /** Duplicate Ids */
             duplicate_ids: string[];
+        };
+        /** MockAnswerIn */
+        MockAnswerIn: {
+            /**
+             * Text
+             * @default
+             */
+            text?: string;
+            /**
+             * Skip
+             * @default false
+             */
+            skip?: boolean;
+            /**
+             * Turn Key
+             * @description The session's expects; a repeat is ignored
+             */
+            turn_key?: string | null;
+        };
+        /** MockCategoryOut */
+        MockCategoryOut: {
+            /** Category */
+            category: string;
+            /** Answers */
+            answers: number;
+            /** Average */
+            average: number;
+            /** Weak */
+            weak: boolean;
+        };
+        /** MockClaimIn */
+        MockClaimIn: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "add_draft" | "dismiss";
+            /**
+             * Text
+             * @description Corrected wording for the draft fact
+             */
+            text?: string | null;
+        };
+        /** MockClaimOut */
+        MockClaimOut: {
+            /** Id */
+            id: string;
+            /** Text */
+            text: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "unverified" | "added" | "dismissed";
+            /** Fact Code */
+            fact_code: string | null;
+        };
+        /** MockEstimateOut */
+        MockEstimateOut: {
+            /**
+             * Parts
+             * @description Upper-bound cost per step kind, micros
+             */
+            parts: {
+                [key: string]: number;
+            };
+            /** Total Micros */
+            total_micros: number;
+            /**
+             * Budget Micros
+             * @description What the session may spend before it pauses and asks
+             */
+            budget_micros: number;
+            /** Currency */
+            currency: string;
+        };
+        /** MockNextOut */
+        MockNextOut: {
+            /** Question */
+            question: string;
+            /** Category */
+            category: string;
+            /** Reason */
+            reason: string;
+        };
+        /** MockProgressOut */
+        MockProgressOut: {
+            /** Sessions */
+            sessions: number;
+            /** Categories */
+            categories: components["schemas"]["MockCategoryOut"][];
+            /** Weak */
+            weak: string[];
+            /** Practise Next */
+            practise_next: components["schemas"]["MockNextOut"][];
+        };
+        /** MockResumeIn */
+        MockResumeIn: {
+            /**
+             * Budget Micros
+             * @description Raise the session cap first
+             */
+            budget_micros?: number | null;
+        };
+        /** MockSessionIn */
+        MockSessionIn: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "behavioural" | "technical" | "role" | "mixed" | "tough";
+            /**
+             * Length
+             * @description Main questions; default interview.mock.default_length
+             */
+            length?: number | null;
+            /**
+             * Use Pack Questions
+             * @description Ask the pack's likely questions first
+             * @default true
+             */
+            use_pack_questions?: boolean;
+            /**
+             * Feedback Each
+             * @description Feedback after each answer as well as at the end
+             */
+            feedback_each?: boolean | null;
+            /**
+             * Timer Seconds
+             * @description Optional answer timer (shown only)
+             */
+            timer_seconds?: number | null;
+            /**
+             * Round Id
+             * @description The round this session targets
+             */
+            round_id?: string | null;
+        };
+        /** MockSessionOut */
+        MockSessionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Pack Id
+             * Format: uuid
+             */
+            pack_id: string;
+            /** Round Id */
+            round_id: string | null;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "behavioural" | "technical" | "role" | "mixed" | "tough";
+            /** Length */
+            length: number;
+            /** Use Pack Questions */
+            use_pack_questions: boolean;
+            /** Feedback Each */
+            feedback_each: boolean;
+            /** Timer Seconds */
+            timer_seconds: number | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "paused" | "failed" | "done";
+            /** Pending Step */
+            pending_step: ("ask" | "reply" | "final") | null;
+            /**
+             * Expects
+             * @description Pass as turn_key with the next answer; null when the session is not waiting for one
+             */
+            expects: string | null;
+            /** Question Index */
+            question_index: number;
+            /** Probes */
+            probes: number;
+            /** Estimate Micros */
+            estimate_micros: number | null;
+            /** Budget Micros */
+            budget_micros: number | null;
+            /** Cost Micros */
+            cost_micros: number;
+            /**
+             * Feedback
+             * @description Final feedback: summary, overall, answers
+             */
+            feedback: {
+                [key: string]: unknown;
+            } | null;
+            /** Scores */
+            scores: {
+                [key: string]: number;
+            };
+            /** Error */
+            error: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Turns */
+            turns: components["schemas"]["MockTurnOut"][];
+            /**
+             * Unverified Prompt
+             * @default
+             */
+            unverified_prompt: string;
+        };
+        /** MockStoryIn */
+        MockStoryIn: {
+            /** Title */
+            title?: string | null;
+            /**
+             * Fact Ids
+             * @description Default: the facts the answer rests on
+             */
+            fact_ids?: string[] | null;
+        };
+        /** MockTurnOut */
+        MockTurnOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Seq */
+            seq: number;
+            /** Step Key */
+            step_key: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "interviewer" | "owner" | "coach";
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "question" | "probe" | "answer" | "skip" | "feedback";
+            /** Text */
+            text: string;
+            /** Question Index */
+            question_index: number;
+            /** Category */
+            category: string | null;
+            /**
+             * Feedback
+             * @description Checked feedback: structure, relevance, specificity, strong, tighten, scores, suggested (with sources), removed (flagged)
+             */
+            feedback: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Claims
+             * @description Statements not in your Kit
+             */
+            claims: components["schemas"]["MockClaimOut"][];
+            /** Fact Ids */
+            fact_ids: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
         };
         /** NeverMention */
         NeverMention: {
@@ -22271,6 +22767,413 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["InterviewRoundOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_list: {
+        parameters: {
+            query?: {
+                round_id?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MockSessionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_estimate: {
+        parameters: {
+            query: {
+                mode: "behavioural" | "technical" | "role" | "mixed" | "tough";
+                length?: number | null;
+                use_pack_questions?: boolean;
+                round_id?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockEstimateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_progress: {
+        parameters: {
+            query?: {
+                round_id?: string | null;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockProgressOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_answer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MockAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_resume: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["MockResumeIn"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_export: {
+        parameters: {
+            query?: {
+                fmt?: "pdf" | "docx" | "txt";
+            };
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                    "application/pdf": unknown;
+                    "text/plain; charset=utf-8": unknown;
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_claim: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                turn_id: string;
+                claim_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MockClaimIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MockTurnOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_mock_save_story: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MockStoryIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InterviewSectionOut"];
                 };
             };
             /** @description Validation Error */
