@@ -120,10 +120,6 @@ const SettingsLayout = lazyPage(
   () => import("@/features/settings/settings-pages"),
   "SettingsLayout"
 )
-const SettingsSection = lazyPage(
-  () => import("@/features/settings/settings-pages"),
-  "SettingsSection"
-)
 const AppearancePage = lazyPage(
   () => import("@/features/settings/appearance-page"),
   "AppearancePage"
@@ -147,6 +143,18 @@ const HistoryPage = lazyPage(
 const ConnectionsPage = lazyPage(
   () => import("@/features/settings/connections/connections-page"),
   "ConnectionsPage"
+)
+const RunnersPage = lazyPage(
+  () => import("@/features/settings/runners/runners-page"),
+  "RunnersPage"
+)
+const AccountsPage = lazyPage(
+  () => import("@/features/accounts/accounts-page"),
+  "AccountsPage"
+)
+const HandoffPage = lazyPage(
+  () => import("@/features/accounts/handoff-page"),
+  "HandoffPage"
 )
 const DataPage = lazyPage(
   () => import("@/features/settings/data/data-page"),
@@ -320,6 +328,15 @@ const runDetailRoute = createRoute({
     return <RunDetailPage runId={runDetailRoute.useParams().runId} />
   },
 })
+const accountsRoute = page("/accounts", "Portal accounts", AccountsPage)
+const handoffRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/accounts/handoff/$actionId",
+  staticData: { title: "Sign-in handoff" },
+  component: function HandoffRoute() {
+    return <HandoffPage actionId={handoffRoute.useParams().actionId} />
+  },
+})
 const campaignsRoute = page("/campaigns", "Campaigns", CampaignsPage)
 const campaignEditorRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -418,7 +435,6 @@ const appearanceRoute = createRoute({
   staticData: { title: "Appearance" },
   component: AppearancePage,
 })
-type SettingsKey = "runners"
 const groupRoute = (path: SettingsPageKey) =>
   createRoute({
     getParentRoute: () => settingsRoute,
@@ -442,6 +458,7 @@ const ownRoute = (
     | "connections"
     | "data"
     | "notifications"
+    | "runners"
     | "health",
   C: ComponentType
 ) =>
@@ -457,21 +474,16 @@ const ownRoutes = [
   ownRoute("connections", ConnectionsPage),
   ownRoute("data", DataPage),
   ownRoute("notifications", NotificationsPage),
+  ownRoute("runners", RunnersPage),
   ownRoute("health", HealthPanel),
 ] as const
-const settingsChild = (path: SettingsKey) =>
-  createRoute({
-    getParentRoute: () => settingsRoute,
-    path,
-    component: () => <SettingsSection section={path} />,
-  })
 const aiRoute = createRoute({
   getParentRoute: () => settingsRoute,
   path: "ai",
   staticData: { title: "AI" },
   component: AiSettingsPage,
 })
-const settingsChildren = [aiRoute, settingsChild("runners")] as const
+const settingsChildren = [aiRoute] as const
 
 // ---- dev ----
 const devComponentsRoute = createRoute({
@@ -505,6 +517,8 @@ export const routeTree = rootRoute.addChildren([
       approvalReviewRoute,
       runsRoute,
       runDetailRoute,
+      accountsRoute,
+      handoffRoute,
       kitRoute.addChildren([kitIndex, ...kitChildren]),
       campaignsRoute,
       campaignEditorRoute,

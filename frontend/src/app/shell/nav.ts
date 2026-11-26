@@ -7,6 +7,7 @@ import {
   Gauge,
   Inbox,
   Radio,
+  UserRoundCheck,
   Settings,
   Sun,
   Target,
@@ -90,6 +91,12 @@ export const NAV_SETUP: NavItem[] = [
     label: "Sources",
     icon: Radio,
     keywords: ["boards", "feeds", "employers", "health"],
+  },
+  {
+    to: "/accounts",
+    label: "Portal accounts",
+    icon: UserRoundCheck,
+    keywords: ["sign in", "login", "account", "portal", "workday", "handoff"],
   },
   {
     to: "/insights",

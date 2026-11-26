@@ -23,6 +23,7 @@ import {
   type DecisionGroup,
   type PendingAction,
 } from "@/features/applications/api"
+import { isHandoff } from "@/features/accounts/logic"
 import { AnswerForm, type AnswerSubmit } from "./answer-form"
 import { actionKit, deadlineText, readDetail, urgency } from "./decisions"
 
@@ -30,6 +31,7 @@ const TYPE_ICON: Partial<Record<PendingAction["type"], LucideIcon>> = {
   unknown_question: HelpCircle,
   sign_in: KeyRound,
   create_account: KeyRound,
+  captcha: KeyRound,
   approve: FileCheck2,
   confirm_submission: MailCheck,
   declaration: ShieldQuestion,
@@ -145,6 +147,16 @@ export function DecisionRow({
                     className={open ? "rotate-180" : undefined}
                     aria-hidden="true"
                   />
+                </Button>
+              )}
+              {isHandoff(first) && (
+                <Button asChild variant="ghost" size="sm">
+                  <Link
+                    to="/accounts/handoff/$actionId"
+                    params={{ actionId: first.id }}
+                  >
+                    Details
+                  </Link>
                 </Button>
               )}
               {secondaryIsLink ? (
