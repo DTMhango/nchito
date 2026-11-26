@@ -1001,3 +1001,10 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
   The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
   skill asks for it.
+
+## Wave 4 insights additions
+
+- `GET /api/insights` replaces the 501 stub; the response changed from the wave 1 placeholder to `InsightsOut` (`app/ops/insights.py`): `funnel` per campaign (nine steps, counts and conversion), `response` (rates by track, source, market with `sent`, `replies`, `too_few`), `time_in_stage` (median, p75, first reply), `spend` (ledger micros by period, stage, model; cost per application sent and per interview), `sources`, `automation`, `exclusions`.
+- Query: `since`, `until` (default `insights.default_range_days` back from today), `campaign_id`, `track_id`, `source_id`, `country`, `channel`, `period` (week or month).
+- Counting: a role counts once (merged jobs and second applications ignored; skipped and never-sent closed are not applications); sent = `applied_at` set (includes "I applied myself"); reply = reached screening, interview, offer or accepted, or rejected after sending.
+- Settings: `insights.min_sample`, `insights.default_range_days`, `insights.week_start`.
