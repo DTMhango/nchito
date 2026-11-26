@@ -737,3 +737,49 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
 - **Exit test** (`tests/integration/test_wave2_exit.py`): besides the pipeline path, an API-only path (set and
   confirm the address, prepare, approve and dispatch through the endpoints; one email in the fake mailbox) and a test
   that a posting's unconfirmed address is packed for manual hand-off and never sent automatically.
+
+## Wave 3 interview additions
+
+Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`, `crib`, `prompt`, `practice`,
+`offer`, `export`, `tasks`), router `backend/app/api/routers/interview.py` (the four wave-1 stubs moved here from
+`applications.py`, same paths, names and models). Migration `0013_interview`: `interview_pack` gains `status`
+(`idle|queued|running|paused|done|failed`), `generation`, `pending_sections`, `basis`, `notes`, `estimate_micros`,
+`cost_micros`, `paused_mark`, `error`, `offered_at`, `requested_by`; new tables `interview_section_version`
+(append-only by convention: unique `(pack, section, version)` and `(pack, section, request_key)`) and
+`interview_practice`.
+
+- **Sections** (setting `interview.sections`, in order): `role_brief`, `why_you`, `questions` (categories
+  `behavioural|technical|role|motivation|logistics`), `stories` (STAR, `favourite`), `questions_to_ask`, `gaps`,
+  `pay_sheet` (code only), `crib_sheet` (code only, from the others). Shapes: `app/pipeline/interview/shapes.py`.
+  Every sentence about the owner is a `Claim {text, fact_ids}` and goes through the document checks
+  (`fact_trace`, `claim_drift`, `keep_out`, `guardrails.*`, optional `claim_check`); guardrails see the pack as
+  scope `interview` (rules scoped `everywhere` apply). A section still blocking after
+  `interview.regenerate_attempts` retries is stored `flagged`; the crib sheet omits flagged sections. Retry notes
+  never repeat a keep-out code, figure or quote. The model claim check runs only on text the code checks passed.
+- **Basis** (`pack.basis`): `source = submitted_packet` (packet by `submitted_snapshot.packet_hash`, else the
+  approved packet once gone out; spec version from its CV/letter `document_id` -> `spec_hash`; answers from the
+  packet), else `latest_checked_spec`, else `none`. `posting_changed` compares `contents.job_version` with the job.
+- **Pay sheet**: topics `interview.pay_topics` (`Topic|Question`) matched with `app.kit.answers.match`; only a
+  usable confirmed answer fills `kit_answer`; form answers fill `told_them`; otherwise `status = decide` with
+  `interview.decide_wording`. Never a guessed number. `posting_pay` only when the posting states pay.
+- **Untrusted**: posting, documents sent, answers given, employer mail (subject/sender), application/job/contact
+  notes and practice drafts reach the model only as `DataBlock`s. No web research: `role_brief.research_note`
+  (setting `interview.research_note`).
+- **Budget**: stage `interview`, model per section `interview.model_<section>` and `interview.model_practice`.
+  `POST` stores `estimate_micros` (sum of per-section estimates); each section reserves on its own call.
+  `BudgetExhausted` parks the pack `paused` with `pending_sections`; versions are keyed `gen<n>`, so a resumed or
+  retried task never writes a section twice. Periodic `interview_tick` (system queue, every 5 min) makes offers,
+  defers queued packs and resumes paused ones; task `interview_generate(pack_id)` under lock `interview:<pack id>`.
+- **Offers** (`interview.auto_offer`: `invite_or_stage` default, `stage_only`, `off`; `interview.auto_generate`):
+  one per pack; a `follow_up` pending action with `detail.kind = "interview_pack_offer"` (resolver
+  `app.pipeline.interview.offer:accept_offer` queues the pack), or a queued generation when auto-generate is on.
+- **Endpoints** (`{code, reason}` errors): `GET|POST /api/jobs/{job_id}/interview-pack` (`InterviewGenerateIn
+  {sections?}`, 202, idempotent while open; `InterviewPackOut` gains `status, generation, pending_sections, basis,
+  notes, estimate_micros, cost_micros, error, offered_at, flagged`), `GET .../interview-pack/estimate?sections=`,
+  `POST .../sections/{section}/regenerate` (202; 409 `still_queued`), `PUT .../sections/{section}` `{content}`
+  (owner version, checked; 422 `invalid_section`), `GET .../sections/{section}/versions`,
+  `PUT .../sections/{section}/note` `{note}`, `PUT .../stories/{story_id}/favourite` `{favourite}`,
+  `GET|POST .../practice` (`PracticeIn {question, category?, draft_answer}` -> `PracticeOut`, `status
+  done|paused|failed`), `POST /api/interview-practice/{id}/retry`, `GET .../export?fmt=pdf|docx|txt` (built-in docs
+  template `pack`; header `X-Flagged-Sections`), `GET|POST .../rounds`, `PUT /api/interview-rounds/{id}`.
+  `thank_you_draft` stays null in this wave.
