@@ -202,10 +202,7 @@ export function ApplicationsPage({
       cell: (r) => (
         <span className="inline-flex flex-wrap items-center gap-1 font-semibold">
           {r.employer}
-          <EmployerChip
-            chip={chips[r.job_id]}
-            hide={["free", "role_in_progress"]}
-          />
+          <EmployerChip chip={chips[r.job_id]} onApplication />
           {r.pinned && (
             <Pin
               className="size-3 text-primary-ink"

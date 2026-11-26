@@ -625,7 +625,8 @@ export const bulkHandlers = [
     const states: Record<string, ReturnType<typeof chipFor>> = {}
     for (const id of job_ids) {
       const j = src.jobs.find((x) => x.id === id)
-      if (j) states[id] = chipFor(src, state.employers, j.canonical_employer)
+      if (j)
+        states[id] = chipFor(src, state.employers, j.canonical_employer, id)
     }
     return HttpResponse.json({ states })
   }),

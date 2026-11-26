@@ -24325,6 +24325,18 @@
           "text": {
             "type": "string",
             "title": "Text"
+          },
+          "live": {
+            "type": "integer",
+            "title": "Live",
+            "description": "The employer's roles in progress (this job's included)",
+            "default": 0
+          },
+          "live_elsewhere": {
+            "type": "integer",
+            "title": "Live Elsewhere",
+            "description": "Roles in progress at this employer other than this job",
+            "default": 0
           }
         },
         "type": "object",

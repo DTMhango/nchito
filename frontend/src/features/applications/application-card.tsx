@@ -131,7 +131,7 @@ export function ApplicationCard({
       <NextStep app={app} timeZone={timeZone} />
       {chip && (
         <div>
-          <EmployerChip chip={chip} hide={["free", "role_in_progress"]} />
+          <EmployerChip chip={chip} onApplication />
         </div>
       )}
     </KanbanCard>

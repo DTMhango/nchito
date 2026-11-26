@@ -141,6 +141,8 @@ class StatesIn(BaseModel):
 class ChipOut(BaseModel):
     state: EmployerStateName
     text: str
+    live: int = Field(default=0, description="The employer's roles in progress (this job's included)")
+    live_elsewhere: int = Field(default=0, description="Roles in progress at this employer other than this job")
 
 
 class StatesOut(BaseModel):
@@ -175,7 +177,8 @@ async def list_employers(session: SessionDep, state: EmployerStateName | None = 
 async def states(body: StatesIn, session: SessionDep) -> StatesOut:
     """The employer chip for each job (Matches and Applications), read only."""
     found = await employers.states_for_jobs(session, body.job_ids)
-    return StatesOut(states={str(j): ChipOut(state=s, text=t) for j, (s, t) in found.items()})
+    return StatesOut(states={str(j): ChipOut(state=c.state, text=c.text, live=c.live, live_elsewhere=c.live_elsewhere)
+                             for j, c in found.items()})
 
 
 @router.get("/detail", response_model=EmployerDetailOut, name="employers_get")

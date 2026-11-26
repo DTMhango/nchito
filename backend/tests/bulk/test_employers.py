@@ -241,7 +241,25 @@ async def test_http_states_for_chips(owner_client, session) -> None:
     r = await owner_client.post("/api/employers/states", json={"job_ids": [str(job.id), str(other.id)]})
     assert r.status_code == 200
     assert r.json()["states"][str(job.id)]["state"] == "free"
-    assert r.json()["states"][str(other.id)] == {"state": "blocked", "text": "never apply: r"}
+    assert r.json()["states"][str(other.id)] == {"state": "blocked", "text": "never apply: r", "live": 0,
+                                                 "live_elsewhere": 0}
+
+
+async def test_http_states_count_live_roles_elsewhere(owner_client, session) -> None:
+    """An application card hides "role in progress" for its own role but shows it when another one is live."""
+    first = await make_job(session, "Analyst", "Acme Ltd")
+    second = await make_job(session, "Manager", "Acme Ltd")
+    lone = await make_job(session, "Analyst", "Solo Co")
+    await make_app(session, first, Stage.submitted, applied_at=APPLIED)
+    await make_app(session, second, Stage.interview, applied_at=APPLIED)
+    await make_app(session, lone, Stage.submitted, applied_at=APPLIED)
+    await session.commit()
+    r = await owner_client.post("/api/employers/states",
+                                json={"job_ids": [str(first.id), str(second.id), str(lone.id)]})
+    states = r.json()["states"]
+    assert states[str(first.id)] == {"state": "role_in_progress", "text": "2 roles in progress", "live": 2,
+                                     "live_elsewhere": 1}
+    assert states[str(lone.id)]["live"] == 1 and states[str(lone.id)]["live_elsewhere"] == 0
 
 
 async def test_http_merge_and_split_reuse_the_corrections_code(owner_client, session) -> None:

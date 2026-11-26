@@ -27,18 +27,32 @@ const FREE_ONLY: EmployerState[] = ["free"]
 /**
  * The employer state: free, role in progress, cooling down until a date, always ask first, or
  * never apply. The text is the server's, so the date and the reason are always its own words.
- * `hide` lists states that add nothing in that place (free almost everywhere; "role in progress"
- * on an application card, which is itself the role in progress).
+ * `hide` lists states that add nothing in that place (free almost everywhere). `onApplication`
+ * is for an application card or row, which is itself a role in progress: "role in progress"
+ * shows only when another role at the employer is live, and says so.
  */
 export function EmployerChip({
   chip,
   hide = FREE_ONLY,
+  onApplication = false,
 }: {
-  chip: ChipData | undefined
+  /** A row's own state (Employers screens) carries no live counts; the per-job chip does. */
+  chip:
+    | (Pick<ChipData, "state" | "text"> &
+        Partial<Pick<ChipData, "live" | "live_elsewhere">>)
+    | undefined
   hide?: EmployerState[]
+  onApplication?: boolean
 }) {
   if (!chip || hide.includes(chip.state)) return null
-  if (chip.state === "free") return <Chip tone="good">{chip.text}</Chip>
+  if (chip.state === "free")
+    return onApplication ? null : <Chip tone="good">{chip.text}</Chip>
+  let text = chip.text
+  if (onApplication && chip.state === "role_in_progress") {
+    const others = chip.live_elsewhere ?? 0
+    if (others < 1) return null
+    text = `${others} other role${others === 1 ? "" : "s"} in progress`
+  }
   const m = META[chip.state]
   return (
     <Chip
@@ -47,7 +61,7 @@ export function EmployerChip({
       data-employer-state={chip.state}
       className="whitespace-normal"
     >
-      {chip.text}
+      {text}
     </Chip>
   )
 }

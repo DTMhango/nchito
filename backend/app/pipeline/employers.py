@@ -264,9 +264,20 @@ async def overview(session: AsyncSession, *, now: datetime | None = None) -> lis
     return rows
 
 
+@dataclass(frozen=True)
+class JobChip:
+    """The employer chip for one job. ``live`` counts the employer's roles in progress; ``live_elsewhere``
+    leaves out this job's own, so an application card can say "another role at this employer is in progress"."""
+
+    state: EmployerStateName
+    text: str
+    live: int
+    live_elsewhere: int
+
+
 async def states_for_jobs(session: AsyncSession, job_ids: Sequence[uuid.UUID], *, now: datetime | None = None
-                          ) -> dict[uuid.UUID, tuple[EmployerStateName, str]]:
-    """The employer chip (state and text) for each job, for Matches and Applications."""
+                          ) -> dict[uuid.UUID, JobChip]:
+    """The employer chip (state, text and live-role counts) for each job, for Matches and Applications."""
     now = now or utcnow()
     jobs, aliases, by_job = await _load(session)
     settings = await settings_service.values(session)
@@ -274,11 +285,13 @@ async def states_for_jobs(session: AsyncSession, job_ids: Sequence[uuid.UUID], *
                             settings, now.date())
     by_key = {r.key: r for r in rows}
     wanted = set(job_ids)
-    out: dict[uuid.UUID, tuple[EmployerStateName, str]] = {}
+    out: dict[uuid.UUID, JobChip] = {}
     for key, members in groups.items():
         for job in members:
             if job.id in wanted:
-                out[job.id] = (by_key[key].state, by_key[key].state_text)
+                row = by_key[key]
+                own = sum(1 for a in by_job.get(job.id, []) if a.stage in LIVE_STAGES)
+                out[job.id] = JobChip(row.state, row.state_text, row.live, row.live - own)
     return out
 
 

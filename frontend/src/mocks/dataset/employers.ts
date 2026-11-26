@@ -176,10 +176,18 @@ function stateOf(
 export function chipFor(
   src: Source,
   s: EmployerStore,
-  employer: string
+  employer: string,
+  jobId?: string
 ): EmployerChip {
-  const { state, text } = stateOf(src, s, employerKey(canonical(s, employer)))
-  return { state, text }
+  const key = employerKey(canonical(s, employer))
+  const { state, text } = stateOf(src, s, key)
+  const live = appsOf(src, s, key).filter((a) => LIVE.includes(a.stage))
+  return {
+    state,
+    text,
+    live: live.length,
+    live_elsewhere: live.filter((a) => a.job_id !== jobId).length,
+  }
 }
 
 function rowFor(

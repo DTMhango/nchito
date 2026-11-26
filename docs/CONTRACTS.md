@@ -1169,6 +1169,8 @@ Code: `app/pipeline/events.py` (events, proposals from mail, reminders, debrief)
   cooling_down, always_ask_first, blocked. Cooldown length: employer override, else the watched employer's, else
   `matching.employer_cooldown_days`; it runs from the end state, or from the applied date when there has been no reply;
   ending it early records who, when and why and ignores applications that ended or went out before then.
+  Integration: each chip (`ChipOut`) also carries `live` (the employer's roles in progress) and `live_elsewhere`
+  (those other than this job), so an application card shows "N other roles in progress" only when there are some.
 - **Never apply** is an exclusion gate (`employer_never_apply`, layer `exclusion`) in the decision table, a refusal in
   `tailoring.service.request`, and a fail in `conflicts.check_conflict_at_submit` (so permits and dispatch refuse it).
   `employer_policy.always_ask_first` joins the watched-employer flag.

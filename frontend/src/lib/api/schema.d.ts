@@ -6797,6 +6797,18 @@ export interface components {
             state: "free" | "role_in_progress" | "cooling_down" | "always_ask_first" | "blocked";
             /** Text */
             text: string;
+            /**
+             * Live
+             * @description The employer's roles in progress (this job's included)
+             * @default 0
+             */
+            live: number;
+            /**
+             * Live Elsewhere
+             * @description Roles in progress at this employer other than this job
+             * @default 0
+             */
+            live_elsewhere: number;
         };
         /** CompareCell */
         CompareCell: {
