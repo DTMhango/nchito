@@ -427,3 +427,36 @@ the registry under its own group prefix only.
   `block, waivable once`; 409 if already waived; 422 blank reason), `GET /api/kit/guardrail-waivers?application_id=`,
   `DELETE /api/kit/guardrail-waivers/{id}`. `POST /api/kit/guardrails/check` takes an optional `application_id`: a waived
   violation shows `waived: true` and no longer sets `blocked`. Audited `kit.guardrail.waived`, `kit.guardrail.waiver_removed`.
+
+
+## Wave 2 tailoring additions
+
+- **Spec versions**: table `application_spec_version` (migration `0007_tailoring`). Every tailored draft and every
+  owner edit is a new version `{version, origin: tailor|owner, parent_version, spec, content_hash, answers,
+  check_results, checked_hash, checked_facts}`; `Application.spec` and `Application.check_results` mirror the latest.
+  `content_hash` is sha256 of the spec's canonical JSON (`app.pipeline.checks.items.content_hash`). A spec is
+  **checked** only while `checked_hash == content_hash` and every cited fact still has the hash it had at check time.
+  The `ApplicationSpec` shape is unchanged.
+- **Tailoring requests**: table `tailoring_request`, unique per (application, sha256 of starting spec version and the
+  digest of usable Kit facts). `POST /applications/{id}/tailor` returns the same request while it is open
+  (`queued` true) and moves a shortlisted application to `tailoring`; 409 after submission. A budget refusal parks the
+  request `paused`; the periodic task `tailoring_resume` re-queues it when a cap is set and the cap or month changed.
+  Queue task `tailor_application(request_id)` under lock `tailor:<application id>`; one spec version per request.
+  Runs call `app.pipeline.tailoring.tasks.tailor(session, application_id, run_id=...)`, commit, then `enqueue(req)`.
+- **`GET /applications/{id}/spec?version=`** (new) -> `SpecStateOut {application_id, version, origin, content_hash,
+  spec, check_results, checked, status, stale_reasons, answers: DraftAnswer[], tailoring, tailoring_error,
+  versions[]}`.
+- **`PUT /applications/{id}/spec`** stores an owner version, runs the code checks, invalidates an approved packet
+  (`invalidated_reason` names the spec version); 409 once the application has gone out.
+  **`POST /applications/{id}/check`** re-runs the code checks plus the model claim check (stage `claim_check`, when
+  `tailoring.claim_check_enabled`); 409 when there is no draft. The model pass only adds findings.
+- **Check results**: `check` is one of `fact_trace`, `claim_drift`, `keep_out`, `guardrails.<type>` (pass row
+  `guardrails`), `limits`, `skills`, `requirement_match`, `answers`, `claim_check`; `detail` starts with the item path
+  (`experience[0].bullets[1]: ...`). For whole-packet checks the apply stream calls
+  `app.pipeline.checks.service.deterministic(spec, kit, cfg, answers=, extra_documents=, file_names=, attachments=,
+  released=, waived=)`.
+- **`DraftAnswer`** (json shape): `{question, outcome: value|ask_owner|do_not_answer, value, select, answer_id,
+  material, reason, pending_action_id}`. Only `value` carries an answer; `ask_owner` raised an `unknown_question`
+  pending action (one per question per application, `group_key` `question:<normalised>`).
+- **Settings** (group `tailoring`): `max_facts`, `claim_check_enabled`, `claim_check_severity`,
+  `ownership_weak_terms`, `ownership_strong_terms`, `scope_terms`, `period_terms`, `qualification_terms`.

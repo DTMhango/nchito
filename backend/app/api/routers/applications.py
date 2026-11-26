@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,8 @@ from app.core.config import get_config
 from app.core.events import publish
 from app.core.settings import service as settings_service
 from app.kit.importers import history
+from app.llm.deps import llm_service
+from app.llm.service import LLMService
 from app.models.applications import (
     Application,
     ApplicationEvent,
@@ -32,12 +35,17 @@ from app.models.applications import (
     PendingAction,
     PendingStatus,
     Stage,
+    TailoringRequest,
 )
 from app.models.search import Assessment, Job
 from app.pipeline import corrections
+from app.pipeline.checks import findings as checks_findings
+from app.pipeline.tailoring import service as tailoring_service
+from app.pipeline.tailoring import studio
 from app.schemas.json_types import (
     ApplicationSpec,
     CheckResult,
+    DraftAnswer,
     Evidence,
     GateResult,
     PacketContents,
@@ -190,6 +198,35 @@ class SpecUpdate(BaseModel):
 class TailorOut(BaseModel):
     run_id: uuid.UUID | None
     queued: bool
+
+
+class SpecVersionSummary(BaseModel):
+    version: int
+    origin: Literal["tailor", "owner"]
+    content_hash: str
+    created_at: datetime
+    created_by: str
+    status: Literal["pass", "warn", "block"]
+
+
+class SpecStateOut(BaseModel):
+    """The Studio's view of the documents: the spec, its checks and whether they still apply."""
+
+    application_id: uuid.UUID
+    version: int | None = Field(description="Spec version shown; null before the first draft")
+    origin: Literal["tailor", "owner"] | None = None
+    content_hash: str | None = None
+    spec: ApplicationSpec
+    check_results: list[CheckResult]
+    checked: bool = Field(description="The stored checks ran on exactly this content and these Kit facts")
+    status: Literal["pass", "warn", "block"] | None = Field(
+        default=None, description="Worst stored result (an unwaived block is block)")
+    stale_reasons: list[str] = Field(default_factory=list)
+    answers: list[DraftAnswer] = Field(default_factory=list,
+                                       description="Screening questions and what the answer bank says")
+    tailoring: Literal["queued", "running", "paused", "done", "failed"] | None = None
+    tailoring_error: str | None = None
+    versions: list[SpecVersionSummary] = Field(default_factory=list)
 
 
 class PacketOut(Timestamps):
@@ -686,22 +723,96 @@ async def timeline(application_id: uuid.UUID, session: SessionDep) -> list[Timel
             for e in rows]
 
 
+TailorEnqueue = Callable[[TailoringRequest], Awaitable[None]]
+
+
+async def get_tailor_enqueue() -> TailorEnqueue:
+    """Defers a tailoring request to the worker (tests replace this dependency)."""
+
+    async def enqueue(req: TailoringRequest) -> None:
+        from app.pipeline.tailoring.tasks import enqueue as defer
+        from app.worker.queue import queue_app
+
+        async with queue_app.open_async():
+            await defer(req)
+
+    return enqueue
+
+
+def _tailoring_error(exc: tailoring_service.TailoringError) -> HTTPException:
+    return HTTPException(exc.status_code, detail=str(exc))
+
+
 @router.post("/applications/{application_id}/tailor", response_model=TailorOut,
-             status_code=status.HTTP_202_ACCEPTED, name="applications_tailor")
-async def tailor(application_id: uuid.UUID) -> TailorOut:
-    not_implemented(2, "tailoring")
+             status_code=status.HTTP_202_ACCEPTED, name="applications_tailor",
+             responses={409: {"description": "The application can no longer be tailored"}})
+async def tailor(application_id: uuid.UUID, principal: PrincipalDep, session: SessionDep,
+                 enqueue: Annotated[TailorEnqueue, Depends(get_tailor_enqueue)]) -> TailorOut:
+    """Queue a tailored draft. Idempotent per spec version and Kit facts: asking again returns the same
+    request (``queued`` is false once it is done)."""
+    app = await session.get(Application, application_id, with_for_update=True)
+    if app is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="application not found")
+    try:
+        req, needs_queue = await tailoring_service.request(session, app, actor=principal.actor)
+    except tailoring_service.TailoringError as exc:
+        raise _tailoring_error(exc) from exc
+    await _changed(session, app.id)
+    await session.commit()
+    if needs_queue:
+        await enqueue(req)
+    return TailorOut(run_id=req.run_id, queued=req.status in tailoring_service.OPEN)
 
 
-@router.put("/applications/{application_id}/spec", response_model=ApplicationDetail, name="applications_put_spec")
-async def put_spec(application_id: uuid.UUID, body: SpecUpdate) -> ApplicationDetail:
+@router.get("/applications/{application_id}/spec", response_model=SpecStateOut, name="applications_get_spec")
+async def get_spec(application_id: uuid.UUID, session: SessionDep,
+                   version: Annotated[int | None, Query(ge=1)] = None) -> SpecStateOut:
+    app = await _load(session, application_id)
+    try:
+        got = await studio.spec_state(session, app, version)
+    except tailoring_service.TailoringError as exc:
+        raise _tailoring_error(exc) from exc
+    v, st, req = got.version, got.state, got.request
+    return SpecStateOut(
+        application_id=app.id, version=v.version if v else None, origin=v.origin if v else None,  # type: ignore[arg-type]
+        content_hash=v.content_hash if v else None, spec=v.spec if v else app.spec,
+        check_results=v.check_results if v else [], checked=bool(st and st.checked),
+        status=st.status if st and v and v.checked_hash else None, stale_reasons=st.stale_reasons if st else [],
+        answers=v.answers if v else [], tailoring=req.status.value if req else None,
+        tailoring_error=req.error if req else None,
+        versions=[SpecVersionSummary(version=r.version, origin=r.origin, content_hash=r.content_hash,  # type: ignore[arg-type]
+                                     created_at=r.created_at, created_by=r.created_by,
+                                     status=checks_findings.worst(r.check_results)) for r in got.versions])
+
+
+@router.put("/applications/{application_id}/spec", response_model=ApplicationDetail, name="applications_put_spec",
+            responses={409: {"description": "The documents can no longer be edited"}})
+async def put_spec(application_id: uuid.UUID, body: SpecUpdate, principal: PrincipalDep,
+                   session: SessionDep) -> ApplicationDetail:
     """Owner edits; re-runs the checks; invalidates an approved packet if material."""
-    not_implemented(2, "tailoring")
+    app = await session.get(Application, application_id, with_for_update=True)
+    if app is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="application not found")
+    try:
+        await studio.owner_edit(session, app, body.spec, actor=principal.actor)
+    except tailoring_service.TailoringError as exc:
+        raise _tailoring_error(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
 
 
 @router.post("/applications/{application_id}/check", response_model=list[CheckResult],
-             name="applications_check")
-async def run_checks(application_id: uuid.UUID) -> list[CheckResult]:
-    not_implemented(2, "tailoring")
+             name="applications_check", responses={409: {"description": "There is no draft to check"}})
+async def run_checks(application_id: uuid.UUID, principal: PrincipalDep, session: SessionDep,
+                     service: Annotated[LLMService, Depends(llm_service)]) -> list[CheckResult]:
+    """Re-run every check on the latest spec version, including the model claim check when enabled."""
+    app = await _load(session, application_id)
+    try:
+        results = await studio.recheck(session, app, service, actor=principal.actor)
+    except tailoring_service.TailoringError as exc:
+        raise _tailoring_error(exc) from exc
+    await _changed(session, app.id)
+    return results
 
 
 @router.get("/applications/{application_id}/documents/{kind}", name="applications_document",

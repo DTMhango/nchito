@@ -48,6 +48,7 @@ GROUPS: dict[str, str] = {
     "ai": "AI",
     "budget": "Budget",
     "documents": "Documents",
+    "tailoring": "Tailoring and checks",
     "retention": "Retention",
     "backups": "Backups",
     "notifications": "Notifications",
@@ -329,6 +330,50 @@ _int("documents.letter_pages", "Letter pages", "Maximum cover letter length.", 1
 _int("documents.letter_paragraphs", "Letter paragraphs", "Maximum cover letter paragraphs.", 4, 5, 1, 10)
 _add("documents.cv_template", "string", "CV template", "Default CV template (by template key).",
      "classic", "modern", str, validators=(slug,), invalid_example="Not A Key", has_invalid_example=True)
+
+# Tailoring and checks (9, 18.5)
+def _terms(key: str, label: str, description: str, default: list[str], example: list[str]) -> None:
+    _add(key, "list", label, description, default, example, list[str], validators=(unique_items, _no_blank_items),
+         invalid_example=["led", "led"], has_invalid_example=True)
+
+
+def _no_blank_items(value: Any) -> None:
+    if any(not str(v).strip() for v in value):
+        raise SettingValueError("terms cannot be blank")
+
+
+_int("tailoring.max_facts", "Facts sent per draft",
+     "Most Kit facts selected for one tailored draft (lead facts first, then the best keyword matches).",
+     60, 40, 5, 500, "facts")
+_bool("tailoring.claim_check_enabled", "Model claim check",
+      "After the code checks, a second model pass looks for unsupported claims. It can only add warnings or "
+      "blocks; it never clears a code check.", True)
+_enum("tailoring.claim_check_severity", "Model claim check result",
+      "What a sentence flagged by the model claim check does.", "warn", "block", ("warn", "block"))
+_terms("tailoring.ownership_weak_terms", "Supporting-role wording",
+       "Wording that marks a supporting role in a fact. A draft that turns it into leading wording is claim drift.",
+       ["contributed to", "supported", "assisted", "helped", "participated in", "worked on", "part of"],
+       ["contributed to", "supported"])
+_terms("tailoring.ownership_strong_terms", "Leading-role wording",
+       "Wording that claims ownership. Allowed only when a cited fact uses leading wording too.",
+       ["led", "owned", "headed", "directed", "spearheaded", "drove", "managed", "ran", "founded"],
+       ["led", "owned"])
+_terms("tailoring.scope_terms", "Scope wording",
+       "Wording that widens scope. A draft may use it only when a cited fact does.",
+       ["company-wide", "organisation-wide", "organization-wide", "group-wide", "enterprise-wide", "global",
+        "globally", "worldwide", "nationwide", "across the business"],
+       ["global", "company-wide"])
+_terms("tailoring.period_terms", "Period wording",
+       "Wording that states a period for a figure. A draft may use it only when a cited fact does.",
+       ["per month", "monthly", "per year", "annually", "per annum", "a year", "a month", "per week", "weekly",
+        "per quarter", "quarterly", "per day", "daily"],
+       ["per month", "per year"])
+_terms("tailoring.qualification_terms", "Qualification words",
+       "Words that name a degree, certificate or membership. A draft may use one only when a cited fact does.",
+       ["bachelor", "bsc", "b.sc", "master", "masters", "msc", "m.sc", "mba", "phd", "doctorate", "diploma",
+        "certificate", "certified", "certification", "chartered", "acca", "cima", "cfa", "cpa", "frm", "pmp",
+        "fellow"],
+       ["mba", "phd", "cfa"])
 
 # Retention (14)
 _int("retention.below_threshold_text_days", "Below-threshold text",

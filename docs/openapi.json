@@ -9947,6 +9947,7 @@
           "applications"
         ],
         "summary": "Applications Tailor",
+        "description": "Queue a tailored draft. Idempotent per spec version and Kit facts: asking again returns the same\nrequest (``queued`` is false once it is done).",
         "operationId": "applications_tailor",
         "parameters": [
           {
@@ -9981,6 +9982,9 @@
               }
             }
           },
+          "409": {
+            "description": "The application can no longer be tailored"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -9995,6 +9999,74 @@
       }
     },
     "/api/applications/{application_id}/spec": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Get Spec",
+        "operationId": "applications_get_spec",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecStateOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "applications"
@@ -10045,6 +10117,9 @@
               }
             }
           },
+          "409": {
+            "description": "The documents can no longer be edited"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -10064,6 +10139,7 @@
           "applications"
         ],
         "summary": "Applications Check",
+        "description": "Re-run every check on the latest spec version, including the model claim check when enabled.",
         "operationId": "applications_check",
         "parameters": [
           {
@@ -10101,6 +10177,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "There is no draft to check"
           },
           "422": {
             "description": "Validation Error",
@@ -18276,6 +18355,85 @@
           "error"
         ],
         "title": "DispatchOut"
+      },
+      "DraftAnswer": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "value",
+              "ask_owner",
+              "do_not_answer"
+            ],
+            "title": "Outcome"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "select": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Select"
+          },
+          "answer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Id"
+          },
+          "material": {
+            "type": "boolean",
+            "title": "Material",
+            "default": false
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "pending_action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Action Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question",
+          "outcome"
+        ],
+        "title": "DraftAnswer",
+        "description": "A screening question and what the answer bank says about it (5.4). Only ``outcome == \"value\"``\ncarries an answer; ``ask_owner`` raised a pending action, ``do_not_answer`` is a ``never`` answer."
       },
       "DryRunOut": {
         "properties": {
@@ -27466,6 +27624,146 @@
         ],
         "title": "SpecItem"
       },
+      "SpecStateOut": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Spec version shown; null before the first draft"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "tailor",
+                  "owner"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ApplicationSpec-Output"
+          },
+          "check_results": {
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            },
+            "type": "array",
+            "title": "Check Results"
+          },
+          "checked": {
+            "type": "boolean",
+            "title": "Checked",
+            "description": "The stored checks ran on exactly this content and these Kit facts"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "warn",
+                  "block"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Worst stored result (an unwaived block is block)"
+          },
+          "stale_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stale Reasons"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/DraftAnswer"
+            },
+            "type": "array",
+            "title": "Answers",
+            "description": "Screening questions and what the answer bank says"
+          },
+          "tailoring": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "paused",
+                  "done",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tailoring"
+          },
+          "tailoring_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tailoring Error"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/SpecVersionSummary"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "version",
+          "spec",
+          "check_results",
+          "checked"
+        ],
+        "title": "SpecStateOut",
+        "description": "The Studio's view of the documents: the spec, its checks and whether they still apply."
+      },
       "SpecUpdate": {
         "properties": {
           "spec": {
@@ -27477,6 +27775,54 @@
           "spec"
         ],
         "title": "SpecUpdate"
+      },
+      "SpecVersionSummary": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "tailor",
+              "owner"
+            ],
+            "title": "Origin"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "warn",
+              "block"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "origin",
+          "content_hash",
+          "created_at",
+          "created_by",
+          "status"
+        ],
+        "title": "SpecVersionSummary"
       },
       "SpendBucket": {
         "properties": {
