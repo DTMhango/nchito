@@ -11,7 +11,7 @@ from sqlalchemy import create_engine
 import app.models  # noqa: F401
 from app.core.migrations import include_object
 from app.models.base import Base
-from tests.conftest import WORKER, _admin_exec, recreate_database, run_migrations
+from tests.conftest import RUN_SUFFIX, WORKER, _admin_exec, recreate_database, run_migrations
 
 pytestmark = pytest.mark.nodb
 
@@ -22,7 +22,7 @@ def _tables(url: str) -> set[str]:
 
 
 def test_upgrade_downgrade_upgrade_on_clean_db():
-    name = f"nchito_mig_{WORKER}"
+    name = f"nchito_mig_{WORKER}_{RUN_SUFFIX}"
     url = recreate_database(name)
     try:
         run_migrations(url)
