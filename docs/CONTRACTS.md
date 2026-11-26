@@ -709,3 +709,12 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   A gate refusal takes its first blocking gate's code (`GATE_CODES`). The approve refusal's code was
   `approval_refused` for every case; it is now the specific code (the `gates` list is still attached).
   `DispatchCreateOut.code` and `ApprovalStatusOut.code` carry the same codes for a 200 that did not queue or approve.
+- **Prepare** `POST /api/applications/{id}/packet/prepare` `PacketPrepareIn {channel: auto | manual = auto,
+  cv_template?, letter_template?}` -> `PacketPrepareOut {channel: email | manual, packet, created, changes, approval}`.
+  It runs `app.apply.prepare.prepare_packet`, the function the pipeline uses: checked spec only, renders the CV and
+  letter (PDF and text; the template keys override the track and documents settings), picks the channel (`auto`:
+  email when the role's address is usable and a mailbox is connected, else manual), builds, then
+  `approval.after_packet_built`. Nothing built: 409 `{code, reason}` (`no_spec`, `check_stale`, `check_blocking`,
+  `answers_waiting`, `no_destination`, `no_identity`, `unknown_template`, `illegal_stage`, or a packet code); the
+  reason is audited `packet.not_built` with the code. The Studio's "Send for approval" calls this, not
+  `POST .../packet`.

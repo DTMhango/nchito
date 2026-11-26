@@ -14,8 +14,9 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -34,12 +35,20 @@ GENERATED = frozenset({"cv", "letter"})
 Check = tuple[str, str]
 
 
+ChannelChoice = Literal["auto", "manual"]
+
+
 @dataclass
 class Prepared:
     built: bool
     reason: str
     packet_id: uuid.UUID | None = None
     approval_status: str | None = None
+    code: str | None = None  # app.apply.errors.CODES, when not built
+    channel: str | None = None
+    created: bool = False
+    approval: Any = None  # approval.ApprovalOutcome | None
+    changes: list[dict[str, Any]] = field(default_factory=list)
 
 
 async def latest_spec(session: AsyncSession, app_id: uuid.UUID) -> ApplicationSpecVersion | None:
@@ -97,11 +106,11 @@ async def _owner_email(session: AsyncSession) -> str | None:
     return person.email.value if person is not None and person.email is not None else None
 
 
-async def _render(session: AsyncSession, store: FileStore, app: Application, kind: str, actor: str
-                  ) -> tuple[PacketFile, str]:
+async def _render(session: AsyncSession, store: FileStore, app: Application, kind: str, actor: str,
+                  template_key: str | None = None) -> tuple[PacketFile, str]:
     from app.docs import service as docs
 
-    prepared = await docs.prepare(session, app, kind)  # type: ignore[arg-type]
+    prepared = await docs.prepare(session, app, kind, template_key)  # type: ignore[arg-type]
     pdf = (await docs.render(session, store, app, prepared, "pdf", actor=actor)).document
     txt = (await docs.render(session, store, app, prepared, "txt", actor=actor)).document
     text = (await store.get(txt.file_key)).decode("utf-8")
@@ -110,57 +119,72 @@ async def _render(session: AsyncSession, store: FileStore, app: Application, kin
 
 
 async def prepare_packet(session: AsyncSession, store: FileStore, app: Application, *, actor: str = "system",
-                         now: datetime | None = None) -> Prepared:
+                         now: datetime | None = None, channel: ChannelChoice = "auto",
+                         templates: dict[str, str] | None = None) -> Prepared:
     """Render the checked spec's CV and letter, build the packet, then let the policy act on it.
-    The caller commits. Nothing is built (and the reason is audited) when the spec is not checked, when an
-    answer still waits for the owner, or when the posting gives no address to apply to."""
-    from app.apply import approval, packets
 
+    The one server function behind the pipeline and the Studio's "Send for approval". ``channel`` ``auto``
+    picks email when the role has a usable application address (``app.apply.target``) and a mailbox is
+    connected, otherwise manual; ``manual`` always hands it to the owner. ``templates`` (``{cv, letter}``
+    template keys) override the track and documents settings. The caller commits. Nothing is built (and the
+    reason is audited, with a code from ``app.apply.errors``) when the spec is not checked, when an answer
+    still waits for the owner, or when there is nowhere to apply."""
+    from app.apply import approval, errors, packets
+
+    templates = templates or {}
     version, check = await spec_state(session, app)
     if check[0] != "pass" or version is None:
-        return await _waiting(session, app, check[1], actor)
+        return await _waiting(session, app, check[1], actor, errors.for_spec(check[1]))
     waiting = [a.question for a in version.answers if a.outcome == "ask_owner"]
     if waiting:
-        return await _waiting(session, app, f"waiting for your answer to: {', '.join(waiting)}", actor)
+        return await _waiting(session, app, f"waiting for your answer to: {', '.join(waiting)}", actor,
+                              "answers_waiting")
     job = await session.get(Job, app.job_id)
     assert job is not None
     identity = await sending_identity(session)
     address = await target.apply_email(session, job)
-    if address is not None and address.usable and identity:
-        channel = "email"
+    if channel == "auto" and address is not None and address.usable and identity:
+        chosen = "email"
         destination = ""
     elif job.apply_url or address is not None:
-        channel = "manual"  # an unconfirmed address is handed to the owner, never sent by the system
+        chosen = "manual"  # an unconfirmed address is handed to the owner, never sent by the system
         destination = job.apply_url or f"mailto:{address.address if address else ''}"
     else:
-        return await _waiting(session, app, "the posting gives no email address or link to apply through", actor)
-    cv, _ = await _render(session, store, app, "cv", actor)
-    letter, letter_text = await _render(session, store, app, "letter", actor)
+        return await _waiting(session, app, "the posting gives no email address or link to apply through", actor,
+                              "no_destination")
+    from app.docs.service import TemplateNotFound
+
+    try:
+        cv, _ = await _render(session, store, app, "cv", actor, templates.get("cv"))
+        letter, letter_text = await _render(session, store, app, "letter", actor, templates.get("letter"))
+    except TemplateNotFound as exc:
+        return await _waiting(session, app, str(exc), actor, "unknown_template")
     email = None
-    if channel == "email":
+    if chosen == "email":
+        assert address is not None
         subject = str(await settings_service.get_value(session, "automation.email_subject_template")).format(
             role=job.title, employer=job.employer, requisition=job.requisition_id or "")
-        assert address is not None
         email = PacketEmail(to=[address.address], subject=subject.strip(), body=letter_text.strip())
     answers = [packets.DraftAnswer(question=a.question, answer_id=uuid.UUID(a.answer_id)) if a.answer_id
                else packets.DraftAnswer(question=a.question, value=a.value)
                for a in version.answers if a.outcome == "value"]
-    identity = identity if channel == "email" else (identity or await _owner_email(session))
+    identity = identity if chosen == "email" else (identity or await _owner_email(session))
     if not identity:
         return await _waiting(session, app, "no sending identity: connect a mailbox or add your email to the Kit",
-                              actor)
-    draft = packets.PacketDraft(channel=channel, destination_url=destination,  # type: ignore[arg-type]
+                              actor, "no_identity")
+    draft = packets.PacketDraft(channel=chosen, destination_url=destination,  # type: ignore[arg-type]
                                 sending_identity=identity, answers=answers, email=email, files=[cv, letter],
                                 requisition=job.requisition_id)
     try:
         built = await packets.build(session, app, draft, actor=actor, now=now)
     except packets.PacketError as exc:
-        return await _waiting(session, app, exc.message, actor)
+        return await _waiting(session, app, exc.message, actor, exc.code)
     outcome = await approval.after_packet_built(session, app, built.packet, now=now) if built.created else None
-    return Prepared(True, "packet built", built.packet.id, outcome.status if outcome else None)
+    return Prepared(True, "packet built", built.packet.id, outcome.status if outcome else None, channel=chosen,
+                    created=built.created, approval=outcome, changes=built.changes if built.previous else [])
 
 
-async def _waiting(session: AsyncSession, app: Application, reason: str, actor: str) -> Prepared:
+async def _waiting(session: AsyncSession, app: Application, reason: str, actor: str, code: str) -> Prepared:
     await audit.record(session, actor=actor, action="packet.not_built", subject_type="application",
-                       subject_id=app.id, detail={"reason": reason})
-    return Prepared(False, reason)
+                       subject_id=app.id, detail={"reason": reason, "code": code})
+    return Prepared(False, reason, code=code)

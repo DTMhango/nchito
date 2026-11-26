@@ -33,6 +33,7 @@ from app.core.clock import utcnow
 from app.core.config import get_config
 from app.core.events import publish
 from app.core.settings import service as settings_service
+from app.docs.api import StoreDep as DocStoreDep
 from app.docs.api import router as documents_router
 from app.kit.importers import history
 from app.llm.deps import llm_service
@@ -317,6 +318,25 @@ class PacketBuildOut(BaseModel):
     created: bool = Field(description="False when the contents were identical to the current packet")
     changes: list[PacketChange] = Field(default_factory=list,
                                         description="What changed from the previous version")
+    approval: ApprovalStatusOut | None = Field(
+        default=None, description="What the automation policy did with the new packet (None: nothing to do)")
+
+
+class PacketPrepareIn(BaseModel):
+    """Prepare the packet the way the pipeline does. ``auto``: email when the role's application address is
+    usable (confirmed, or a trusted domain) and a mailbox is connected, else manual. ``manual``: the owner
+    applies. Template keys override the track and documents settings (``GET /api/document-templates``)."""
+
+    channel: Literal["auto", "manual"] = "auto"
+    cv_template: str | None = Field(default=None, max_length=60)
+    letter_template: str | None = Field(default=None, max_length=60)
+
+
+class PacketPrepareOut(BaseModel):
+    channel: Literal["email", "manual"]
+    packet: PacketOut
+    created: bool = Field(description="False when the contents were identical to the current packet")
+    changes: list[PacketChange] = Field(default_factory=list)
     approval: ApprovalStatusOut | None = Field(
         default=None, description="What the automation policy did with the new packet (None: nothing to do)")
 
@@ -1000,6 +1020,38 @@ async def build_packet(application_id: uuid.UUID, body: PacketBuildIn, principal
         packet=_packet_out(built.packet), created=built.created,
         changes=[PacketChange(**c) for c in built.changes] if built.previous else [],
         approval=None if outcome is None else _approval_status(outcome))
+
+
+@router.post("/applications/{application_id}/packet/prepare", response_model=PacketPrepareOut,
+             name="applications_packet_prepare",
+             responses={409: {"description": "Nothing built: {code, reason} (spec not checked, answers waiting, "
+                                             "nowhere to apply, or the application has gone out)"}})
+async def prepare_packet(application_id: uuid.UUID, body: PacketPrepareIn, principal: PrincipalDep,
+                         session: SessionDep, store: DocStoreDep) -> PacketPrepareOut:
+    """Prepare the packet exactly as the pipeline does (``app.apply.prepare.prepare_packet``): render the
+    checked spec's CV and letter, pick the channel (email to a usable application address when a mailbox is
+    connected, else manual; ``channel: manual`` always hands it to the owner), build, then let the automation
+    policy act (an approval request, or automatic approval)."""
+    from app.apply import prepare as apply_prepare
+
+    app = await _load(session, application_id)
+    if app.stage not in approval.APPROVABLE_STAGES:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=apply_errors.detail(
+            "illegal_stage", f"an application in {app.stage.value} cannot be repacked"))
+    templates = {k: v for k, v in (("cv", body.cv_template), ("letter", body.letter_template)) if v}
+    prepared = await apply_prepare.prepare_packet(session, store, app, actor=principal.actor, channel=body.channel,
+                                                  templates=templates)
+    if not prepared.built or prepared.packet_id is None:
+        await session.commit()  # keep the audited reason
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            detail=apply_errors.detail(prepared.code or "refused", prepared.reason))
+    await _changed(session, app.id)
+    packet = await session.get(ApplicationPacket, prepared.packet_id, populate_existing=True)
+    assert packet is not None
+    return PacketPrepareOut(
+        channel=prepared.channel, packet=_packet_out(packet), created=prepared.created,  # type: ignore[arg-type]
+        changes=[PacketChange(**c) for c in prepared.changes],
+        approval=None if prepared.approval is None else _approval_status(prepared.approval))
 
 
 @router.get("/applications/{application_id}/receipt", response_model=ReceiptOut, name="applications_receipt")

@@ -10798,6 +10798,73 @@
         }
       }
     },
+    "/api/applications/{application_id}/packet/prepare": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Packet Prepare",
+        "description": "Prepare the packet exactly as the pipeline does (``app.apply.prepare.prepare_packet``): render the\nchecked spec's CV and letter, pick the channel (email to a usable application address when a mailbox is\nconnected, else manual; ``channel: manual`` always hands it to the owner), build, then let the automation\npolicy act (an approval request, or automatic approval).",
+        "operationId": "applications_packet_prepare",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PacketPrepareIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacketPrepareOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing built: {code, reason} (spec not checked, answers waiting, nowhere to apply, or the application has gone out)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/{application_id}/receipt": {
       "get": {
         "tags": [
@@ -24207,6 +24274,91 @@
           "invalidated_reason"
         ],
         "title": "PacketOut"
+      },
+      "PacketPrepareIn": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual"
+            ],
+            "title": "Channel",
+            "default": "auto"
+          },
+          "cv_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cv Template"
+          },
+          "letter_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letter Template"
+          }
+        },
+        "type": "object",
+        "title": "PacketPrepareIn",
+        "description": "Prepare the packet the way the pipeline does. ``auto``: email when the role's application address is\nusable (confirmed, or a trusted domain) and a mailbox is connected, else manual. ``manual``: the owner\napplies. Template keys override the track and documents settings (``GET /api/document-templates``)."
+      },
+      "PacketPrepareOut": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "manual"
+            ],
+            "title": "Channel"
+          },
+          "packet": {
+            "$ref": "#/components/schemas/PacketOut"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "False when the contents were identical to the current packet"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/PacketChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalStatusOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the automation policy did with the new packet (None: nothing to do)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel",
+          "packet",
+          "created"
+        ],
+        "title": "PacketPrepareOut"
       },
       "Page_AliasOut_": {
         "properties": {

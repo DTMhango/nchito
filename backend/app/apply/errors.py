@@ -12,13 +12,14 @@ from typing import Any
 # The codes, one place. Adding one is a contract change (document it in CONTRACTS.md).
 CODES: tuple[str, ...] = (
     "no_spec", "check_stale", "check_blocking", "document_not_rendered", "answers_waiting", "no_destination",
-    "no_identity", "invalid_packet", "no_packet", "packet_superseded", "packet_changed", "channel_mismatch",
-    "illegal_stage", "not_approved", "mode_not_allowed", "excluded", "held_by_conflict", "employer_cooldown",
-    "paused", "quiet_hours", "cap_reached", "budget", "duplicate", "permit_outstanding", "posting_changed",
-    "role_closed", "deadline_passed", "email_unconfirmed", "destination_unverified", "untrusted_site",
-    "answers_not_automatic", "runner_refused", "channel_unavailable", "retry_limit", "waiver_reason_required",
-    "note_required", "not_found", "already_handed_over", "already_settled", "not_uncertain", "not_started",
-    "still_queued", "nothing_to_submit", "system_channel", "invalid_address", "no_address", "refused",
+    "no_identity", "unknown_template", "invalid_packet", "no_packet", "packet_superseded", "packet_changed",
+    "channel_mismatch", "illegal_stage", "not_approved", "mode_not_allowed", "excluded", "held_by_conflict",
+    "employer_cooldown", "paused", "quiet_hours", "cap_reached", "budget", "duplicate", "permit_outstanding",
+    "posting_changed", "role_closed", "deadline_passed", "email_unconfirmed", "destination_unverified",
+    "untrusted_site", "answers_not_automatic", "runner_refused", "channel_unavailable", "retry_limit",
+    "waiver_reason_required", "note_required", "not_found", "already_handed_over", "already_settled",
+    "not_uncertain", "not_started", "still_queued", "nothing_to_submit", "system_channel", "invalid_address",
+    "no_address", "refused",
 )
 
 GATE_CODES: dict[str, str] = {
