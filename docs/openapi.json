@@ -14345,6 +14345,88 @@
         }
       }
     },
+    "/api/tokens/{token_id}/tasks": {
+      "get": {
+        "tags": [
+          "tokens"
+        ],
+        "summary": "Tokens Runner Tasks",
+        "description": "A runner's recent tasks, most recent claim first (read-only): each with its latest checkpoint, the\nblockers it raised, every permit decision with its reason, and its result with evidence refs.",
+        "operationId": "tokens_runner_tasks",
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Token Id"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunnerTaskOut_"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/today": {
       "get": {
         "tags": [
@@ -27222,6 +27304,45 @@
         ],
         "title": "Page[RunOut]"
       },
+      "Page_RunnerTaskOut_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunnerTaskOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor",
+            "description": "Opaque; pass back as ?cursor="
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "Page[RunnerTaskOut]"
+      },
       "Page_SavedViewOut_": {
         "properties": {
           "items": {
@@ -28041,6 +28162,45 @@
             ],
             "title": "Kind",
             "description": "The exact kind within the type (``detail.kind``): e.g. posting_changed, posting_closed, verification_code"
+          },
+          "reminders_sent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reminders Sent",
+            "description": "Blocker actions: reminders sent so far"
+          },
+          "next_reminder_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Reminder At",
+            "description": "Blocker actions with a deadline: when the next reminder is due (accounts.reminder_offsets_hours); null when none is left"
+          },
+          "choices": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "continue_acknowledged",
+                "manual_handoff",
+                "skipped"
+              ]
+            },
+            "type": "array",
+            "title": "Choices",
+            "description": "A runner blocker's owner choices: continue (resolve 'continue'), continue_acknowledged (resolve 'continue' with acknowledged=true), manual_handoff / skipped (POST /api/portal-accounts/actions/{id}/give-up). Empty for other actions."
           }
         },
         "type": "object",
@@ -28059,6 +28219,59 @@
           "status"
         ],
         "title": "PendingActionOut"
+      },
+      "PermitDecisionOut": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "wait_for_owner",
+              "denied"
+            ],
+            "title": "Decision"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "changes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "permit_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permit Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "at",
+          "decision"
+        ],
+        "title": "PermitDecisionOut"
       },
       "PersonField": {
         "properties": {
@@ -30237,6 +30450,12 @@
             ],
             "title": "Reference",
             "description": "confirmed: the employer's reference number, kept as evidence"
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "title": "Acknowledged",
+            "description": "continue on a suspicious-page blocker (redirect_off_domain, page_instruction): the owner confirms they checked the page and it is safe; required there (422 acknowledgement_required), audited",
+            "default": false
           }
         },
         "type": "object",
@@ -31204,6 +31423,34 @@
               }
             ],
             "title": "Current Task Id"
+          },
+          "current_task_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Task Title",
+            "description": "The role (title at employer) or site"
+          },
+          "current_task_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "apply",
+                  "check_posting",
+                  "sweep_site"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Task Type"
           }
         },
         "type": "object",
@@ -31216,6 +31463,125 @@
           "current_task_id"
         ],
         "title": "RunnerStatus"
+      },
+      "RunnerTaskOut": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Task Id"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "The role (title at employer), or the site for a sweep"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id"
+          },
+          "claimed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Claimed At",
+            "description": "This runner's latest claim of the task"
+          },
+          "steps_used": {
+            "type": "integer",
+            "title": "Steps Used"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "title": "Dry Run"
+          },
+          "checkpoint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentTaskState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/TaskBlockerOut"
+            },
+            "type": "array",
+            "title": "Blockers"
+          },
+          "permit_decisions": {
+            "items": {
+              "$ref": "#/components/schemas/PermitDecisionOut"
+            },
+            "type": "array",
+            "title": "Permit Decisions"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskResultOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs",
+            "description": "Screenshots and files the runner uploaded or cited (``evidence:<task>/<id>``)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "type",
+          "status",
+          "title",
+          "application_id",
+          "claimed_at",
+          "steps_used",
+          "attempts",
+          "dry_run",
+          "checkpoint",
+          "blockers",
+          "permit_decisions",
+          "result",
+          "evidence_refs"
+        ],
+        "title": "RunnerTaskOut"
       },
       "SavedViewBody-Input": {
         "properties": {
@@ -33423,6 +33789,121 @@
           "queued"
         ],
         "title": "TailorOut"
+      },
+      "TaskBlockerOut": {
+        "properties": {
+          "pending_action_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pending Action Id"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "raised_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Raised At"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pending_action_id",
+          "kind",
+          "title",
+          "status",
+          "raised_at"
+        ],
+        "title": "TaskBlockerOut"
+      },
+      "TaskResultOut": {
+        "properties": {
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "confirmation_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmation Text"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          }
+        },
+        "type": "object",
+        "title": "TaskResultOut"
       },
       "TemplateDefaultOut": {
         "properties": {

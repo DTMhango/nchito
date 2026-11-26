@@ -623,6 +623,27 @@
           ],
           "title": "EnteredAnswer",
           "type": "object"
+        },
+        "EnteredField": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "description": "The packet field key from get_packet fields[] (e.g. full_name, phone, sending_identity, link.<name>), or file.<name> for an attached packet file",
+              "title": "Key",
+              "type": "string"
+            },
+            "value": {
+              "description": "What was typed; for file.<name>, the attached file's sha256",
+              "title": "Value",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key",
+            "value"
+          ],
+          "title": "EnteredField",
+          "type": "object"
         }
       },
       "additionalProperties": false,
@@ -652,6 +673,22 @@
         "current_url": {
           "title": "Current Url",
           "type": "string"
+        },
+        "entered_fields": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/EnteredField"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The person, contact and document fields typed or attached, by packet field key. Compared with the packet: a difference asks the owner (wait_for_owner, the differing keys in changes). Omitted: not compared (older runners).",
+          "title": "Entered Fields"
         }
       },
       "required": [
