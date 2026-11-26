@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { lazy, Suspense, useState } from "react"
 import { Link } from "@tanstack/react-router"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -27,6 +27,10 @@ import {
   type ExportFormat,
 } from "./api"
 import { PracticePanel } from "./practice"
+
+const MockInterviewPanel = lazy(() =>
+  import("./mock/panel").then((m) => ({ default: m.MockInterviewPanel }))
+)
 import { PackSectionView } from "./section"
 import {
   basisOf,
@@ -252,6 +256,7 @@ function PackView({ jobId, pack }: { jobId: string; pack: InterviewPack }) {
   const facts = useQuery(listQuery<FactOut>("facts"))
   const index = indexFacts(facts.data ?? [])
   const [practising, setPractising] = useState(false)
+  const [mocking, setMocking] = useState(false)
   const open = isOpen(pack.status)
   const pending = pack.pending_sections ?? []
   const all = sectionsOf(pack)
@@ -282,6 +287,14 @@ function PackView({ jobId, pack }: { jobId: string; pack: InterviewPack }) {
             onClick={() => setPractising((p) => !p)}
           >
             Practice mode
+          </Button>
+          <Button
+            size="sm"
+            variant={mocking ? "default" : "outline"}
+            aria-pressed={mocking}
+            onClick={() => setMocking((p) => !p)}
+          >
+            Mock interview
           </Button>
           {pack.cost_micros > 0 && (
             <span className="self-center text-xs text-faint">
@@ -362,6 +375,14 @@ function PackView({ jobId, pack }: { jobId: string; pack: InterviewPack }) {
         <p role="alert" className="text-sm text-danger">
           {again.error.message}
         </p>
+      )}
+
+      {mocking && (
+        <Suspense
+          fallback={<p className="text-sm text-muted-foreground">Loading...</p>}
+        >
+          <MockInterviewPanel jobId={jobId} />
+        </Suspense>
       )}
 
       {practising && (

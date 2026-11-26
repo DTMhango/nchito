@@ -20,6 +20,7 @@ import { matchesHandlers } from "./handlers/matches"
 import { studioHandlers } from "./handlers/studio"
 import { autopilotHandlers } from "./handlers/autopilot"
 import { w3JobUiHandlers } from "./handlers/w3-job-ui"
+import { mockInterviewHandlers } from "./handlers/mock-interview"
 import { runnersHandlers } from "./handlers/runners"
 
 const latency = () =>
@@ -39,6 +40,7 @@ export const handlers = [
   ...autopilotHandlers,
   // Wave 3 job page: interview pack, compare, posting changes (before the generic /api/jobs/:id).
   ...w3JobUiHandlers,
+  ...mockInterviewHandlers,
   // Data, non-AI connections and health: before the AI handlers (they fall through for LLM providers).
   ...dataHandlers,
   ...kitHandlers,
