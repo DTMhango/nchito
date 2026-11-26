@@ -157,6 +157,47 @@ export const FORMS: Record<
       },
     ],
   },
+  s3: {
+    cta: "Connect storage",
+    fields: [
+      {
+        name: "endpoint",
+        label: "Storage address",
+        to: "config",
+        type: "url",
+        placeholder: "https://s3.example.com",
+        help: "The S3-compatible service's address (Backblaze B2, Cloudflare R2, MinIO, AWS S3 and others).",
+      },
+      { name: "bucket", label: "Bucket", to: "config" },
+      {
+        name: "region",
+        label: "Region",
+        to: "config",
+        optional: true,
+        help: "Leave empty if the provider does not use one.",
+      },
+      {
+        name: "prefix",
+        label: "Folder inside the bucket",
+        to: "config",
+        optional: true,
+        help: "Backups are written under this folder only.",
+      },
+      {
+        name: "access_key_id",
+        label: "Access key ID",
+        to: "secret",
+        type: "password",
+      },
+      {
+        name: "secret_access_key",
+        label: "Secret access key",
+        to: "secret",
+        type: "password",
+        help: "Encrypted and never shown again. Give it permission to write, read and delete in that bucket only.",
+      },
+    ],
+  },
   search_api: {
     cta: "Connect search API",
     check: checkSearchApi,

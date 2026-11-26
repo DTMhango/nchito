@@ -136,6 +136,19 @@ function checkConnection(
     if ((creating || secret) && secret.length < 16)
       return "signing_secret must be at least 16 characters"
   }
+  if (provider === "s3") {
+    const endpoint = String(config.endpoint ?? "")
+    if ((creating || "endpoint" in config) && !endpoint.startsWith("https://"))
+      return "endpoint must be an https address (http only for localhost)"
+    if (
+      (creating || "bucket" in config) &&
+      !/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(String(config.bucket ?? ""))
+    )
+      return "bucket must be 3 to 63 lowercase letters, digits, dots or hyphens"
+    for (const k of ["access_key_id", "secret_access_key"])
+      if ((creating || k in secrets) && !(secrets[k] ?? "").trim())
+        return `${k} is required`
+  }
   if (provider === "search_api") {
     // search_api.py: known config keys only, endpoint http(s), the key as header or param.
     const known = [
@@ -183,6 +196,7 @@ const OWN = [
   "telegram",
   "webhook",
   "search_api",
+  "s3",
 ]
 
 const READS: Record<string, string> = {
@@ -191,6 +205,7 @@ const READS: Record<string, string> = {
   gdrive: "Only the files this app puts in its own folder.",
   telegram: "Nothing. It only sends messages to your chat.",
   webhook: "Nothing. It only sends signed messages.",
+  s3: "Writes, reads back and deletes encrypted backup files in one bucket. Lists nothing else.",
   search_api:
     "Sends search phrases built from your campaigns' titles and places to the search provider. Reads only the result links.",
 }

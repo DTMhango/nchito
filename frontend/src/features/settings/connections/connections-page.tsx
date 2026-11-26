@@ -59,6 +59,13 @@ const BLOCKS: Block[] = [
     add: <ConnectForm provider="webhook" label="Webhook" />,
   },
   {
+    id: "s3",
+    title: "Backup storage (S3-compatible)",
+    providers: ["s3"],
+    lead: "A bucket that keeps a copy of each encrypted backup. Choose it as the backup target under Settings, Data. The app only writes, reads back and deletes its own backup files. Test checks the bucket is reachable.",
+    add: <ConnectForm provider="s3" label="Backup storage" />,
+  },
+  {
     id: "search",
     title: "Search API",
     providers: ["search_api"],
