@@ -3,7 +3,9 @@ import {
   BriefcaseBusiness,
   ExternalLink,
   FileText,
+  Columns3,
   Gauge,
+  History,
   Mail,
   MessagesSquare,
   Pin,
@@ -39,6 +41,9 @@ import { WhyButton } from "./why-sheet"
 import { ActivityTab } from "./tabs/activity-tab"
 import { ApplicationTab } from "./tabs/application-tab"
 import { ComingTab } from "./tabs/coming-tab"
+import { ChangesTab, StalePacketBanner } from "./changes/changes-tab"
+import { InterviewTab } from "./interview/interview-tab"
+import { InterviewOffer } from "./interview/offer-banner"
 import { FitTab } from "./tabs/fit-tab"
 import { MessagesTab } from "./tabs/messages-tab"
 import { OverviewTab } from "./tabs/overview-tab"
@@ -58,6 +63,7 @@ const TAB_META: Record<JobTab, { label: string; icon: LucideIcon }> = {
   messages: { label: "Messages", icon: Mail },
   people: { label: "People", icon: Users },
   interview: { label: "Interview", icon: MessagesSquare },
+  changes: { label: "Changes", icon: History },
   activity: { label: "Activity", icon: Activity },
 }
 
@@ -100,6 +106,8 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
   return (
     <View>
       <JobHeader job={job.data} />
+      <StalePacketBanner jobId={job.data.id} />
+      {tab !== "interview" && <InterviewOffer job={job.data} />}
       <SubNav label="Role sections" className="mt-1 mb-5">
         {JOB_TABS.map((t) => {
           const Icon = TAB_META[t].icon
@@ -131,7 +139,8 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
         {tab === "application" && <ApplicationTab job={job.data} />}
         {tab === "messages" && <MessagesTab job={job.data} />}
         {tab === "people" && <PeopleTab job={job.data} />}
-        {tab === "interview" && <ComingTab tab="interview" />}
+        {tab === "interview" && <InterviewTab job={job.data} />}
+        {tab === "changes" && <ChangesTab job={job.data} />}
         {tab === "activity" && <ActivityTab job={job.data} />}
       </section>
     </View>
@@ -192,6 +201,12 @@ function JobHeader({ job }: { job: JobDetail }) {
         </div>
         <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
           <WhyButton jobId={job.id} />
+          <Button asChild size="sm" variant="outline">
+            <Link to="/compare" search={{ ids: job.id }}>
+              <Columns3 aria-hidden="true" />
+              Compare
+            </Link>
+          </Button>
           <CorrectionsMenu job={job} />
         </div>
       </div>

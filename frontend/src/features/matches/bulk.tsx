@@ -1,6 +1,7 @@
 import { useId, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Archive, RefreshCw, Tag, X } from "lucide-react"
+import { Link } from "@tanstack/react-router"
+import { Archive, Columns3, RefreshCw, Tag, X } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -57,6 +58,24 @@ export function BulkBar({ ids, onClear, onAction }: BulkBarProps) {
         <RefreshCw data-icon="inline-start" aria-hidden="true" />
         Rescore
       </Button>
+      {ids.length >= 2 && ids.length <= 4 ? (
+        <Button asChild variant="outline" size="xs">
+          <Link to="/compare" search={{ ids: ids.join(",") }}>
+            <Columns3 data-icon="inline-start" aria-hidden="true" />
+            Compare
+          </Link>
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          size="xs"
+          disabled
+          title="Select 2 to 4 roles to compare"
+        >
+          <Columns3 data-icon="inline-start" aria-hidden="true" />
+          Compare
+        </Button>
+      )}
       <Button variant="ghost" size="xs" className="ml-auto" onClick={onClear}>
         Clear
       </Button>

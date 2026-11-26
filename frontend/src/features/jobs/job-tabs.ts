@@ -8,6 +8,7 @@ export const JOB_TABS = [
   "messages",
   "people",
   "interview",
+  "changes",
   "activity",
 ] as const
 export type JobTab = (typeof JOB_TABS)[number]
