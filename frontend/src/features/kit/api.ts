@@ -252,3 +252,31 @@ export const REVIEW_PAGE: Partial<Record<ReviewEntity, string>> = {
   vault_document: "documents",
   template: "templates",
 }
+
+/** Open applications whose packet or pending actions use this answer (shown before a change). */
+export const answerUsage = (id: string) =>
+  unwrap(
+    api.GET("/api/kit/answers/{item_id}/usage", {
+      params: { path: { item_id: id } },
+    })
+  )
+
+// ---- guardrail waivers ----
+export const waiversKey = ["kit", "guardrail-waivers"] as const
+export const listWaivers = () => unwrap(api.GET("/api/kit/guardrail-waivers"))
+export const waiveGuardrail = (
+  guardrailId: string,
+  body: { application_id: string; reason: string }
+) =>
+  unwrap(
+    api.POST("/api/kit/guardrails/{item_id}/waivers", {
+      params: { path: { item_id: guardrailId } },
+      body,
+    })
+  )
+export const removeWaiver = (id: string) =>
+  unwrap(
+    api.DELETE("/api/kit/guardrail-waivers/{waiver_id}", {
+      params: { path: { waiver_id: id } },
+    })
+  )

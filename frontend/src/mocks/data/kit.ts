@@ -438,7 +438,7 @@ export function kitSeed(): Record<Resource, Row[]> {
             conditions: [
               {
                 type: "values",
-                facet: "country",
+                facet: "location.country",
                 include: ["ZM"],
                 exclude: [],
                 match: "any",

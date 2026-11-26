@@ -1,10 +1,25 @@
 {
   "foreground": { "light": "#FFFFFF", "dark": "#0B0F14" },
   "swatches": [
-    { "id": "malachite", "name": "Malachite", "light": "#0F6B55", "dark": "#3FBF9A" },
+    {
+      "id": "malachite",
+      "name": "Malachite",
+      "light": "#0F6B55",
+      "dark": "#3FBF9A"
+    },
     { "id": "cobalt", "name": "Cobalt", "light": "#1F4FD8", "dark": "#7B9BFF" },
     { "id": "amber", "name": "Amber", "light": "#A35F00", "dark": "#FFB224" },
-    { "id": "jacaranda", "name": "Jacaranda", "light": "#7A4FB0", "dark": "#B892E8" },
-    { "id": "bougainvillea", "name": "Bougainvillea", "light": "#B2365F", "dark": "#F27FA5" }
+    {
+      "id": "jacaranda",
+      "name": "Jacaranda",
+      "light": "#7A4FB0",
+      "dark": "#B892E8"
+    },
+    {
+      "id": "bougainvillea",
+      "name": "Bougainvillea",
+      "light": "#B2365F",
+      "dark": "#F27FA5"
+    }
   ]
 }

@@ -4,6 +4,8 @@ import type { Resource } from "@/features/kit/api"
 import { db } from "../db"
 import { kitSeed } from "@/mocks/data/kit"
 import { FACTS } from "@/mocks/data/jobs"
+import type { AnswerUse, Waiver, WaiverIn } from "@/lib/api/types"
+import { applicationsMock } from "./applications"
 
 type Row = Record<string, unknown> & { id: string }
 
@@ -14,9 +16,11 @@ function seed() {
   return s
 }
 let store = seed()
+let waivers: Waiver[] = []
 /** Reset the mock Kit to its seed (tests call this; the browser mock resets on reload). */
 export const resetKitMock = () => {
   store = seed()
+  waivers = []
 }
 export const kitStore = () => store
 
@@ -287,6 +291,53 @@ export const kitHandlers = [
   ...crud("guardrails", "/api/kit/guardrails"),
   ...crud("answers", "/api/kit/answers"),
   ...crud("templates", "/api/kit/templates"),
+  // ---- answer usage and guardrail waivers ----
+  http.get("*/api/kit/answers/:id/usage", ({ params }) => {
+    if (!db.get().session) return unauthorized()
+    const answer = store.answers.find((x) => x.id === String(params.id))
+    if (!answer) return notFound()
+    const n = Number(answer.pending_applications_using ?? 0)
+    const open = applicationsMock().apps.filter((x) =>
+      ["shortlisted", "tailoring", "ready"].includes(x.stage)
+    )
+    const uses: AnswerUse[] = open.slice(0, n).map((x, i) => ({
+      application_id: x.id,
+      job_id: x.job_id,
+      job_title: x.title,
+      employer: x.employer,
+      stage: x.stage,
+      via: i % 2 ? "pending_action" : "packet",
+    }))
+    return HttpResponse.json(uses)
+  }),
+  http.post("*/api/kit/guardrails/:id/waivers", async ({ params, request }) => {
+    if (!db.get().session) return unauthorized()
+    const g = store.guardrails.find((x) => x.id === String(params.id))
+    if (!g) return notFound()
+    const b = (await request.json()) as WaiverIn
+    if (!b.reason?.trim())
+      return HttpResponse.json({ detail: "Give a reason." }, { status: 422 })
+    const w: Waiver = {
+      id: crypto.randomUUID(),
+      created_at: now(),
+      updated_at: now(),
+      guardrail_id: g.id,
+      application_id: b.application_id,
+      reason: b.reason.trim(),
+      waived_by: "owner",
+    }
+    waivers.push(w)
+    return HttpResponse.json(w, { status: 201 })
+  }),
+  http.get("*/api/kit/guardrail-waivers", () => {
+    if (!db.get().session) return unauthorized()
+    return HttpResponse.json(waivers)
+  }),
+  http.delete("*/api/kit/guardrail-waivers/:id", ({ params }) => {
+    if (!db.get().session) return unauthorized()
+    waivers = waivers.filter((w) => w.id !== String(params.id))
+    return new HttpResponse(null, { status: 204 })
+  }),
   ...crud("vault", "/api/kit/vault"),
   ...crud("skill-aliases", "/api/skill-aliases"),
 ]

@@ -8,6 +8,7 @@ import {
   TriangleAlert,
 } from "lucide-react"
 import { toast } from "sonner"
+import { WaiversSection } from "./waivers-section"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -646,6 +647,7 @@ export function GuardrailsPage() {
           }}
         </QueryGate>
         <RuleTester />
+        <WaiversSection />
       </div>
       {dialog && (
         <GuardrailDialog

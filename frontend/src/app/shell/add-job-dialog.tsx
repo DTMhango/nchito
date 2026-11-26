@@ -88,9 +88,7 @@ export function AddJobDialog({
     },
     onError: (e) => {
       if (isApiError(e, 404))
-        toast.error(
-          "Adding jobs by hand isn't available on this server."
-        )
+        toast.error("Adding jobs by hand isn't available on this server.")
       else
         toast.error(
           e instanceof Error ? e.message : "Couldn't add that job. Try again."

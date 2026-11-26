@@ -29,5 +29,5 @@ export type JobCaptureRequest = Schemas["CaptureIn"]
 export type JobCaptureResponse = Schemas["CaptureOut"]
 export type AutopilotState = Schemas["AutopilotState"]
 export type PauseItem = AutopilotState["summary"]["cancelled"][number]
-export type { Session } from "./pending"
+export type { AnswerUse, Session, Waiver, WaiverIn } from "./pending"
 export type { Appearance, Theme } from "@/themes/schema"

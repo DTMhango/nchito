@@ -106,13 +106,7 @@
     "panel-border": "#FFFFFF",
     "elev-top-color": "var(--t-border-strong)"
   },
-  "chart": [
-    "#00359E",
-    "#7A2E00",
-    "#00521C",
-    "#5C3300",
-    "#6B6B6B"
-  ],
+  "chart": ["#00359E", "#7A2E00", "#00521C", "#5C3300", "#6B6B6B"],
   "score": {
     "low": "#6B6B6B",
     "mid": "#00359E",

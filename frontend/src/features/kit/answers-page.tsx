@@ -1,3 +1,4 @@
+import type { AnswerUse } from "@/lib/api/types"
 import { useMemo, useState } from "react"
 import { CalendarClock, Pencil, Plus } from "lucide-react"
 import { toast } from "sonner"
@@ -7,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Chip, type ChipTone } from "@/components/chip"
 import { PageHeader } from "@/components/page-header"
 import {
+  answerUsage,
   useKitList,
   useRemove,
   useSave,
@@ -197,6 +199,8 @@ function AnswerDialog({
 }) {
   const save = useSave<AnswerOut, AnswerIn>("answers")
   const remove = useRemove("answers")
+  // Applications already using this answer, fetched before a changed value is saved.
+  const [usage, setUsage] = useState<AnswerUse[] | null>(null)
   const [canonical, setCanonical] = useState(a?.patterns.canonical ?? "")
   const [variants, setVariants] = useState(
     (a?.patterns.variants ?? []).join("\n")
@@ -236,8 +240,16 @@ function AnswerDialog({
       description="A question answered once and reused. Material answers ask first."
       saving={save.isPending}
       error={save.error}
+      submitLabel={usage?.length ? "Save anyway" : "Save"}
       onSubmit={() => {
         if (!canonical.trim()) return
+        const changed = !!a && (value.trim() || null) !== (a.value ?? null)
+        if (a && changed && a.pending_applications_using > 0 && !usage) {
+          void answerUsage(a.id)
+            .then(setUsage)
+            .catch(() => setUsage([]))
+          return
+        }
         const kept = existing.conditions.filter(
           (c) => !COND_FACETS.some((f) => isFacet(c, f))
         )
@@ -281,6 +293,36 @@ function AnswerDialog({
         )
       }}
     >
+      {!!usage?.length && (
+        <div
+          role="status"
+          className="grid gap-1.5 rounded-md border border-warn bg-warn-soft p-3 text-sm"
+        >
+          <p>
+            {usage.length === 1
+              ? "One open application uses this answer."
+              : `${usage.length} open applications use this answer.`}{" "}
+            Saving changes it for them too.
+          </p>
+          <ul
+            className="grid gap-0.5"
+            aria-label="Applications using this answer"
+          >
+            {usage.map((u) => (
+              <li key={`${u.application_id}-${u.via}`}>
+                {u.job_title}, {u.employer}{" "}
+                <span className="text-muted-foreground">
+                  ({u.stage.replace(/_/g, " ")},{" "}
+                  {u.via === "packet"
+                    ? "in the packet"
+                    : "in a question waiting for you"}
+                  )
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <Field label="Question">
         {(id) => (
           <Input
