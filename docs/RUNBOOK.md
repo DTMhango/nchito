@@ -21,6 +21,33 @@ but no worker heartbeat is fresh; `down` (HTTP 503) means the database is unreac
     docker compose up -d --build
     open http://localhost:8000
 
+## First run
+
+1. **Create the owner.** Open the app: with no owner yet it shows the setup page
+   (`POST /api/setup/owner`). Pick a long passphrase; there is one owner per instance.
+2. **Wizard.** Onboarding walks through the Kit (import a `.kit.zip` or the old job-hunting folder,
+   or start empty), the profile, work rights and answers, the first track and campaign, the theme
+   (built-in or one made in the Theme studio) and the autopilot mode (start in *review*).
+   Every imported fact, skill and guardrail starts *to review*; nothing is used until you confirm it.
+3. **Connect Gmail (and Drive, Calendar).** In Google Cloud console create one OAuth client
+   (type *Web application*) and set `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET`.
+   Enable the **Gmail API**, **Google Drive API** and **Google Calendar API** for the project, and
+   register these redirect URIs (`BASE_URL` is the public address, e.g. `http://localhost:8000`):
+   - `BASE_URL/api/connections/oauth/gmail/callback` (scopes `gmail.send`, `gmail.readonly`)
+   - `BASE_URL/api/connections/oauth/gdrive/callback` (scope `drive.file`, backups and exports)
+   - `BASE_URL/api/connections/oauth/gcalendar/callback` (scope `calendar.app.created`)
+
+   While the consent screen is in *testing*, add your own address as a test user. Then
+   Settings → Connections → Connect. Outlook/OneDrive: see "Outlook and OneDrive" below.
+4. **Try it without real postings.** `docker compose exec web nchito demo-job` (or
+   `python -m app.cli demo-job` in `backend/`) inserts one fictional role so you can walk
+   score → tailor → approve → send-by-hand end to end. It is refused in production.
+5. **PC runner** (portals that need a browser): see "Local runner" below; pair it from
+   Settings → Runners. The optional server runner is under "Server runner".
+6. **Backups.** Set the backup target (local folder, S3, Google Drive or OneDrive) in Settings →
+   Data, run `nchito backup` once and test a restore (see "Backups and restore"). Keep
+   `ENCRYPTION_KEY` outside the server.
+
 ## First start (VPS, Dokploy)
 
 1. Create a Compose app in Dokploy from this repository, compose file `docker-compose.dokploy.yml`.

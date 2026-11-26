@@ -4,10 +4,14 @@ Working title "Nchito" (Nyanja for work). The name is a setting (`APP_NAME`), no
 Status: design v1, 25 Nov 2026. Awaiting the owner's go-ahead to build.
 Visual reference: `design/ui-preview.html` (clickable mockup, five themes).
 
-Build status (26 Nov 2026): waves 0 to 3 are built (foundations; sweep, score and documents;
-approvals, email channel and tracker; agent gateway, runners, sign-in handoff and interview pack).
-Wave 4 adds the remaining screens and channels, hardening of earlier waves, and the old-kit
-importer.
+Build status (26 Nov 2026): waves 0 to 4 are built (foundations; sweep, score and documents;
+approvals, email channel and tracker; agent gateway, runners, sign-in handoff and interview pack;
+wave 4: insights, employers, bulk actions, follow-ups, calendar, feedback and preferences,
+wind-down, theme studio, mock interview, config history, Outlook/OneDrive/S3, tool and skill
+tracing in the truth checks).
+Declined: remote sign-in for the server runner, tweakcn theme import, an AI summary of feedback
+notes. Known limits: Outlook attachments above 3 MB are refused (no upload session); OneDrive
+works with personal Microsoft accounts only; LLM replies are not streamed.
 
 This document is the build specification. Build agents read it in full before touching code.
 Where it says MUST, a reviewer rejects work that does otherwise.

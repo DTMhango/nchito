@@ -12,6 +12,28 @@ is data (the Kit), never code.
 
 **The repository contains no personal data.** Personal material enters only through the UI.
 
+## What it does (waves 0 to 4)
+
+- **Kit:** facts, experiences, skills (with aliases), guardrails, answers, work rights, tracks;
+  imported from a `.kit.zip` or an old job-hunting folder, everything confirmed by you before use.
+- **Find and score:** sources and watched employers swept on a schedule, de-duplicated, facets
+  extracted, scored against campaign rules; Matches with saved views, facet filters and bulk actions.
+- **Documents:** CVs and letters tailored only from approved facts, then code-checked: fact tracing
+  (figures, dates, employers, titles, qualifications, tools and skills), claim drift, keep-out facts,
+  guardrails, limits; an optional model claim check can only add findings.
+- **Apply:** hashed packets, your approval, single-use permits; email (Gmail, Outlook), a browser
+  agent on your PC runner or the optional server runner, or by hand; one role per employer at a time.
+- **After applying:** mail sync and tracker, follow-up messages (checked like documents, sent only on
+  your approval), calendar (Google Calendar, `.ics` invites and a private feed), interview packs,
+  mock interviews with truth-checked suggestions, offers.
+- **Wave 4:** Insights with drill-through, Employers (policy, cooldown, live roles), bulk actions,
+  feedback and preference suggestions with a policy preview, wind-down, theme studio (contrast
+  checked, also for imported themes), config history and rollback, OneDrive and S3 backups.
+- **Operations:** append-only audit, spend caps with reservations, notifications and digest, health
+  alerts, encrypted backups and restore. Every business value is a setting (Settings screen).
+
+First run (owner, wizard, Google redirect URIs, demo role, runner, backups): [`docs/RUNBOOK.md`](docs/RUNBOOK.md#first-run).
+
 ## Run it (Docker)
 
 Requires Docker with Compose v2.
