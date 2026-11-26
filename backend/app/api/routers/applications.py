@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.apply import approval, autopilot, stages
 from app.apply import dispatch as apply_dispatch

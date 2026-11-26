@@ -7388,7 +7388,7 @@
           "jobs"
         ],
         "summary": "Jobs Compare",
-        "description": "Comma-separated job ids. Wave 3.",
+        "description": "Side by side, 2 to 4 roles (comma-separated ids): facets (three-state), pay (normalised per year where\nthat is sound, else marked not comparable), score by rubric criterion, eligibility gates, employer group,\ndeadline and how to apply. ``campaign_id`` picks whose assessment is shown (default: the best scored one).\nNo model call; unknown stays unknown.",
         "operationId": "jobs_compare",
         "parameters": [
           {
@@ -7398,6 +7398,23 @@
             "schema": {
               "type": "string",
               "title": "Job Ids"
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
             }
           }
         ],
@@ -8643,6 +8660,194 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BackfillEstimate"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/changes": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Changes",
+        "description": "The change history of one posting, newest first, and when it was last scanned.",
+        "operationId": "jobs_changes",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobChangesOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/job-changes": {
+      "get": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Job Changes List",
+        "description": "Posting changes across all roles, newest first (the alert feed).",
+        "operationId": "job_changes_list",
+        "parameters": [
+          {
+            "name": "unacknowledged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Unacknowledged"
+            }
+          },
+          {
+            "name": "material_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Material Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobChangeOut"
+                  },
+                  "title": "Response Job Changes List"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/job-changes/{change_id}/acknowledge": {
+      "post": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Job Changes Acknowledge",
+        "description": "\"Seen\": clears the alert. Pending actions the change opened stay until the owner resolves them.",
+        "operationId": "job_changes_acknowledge",
+        "parameters": [
+          {
+            "name": "change_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Change Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobChangeOut"
                 }
               }
             }
@@ -19374,6 +19579,163 @@
         ],
         "title": "CheckResult"
       },
+      "CompareCell": {
+        "properties": {
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "stated",
+              "not_stated",
+              "unknown",
+              "yes",
+              "no",
+              "estimated",
+              "pass",
+              "fail"
+            ],
+            "title": "State"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "amount_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount Minor",
+            "description": "Pay: the per-year midpoint, when normalised"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "state"
+        ],
+        "title": "CompareCell"
+      },
+      "CompareJob": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "availability": {
+            "type": "string",
+            "title": "Availability"
+          },
+          "campaign_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Id",
+            "description": "The campaign whose assessment is shown"
+          },
+          "campaign_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Campaign Name"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "assessment_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assessment State"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "employer",
+          "availability"
+        ],
+        "title": "CompareJob"
+      },
       "CompareOut": {
         "properties": {
           "job_ids": {
@@ -19384,22 +19746,16 @@
             "type": "array",
             "title": "Job Ids"
           },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/CompareJob"
+            },
+            "type": "array",
+            "title": "Jobs"
+          },
           "rows": {
             "items": {
-              "additionalProperties": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              },
-              "type": "object"
+              "$ref": "#/components/schemas/CompareRow"
             },
             "type": "array",
             "title": "Rows"
@@ -19414,7 +19770,8 @@
                 "type": "null"
               }
             ],
-            "title": "Winner Id"
+            "title": "Winner Id",
+            "description": "The conflict group's winner when the roles share an employer"
           },
           "winner_reason": {
             "anyOf": [
@@ -19431,11 +19788,81 @@
         "type": "object",
         "required": [
           "job_ids",
+          "jobs",
           "rows",
-          "winner_id",
-          "winner_reason"
+          "winner_id"
         ],
         "title": "CompareOut"
+      },
+      "CompareRow": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "group": {
+            "type": "string",
+            "enum": [
+              "facets",
+              "pay",
+              "score",
+              "gates",
+              "employer",
+              "timing",
+              "apply"
+            ],
+            "title": "Group"
+          },
+          "cells": {
+            "items": {
+              "$ref": "#/components/schemas/CompareCell"
+            },
+            "type": "array",
+            "title": "Cells",
+            "description": "One per job, in the order of ``job_ids``"
+          },
+          "comparable": {
+            "type": "boolean",
+            "title": "Comparable",
+            "description": "False when the roles cannot be ranked on this row; ``note`` says why"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "best_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Index",
+            "description": "Index of the best role on this row, when comparable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "group",
+          "cells",
+          "comparable"
+        ],
+        "title": "CompareRow"
       },
       "Component": {
         "properties": {
@@ -22049,6 +22476,52 @@
         "type": "object",
         "title": "FavouriteIn"
       },
+      "FieldChange": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "closed",
+              "reopened",
+              "deadline_moved",
+              "pay_changed",
+              "requirements_changed",
+              "apply_method_changed",
+              "eligibility_changed",
+              "location_changed",
+              "wording"
+            ],
+            "title": "Kind"
+          },
+          "field": {
+            "type": "string",
+            "title": "Field"
+          },
+          "before": {
+            "title": "Before"
+          },
+          "after": {
+            "title": "After"
+          },
+          "material": {
+            "type": "boolean",
+            "title": "Material"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary",
+            "description": "e.g. \"Work model: remote -> on site\""
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "field",
+          "material",
+          "summary"
+        ],
+        "title": "FieldChange"
+      },
       "FilterResult": {
         "properties": {
           "name": {
@@ -23618,6 +24091,149 @@
           "created_by"
         ],
         "title": "InterviewSectionOut"
+      },
+      "JobChangeOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "job_title": {
+            "type": "string",
+            "title": "Job Title"
+          },
+          "employer": {
+            "type": "string",
+            "title": "Employer"
+          },
+          "detected_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Detected At"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "material": {
+            "type": "boolean",
+            "title": "Material",
+            "description": "Material changes reassess the role and flag an approved packet"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/FieldChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "acknowledged_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged At"
+          },
+          "acknowledged_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Acknowledged By"
+          },
+          "application_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Application Ids"
+          },
+          "invalidated_packet_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Invalidated Packet Ids"
+          },
+          "pending_action_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Pending Action Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "job_id",
+          "job_title",
+          "employer",
+          "detected_at",
+          "source",
+          "material",
+          "kinds",
+          "changes"
+        ],
+        "title": "JobChangeOut"
+      },
+      "JobChangesOut": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Job Id"
+          },
+          "watch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WatchOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the scheduled scan last looked at this role"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/JobChangeOut"
+            },
+            "type": "array",
+            "title": "Changes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "changes"
+        ],
+        "title": "JobChangesOut"
       },
       "JobDetail": {
         "properties": {
@@ -34413,6 +35029,42 @@
           "waived_by"
         ],
         "title": "WaiverOut"
+      },
+      "WatchOut": {
+        "properties": {
+          "last_scanned_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Scanned At"
+          },
+          "last_result": {
+            "type": "string",
+            "enum": [
+              "unchanged",
+              "changed",
+              "closed",
+              "unknown"
+            ],
+            "title": "Last Result"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "last_scanned_at",
+          "last_result"
+        ],
+        "title": "WatchOut"
       },
       "WatchedEmployerFromUrl": {
         "properties": {
