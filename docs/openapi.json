@@ -18756,7 +18756,8 @@
             "enum": [
               "local",
               "s3",
-              "gdrive"
+              "gdrive",
+              "onedrive"
             ],
             "title": "Target"
           },

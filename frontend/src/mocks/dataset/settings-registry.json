@@ -1122,6 +1122,19 @@
    "unit": null
   },
   {
+   "key": "mail.default_mailbox",
+   "group": "mail",
+   "label": "Default mailbox",
+   "description": "The mailbox connection used first when more than one is connected (sending identity, notices). Empty: the one connected first. Set it with Use as default on the Connections screen.",
+   "kind": "uuid",
+   "default": null,
+   "nullable": true,
+   "choices": null,
+   "minimum": null,
+   "maximum": null,
+   "unit": null
+  },
+  {
    "key": "mail.auto_link_confidence",
    "group": "mail",
    "label": "Link replies automatically at",
@@ -2223,14 +2236,15 @@
    "key": "backups.target",
    "group": "backups",
    "label": "Backup target",
-   "description": "Where backups are written.",
+   "description": "Where backups are written. Also the file store to use when more than one is connected.",
    "kind": "enum",
    "default": "local",
    "nullable": false,
    "choices": [
     "local",
     "s3",
-    "gdrive"
+    "gdrive",
+    "onedrive"
    ],
    "minimum": null,
    "maximum": null,

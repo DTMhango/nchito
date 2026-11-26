@@ -35,7 +35,7 @@ export const checkSearchApi = (v: Record<string, string>) =>
     : null
 
 export const FORMS: Record<
-  Exclude<ConnectionProvider, "gmail" | "gdrive">,
+  Exclude<ConnectionProvider, "gmail" | "gdrive" | "onedrive">,
   FormDef
 > = {
   imap_smtp: {
@@ -116,6 +116,20 @@ export const FORMS: Record<
         to: "secret",
         type: "password",
         help: "Use an app password, not your main password. It is encrypted and never shown again.",
+      },
+    ],
+  },
+  msgraph: {
+    // Outlook is added with Microsoft sign-in; this form only changes the folder it may read.
+    cta: "Save",
+    fields: [
+      {
+        name: "read_folder",
+        label: "Folder to read",
+        to: "config",
+        optional: true,
+        placeholder: "Inbox",
+        help: "The app reads only this folder (Inbox, Archive, or the name of one of your folders). Leave empty to read nothing. Outlook cannot limit the permission itself to one folder.",
       },
     ],
   },

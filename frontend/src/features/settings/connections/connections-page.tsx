@@ -31,6 +31,20 @@ const BLOCKS: Block[] = [
     add: <OAuthButton provider="gmail" label="Connect Gmail" />,
   },
   {
+    id: "outlook",
+    title: "Outlook",
+    providers: ["msgraph"],
+    lead: (
+      <>
+        For applying by email and spotting replies, with a Microsoft account.
+        Microsoft's read permission covers your <b>whole mailbox</b>, even
+        though this app only reads the folder you choose (use Change to name
+        it). Use a separate mailbox just for the job search.
+      </>
+    ),
+    add: <OAuthButton provider="msgraph" label="Connect Outlook" />,
+  },
+  {
     id: "imap",
     title: "Other mailbox (IMAP and SMTP)",
     providers: ["imap_smtp"],
@@ -43,6 +57,13 @@ const BLOCKS: Block[] = [
     providers: ["gdrive"],
     lead: "Keeps a copy of each application's final files in one folder, and makes share links when a posting wants a link. It can only see files it puts there.",
     add: <OAuthButton provider="gdrive" label="Connect Google Drive" />,
+  },
+  {
+    id: "onedrive",
+    title: "OneDrive",
+    providers: ["onedrive"],
+    lead: "Keeps a copy of each backup in the app's own OneDrive folder, and makes share links when a posting wants a link. It can only see files it puts there. Microsoft offers the app folder on personal OneDrive accounts only.",
+    add: <OAuthButton provider="onedrive" label="Connect OneDrive" />,
   },
   {
     id: "telegram",
@@ -67,10 +88,12 @@ const BLOCKS: Block[] = [
   },
 ]
 
-/** Where Google sends the owner back after consent: `?connected=gmail|gdrive`. */
+/** Where Google or Microsoft sends the owner back after consent: `?connected=gmail|gdrive`. */
 const RETURNED: Record<string, string> = {
   gmail: "Gmail is connected.",
   gdrive: "Google Drive is connected.",
+  msgraph: "Outlook is connected. Use Change to choose the folder it reads.",
+  onedrive: "OneDrive is connected.",
 }
 
 export function ConnectionsPage() {
@@ -121,7 +144,7 @@ export function ConnectionsPage() {
                   className="grid gap-2"
                 >
                   {mine.map((c) => (
-                    <ConnectionCard key={c.id} c={c} />
+                    <ConnectionCard key={c.id} c={c} all={q.data} />
                   ))}
                 </ul>
               )}

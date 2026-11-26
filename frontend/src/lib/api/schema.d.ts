@@ -4967,7 +4967,7 @@ export interface components {
              * Target
              * @enum {string}
              */
-            target: "local" | "s3" | "gdrive";
+            target: "local" | "s3" | "gdrive" | "onedrive";
             /** Encrypted */
             encrypted: boolean;
         };

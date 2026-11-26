@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, Page, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.connect import mail_connections, search_api
+from app.connect import mail_connections, onedrive_records, search_api
 from app.connect import records as ops_records
 from app.connect.mailbox import MailError
 from app.core import audit
@@ -118,7 +118,7 @@ def _out(conn: Connection) -> ConnectionOut:
 
 
 def _masked(conn: Connection) -> dict[str, str]:
-    if conn.provider.value == "gdrive":  # OAuth tokens: a nested record, never shown
+    if conn.provider.value in ("gdrive", "onedrive"):  # OAuth tokens: a nested record, never shown
         return {"tokens": mask("x" * 8)} if conn.secrets_enc else {}
     return provider_records.masked_secrets(conn)
 
@@ -129,7 +129,8 @@ async def _get_llm(session: AsyncSession, connection_id: uuid.UUID) -> Connectio
     if conn is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="connection not found")
     if not (provider_records.is_llm(conn.provider.value) or mail_connections.is_mail(conn.provider.value)
-            or ops_records.is_ops(conn.provider.value) or search_api.is_search(conn.provider.value)):
+            or ops_records.is_ops(conn.provider.value) or search_api.is_search(conn.provider.value)
+            or conn.provider.value == "onedrive"):
         not_implemented(2, "connect")
     return conn
 
@@ -162,6 +163,8 @@ async def create_connection(body: ConnectionCreate, session: SessionDep, princip
             raise HTTPException(422, detail=str(exc)) from exc
         await session.refresh(conn)
         return _out(conn)
+    if body.provider == "onedrive":
+        raise HTTPException(422, detail="connect OneDrive with the Connect button, not by pasting keys")
     is_mail = mail_connections.is_mail(body.provider)
     if not (provider_records.is_llm(body.provider) or is_mail):
         not_implemented(2, "connect")
@@ -184,6 +187,14 @@ async def update_connection(connection_id: uuid.UUID, body: ConnectionUpdate, se
         try:
             await search_api.update(session, conn, label=body.label, config=body.config, secrets=body.secrets,
                                     enabled=body.enabled, actor=principal.actor)
+        except ValueError as exc:
+            raise HTTPException(422, detail=str(exc)) from exc
+        await session.refresh(conn)
+        return _out(conn)
+    if conn.provider.value == "onedrive":
+        try:
+            await onedrive_records.update(session, conn, label=body.label, config=body.config,
+                                          secrets_in=body.secrets, enabled=body.enabled, actor=principal.actor)
         except ValueError as exc:
             raise HTTPException(422, detail=str(exc)) from exc
         await session.refresh(conn)
@@ -223,6 +234,11 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
     if ops_records.is_ops(conn.provider.value):
         ok, detail = await ops_records.run_test(session, conn)
         return ConnectionTestOut(ok=ok, detail=detail)
+    if conn.provider.value == "onedrive":
+        ok, detail = await onedrive_records.run_test(session, conn)
+        await audit.record(session, actor=principal.actor, action="connection.tested", subject_type="connection",
+                           subject_id=conn.id, detail={"provider": "onedrive", "ok": ok})
+        return ConnectionTestOut(ok=ok, detail=detail)
     if search_api.is_search(conn.provider.value):
         ok, detail = await search_api.run_test(conn)
         conn.health = "ok" if ok else "failing"
@@ -253,7 +269,11 @@ async def oauth_start(provider: Literal["gmail", "gdrive", "msgraph", "onedrive"
             return OAuthStartOut(authorize_url=ops_records.oauth_start_url())
         if provider == "gmail":
             return OAuthStartOut(authorize_url=mail_connections.oauth_start())
-    except (ops_records.OAuthNotConfigured, MailError) as exc:
+        if provider == "msgraph":
+            return OAuthStartOut(authorize_url=mail_connections.msgraph_oauth_start())
+        if provider == "onedrive":
+            return OAuthStartOut(authorize_url=onedrive_records.oauth_start_url())
+    except (ops_records.OAuthNotConfigured, onedrive_records.OAuthNotConfigured, MailError) as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     not_implemented(2, "connect")
 
@@ -277,6 +297,22 @@ async def oauth_callback(provider: Literal["gmail", "gdrive", "msgraph", "onedri
         except MailError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
         return RedirectResponse("/settings/connections?connected=gmail",
+                                status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    if provider == "msgraph":
+        try:
+            await mail_connections.msgraph_oauth_callback(session, code=code, state=state, actor=principal.actor)
+        except MailError as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        return RedirectResponse("/settings/connections?connected=msgraph",
+                                status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+    if provider == "onedrive":
+        if not onedrive_records.check_state(state):
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="the sign-in link expired; start again")
+        try:
+            await onedrive_records.oauth_finish(session, code=code, actor=principal.actor)
+        except (onedrive_records.OAuthNotConfigured, onedrive_records.onedrive.OneDriveError) as exc:
+            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        return RedirectResponse("/settings/connections?connected=onedrive",
                                 status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     not_implemented(2, "connect")
 

@@ -100,7 +100,7 @@ async def test_gmail_oauth_start_needs_server_credentials_then_returns_the_conse
     assert q["access_type"] == ["offline"] and "csecret-1" not in r.text
     assert set(q["scope"][0].split()) == {"https://www.googleapis.com/auth/gmail.send",
                                           "https://www.googleapis.com/auth/gmail.readonly"}
-    assert (await owner_client.post("/api/connections/oauth/msgraph/start")).status_code == 501  # not built yet
+    assert (await owner_client.post("/api/connections/oauth/msgraph/start")).status_code == 409  # Microsoft sign-in is not set up here
 
 
 async def test_gmail_oauth_callback_stores_encrypted_tokens(owner_client, session, monkeypatch):
