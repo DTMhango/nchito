@@ -3684,6 +3684,207 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Events List
+         * @description Every event of the job's applications, earliest first; proposals without a time last.
+         */
+        get: operations["job_events_list"];
+        put?: never;
+        /**
+         * Job Events Create
+         * @description Add an event by hand. It belongs to the job's application; a job with no application has no schedule yet.
+         */
+        post: operations["job_events_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-events/upcoming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interview Events Upcoming
+         * @description Confirmed and proposed events from now to the window (setting ``calendar.upcoming_days``), soonest first,
+         *     plus proposals still waiting for a time.
+         */
+        get: operations["interview_events_upcoming"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-events/{event_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Interview Events Get */
+        get: operations["interview_events_get"];
+        /** Interview Events Update */
+        put: operations["interview_events_update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-events/{event_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Events Confirm
+         * @description The owner settles a proposal (from mail or entered by hand). Pick a candidate or give the time.
+         */
+        post: operations["interview_events_confirm"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-events/{event_id}/reschedule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Events Reschedule
+         * @description Move an event. Returns the new event; the old one is kept as ``rescheduled``.
+         */
+        post: operations["interview_events_reschedule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-events/{event_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Interview Events Cancel */
+        post: operations["interview_events_cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-events/{event_id}/debrief": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Interview Events Debrief
+         * @description 'How did it go?': updates the event, moves the application where you say, sets a follow-up.
+         */
+        post: operations["interview_events_debrief"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/interview-events/{event_id}/ics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Interview Events Ics
+         * @description The event as a calendar file for the owner's own calendar app (place, link and interviewers; no notes).
+         */
+        get: operations["interview_events_ics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Calendar Get
+         * @description Feed URL, detail level, reminder settings and the Google Calendar state, for Settings > Connections.
+         */
+        get: operations["calendar_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/calendar/feed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Calendar Feed Rotate
+         * @description Create the subscription URL, or replace it: the old URL stops working at once.
+         */
+        post: operations["calendar_feed_rotate"];
+        /** Calendar Feed Revoke */
+        delete: operations["calendar_feed_revoke"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data/export/preview": {
         parameters: {
             query?: never;
@@ -5094,6 +5295,23 @@ export interface components {
             /** Detail */
             detail: string[];
         };
+        /** CalendarOut */
+        CalendarOut: {
+            /** Feed Url */
+            feed_url: string | null;
+            /**
+             * Detail Level
+             * @enum {string}
+             */
+            detail_level: "employer" | "role" | "full";
+            /** Reminder Offsets Minutes */
+            reminder_offsets_minutes: number[];
+            /** Prep Nudge Minutes */
+            prep_nudge_minutes: number;
+            /** Owner Timezone */
+            owner_timezone: string;
+            google: components["schemas"]["GoogleState"];
+        };
         /** CampaignBudget */
         CampaignBudget: {
             /** Monthly Cap Minor */
@@ -5537,31 +5755,22 @@ export interface components {
             /** Note */
             note: string | null;
         };
-        /**
-         * ConflictOut
-         * @description The role's employer-group state; for a held role, the role that outranks it and both scores.
-         */
-        ConflictOut: {
+        /** ConfirmIn */
+        ConfirmIn: {
             /**
-             * State
-             * @enum {string}
+             * Candidate Index
+             * @description Pick one of the proposal's candidates
              */
-            state: "none" | "winner" | "held" | "released";
-            /** Note */
-            note: string | null;
-            /** Outranked By Job Id */
-            outranked_by_job_id: string | null;
-            /** Outranked By Title */
-            outranked_by_title: string | null;
-            /** Score */
-            score: number | null;
-            /** Outranked By Score */
-            outranked_by_score: number | null;
+            candidate_index?: number | null;
+            /** Starts Local */
+            starts_local?: string | null;
+            /** Ends Local */
+            ends_local?: string | null;
             /**
-             * Reason
-             * @description outranked: a higher role won; applied: the employer is locked after applying
+             * Timezone
+             * @description Needed when the invitation named none
              */
-            reason: ("outranked" | "applied") | null;
+            timezone?: string | null;
         };
         /** ConnectionCreate */
         ConnectionCreate: {
@@ -5569,7 +5778,7 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "anthropic" | "openai_compatible" | "gmail" | "imap_smtp" | "gdrive" | "msgraph" | "onedrive" | "telegram" | "webhook" | "s3" | "search_api";
+            provider: "anthropic" | "openai_compatible" | "gmail" | "imap_smtp" | "gdrive" | "msgraph" | "onedrive" | "telegram" | "webhook" | "s3" | "search_api" | "gcalendar";
             /** Label */
             label: string;
             /** Config */
@@ -5623,7 +5832,7 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "anthropic" | "openai_compatible" | "gmail" | "imap_smtp" | "gdrive" | "msgraph" | "onedrive" | "telegram" | "webhook" | "s3" | "search_api";
+            provider: "anthropic" | "openai_compatible" | "gmail" | "imap_smtp" | "gdrive" | "msgraph" | "onedrive" | "telegram" | "webhook" | "s3" | "search_api" | "gcalendar";
             /** Label */
             label: string;
             /**
@@ -5829,6 +6038,30 @@ export interface components {
             state: "dated" | "open_until_filled" | "not_stated";
             /** On */
             on: string | null;
+        };
+        /** DebriefIn */
+        DebriefIn: {
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "went_well" | "mixed" | "went_badly" | "did_not_happen";
+            /**
+             * Next Step
+             * @default waiting
+             * @enum {string}
+             */
+            next_step?: "waiting" | "another_round" | "offer" | "rejected" | "withdrawn";
+            /** Notes */
+            notes?: string | null;
+        };
+        /** DebriefOut */
+        DebriefOut: {
+            event: components["schemas"]["EventOut"];
+            /** Stage Changed To */
+            stage_changed_to: string | null;
+            /** Follow Up Id */
+            follow_up_id: string | null;
         };
         /**
          * DecisionGroup
@@ -6137,6 +6370,218 @@ export interface components {
         ErrorOut: {
             /** Detail */
             detail: unknown;
+        };
+        /**
+         * EventCandidate
+         * @description One possible time found in an invitation. The owner picks one; nothing is chosen for them.
+         */
+        EventCandidate: {
+            /**
+             * Starts At
+             * @description UTC ISO instant; null while the zone is unknown
+             */
+            starts_at: string | null;
+            /** Ends At */
+            ends_at: string | null;
+            /**
+             * Starts Local
+             * @description Wall time as written, YYYY-MM-DDTHH:MM
+             */
+            starts_local: string;
+            /** Ends Local */
+            ends_local: string | null;
+            /**
+             * Timezone
+             * @description IANA zone; null when the invitation did not say
+             */
+            timezone: string | null;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+        };
+        /** EventIn */
+        EventIn: {
+            /**
+             * Round Number
+             * @default 1
+             */
+            round_number?: number;
+            /**
+             * Type
+             * @default video
+             * @enum {string}
+             */
+            type?: "phone" | "video" | "onsite" | "assessment";
+            /** Location */
+            location?: string | null;
+            /**
+             * Meeting Link
+             * @description http(s) only; never fetched
+             */
+            meeting_link?: string | null;
+            /** Interviewers */
+            interviewers?: string[];
+            /**
+             * Notes
+             * @description Private: never in the feed or Google
+             */
+            notes?: string | null;
+            /**
+             * Status
+             * @description proposed or confirmed
+             * @default confirmed
+             * @enum {string}
+             */
+            status?: "proposed" | "confirmed" | "done" | "cancelled" | "rescheduled";
+            /** Starts Local */
+            starts_local?: string | null;
+            /** Ends Local */
+            ends_local?: string | null;
+            /**
+             * Timezone
+             * @description IANA zone of the wall times
+             */
+            timezone?: string | null;
+        };
+        /** EventOut */
+        EventOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Application Id
+             * Format: uuid
+             */
+            application_id: string;
+            /**
+             * Job Id
+             * Format: uuid
+             */
+            job_id: string;
+            /** Employer */
+            employer: string;
+            /** Job Title */
+            job_title: string;
+            /** Round Number */
+            round_number: number;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "phone" | "video" | "onsite" | "assessment";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "proposed" | "confirmed" | "done" | "cancelled" | "rescheduled";
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "owner" | "mail";
+            /** Starts At */
+            starts_at: string | null;
+            /** Ends At */
+            ends_at: string | null;
+            /**
+             * Timezone
+             * @description Zone the employer used
+             */
+            timezone: string | null;
+            /** Owner Timezone */
+            owner_timezone: string;
+            /**
+             * Starts Local
+             * @description Wall time in the employer's zone
+             */
+            starts_local: string | null;
+            /** Ends Local */
+            ends_local: string | null;
+            /**
+             * Owner Starts Local
+             * @description Wall time in the owner's zone
+             */
+            owner_starts_local: string | null;
+            /** Owner Ends Local */
+            owner_ends_local: string | null;
+            /** Location */
+            location: string | null;
+            /** Meeting Link */
+            meeting_link: string | null;
+            /** Interviewers */
+            interviewers: string[];
+            /** Notes */
+            notes: string | null;
+            /** Candidates */
+            candidates: components["schemas"]["EventCandidate"][];
+            /**
+             * Needs Input
+             * @description A proposal with no settled time (or no zone): the owner must choose
+             */
+            needs_input: boolean;
+            /**
+             * Conflicts
+             * @description Other events that overlap this one (a warning, not a block)
+             */
+            conflicts: components["schemas"]["app__api__routers__events__ConflictOut"][];
+            /** Replaces Id */
+            replaces_id: string | null;
+            /** Google Synced */
+            google_synced: boolean;
+            /** Google Error */
+            google_error: string | null;
+            /** Outcome */
+            outcome: ("went_well" | "mixed" | "went_badly" | "did_not_happen") | null;
+            /** Debrief Due */
+            debrief_due: boolean;
+        };
+        /** EventUpdate */
+        EventUpdate: {
+            /**
+             * Round Number
+             * @default 1
+             */
+            round_number?: number;
+            /**
+             * Type
+             * @default video
+             * @enum {string}
+             */
+            type?: "phone" | "video" | "onsite" | "assessment";
+            /** Location */
+            location?: string | null;
+            /**
+             * Meeting Link
+             * @description http(s) only; never fetched
+             */
+            meeting_link?: string | null;
+            /** Interviewers */
+            interviewers?: string[];
+            /**
+             * Notes
+             * @description Private: never in the feed or Google
+             */
+            notes?: string | null;
+            /** Starts Local */
+            starts_local?: string | null;
+            /** Ends Local */
+            ends_local?: string | null;
+            /** Timezone */
+            timezone?: string | null;
         };
         /** Evidence */
         Evidence: {
@@ -6481,6 +6926,11 @@ export interface components {
              */
             favourite?: boolean;
         };
+        /** FeedOut */
+        FeedOut: {
+            /** Url */
+            url: string;
+        };
         /** FieldChange */
         FieldChange: {
             /**
@@ -6597,6 +7047,28 @@ export interface components {
             remaining: number;
             /** Closed */
             closed: boolean;
+        };
+        /** GoogleState */
+        GoogleState: {
+            /**
+             * Configured
+             * @description The server has Google sign-in credentials
+             */
+            configured: boolean;
+            /** Connected */
+            connected: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Connection Id */
+            connection_id: string | null;
+            /** Calendar Ready */
+            calendar_ready: boolean;
+            /** Health */
+            health: string | null;
+            /** Last Checked At */
+            last_checked_at: string | null;
+            /** Reads Description */
+            reads_description: string;
         };
         /** Group */
         "Group-Input": {
@@ -7218,7 +7690,7 @@ export interface components {
             conflict_state: "none" | "winner" | "held" | "released";
             /** Conflict Note */
             conflict_note: string | null;
-            conflict: components["schemas"]["ConflictOut"] | null;
+            conflict: components["schemas"]["app__api__routers__jobs__ConflictOut"] | null;
             /**
              * Pay State
              * @default not_stated
@@ -7391,7 +7863,7 @@ export interface components {
             conflict_state: "none" | "winner" | "held" | "released";
             /** Conflict Note */
             conflict_note: string | null;
-            conflict: components["schemas"]["ConflictOut"] | null;
+            conflict: components["schemas"]["app__api__routers__jobs__ConflictOut"] | null;
             /**
              * Pay State
              * @default not_stated
@@ -9251,6 +9723,18 @@ export interface components {
             evidence_fact_ids?: string[];
             /** Note */
             note?: string | null;
+        };
+        /** RescheduleIn */
+        RescheduleIn: {
+            /**
+             * Starts Local
+             * @description Wall time YYYY-MM-DDTHH:MM
+             */
+            starts_local: string;
+            /** Ends Local */
+            ends_local?: string | null;
+            /** Timezone */
+            timezone: string;
         };
         /** RescoreIn */
         RescoreIn: {
@@ -11603,6 +12087,51 @@ export interface components {
              * @description e.g. 'free-form text will be sent to <provider>'
              */
             notices: string[];
+        };
+        /** ConflictOut */
+        app__api__routers__events__ConflictOut: {
+            /**
+             * Event Id
+             * Format: uuid
+             */
+            event_id: string;
+            /** Employer */
+            employer: string;
+            /** Job Title */
+            job_title: string;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /** Ends At */
+            ends_at: string | null;
+        };
+        /**
+         * ConflictOut
+         * @description The role's employer-group state; for a held role, the role that outranks it and both scores.
+         */
+        app__api__routers__jobs__ConflictOut: {
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "none" | "winner" | "held" | "released";
+            /** Note */
+            note: string | null;
+            /** Outranked By Job Id */
+            outranked_by_job_id: string | null;
+            /** Outranked By Title */
+            outranked_by_title: string | null;
+            /** Score */
+            score: number | null;
+            /** Outranked By Score */
+            outranked_by_score: number | null;
+            /**
+             * Reason
+             * @description outranked: a higher role won; applied: the employer is locked after applying
+             */
+            reason: ("outranked" | "applied") | null;
         };
         /** AnswerIn */
         app__api__routers__kit__AnswerIn: {
@@ -21536,7 +22065,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                provider: "gmail" | "gdrive" | "msgraph" | "onedrive";
+                provider: "gmail" | "gdrive" | "gcalendar" | "msgraph" | "onedrive";
             };
             cookie?: never;
         };
@@ -21579,7 +22108,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                provider: "gmail" | "gdrive" | "msgraph" | "onedrive";
+                provider: "gmail" | "gdrive" | "gcalendar" | "msgraph" | "onedrive";
             };
             cookie?: never;
         };
@@ -22472,6 +23001,394 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    job_events_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    job_events_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_events_upcoming: {
+        parameters: {
+            query?: {
+                days?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_events_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EventUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_events_confirm: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_events_reschedule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_events_cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EventOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_events_debrief: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DebriefIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DebriefOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    interview_events_ics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One event as an .ics file */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/calendar": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    calendar_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarOut"];
+                };
+            };
+        };
+    };
+    calendar_feed_rotate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeedOut"];
+                };
+            };
+        };
+    };
+    calendar_feed_revoke: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

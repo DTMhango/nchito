@@ -58,7 +58,7 @@ export const testConnection = (id: string) =>
       params: { path: { connection_id: id } },
     })
   )
-export type OAuthProvider = "gmail" | "gdrive" | "msgraph" | "onedrive"
+export type OAuthProvider = "gmail" | "gdrive" | "msgraph" | "onedrive" | "gcalendar"
 export const oauthStart = (provider: OAuthProvider) =>
   unwrap(
     api.POST("/api/connections/oauth/{provider}/start", {

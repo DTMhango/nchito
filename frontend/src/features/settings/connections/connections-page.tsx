@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header"
 import { Skeleton } from "@/components/ui/skeleton"
 import { connectionsQuery, type ConnectionProvider } from "./api"
 import { ConnectionCard } from "./connection-card"
+import { CalendarCard } from "./calendar-card"
 import { ConnectForm, OAuthButton } from "./connect-form"
 
 type Block = {
@@ -101,6 +102,8 @@ const RETURNED: Record<string, string> = {
   gdrive: "Google Drive is connected.",
   msgraph: "Outlook is connected. Use Change to choose the folder it reads.",
   onedrive: "OneDrive is connected.",
+  gcalendar:
+    "Google Calendar is connected. It stays off until you switch it on below.",
 }
 
 export function ConnectionsPage() {
@@ -128,6 +131,7 @@ export function ConnectionsPage() {
           Could not load connections. Check your connection and reload.
         </p>
       )}
+      <CalendarCard />
       {q.isSuccess &&
         BLOCKS.map((b) => {
           const mine = q.data.filter((c) =>

@@ -1,6 +1,7 @@
 import {
   Activity,
   BriefcaseBusiness,
+  CalendarDays,
   ExternalLink,
   FileText,
   Columns3,
@@ -50,6 +51,7 @@ import { MessagesTab } from "./tabs/messages-tab"
 import { OverviewTab } from "./tabs/overview-tab"
 import { PeopleTab } from "./tabs/people-tab"
 import { PostingTab } from "./tabs/posting-tab"
+import { ScheduleTab } from "./schedule/schedule-tab"
 
 import { JOB_TABS, type JobTab } from "./job-tabs"
 
@@ -64,6 +66,7 @@ const TAB_META: Record<JobTab, { label: string; icon: LucideIcon }> = {
   messages: { label: "Messages", icon: Mail },
   people: { label: "People", icon: Users },
   interview: { label: "Interview", icon: MessagesSquare },
+  schedule: { label: "Schedule", icon: CalendarDays },
   changes: { label: "Changes", icon: History },
   activity: { label: "Activity", icon: Activity },
 }
@@ -159,6 +162,7 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
         {tab === "messages" && <MessagesTab job={job.data} />}
         {tab === "people" && <PeopleTab job={job.data} />}
         {tab === "interview" && <InterviewTab job={job.data} />}
+        {tab === "schedule" && <ScheduleTab job={job.data} />}
         {tab === "changes" && <ChangesTab job={job.data} />}
         {tab === "activity" && <ActivityTab job={job.data} />}
       </section>

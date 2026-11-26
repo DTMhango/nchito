@@ -55,6 +55,7 @@ GROUPS: dict[str, str] = {
     "documents": "Documents",
     "tailoring": "Tailoring and checks",
     "interview": "Interview pack",
+    "calendar": "Calendar",
     "retention": "Retention",
     "backups": "Backups",
     "notifications": "Notifications",
@@ -72,7 +73,7 @@ ANSWER_SCOPES = ("this_application", "this_employer", "this_country", "all_match
 NOTIFICATION_CHANNELS = ("telegram", "email", "webhook")
 # Notification kinds the owner can switch on or off (the digest is governed by notifications.digest).
 NOTIFIABLE_KINDS = ("pending_action", "pending_action_stale", "application_sent", "reply_received", "run_failed",
-                    "budget", "health", "backup")
+                    "budget", "health", "backup", "interview_reminder")
 TITLE_FIELDS = frozenset({"title", "app_name", "date", "count"})
 
 _DEFS: list[SettingDef] = []
@@ -665,6 +666,44 @@ _add("interview.research_note", "string", "Research note",
      "Company notes are from the posting and your notes only.", str, validators=(non_empty, max_length(300)),
      invalid_example="", has_invalid_example=True)
 
+# Calendar: interview events, reminders, feed and Google Calendar (12, wave 4)
+def _reminder_minutes(value: Any) -> None:
+    if not all(isinstance(v, int) and not isinstance(v, bool) and 0 < v <= 60 * 24 * 14 for v in value):
+        raise SettingValueError("minutes must be whole numbers between 1 and 20160 (14 days)")
+
+
+_enum("calendar.detail_level", "Calendar detail",
+      "What the subscription feed and Google Calendar show. employer: 'Interview: <employer>' only. role: adds "
+      "the role title. full: adds place or link, interviewers, round and type. Your private notes never leave.",
+      "employer", "role", ("employer", "role", "full"))
+_bool("calendar.propose_from_mail", "Propose events from invitation mail",
+      "When a reply is classified as an interview invitation, propose an event (never confirmed for you).", True)
+_bool("calendar.llm_extract", "Read invitations with the model",
+      "Off: dates come from the attached calendar file and plain wording rules only. On: when the rules find no "
+      "time, a budgeted model reads the email as untrusted data and its answer is still only a proposal.", False)
+_add("calendar.reminder_offsets_minutes", "list", "Reminders before an interview",
+     "Minutes before the start at which you are reminded. Empty: no reminders. Quiet hours apply.",
+     [1440, 60], [30], list[int], validators=(unique_items, _reminder_minutes), invalid_example=[5, 5],
+     has_invalid_example=True)
+_int("calendar.prep_nudge_minutes", "Preparation nudge",
+     "Minutes before the start at which you are nudged to open the interview pack. 0 turns the nudge off.",
+     2880, 720, 0, 20_160, "minutes")
+_int("calendar.debrief_delay_minutes", "Ask how it went after",
+     "Minutes after an interview ends before you are asked how it went.", 60, 180, 0, 2880, "minutes")
+_int("calendar.followup_days", "Follow-up reminder",
+     "Days after a debrief at which a follow-up is due (a thank-you or a chase).", 2, 5, 1, 30, "days")
+_int("calendar.default_duration_minutes", "Default length",
+     "Length assumed for an event that has no end time (overlap checks, reminders, the feed).", 60, 45, 5, 480,
+     "minutes")
+_int("calendar.feed_past_days", "Feed history",
+     "How many days of past events stay in the subscription feed.", 30, 7, 0, 365, "days")
+_int("calendar.upcoming_days", "Upcoming window",
+     "How many days ahead the Upcoming block on Today looks.", 14, 30, 1, 120, "days")
+_add("calendar.google_calendar_name", "string", "Google calendar name",
+     "Name of the dedicated calendar the app creates in your Google account (used when it is created).",
+     "Nchito interviews", "Job interviews", str, validators=(non_empty, max_length(100)),
+     invalid_example="", has_invalid_example=True)
+
 # Retention (14)
 _int("retention.below_threshold_text_days", "Below-threshold text",
      "Drop full posting text of below-threshold roles after this many days.", 30, 14, 1, 3650, "days")
@@ -693,7 +732,8 @@ _add("notifications.channels", "list", "Channels",
      invalid_example=["pigeon"], has_invalid_example=True)
 _add("notifications.events", "list", "Events that notify",
      "Which kinds of event send a message to the channels. The digest has its own setting.",
-     ["pending_action", "pending_action_stale", "reply_received", "run_failed", "budget", "health", "backup"],
+     ["pending_action", "pending_action_stale", "reply_received", "run_failed", "budget", "health", "backup",
+      "interview_reminder"],
      ["pending_action"], list[str], choices=NOTIFIABLE_KINDS, validators=(unique_items,),
      invalid_example=["everything"], has_invalid_example=True)
 _bool("notifications.quiet_hours_enabled", "Notification quiet hours",
