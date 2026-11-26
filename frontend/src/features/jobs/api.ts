@@ -22,6 +22,10 @@ export type PendingAction = S["PendingActionOut"]
 export type AuditEvent = S["AuditEventOut"]
 export type JobFacets = S["JobFacets"]
 export type MailThread = S["MailThreadOut"]
+export type ApplyEmailIn = S["ApplyEmailIn"]
+export type ApplyEmailOut = S["ApplyEmailOut"]
+export type ApplyChannelCandidate = S["ApplyChannelCandidate"]
+export type DispatchOut = S["DispatchOut"]
 
 export const jobKeys = {
   job: (id: string) => ["jobs", id] as const,
@@ -191,6 +195,13 @@ export const fixEmployer = (
       body: { canonical_employer, remember_alias },
     })
   )
+/**
+ * Set, correct, confirm or clear where this role's application email goes. `address` null goes
+ * back to the posting's own address; `confirmed: false` withdraws a confirmation. 422
+ * `{code: invalid_address | no_address, reason}`.
+ */
+export const setApplyEmail = (id: string, body: ApplyEmailIn) =>
+  unwrap(gen.PUT("/api/jobs/{job_id}/apply-email", { ...path(id), body }))
 export const appliedMyself = (id: string, body: S["AppliedMyselfIn"]) =>
   unwrap(gen.POST("/api/jobs/{job_id}/applied-myself", { ...path(id), body }))
 

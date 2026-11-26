@@ -7,7 +7,8 @@ import { http, HttpResponse } from "msw"
 import { db } from "../db"
 import { seedContacts } from "../dataset/contacts"
 import { matchesMock } from "./matches"
-import type { MockJob } from "../dataset/jobs"
+import { autopilotMock } from "./autopilot"
+import { channelCandidates, type MockJob } from "../dataset/jobs"
 
 let contacts = seedContacts()
 export const jobAudit: {
@@ -25,6 +26,7 @@ export const jobAudit: {
 export function resetJobsMock() {
   contacts = seedContacts()
   jobAudit.length = 0
+  fromPosting.clear()
 }
 
 const jobs = () => matchesMock.get().jobs
@@ -36,6 +38,21 @@ const missing = (what: string) =>
   HttpResponse.json({ detail: `${what} not found.` }, { status: 404 })
 const bad = (detail: string) => HttpResponse.json({ detail }, { status: 422 })
 const find = (id: unknown) => jobs().find((j) => j.id === String(id))
+const refused = (status: number, code: string, reason: string) =>
+  HttpResponse.json({ detail: { code, reason } }, { status })
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
+/** The address the posting gave, kept aside once the owner overrides it (`Job.apply_email`). */
+const fromPosting = new Map<string, NonNullable<MockJob["apply_email"]>>()
+function postingAddress(j: MockJob) {
+  if (
+    !fromPosting.has(j.id) &&
+    j.apply_email &&
+    j.apply_email.found_in !== "owner"
+  )
+    fromPosting.set(j.id, j.apply_email)
+  return fromPosting.get(j.id) ?? null
+}
 const touch = (j: MockJob) => {
   j.updated_at = new Date().toISOString()
   return j
@@ -94,6 +111,55 @@ export const jobHandlers = [
     const b = (await request.json()) as { canonical_employer: string }
     j.canonical_employer = b.canonical_employer
     log(j, "job.employer_fixed", b)
+    return HttpResponse.json(touch(j))
+  }),
+
+  http.put("*/api/jobs/:id/apply-email", async ({ params, request }) => {
+    if (!signedIn()) return unauthorized()
+    const j = find(params.id)
+    if (!j) return missing("Role")
+    const b = (await request.json()) as {
+      address?: string | null
+      confirmed?: boolean
+    }
+    const confirmed = b.confirmed ?? true
+    const posting = postingAddress(j)
+    const address = b.address?.trim() || null
+    if (address && !EMAIL.test(address))
+      return refused(
+        422,
+        "invalid_address",
+        `${address} is not an email address`
+      )
+    const target = address ?? posting?.address ?? null
+    if (!target) {
+      if (confirmed)
+        return refused(422, "no_address", "there is no address to confirm")
+      j.apply_email = null
+    } else {
+      const trusted = autopilotMock().trusted.some(
+        (t) =>
+          target.split("@")[1] === t.domain ||
+          target.split("@")[1].endsWith(`.${t.domain}`)
+      )
+      const now = new Date().toISOString()
+      j.apply_email = {
+        ...(address && address !== posting?.address
+          ? { address, found_in: "owner" as const, evidence: null }
+          : {
+              address: target,
+              found_in: posting?.found_in ?? ("owner" as const),
+              evidence: posting?.evidence ?? null,
+            }),
+        confirmed,
+        confirmed_by: confirmed ? "owner" : null,
+        confirmed_at: confirmed ? now : null,
+        trusted_domain: trusted,
+        usable: confirmed || trusted,
+      }
+    }
+    j.apply_channel_candidates = channelCandidates(j.apply_email, j.apply_url)
+    log(j, "job.apply_email_set", { address: target, confirmed })
     return HttpResponse.json(touch(j))
   }),
 

@@ -33,7 +33,7 @@ export function channelCandidates(
       channel: "email",
       available: !!email?.usable,
       reason: !email
-        ? "The posting gives no application address."
+        ? "No application address is known for this role."
         : email.usable
           ? `Sends to ${email.address} from your connected mailbox.`
           : `${email.address} is not confirmed yet. Confirm it to send by email.`,
@@ -54,7 +54,7 @@ export function channelCandidates(
 }
 
 /** Every third role asks for applications by email: an address quoted in the posting, unconfirmed. */
-function applyTarget(method: string, slug: string) {
+function applyTarget(method: string, slug: string, applyUrl: string) {
   const apply_email: ApplyEmail | null =
     method === "email"
       ? {
@@ -70,10 +70,7 @@ function applyTarget(method: string, slug: string) {
       : null
   return {
     apply_email,
-    apply_channel_candidates: channelCandidates(
-      apply_email,
-      `https://careers.example.com/${slug}`
-    ),
+    apply_channel_candidates: channelCandidates(apply_email, applyUrl),
   }
 }
 
@@ -1090,7 +1087,11 @@ function buildJobs(): MockJob[] {
       },
       apply_url: `https://careers.example.com/${slug}/${i + 1}`,
       apply_method: cyc(["portal", "email", "easy_apply"], i),
-      ...applyTarget(cyc(["portal", "email", "easy_apply"], i), slug),
+      ...applyTarget(
+        cyc(["portal", "email", "easy_apply"], i),
+        slug,
+        `https://careers.example.com/${slug}/${i + 1}`
+      ),
       requirements: [
         ...(facets.required_skills ?? []).map((s) => ({
           text: `Strong ${s}`,
