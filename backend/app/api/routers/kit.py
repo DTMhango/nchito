@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps
 from app.api.deps import Principal, PrincipalDep, RequireOwner, SessionDep
 from app.core import audit
 from app.core.clock import utcnow
@@ -23,6 +23,7 @@ from app.core.settings import service as settings_service
 from app.kit import answers as answer_matcher
 from app.kit import crud, guardrails, service, vault
 from app.kit.crud import Resource, add_kit_crud
+from app.llm import prompts as prompt_registry
 from app.models.base import Origin, ReviewState
 from app.models.kit import (
     Answer,
@@ -475,7 +476,7 @@ async def upload_vault_document(
     if len(content) > limit:
         raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="file is larger than the vault limit")
     if not content:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="file is empty")
+        raise HTTPException(422, detail="file is empty")
     row = await service.store_vault_file(
         session, filename=file.filename or title, content=content, declared_mime=file.content_type,
         title=title, doc_type=doc_type, sensitivity=sensitivity)
@@ -501,20 +502,30 @@ async def download_vault_document(item_id: uuid.UUID, principal: PrincipalDep, s
 
 
 @router.get("/prompts", response_model=list[PromptOut], name="kit_prompts_list")
-async def list_prompts(stage: str | None = None) -> list[PromptOut]:
-    not_implemented(WAVE, "llm")
+async def list_prompts(session: SessionDep, stage: str | None = None) -> list[PromptOut]:
+    """Every version, newest first per stage. Defaults are loaded on first read."""
+    return [PromptOut.model_validate(p) for p in await prompt_registry.list_prompts(session, stage)]
 
 
 @router.post("/prompts", response_model=PromptOut, status_code=status.HTTP_201_CREATED,
              name="kit_prompts_create_version")
-async def create_prompt_version(body: PromptIn) -> PromptOut:
+async def create_prompt_version(body: PromptIn, session: SessionDep, principal: PrincipalDep) -> PromptOut:
     """Each save is a new version; activating one records a ConfigRevision."""
-    not_implemented(WAVE, "llm")
+    try:
+        prompt = await prompt_registry.create_version(session, stage=body.stage, text=body.text, note=body.note,
+                                                      actor=principal.actor)
+    except prompt_registry.PromptError as exc:
+        raise HTTPException(422, detail=str(exc)) from exc
+    await session.refresh(prompt)
+    return PromptOut.model_validate(prompt)
 
 
 @router.post("/prompts/{item_id}/activate", response_model=PromptOut, name="kit_prompts_activate")
-async def activate_prompt(item_id: uuid.UUID) -> PromptOut:
-    not_implemented(WAVE, "llm")
+async def activate_prompt(item_id: uuid.UUID, session: SessionDep, principal: PrincipalDep) -> PromptOut:
+    prompt = await prompt_registry.activate(session, item_id, actor=principal.actor)
+    if prompt is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="prompt not found")
+    return PromptOut.model_validate(prompt)
 
 
 @router.get("/review", response_model=Page[ReviewItem], name="kit_review_list")

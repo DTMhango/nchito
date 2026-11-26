@@ -280,7 +280,7 @@ async def capture_job(body: CaptureIn, principal: PrincipalDep, session: Session
     try:
         job = await capture(session, body.url, body.text)
     except CaptureError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+        raise HTTPException(422, detail=str(exc)) from exc
     await audit.record(session, actor=principal.actor, action="job.captured", subject_type="job",
                        subject_id=job.id, detail={"has_url": body.url is not None, "has_text": body.text is not None})
     await publish(session, "job.created", {"job_id": str(job.id)})

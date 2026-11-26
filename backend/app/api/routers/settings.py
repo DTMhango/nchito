@@ -116,7 +116,7 @@ async def get_appearance(session: SessionDep) -> Appearance:
 @router.put("/appearance", response_model=Appearance, operation_id="settings_put_appearance")
 async def put_appearance(body: Appearance, principal: PrincipalDep, session: SessionDep) -> Appearance:
     if await get_theme(session, body.theme_id) is None:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="unknown theme_id")
+        raise HTTPException(422, detail="unknown theme_id")
     changes = {key: getattr(body, field) for field, key in APPEARANCE_KEYS.items()}
     changes["appearance.theme_id"] = str(body.theme_id)
     current = await service.values(session)
@@ -124,7 +124,7 @@ async def put_appearance(body: Appearance, principal: PrincipalDep, session: Ses
     try:
         await service.set_many(session, changed, actor=principal.actor)
     except SettingValueError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+        raise HTTPException(422, detail=str(exc)) from exc
     return await read_appearance(session)
 
 
@@ -145,7 +145,7 @@ async def put_setting(key: str, body: SettingWrite, principal: PrincipalDep, ses
             raise SettingValueError("unknown theme")
         await service.set_value(session, key, body.value, actor=principal.actor, reason=body.reason)
     except (SettingValueError, ValueError) as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+        raise HTTPException(422, detail=str(exc)) from exc
     return _out((await service.get_all(session))[key])
 
 

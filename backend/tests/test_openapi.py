@@ -41,7 +41,7 @@ def test_gateway_tools_have_schemas():
 
 
 @pytest.mark.parametrize("method,path", [
-    ("GET", "/api/kit/prompts"),
+    ("GET", "/api/jobs/00000000-0000-4000-8000-000000000001/interview-pack"),
     ("GET", "/api/jobs/00000000-0000-4000-8000-000000000001"),
     ("GET", "/api/campaigns"),
     ("POST", "/api/rubrics/backtest"),

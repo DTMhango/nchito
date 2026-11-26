@@ -19,6 +19,7 @@ from app.api.routers import (
     system,
     themes,
 )
+from app.llm import api as llm_api
 
 ALL_ROUTERS: list[APIRouter] = [
     auth.setup_router,
@@ -38,4 +39,5 @@ ALL_ROUTERS: list[APIRouter] = [
     connections.tokens_router,
     insights.router,
     data.router,
+    llm_api.router,
 ]

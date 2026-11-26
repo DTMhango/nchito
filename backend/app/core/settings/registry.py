@@ -274,6 +274,15 @@ _model("ai.model_claim_check", "Model: unsupported-claim check", "Second-pass tr
        "claude-sonnet-5-5", "claude-opus-5-5")
 _model("ai.model_browser_agent", "Model: server browser agent", "Drives the optional server runner.",
        "claude-sonnet-5-5", "claude-opus-5-5")
+_int("ai.max_output_tokens", "Output token limit",
+     "Most tokens a model may write in one call (bounds each call's reserved cost).",
+     8192, 4096, 256, 128_000, "tokens")
+_int("ai.request_timeout_seconds", "Request timeout", "Give up on one model call after this long.",
+     120, 60, 5, 1800, "seconds")
+_int("ai.max_retries", "Retries", "Retries after a failed or invalid model reply. Each attempt is budgeted.",
+     2, 3, 0, 6)
+_int("ai.route_test_valid_minutes", "Route test validity",
+     "A model route can be activated only after a successful test within this window.", 60, 240, 1, 10_080, "minutes")
 
 # Budget (11)
 _add("budget.currency", "currency", "Budget currency", "Currency of the spend ledger.",
@@ -287,6 +296,8 @@ _int("budget.warning_percent", "Warning", "Warn when month-to-date spend passes 
      80, 90, 1, 100, "%")
 _int("budget.agent_task_ceiling_minor", "Agent task ceiling", "Maximum spend for one agent task, in minor units.",
      100, 250, 1, 100_000, "minor units")
+_int("budget.reservation_stale_minutes", "Reservation expiry",
+     "An unreconciled reservation older than this is closed and charged at its estimate.", 30, 60, 1, 1440, "minutes")
 
 # Documents (9)
 _int("documents.cv_pages", "CV pages", "Maximum CV length.", 2, 3, 1, 6, "pages")

@@ -141,7 +141,7 @@ async def create_owner(body: OwnerCreate, request: Request, response: Response, 
         await settings_service.set_value(session, "general.timezone", body.timezone, actor=OWNER_ACTOR,
                                          reason="setup")
     except SettingValueError as exc:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+        raise HTTPException(422, detail=str(exc)) from exc
     owner = Owner(email=str(body.email).lower(), display_name=body.display_name.strip(),
                   password_hash=hash_password(body.password))
     session.add(owner)
@@ -234,7 +234,7 @@ async def totp_setup(principal: PrincipalDep, session: SessionDep) -> TotpSetupO
 async def totp_enable(body: TotpCode, principal: PrincipalDep, session: SessionDep) -> Response:
     owner = principal.owner
     if not owner.totp_secret_enc or not verify_totp(crypto.decrypt(owner.totp_secret_enc), body.code):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="code does not match")
+        raise HTTPException(422, detail="code does not match")
     owner.totp_enabled = True
     await audit.record(session, actor=principal.actor, action="auth.totp_enabled", subject_type="owner",
                        subject_id=owner.id)

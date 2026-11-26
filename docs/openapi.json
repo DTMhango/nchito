@@ -3829,6 +3829,7 @@
           "kit"
         ],
         "summary": "Kit Prompts List",
+        "description": "Every version, newest first per stage. Defaults are loaded on first read.",
         "operationId": "kit_prompts_list",
         "parameters": [
           {
@@ -11162,6 +11163,7 @@
           "connections"
         ],
         "summary": "Connections Create",
+        "description": "LLM providers (wave 1). Keys are encrypted at rest and only ever returned masked.",
         "operationId": "connections_create",
         "requestBody": {
           "content": {
@@ -11213,6 +11215,7 @@
           "connections"
         ],
         "summary": "Connections Update",
+        "description": "Omitted fields stay; a blank secret value keeps the stored one.",
         "operationId": "connections_update",
         "parameters": [
           {
@@ -11320,6 +11323,7 @@
           "connections"
         ],
         "summary": "Connections Test",
+        "description": "One tiny budgeted request with this provider record (model: config ``test_model`` or the extract model).",
         "operationId": "connections_test",
         "parameters": [
           {
@@ -12285,6 +12289,283 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/routing": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Routing List",
+        "operationId": "ai_routing_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RouteOut"
+                  },
+                  "type": "array",
+                  "title": "Response Ai Routing List"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/routing/test": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Routing Test",
+        "description": "One tiny budgeted request on the route (costs well under one cent on the defaults).",
+        "operationId": "ai_routing_test",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteTestIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteTestOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/routing/activate": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Routing Activate",
+        "description": "Switch a stage to a model. The route must have passed a test recently (DESIGN.md 18.5).",
+        "operationId": "ai_routing_activate",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteActivateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/prices": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Prices List",
+        "operationId": "ai_prices_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceOut"
+                  },
+                  "type": "array",
+                  "title": "Response Ai Prices List"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Prices Replace",
+        "description": "Replace the whole price table (the screen edits it as one table).",
+        "operationId": "ai_prices_replace",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PriceTableIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceOut"
+                  },
+                  "type": "array",
+                  "title": "Response Ai Prices Replace"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/prices/reset": {
+      "post": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Prices Reset",
+        "description": "Restore the dated default table.",
+        "operationId": "ai_prices_reset",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PriceOut"
+                  },
+                  "type": "array",
+                  "title": "Response Ai Prices Reset"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/spend": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Spend Summary",
+        "description": "Month to date (owner's time zone), by stage, model and run; billed and estimated-unbilled apart.",
+        "operationId": "ai_spend_summary",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ai/spend/meter": {
+      "get": {
+        "tags": [
+          "ai"
+        ],
+        "summary": "Ai Spend Meter",
+        "description": "The top-bar meter. Refetch on the ``spend.updated`` event.",
+        "operationId": "ai_spend_meter",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpendMeter"
                 }
               }
             }
@@ -18691,6 +18972,36 @@
         ],
         "title": "JobSummary"
       },
+      "LastTest": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "at"
+        ],
+        "title": "LastTest"
+      },
       "LimitRule": {
         "properties": {
           "type": {
@@ -21304,6 +21615,300 @@
         ],
         "title": "Positioning"
       },
+      "PriceIn": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency"
+          },
+          "input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Input Per Mtok"
+          },
+          "output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              }
+            ],
+            "title": "Output Per Mtok"
+          },
+          "cache_write_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Per Mtok"
+          },
+          "cache_read_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Per Mtok"
+          },
+          "long_context_threshold": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Context Threshold"
+          },
+          "long_input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Input Per Mtok"
+          },
+          "long_output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Output Per Mtok"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "currency",
+          "input_per_mtok",
+          "output_per_mtok",
+          "as_of"
+        ],
+        "title": "PriceIn"
+      },
+      "PriceOut": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$",
+            "title": "Currency"
+          },
+          "input_per_mtok": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Input Per Mtok"
+          },
+          "output_per_mtok": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Output Per Mtok"
+          },
+          "cache_write_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Write Per Mtok"
+          },
+          "cache_read_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cache Read Per Mtok"
+          },
+          "long_context_threshold": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Context Threshold"
+          },
+          "long_input_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Input Per Mtok"
+          },
+          "long_output_per_mtok": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Long Output Per Mtok"
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date",
+            "title": "As Of"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "model",
+          "currency",
+          "input_per_mtok",
+          "output_per_mtok",
+          "as_of",
+          "id",
+          "updated_at"
+        ],
+        "title": "PriceOut"
+      },
+      "PriceTableIn": {
+        "properties": {
+          "prices": {
+            "items": {
+              "$ref": "#/components/schemas/PriceIn"
+            },
+            "type": "array",
+            "title": "Prices"
+          }
+        },
+        "type": "object",
+        "required": [
+          "prices"
+        ],
+        "title": "PriceTableIn"
+      },
       "PromptIn": {
         "properties": {
           "stage": {
@@ -22125,6 +22730,188 @@
         },
         "type": "object",
         "title": "RollbackIn"
+      },
+      "RouteActivateIn": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "model": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "model"
+        ],
+        "title": "RouteActivateIn"
+      },
+      "RouteOut": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "setting_key": {
+            "type": "string",
+            "title": "Setting Key"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "billed": {
+            "type": "boolean",
+            "title": "Billed"
+          },
+          "last_test": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastTest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage",
+          "setting_key",
+          "provider",
+          "model",
+          "billed"
+        ],
+        "title": "RouteOut"
+      },
+      "RouteTestIn": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Defaults to the stage's current model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage"
+        ],
+        "title": "RouteTestIn"
+      },
+      "RouteTestOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "cost_minor": {
+            "type": "integer",
+            "title": "Cost Minor",
+            "default": 0
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "billed": {
+            "type": "boolean",
+            "title": "Billed",
+            "default": true
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "stage"
+        ],
+        "title": "RouteTestOut"
       },
       "RubricBody-Input": {
         "properties": {
@@ -24022,6 +24809,58 @@
         ],
         "title": "SpecUpdate"
       },
+      "SpendBucket": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "billed_minor": {
+            "type": "integer",
+            "title": "Billed Minor",
+            "default": 0
+          },
+          "unbilled_minor": {
+            "type": "integer",
+            "title": "Unbilled Minor",
+            "default": 0
+          },
+          "calls": {
+            "type": "integer",
+            "title": "Calls",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "key"
+        ],
+        "title": "SpendBucket"
+      },
+      "SpendDay": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "billed_minor": {
+            "type": "integer",
+            "title": "Billed Minor",
+            "default": 0
+          },
+          "unbilled_minor": {
+            "type": "integer",
+            "title": "Unbilled Minor",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "day"
+        ],
+        "title": "SpendDay"
+      },
       "SpendMeter": {
         "properties": {
           "month_to_date_minor": {
@@ -24061,6 +24900,122 @@
           "estimated_unbilled_minor"
         ],
         "title": "SpendMeter"
+      },
+      "SpendSummary": {
+        "properties": {
+          "month": {
+            "type": "string",
+            "title": "Month"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "cap_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Minor"
+          },
+          "per_run_cap_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Run Cap Minor"
+          },
+          "warning_percent": {
+            "type": "integer",
+            "title": "Warning Percent"
+          },
+          "month_to_date_minor": {
+            "type": "integer",
+            "title": "Month To Date Minor"
+          },
+          "reserved_minor": {
+            "type": "integer",
+            "title": "Reserved Minor"
+          },
+          "estimated_unbilled_minor": {
+            "type": "integer",
+            "title": "Estimated Unbilled Minor"
+          },
+          "remaining_minor": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Minor"
+          },
+          "warning_reached": {
+            "type": "boolean",
+            "title": "Warning Reached"
+          },
+          "by_stage": {
+            "items": {
+              "$ref": "#/components/schemas/SpendBucket"
+            },
+            "type": "array",
+            "title": "By Stage"
+          },
+          "by_model": {
+            "items": {
+              "$ref": "#/components/schemas/SpendBucket"
+            },
+            "type": "array",
+            "title": "By Model"
+          },
+          "by_run": {
+            "items": {
+              "$ref": "#/components/schemas/SpendBucket"
+            },
+            "type": "array",
+            "title": "By Run"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/SpendDay"
+            },
+            "type": "array",
+            "title": "Daily"
+          }
+        },
+        "type": "object",
+        "required": [
+          "month",
+          "timezone",
+          "currency",
+          "cap_minor",
+          "per_run_cap_minor",
+          "warning_percent",
+          "month_to_date_minor",
+          "reserved_minor",
+          "estimated_unbilled_minor",
+          "remaining_minor",
+          "warning_reached",
+          "by_stage",
+          "by_model",
+          "by_run",
+          "daily"
+        ],
+        "title": "SpendSummary"
       },
       "SplitIn": {
         "properties": {

@@ -8,7 +8,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { SpendMeter } from "@/components/spend-meter"
+import { LiveSpendMeter } from "@/features/settings/ai/live-spend-meter"
 import { cn } from "@/lib/utils"
 import { NAV_FOOT, NAV_MAIN, NAV_SETUP, type NavItem } from "./nav"
 
@@ -86,7 +86,7 @@ export function MobileTabs() {
             ))}
           </nav>
           <div className="px-4 pb-4">
-            <SpendMeter spentMinor={0} capMinor={null} />
+            <LiveSpendMeter />
           </div>
         </SheetContent>
       </Sheet>

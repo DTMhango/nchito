@@ -55,7 +55,7 @@ def _offset(cursor: str | None) -> int:
     try:
         return max(int(cursor), 0) if cursor else 0
     except ValueError:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="bad cursor") from None
+        raise HTTPException(422, detail="bad cursor") from None
 
 
 async def page_of(session: AsyncSession, res: Resource, stmt: Select[Any], cursor: str | None,
@@ -130,7 +130,7 @@ def add_kit_crud(
                 if key == "code" and value is None:
                     continue
                 if key == "code" and value != row.code:
-                    raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, detail="a fact code never changes")
+                    raise HTTPException(422, detail="a fact code never changes")
                 if getattr(row, key) != value:
                     setattr(row, key, value)
                     changed.append(key)

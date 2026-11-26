@@ -24,6 +24,8 @@ dependencies = [
   "croniter>=2.0",
   "email-validator>=2.1",
   "python-multipart>=0.0.9",
+  "anthropic>=1.2",
+  "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
@@ -42,7 +44,7 @@ nchito = "app.cli:main"
 include = ["app*"]
 
 [tool.setuptools.package-data]
-app = ["py.typed", "migrations/*.mako", "migrations/versions/*.py", "themes/*.json"]
+app = ["py.typed", "migrations/*.mako", "migrations/versions/*.py", "themes/*.json", "llm/*.json", "llm/prompt_defaults/*.md"]
 
 [tool.ruff]
 line-length = 120
@@ -50,8 +52,15 @@ target-version = "py311"
 extend-exclude = ["app/migrations/versions"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "S", "RUF", "SIM"]
+select = ["E", "F", "W", "I", "B", "UP", "ASYNC", "S", "RUF", "SIM", "TID251"]
 ignore = ["S101", "B008", "RUF012", "S105", "S106", "UP042"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+# The 422 constant was renamed across Starlette releases; use the number so the code runs on any version.
+"fastapi.status.HTTP_422_UNPROCESSABLE_CONTENT".msg = "use 422 (constant missing in older Starlette)"
+"fastapi.status.HTTP_422_UNPROCESSABLE_ENTITY".msg = "use 422 (constant deprecated in newer Starlette)"
+"starlette.status.HTTP_422_UNPROCESSABLE_CONTENT".msg = "use 422 (constant missing in older Starlette)"
+"starlette.status.HTTP_422_UNPROCESSABLE_ENTITY".msg = "use 422 (constant deprecated in newer Starlette)"
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "B"]
