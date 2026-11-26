@@ -15,6 +15,7 @@ from app.models.applications import (
     SubmitPermit,
 )
 from app.models.base import Base
+from app.models.changes import JobChange, JobVersion, JobWatch
 from app.models.documents import ApplicationDocument
 from app.models.kit import (
     Answer,
@@ -70,7 +71,8 @@ __all__ = [
     "ApplicationPacket", "Assessment",
     "AuditEvent", "AuthSession", "Base", "Campaign", "ConfigRevision", "Connection", "Contact", "CustomFacet",
     "DispatchAttempt", "EmployerAlias", "Experience", "Fact", "Guardrail", "GuardrailWaiver", "InterviewPack",
-    "InterviewRound", "Job", "JobSighting", "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread", "Notification",
+    "InterviewRound", "Job", "JobChange", "JobSighting", "JobVersion", "JobWatch",
+    "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread", "Notification",
     "Owner",
     "PayEstimate", "PendingAction", "Person", "PortalAccount", "Prompt", "Reference", "Rubric", "Run",
     "SavedView", "Schedule", "Setting", "SettingRevision", "Skill", "SkillAlias", "Source", "SubmitPermit",

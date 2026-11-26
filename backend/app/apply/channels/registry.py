@@ -37,7 +37,8 @@ ChannelFactory = Callable[[AsyncSession], Awaitable[Channel]]
 
 _FACTORIES: dict[str, ChannelFactory] = {}
 # Built-in channels. ``unregister`` of a built-in puts its default back (tests replace and restore them).
-_BUILTIN: dict[str, str] = {"manual": "app.apply.channels.manual:factory", "email": "app.apply.channels.email:factory"}
+_BUILTIN: dict[str, str] = {"manual": "app.apply.channels.manual:factory", "email": "app.apply.channels.email:factory",
+                            "browser": "app.apply.channels.browser:factory"}
 _LAZY: dict[str, str] = dict(_BUILTIN)
 
 __all__ = ["ChannelFactory", "ChannelUnavailable", "available", "get", "is_available", "packet_hash", "register",

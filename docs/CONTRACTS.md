@@ -737,3 +737,48 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
 - **Exit test** (`tests/integration/test_wave2_exit.py`): besides the pipeline path, an API-only path (set and
   confirm the address, prepare, approve and dispatch through the endpoints; one email in the fake mailbox) and a test
   that a posting's unconfirmed address is packed for manual hand-off and never sent automatically.
+
+## Wave 3 browser-changes additions
+
+- **Browser channel** (`app/apply/channels/browser.py`, enforcement `instructed`, registered built-in). The permit is
+  consumed when the runner asks for it at Submit, never at task creation: (1) `dispatch.queue(app)` with no
+  `runner_token_id` (the owner's "Let the agent submit", or the worker's `browser.queue_approved_tasks`) creates an
+  `AgentTask` for the approved current packet and takes **no permit**; (2) the gateway claims it with
+  `browser.mark_task_claimed(task_id, token_id=)`; (3) at Submit the gateway calls `dispatch.queue(app,
+  runner_token_id=, agent_task_id=)` (permit requested and consumed, `DispatchAttempt` reserved, one transaction) then
+  `dispatch.run(attempt_id)`, which rechecks every gate and calls `BrowserChannel.dispatch`; an attempt that comes
+  back `handed_off` means **cleared: the runner may click Submit**, `cancelled` means refused; (4) the runner's
+  report goes to `browser.record_result(attempt, "submitted" | "uncertain" | "failed", evidence, task_id=, detail=)`.
+  `BrowserChannel.dispatch` returns `failed` (nothing handed over) unless the attempt's permit is consumed, bound to
+  the same packet hash, and held by a claimed task. `submitted` with `confirmation_page` / `reference` /
+  `confirmation_email` evidence settles as sent; without it, or `uncertain`, the attempt stays uncertain
+  (`submitted_unconfirmed`); `failed` settles as not sent (back to `ready`, never retried automatically). A report
+  with no consumed permit, or before clearance, raises `browser.UnpermittedReport` (code `no_permit`): the gateway
+  suspends the token (18.1). **An open or sent attempt blocks any new task, claim or clearance for that application.**
+  `BrowserChannel.reconcile` asks no runner: it reads the runner's own report on its task, a confirmation email
+  recorded on the application since the attempt started, and a classified confirmation `MailThread`; the watch window
+  and give-up age are `reconcile.confirmation_wait_hours` and `reconcile.check_every_minutes`.
+  `dispatch.queue` gains `agent_task_id`; with `channel == "browser"` and no runner token it returns
+  `status: queued` with no attempt. Worker task `browser_tick` (every 5 min): `queue_approved_tasks`,
+  `expire_stale_tasks`.
+- **Posting change alerts** (`app/pipeline/changes.py`, migration `0013_browser_changes`: tables `job_version`,
+  `job_change`, `job_watch`). `recheck_job` records a `JobChange` (kinds `closed`, `reopened`, `deadline_moved`,
+  `pay_changed`, `requirements_changed`, `apply_method_changed`, `eligibility_changed`, `location_changed`,
+  `wording`; each change has `field`, `before`, `after`, `material`, `summary`). Building a packet stores the
+  posting as the packet saw it, and a change is judged against that. A material change invalidates a current packet
+  (approval cleared, permits revoked) and opens one `follow_up` pending action per application with
+  `detail.kind` `posting_changed` (or `posting_closed`, which leaves the packet; the send gates refuse a closed
+  role); wording does nothing. Roles past `ready` get a `posting_changed` timeline event only. A failed fetch is
+  `unknown`, never `closed`. Worker task `posting_changes_scan` (every 15 min) rechecks the watched roles that are due.
+- **Endpoints:** `GET /api/jobs/{id}/changes` -> `JobChangesOut {job_id, watch, changes[]}`; `GET /api/job-changes
+  ?unacknowledged=true&material_only=false&limit=50` -> `JobChangeOut[]`; `POST /api/job-changes/{id}/acknowledge`.
+- **Compare** `GET /api/jobs/compare/{ids}?campaign_id=` (2 to 4 comma-separated ids; 422 otherwise, 404 for an
+  unknown id). `CompareOut` is reshaped: `{job_ids, jobs[] {id, title, employer, location, availability, campaign_id,
+  campaign_name, score, assessment_state}, rows[] {key, label, group, cells[] {value, state, note, amount_minor,
+  currency}, comparable, note, best_index}, winner_id, winner_reason}`. Cell states: `stated`, `not_stated`,
+  `unknown`, `yes`, `no`, `estimated`, `pass`, `fail`. Pay is normalised per year for year, month and week amounts in
+  one currency; hourly, daily, mixed-currency and unstated pay make the row `comparable: false` with the reason. No
+  model call.
+- **Settings:** `tracking.change_watch_enabled` (true), `tracking.change_watch_stages` (shortlisted, tailoring,
+  ready), `tracking.change_watch_pinned` (true), `tracking.change_check_every_hours` (12),
+  `tracking.change_batch_size` (20), `runners.browser_task_expiry_hours` (24).

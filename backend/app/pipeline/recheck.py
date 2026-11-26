@@ -17,7 +17,7 @@ from app.core import audit
 from app.core.events import publish
 from app.llm.client import LLMClient
 from app.models.search import Availability, Job, JobSighting, Source
-from app.pipeline import conflicts, normalise, orchestrator
+from app.pipeline import changes, conflicts, normalise, orchestrator
 from app.schemas.json_types import RateLimit
 from app.sources.base import RawJob
 
@@ -35,6 +35,8 @@ class RecheckResult:
     reassessed: bool = False
     fetched: bool = False
     note: str | None = None
+    change_id: str | None = None
+    change_kinds: list[str] = field(default_factory=list)
 
 
 async def _connector_for(session: AsyncSession, job: Job, deps: orchestrator.IntakeDeps):
@@ -77,6 +79,7 @@ async def recheck_job(session: AsyncSession, job: Job, *, actor: str, deps: orch
                       llm: LLMClient | None = None) -> RecheckResult:
     deps = deps or orchestrator.DEPS
     before = job.availability
+    before_snapshot = changes.snapshot_of(job)
     after = await orchestrator.check_job_open(session, job, deps)
     result = RecheckResult(availability_before=before.value, availability_after=after.value)
 
@@ -99,6 +102,9 @@ async def recheck_job(session: AsyncSession, job: Job, *, actor: str, deps: orch
 
     if before != job.availability and job.availability == Availability.closed:
         await conflicts.on_job_changed(session, job)
+    change = await changes.record_changes(session, job, before=before_snapshot, availability_before=before, actor=actor)
+    if change is not None:
+        result.change_id, result.change_kinds = str(change.id), list(change.kinds)
     await audit.record(session, actor=actor, action="job.rechecked", subject_type="job", subject_id=job.id,
                        detail={"availability": [result.availability_before, result.availability_after],
                                "changed_fields": result.changed_fields, "reassessed": result.reassessed})

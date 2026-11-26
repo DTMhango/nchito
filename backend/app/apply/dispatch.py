@@ -139,8 +139,8 @@ async def _fresh_open_check(session: AsyncSession, packet: ApplicationPacket, jo
 
 
 async def queue(session: AsyncSession, application_id: uuid.UUID, *, actor: str = "system",
-                runner_token_id: uuid.UUID | None = None, automatic_retry: bool = False,
-                now: datetime | None = None) -> QueueResult:
+                runner_token_id: uuid.UUID | None = None, agent_task_id: uuid.UUID | None = None,
+                automatic_retry: bool = False, now: datetime | None = None) -> QueueResult:
     """Permit request, then permit consumption and the attempt, in the caller's transaction (the caller
     commits). ``wait_for_owner`` raises the owner's approval request."""
     now = now or utcnow()
@@ -162,10 +162,12 @@ async def queue(session: AsyncSession, application_id: uuid.UUID, *, actor: str 
                                   "retry_limit")
     job = await session.get(Job, app.job_id)
     assert job is not None
+    if channel == "browser" and runner_token_id is None:
+        return await _queue_browser_task(session, app, actor, now)
     await _fresh_open_check(session, packet, job, now)
 
     result = await permits.request(session, app.id, packet_hash=packet.content_hash, channel=channel,
-                                   runner_token_id=runner_token_id, actor=actor, now=now)
+                                   runner_token_id=runner_token_id, agent_task_id=agent_task_id, actor=actor, now=now)
     if result.status == "wait_for_owner":
         action = await approval.request_owner_approval(session, app, packet, result.reason)
         return QueueResult("wait_for_owner", result.reason, None, result.gates, action.id, result.code)
@@ -186,6 +188,18 @@ async def queue(session: AsyncSession, application_id: uuid.UUID, *, actor: str 
                         else None, send_after=attempt.send_after.isoformat() if attempt.send_after else None,
                         retry=automatic_retry, gates=result.gates)
     return QueueResult("queued", result.reason, attempt, result.gates)
+
+
+async def _queue_browser_task(session: AsyncSession, app: Application, actor: str, now: datetime) -> QueueResult:
+    """Browser packets go to a runner as a task; the permit is asked for, and consumed with the attempt, only
+    when the runner reaches Submit (``queue`` with its ``runner_token_id``). See ``channels/browser.py``."""
+    from app.apply.channels import browser
+
+    try:
+        await browser.queue_task(session, app.id, actor=actor, now=now)
+    except browser.BrowserError as exc:
+        return await _refused(session, app, exc.message, actor, exc.code)
+    return QueueResult("queued", "waiting for a runner: it asks for its permit when it reaches Submit")
 
 
 # ----- dispatch-time recheck ---------------------------------------------------------------------

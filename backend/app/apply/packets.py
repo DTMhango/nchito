@@ -164,6 +164,15 @@ async def _files(session: AsyncSession, files: list[PacketFile]) -> list[PacketF
     return list(files)
 
 
+async def _capture_posting(session: AsyncSession, app: Application, now: datetime) -> None:
+    """Remember the posting as this packet saw it, so a later change is judged against it (18.4)."""
+    from app.pipeline import changes
+
+    job = await session.get(Job, app.job_id)
+    if job is not None:
+        await changes.capture_version(session, job, now=now)
+
+
 async def assemble(session: AsyncSession, app: Application, draft: PacketDraft) -> PacketContents:
     job = await session.get(Job, app.job_id)
     assert job is not None
@@ -269,6 +278,7 @@ async def build(session: AsyncSession, app: Application, draft: PacketDraft, *, 
     session.add(packet)
     app.channel = Channel(draft.channel)
     await session.flush()
+    await _capture_posting(session, app, now)
     await add_event(session, app.id, "packet_built", actor, {
         "version": version, "packet_hash": digest, "channel": draft.channel,
         "changes": [c["path"] for c in changes] if latest else [], "previous_hash": latest.content_hash if latest

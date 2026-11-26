@@ -203,7 +203,7 @@ async def test_channel_registry_registers_by_name_and_shares_the_packet_hash():
     assert "manual" in registry.available() and registry.packet_hash is packets.content_hash
     with pytest.raises(registry.ChannelUnavailable):
         async with get_sessionmaker()() as s:
-            await registry.get(s, "browser")
+            await registry.get(s, "carrier-pigeon")
 
 
 async def test_stage_machine_only_reconciliation_returns_an_unconfirmed_send_to_ready():
