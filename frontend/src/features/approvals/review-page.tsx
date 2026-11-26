@@ -17,38 +17,47 @@ import { Chip } from "@/components/chip"
 import { SectionHeader } from "@/components/page-header"
 import { View } from "@/components/view"
 import { appKeys, getApplication } from "@/features/applications/api"
+import { jobQuery } from "@/features/jobs/api"
+import { ConfirmAddressNotice } from "@/features/jobs/apply-address"
+import { preparePacket } from "@/features/studio/api"
+import { meQuery } from "@/lib/api/endpoints"
+import { explainCode, explainError, type Explained } from "@/lib/api/refusals"
 import { isApiError } from "@/lib/api/client"
 import {
   apKeys,
   approvePacket,
   createDispatch,
   currentPacketQuery,
-  errorText,
   heldRolesQuery,
   packetsQuery,
   receiptQuery,
-  refusalOf,
   rejectApplication,
   requestChanges,
   type Channel,
-  type GateResult,
   type PacketContents,
 } from "@/features/autopilot/api"
 import {
   approvalStanding,
   CHANNEL_LABEL,
+  deferredText,
   shortHash,
   stamp,
 } from "@/features/autopilot/logic"
 import { GateList } from "./gate-list"
 import { HandoffPanel } from "./handoff-panel"
 
-type Problem = { message: string; gates: GateResult[] }
+/** What stopped an action, in plain words (switched on `code`), with the server's reason and gates. */
+type Problem = Explained
 
-const problemOf = (e: unknown): Problem => {
-  const r = refusalOf(e)
-  return { message: r?.reason ?? errorText(e), gates: r?.gates ?? [] }
-}
+const problemOf = (e: unknown): Problem =>
+  explainError(e, "Something went wrong. Try again in a moment.")
+const plain = (message: string): Problem => ({
+  code: "error",
+  text: message,
+  action: null,
+  reason: null,
+  gates: [],
+})
 
 /** Packet review: exactly what will be sent, why it can or cannot go automatically, and the decision. */
 export function ReviewPage({ applicationId }: { applicationId: string }) {
@@ -66,11 +75,17 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
   })
   const packets = useQuery(packetsQuery(applicationId))
   const held = useQuery(heldRolesQuery())
+  const tz = useQuery(meQuery()).data?.timezone
   const [mode, setMode] = useState<"changes" | "reject" | null>(null)
   const [note, setNote] = useState("")
   const [problem, setProblem] = useState<Problem | null>(null)
+  const [addressConfirmed, setAddressConfirmed] = useState(false)
+  const job = useQuery({
+    ...jobQuery(app.data?.job_id ?? ""),
+    enabled: !!app.data,
+  })
   const setError = (message: string | null) =>
-    setProblem(message ? { message, gates: [] } : null)
+    setProblem(message ? plain(message) : null)
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: apKeys.packet(applicationId) })
@@ -92,7 +107,7 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
       setProblem(null)
       refresh()
     },
-    // 409 approval_refused: the reason (and gates, when given) shown plainly.
+    // 409 with the specific code (e.g. packet_superseded), the reason and the gates.
     onError: (e) => {
       setProblem(problemOf(e))
       refresh()
@@ -103,15 +118,28 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
     onSuccess: (out) => {
       if (out.status === "queued") {
         setProblem(null)
-        toast.success("Queued. You can cancel it under Autopilot, Sending.")
-      } else
-        setProblem({
-          message:
-            out.status === "wait_for_owner"
-              ? `Waiting for you: ${out.reason}`
-              : `Not sent: ${out.reason}`,
-          gates: out.gates,
-        })
+        const held = out.dispatch ? deferredText(out.dispatch, tz) : null
+        toast.success(
+          held
+            ? `${held}. You can cancel it under Autopilot, Sending.`
+            : "Queued. You can cancel it under Autopilot, Sending."
+        )
+      } else setProblem(explainCode(out.code, out.reason, out.gates))
+      refresh()
+    },
+    onError: (e) => setProblem(problemOf(e)),
+  })
+  // Prepare again (e.g. after confirming the address): the server picks the channel afresh.
+  const prepare = useMutation({
+    mutationFn: () => preparePacket(applicationId, { channel: "auto" }),
+    onSuccess: (out) => {
+      setProblem(null)
+      setAddressConfirmed(false)
+      toast.success(
+        out.channel === "email"
+          ? "Prepared again: it goes by email once you approve."
+          : "Prepared again for you to apply yourself."
+      )
       refresh()
     },
     onError: (e) => setProblem(problemOf(e)),
@@ -304,11 +332,79 @@ export function ReviewPage({ applicationId }: { applicationId: string }) {
         </section>
       )}
 
+      <ConfirmAddressNotice
+        job={job.data}
+        note={
+          channel === "manual"
+            ? "This packet was prepared for you to apply yourself."
+            : undefined
+        }
+        onConfirmed={() => setAddressConfirmed(true)}
+      />
+      {addressConfirmed && channel === "manual" && (
+        <div
+          role="status"
+          className="flex flex-wrap items-center gap-2 rounded-sm bg-info-soft px-3 py-2 text-sm text-info"
+        >
+          <span className="min-w-0 flex-1">
+            Address confirmed. This packet was built for you to apply yourself;
+            prepare it again to send it by email.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={prepare.isPending}
+            onClick={() => prepare.mutate()}
+          >
+            Prepare again
+          </Button>
+        </div>
+      )}
+
       {channel === "manual" && <HandoffPanel app={app.data} />}
 
       {problem && (
-        <div role="alert" className="grid gap-2">
-          <p className="text-sm text-danger">{problem.message}</p>
+        <div role="alert" data-code={problem.code} className="grid gap-2">
+          <p className="text-sm text-danger">{problem.text}</p>
+          {problem.reason && (
+            <p className="text-xs text-muted-foreground">{problem.reason}</p>
+          )}
+          {problem.action === "reload" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-fit"
+              onClick={() => {
+                setProblem(null)
+                refresh()
+              }}
+            >
+              Load the latest version
+            </Button>
+          )}
+          {problem.action === "prepare_again" && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-fit"
+              disabled={prepare.isPending}
+              onClick={() => prepare.mutate()}
+            >
+              Prepare again
+            </Button>
+          )}
+          {problem.action === "resume_autopilot" && (
+            <Button asChild size="sm" variant="outline" className="w-fit">
+              <Link to="/autopilot">Open the Autopilot</Link>
+            </Button>
+          )}
+          {problem.action === "recheck" && (
+            <Button asChild size="sm" variant="outline" className="w-fit">
+              <Link to="/studio" search={{ application: applicationId }}>
+                Re-run the checks in the Studio
+              </Link>
+            </Button>
+          )}
           {problem.gates.length > 0 && (
             <GateList gates={problem.gates} label="Checks that stopped it" />
           )}

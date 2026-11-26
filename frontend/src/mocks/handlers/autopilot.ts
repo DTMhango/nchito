@@ -200,14 +200,13 @@ export const autopilotHandlers = [
       current.content_hash !== body.packet_hash
     )
       return refused({
-        code: "approval_refused",
+        code: "packet_superseded",
         reason:
           "The packet changed since you opened it. Review the new version first.",
       })
     if (state.refuseApproval)
       return refused({
-        code: "approval_refused",
-        reason: state.refuseApproval,
+        ...state.refuseApproval,
         gates: gatesFor(a).filter((g) => g.outcome !== "pass"),
       })
     current.approved_at = now()
@@ -316,10 +315,10 @@ export const autopilotHandlers = [
     const d = dispatchesOf(a).find((x) => x.id === String(params.did))
     if (!d) return notFound("Dispatch")
     if (d.status !== "reserved" || d.started_at)
-      return HttpResponse.json(
-        { detail: "already handed over: it can no longer be cancelled" },
-        { status: 409 }
-      )
+      return refused({
+        code: "already_handed_over",
+        reason: "already handed over: it can no longer be cancelled",
+      })
     d.status = "cancelled"
     return HttpResponse.json(d)
   }),
@@ -332,10 +331,10 @@ export const autopilotHandlers = [
       const d = dispatchesOf(a).find((x) => x.id === String(params.did))
       if (!d) return notFound("Dispatch")
       if (!d.uncertain)
-        return HttpResponse.json(
-          { detail: "this send is not uncertain" },
-          { status: 409 }
-        )
+        return refused({
+          code: "not_uncertain",
+          reason: "this send is not uncertain",
+        })
       const body = (await request.json()) as ReconcileIn
       d.reconcile_attempts += 1
       d.last_reconciled_at = now()

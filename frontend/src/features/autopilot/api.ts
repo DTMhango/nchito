@@ -5,6 +5,7 @@
 import { queryOptions } from "@tanstack/react-query"
 import { api, isApiError, unwrap } from "@/lib/api/client"
 import type { Schemas } from "@/lib/api/types"
+import { explainError } from "@/lib/api/refusals"
 import { resolveAction } from "@/features/applications/api"
 
 export type PacketOut = Schemas["PacketOut"]
@@ -52,32 +53,13 @@ export const apKeys = {
 }
 
 /** A structured 409 from the apply layer: `{code, reason, gates?, outstanding?}`. */
-export type Refusal = {
-  code: string | null
-  reason: string
-  gates: GateResult[]
-  outstanding: string[]
-}
+export { refusalOf, type Refusal } from "@/lib/api/refusals"
 
-/** Read a refusal from an error; null when it is not a structured refusal. */
-export function refusalOf(e: unknown): Refusal | null {
-  if (!isApiError(e)) return null
-  const d = (e.body as { detail?: unknown } | undefined)?.detail
-  if (!d || typeof d !== "object" || Array.isArray(d)) return null
-  const o = d as Record<string, unknown>
-  return {
-    code: typeof o.code === "string" ? o.code : null,
-    reason: typeof o.reason === "string" ? o.reason : e.message,
-    gates: Array.isArray(o.gates) ? (o.gates as GateResult[]) : [],
-    outstanding: Array.isArray(o.outstanding)
-      ? o.outstanding.filter((x): x is string => typeof x === "string")
-      : [],
-  }
+/** Plain words for any error: a coded refusal in the app's words, else the error's message. */
+export const errorText = (e: unknown) => {
+  const x = explainError(e, e instanceof Error ? e.message : String(e))
+  return x.reason ? `${x.text} (${x.reason})` : x.text
 }
-
-/** Plain words for any error: the refusal's reason when there is one. */
-export const errorText = (e: unknown) =>
-  refusalOf(e)?.reason ?? (e instanceof Error ? e.message : String(e))
 
 // ---- master pause and restore ----
 export const writeAutopilot = (paused: boolean, reason?: string | null) =>
@@ -318,18 +300,6 @@ export const reconcileDispatch = (
       }
     )
   )
-
-/** The application timeline: where a quiet-hours postponement (`dispatch_deferred`) is recorded. */
-export const timelineQuery = (id: string) =>
-  queryOptions({
-    queryKey: apKeys.timeline(id),
-    queryFn: () =>
-      unwrap(
-        api.GET("/api/applications/{application_id}/timeline", {
-          params: { path: { application_id: id } },
-        })
-      ),
-  })
 
 // ---- handoff ----
 export const handoffQuery = (id: string) =>

@@ -31,8 +31,8 @@ export type MockAutopilot = {
   dispatches: Record<string, DispatchOut[]>
   trusted: TrustedSiteOut[]
   runners: RunnerStatus[]
-  /** When set, approve answers 409 `approval_refused` with this reason and the open gates. */
-  refuseApproval: string | null
+  /** When set, approve answers 409 with this code and reason, and the open gates. */
+  refuseApproval: { code: string; reason: string } | null
   /** Reject and request-changes calls, in order (tests read them). */
   decisions: { id: string; kind: "reject" | "changes"; text: string | null }[]
 }
