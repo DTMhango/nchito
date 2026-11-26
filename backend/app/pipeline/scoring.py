@@ -436,6 +436,7 @@ class BacktestResult:
     rows: list[dict[str, Any]]
     estimated_cost_minor: int
     currency: str
+    to_score: int = 0
 
 
 def _crossings(old: int | None, new: int | None, old_t: Sequence[int], new_t: Sequence[int]) -> list[str]:
@@ -480,7 +481,7 @@ async def backtest(session: AsyncSession, draft: Rubric, campaign: Campaign, job
     kit = await kit_snapshot(session)
     prompt, prompt_version = await prompt_for(session)
     model = settings["ai.model_score"]
-    estimate, currency = 0, settings.get("budget.currency") or ""
+    estimate, to_score, currency = 0, 0, settings.get("budget.currency") or ""
     old_scores: dict[uuid.UUID, int | None] = {}
     new_scores: dict[uuid.UUID, int | None] = {}
     for job, record in records:
@@ -494,6 +495,7 @@ async def backtest(session: AsyncSession, draft: Rubric, campaign: Campaign, job
             continue
         key = cache_key(job, kit, draft, prompt_version, model)
         cached = await session.scalar(select(Assessment.id).where(Assessment.cache_key == key).limit(1))
+        to_score += int(cached is None)
         if cached is None and client is not None:
             estimate += await client.estimate_cost_minor(STAGE, build_messages(prompt, draft.body, kit, job),
                                                          model=model)
@@ -514,7 +516,7 @@ async def backtest(session: AsyncSession, draft: Rubric, campaign: Campaign, job
              "crossed": _crossings(old_scores.get(job.id), new_scores.get(job.id), old_t, new_t)}
             for job, _ in records]
     rows.sort(key=lambda r: (r["new_rank"] is None, r["new_rank"] or 0, r["old_rank"] or 0))
-    return BacktestResult(rows=rows, estimated_cost_minor=estimate, currency=currency)
+    return BacktestResult(rows=rows, estimated_cost_minor=estimate, currency=currency, to_score=to_score)
 
 
 # ----- overrides --------------------------------------------------------------------------

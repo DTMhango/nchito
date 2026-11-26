@@ -144,7 +144,7 @@ def campaign_record(campaign: Campaign, *, work_rights: Sequence[str] | None = N
         "name": campaign.name,
         "status": _val(campaign.status),
         "review_state": _val(campaign.review_state),
-        "confirmed": campaign.confirmed_at is not None,
+        "confirmed": campaign.confirmed_at is not None and not campaign.unconfirmed_items,
         "priority": campaign.priority,
         "criteria": campaign.criteria,
         "unknown_data_policy": campaign.unknown_data_policy.model_dump(),
@@ -193,7 +193,7 @@ async def load_records(session: AsyncSession, *, now: datetime, job_ids: Sequenc
     sources: dict[uuid.UUID, list[str]] = {}
     for job_id, name in (await session.execute(
             select(JobSighting.job_id, Source.name).join(Source, Source.id == JobSighting.source_id)
-            .where(JobSighting.job_id.in_(ids)))).all():
+            .where(JobSighting.job_id.in_(ids)).order_by(JobSighting.first_seen_at))).all():
         sources.setdefault(job_id, []).append(name)
     lk = await load_lookups(session)
     out = []

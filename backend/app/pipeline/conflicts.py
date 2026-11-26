@@ -289,7 +289,7 @@ async def _resolve_group(session: AsyncSession, key: str, group: list[Job], entr
     contenders = {e.job.id for e in mine}
     for job in group:
         if job.conflict_state != ConflictState.released and job.id not in contenders:
-            job.conflict_state, job.conflict_note = ConflictState.none, None
+            job.conflict_state, job.conflict_note, job.conflict_detail = ConflictState.none, None, None
     if not mine:
         return GroupOutcome(None, [], None)
     ordered = sorted(mine, key=lambda e: rank_key(e, rule))
@@ -316,6 +316,10 @@ async def _resolve_group(session: AsyncSession, key: str, group: list[Job], entr
             if entry.job.id == anchor_app.job_id:
                 continue
             entry.job.conflict_state = ConflictState.held
+            entry.job.conflict_detail = {"outranked_by_job_id": str(anchor_app.job_id),
+                                         "outranked_by_title": anchor_job.title if anchor_job else None,
+                                         "score": entry.score, "outranked_by_score": locked_score,
+                                         "reason": "applied"}
             entry.job.conflict_note = f"held: already applied to {anchor_job.title if anchor_job else 'a role'} " \
                                       f"here; {why}"
             if locked_score is not None and entry.score > locked_score:
@@ -349,11 +353,14 @@ async def _resolve_group(session: AsyncSession, key: str, group: list[Job], entr
     if previous_winner is not None and previous_winner.id != winner.job.id and previous_winner.id not in contenders:
         note = f"promoted after {previous_winner.title} left the contest; " + note
     winner.job.conflict_state, winner.job.conflict_note = ConflictState.winner, note
+    winner.job.conflict_detail = None
     held = []
     for entry in others:
         if entry.job.id == winner.job.id:
             continue
         entry.job.conflict_state = ConflictState.held
+        entry.job.conflict_detail = {"outranked_by_job_id": str(winner.job.id), "outranked_by_title": winner.job.title,
+                                     "score": entry.score, "outranked_by_score": winner.score, "reason": "outranked"}
         entry.job.conflict_note = f"outranked by {describe(winner)}, {winner.score} vs {entry.score} ({rule_ref})"
         held.append(entry.job.id)
     if previous_winner is None or previous_winner.id != winner.job.id:
@@ -407,7 +414,7 @@ async def resolve_employers(session: AsyncSession, employers: Iterable[str], *, 
         if scope == "off":
             for job in jobs:
                 if job.conflict_state != ConflictState.released:
-                    job.conflict_state, job.conflict_note = ConflictState.none, None
+                    job.conflict_state, job.conflict_note, job.conflict_detail = ConflictState.none, None, None
             for entry in entries:
                 entry.assessment.is_conflict_winner = False
             await flag_recruiter_postings(session, jobs, similarity_threshold)
@@ -430,7 +437,7 @@ async def release_held(session: AsyncSession, job: Job, *, actor: str, reason: s
     if job.conflict_state != ConflictState.held:
         raise ValueError("only a held role can be released")
     previous = job.conflict_note
-    job.conflict_state = ConflictState.released
+    job.conflict_state, job.conflict_detail = ConflictState.released, None
     job.conflict_note = f"released by {actor}: {reason}"
     await audit.record(session, actor=actor, action="conflict.released", subject_type="job", subject_id=job.id,
                        detail={"reason": reason, "was": previous})

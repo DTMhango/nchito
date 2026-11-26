@@ -303,6 +303,18 @@ never permits an automatic action; every gate carries a reason and the effective
 source and version of each rule it used (the "Why?" panel reads these). Wave 1 (filters and
 scoring stream) implements `decide`; wave 2 (apply) adds permit-time gates to the same function.
 
+Wave 1 additions (all optional, defaulted): `DecisionInput.rubric` (id, version, thresholds),
+`override`, `setting_versions`, `conflict_note`; `GateDecision.would_change_if`;
+`Decision.effective_score` (score after campaign penalty/bonus rules, unknown-data penalties and
+any override) and `mode` (after the unconfirmed-campaign ceiling). Unknown-data policies:
+`review` keeps a mandatory `unknown` (verdict review); `pass_with_penalty` and `pass_blocks_auto`
+keep a non-mandatory `unknown` that blocks automation (the first also deducts
+`scoring.unknown_penalty`); `fail` fails the gate. Permit purpose: wave 2 supplies
+`application["permit_checks"]` (`{name: (outcome, reason)}`); without it the permit is refused.
+Records come from `pipeline/filters.job_record` / `campaign_record`. Campaigns carry
+`unconfirmed` criteria items (confirmed one by one, `POST /campaigns/{id}/confirm/{item}`);
+backtest is two steps (`/rubrics/backtest/estimate`, then `/rubrics/backtest`).
+
 ## 11. Data model conventions
 
 - Models: `backend/app/models/`, one module per aggregate (`kit`, `search`, `applications`,
