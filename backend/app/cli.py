@@ -1,4 +1,5 @@
-"""Command line: ``nchito migrate | web | worker | openapi | contracts | gen-key | worker-alive | restored``."""
+"""Command line: ``nchito migrate | web | worker | openapi | contracts | gen-key | worker-alive | restored |
+demo-job``."""
 
 from __future__ import annotations
 
@@ -159,6 +160,28 @@ async def restored(backup_taken_at: str | None, *, database_url: str | None = No
           "reconciliation list, then resume.")
 
 
+async def demo_job() -> int:
+    """Insert one fictional role, scored with no model call, shortlisted for the Studio (refused in production)."""
+    from app.core.db import dispose_engine, get_sessionmaker
+    from app.ops import demo
+
+    try:
+        demo.refuse_in_production()
+    except demo.DemoRefused as exc:
+        print(f"refused: {exc}")
+        return 2
+    try:
+        async with get_sessionmaker()() as session:
+            made = await demo.create(session)
+            await session.commit()
+    finally:
+        await dispose_engine()
+    scores = ", ".join(f"{k}: {v}" for k, v in made.scores.items()) or "no campaign to score against"
+    print(f"demo job {made.job_id} (application {made.application_id}); scores: {scores}. "
+          f"Open /jobs/{made.job_id} or /studio?application={made.application_id}.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="nchito")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -184,6 +207,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("worker-alive", help="Exit 0 if a worker heartbeat is fresh (container healthcheck)")
     rd = sub.add_parser("restored", help="Mark a restored database paused for restore (restore does this itself)")
     rd.add_argument("--backup-taken-at", default=None, help="ISO time the backup was taken")
+    sub.add_parser("demo-job", help="Insert one fictional role for manual testing (refused in production)")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=get_config().log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -214,6 +238,8 @@ def main(argv: list[str] | None = None) -> None:
                          pause=not args.no_pause, inspect=args.inspect, yes=args.yes))
     elif args.cmd == "restored":
         asyncio.run(restored(args.backup_taken_at))
+    elif args.cmd == "demo-job":
+        sys.exit(asyncio.run(demo_job()))
     elif args.cmd == "worker-alive":
         sys.exit(0 if asyncio.run(worker_alive()) else 1)
 

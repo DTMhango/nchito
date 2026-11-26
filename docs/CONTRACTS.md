@@ -727,3 +727,8 @@ Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `servi
   `send_after`) while a reserved, not yet started attempt has been postponed by the send-time quiet-hours check
   (`dispatch.deferred`, whose detail now carries `code`). The UI reads these, not the timeline.
 - **Studio answers**: an `ask_owner` `DraftAnswer` carries its `pending_action_id`; the Studio links to that action.
+- **Demo seed** (manual testing only): `python -m app.cli demo-job` inserts one fictional open role
+  (`app/ops/demo.py`: an `example.com` employer and application address, tag `demo`, unconfirmed address), scores it
+  against every campaign through `scoring.score_jobs` with an in-process stand-in for the score model (no provider
+  call, no spend; `Assessment.model = "demo (no model call)"`), opens a shortlisted application and audits
+  `job.demo_created`. Refused (exit 2) when `ENVIRONMENT=production` (or `ENV=production`).
