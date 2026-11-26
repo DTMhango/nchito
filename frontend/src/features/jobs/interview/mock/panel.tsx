@@ -18,15 +18,18 @@ import {
   type MockSession,
 } from "./api"
 import { SessionView } from "./chat"
+import { RoundEventLink } from "../../schedule/round-links"
 
 const SELECT =
   "h-9 rounded-md border border-border bg-transparent px-2 font-normal"
 
 function Setup({
   jobId,
+  round,
   onStarted,
 }: {
   jobId: string
+  round?: number
   onStarted: (id: string) => void
 }) {
   const qc = useQueryClient()
@@ -36,7 +39,11 @@ function Setup({
   const [usePack, setUsePack] = useState(true)
   const [each, setEach] = useState(false)
   const [timer, setTimer] = useState("")
-  const [roundId, setRoundId] = useState("")
+  const [picked, setRoundId] = useState<string | null>(null)
+  // Opened from a schedule event: that round, until the owner picks another.
+  const roundId =
+    picked ?? rounds.data?.find((r) => r.round_number === round)?.id ?? ""
+  const roundNumber = rounds.data?.find((r) => r.id === roundId)?.round_number
   const est = useQuery(
     estimateQuery(jobId, {
       mode,
@@ -128,6 +135,9 @@ function Setup({
           />
         </label>
       </div>
+      {roundNumber != null && (
+        <RoundEventLink jobId={jobId} round={roundNumber} />
+      )}
       <label className="flex items-center gap-2 text-sm">
         <input
           type="checkbox"
@@ -291,10 +301,16 @@ function History({
 }
 
 /** Mock interview in chat: set it up, practise, read the feedback, see progress. */
-export function MockInterviewPanel({ jobId }: { jobId: string }) {
+export function MockInterviewPanel({
+  jobId,
+  round,
+}: {
+  jobId: string
+  round?: number
+}) {
   const list = useQuery(sessionsQuery(jobId))
   const [open, setOpen] = useState<string | null>(null)
-  const [setup, setSetup] = useState(false)
+  const [setup, setSetup] = useState(round != null)
   return (
     <div
       role="region"
@@ -321,6 +337,7 @@ export function MockInterviewPanel({ jobId }: { jobId: string }) {
           {setup && (
             <Setup
               jobId={jobId}
+              round={round}
               onStarted={(id) => {
                 setSetup(false)
                 setOpen(id)

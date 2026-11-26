@@ -3,6 +3,7 @@ import { configure, screen, waitFor, within } from "@testing-library/react"
 import { renderApp, setupUser } from "@/test/render"
 import { applicationsMock } from "@/mocks/handlers/applications"
 import { calendarMock } from "@/mocks/handlers/calendar"
+import { followupsMock } from "@/mocks/handlers/followups"
 
 configure({ asyncUtilTimeout: 8000 })
 
@@ -37,8 +38,9 @@ describe("Schedule tab", () => {
       name: "Round 2, Video call",
     })
     expect(within(card).getByText(/Overlaps with/)).toBeVisible()
-    const pack = within(card).getByRole("link", { name: "Interview pack" })
+    const pack = within(card).getByRole("link", { name: "Prepare round 2" })
     expect(pack.getAttribute("href")).toContain("tab=interview")
+    expect(pack.getAttribute("href")).toContain("round=2")
   })
 
   it("labels a proposal as not confirmed and does not confirm on render", async () => {
@@ -133,6 +135,42 @@ describe("Schedule tab", () => {
       expect(calendarMock.events().find((x) => x.id === e.id)!.outcome).toBe(
         "mixed"
       )
+    )
+  })
+
+  it("offers a thank-you once the interview is marked done", async () => {
+    const user = setupUser()
+    const e = confirmed()
+    const { router } = renderApp(`/jobs/${e.job_id}?tab=schedule`)
+    const card = await screen.findByRole("article", {
+      name: "Round 2, Video call",
+    })
+    expect(
+      within(card).queryByRole("button", { name: /Draft a thank-you/ })
+    ).toBeNull()
+    await user.click(
+      within(card).getByRole("button", { name: "How did it go?" })
+    )
+    const form = await screen.findByRole("form", { name: "How did it go" })
+    await user.click(within(form).getByRole("button", { name: "Save" }))
+    const offer = await within(card).findByRole("button", {
+      name: /Draft a thank-you/,
+    })
+    await user.click(offer)
+    await waitFor(() =>
+      expect(
+        followupsMock().messages.filter(
+          (m) => m.application_id === e.application_id
+        )
+      ).toEqual([
+        expect.objectContaining({
+          kind: "thank_you",
+          note: expect.stringContaining("round 2"),
+        }),
+      ])
+    )
+    await waitFor(() =>
+      expect(router.state.location.search).toMatchObject({ tab: "messages" })
     )
   })
 })

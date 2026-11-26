@@ -419,6 +419,8 @@ const insightsRoute = createRoute({
 
 const jobSearch = z.object({
   tab: z.enum(JOB_TABS).catch("overview").default("overview"),
+  /** An interview round to prepare (opens the mock interview on it). */
+  round: z.coerce.number().int().min(1).optional().catch(undefined),
 })
 const jobRoute = createRoute({
   getParentRoute: () => shellRoute,

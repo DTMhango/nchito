@@ -20,6 +20,7 @@ import { EventForm, type FormMode } from "./event-form"
 import { ConflictWarning, EventTimes } from "./event-times"
 import { STATUS_LABEL, TYPE_LABEL } from "./format"
 import { ProposalConfirm } from "./proposal"
+import { ThankYouOffer } from "./round-links"
 
 type Editing = { mode: FormMode; event: EventOut | null }
 
@@ -271,13 +272,16 @@ function EventCard({
             </a>
           </Button>
         )}
+        {e.status === "done" && e.outcome !== "did_not_happen" && (
+          <ThankYouOffer event={e} />
+        )}
         <Button asChild size="sm" variant="ghost" className="ml-auto">
           <Link
             to="/jobs/$id"
             params={{ id: job.id }}
-            search={{ tab: "interview" }}
+            search={{ tab: "interview", round: e.round_number }}
           >
-            Interview pack
+            Prepare round {e.round_number}
           </Link>
         </Button>
       </div>
