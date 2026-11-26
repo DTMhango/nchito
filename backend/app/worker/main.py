@@ -8,6 +8,7 @@ import logging
 import signal
 
 from app.core.db import dispose_engine
+from app.pipeline import orchestrator
 from app.worker.heartbeat import heartbeat_loop
 from app.worker.queue import RUNS_QUEUE, SYSTEM_QUEUE, queue_app
 
@@ -15,6 +16,7 @@ log = logging.getLogger(__name__)
 
 
 async def run_worker() -> None:
+    orchestrator.install()  # sweep, expiry_check and retention handlers (the worker process only)
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

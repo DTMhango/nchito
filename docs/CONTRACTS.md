@@ -128,6 +128,7 @@ data)` inside their transaction; the event is delivered only after commit (Postg
 | `run.started` / `run.finished` | `{run_id[, status]}` | worker |
 | `spend.updated` | `{stage}` | ledger (every reservation and closing row; the spend meter refetches `GET /api/ai/spend/meter`) |
 | `budget.warning` / `budget.exhausted` | `{month, ...}` (`scope` on exhausted) | ledger, at most once per month each |
+| `run.progress` | `{run_id, stage, counts}` (stage: `search`, `source:<name>`, `done`) | sweep orchestrator |
 | (wave 1+) `job.created`, `job.updated`, `assessment.updated`, `pending_action.created`, `pending_action.resolved`, `application.updated`, `dispatch.updated`, `notification.created` | `{<entity>_id, ...}` | owning stream |
 
 New event names follow `<entity>.<past tense verb>` and are added to this table.

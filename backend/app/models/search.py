@@ -280,6 +280,21 @@ class PayEstimate(Base, Entity):
     assumptions: Mapped[str | None] = mapped_column(Text)
 
 
+class ExtractionCache(Base, Entity):
+    """Model extraction results, keyed on (content hash, prompt version, model), so unchanged
+    postings are never sent to a model twice (DESIGN 6, 11)."""
+
+    __tablename__ = "extraction_cache"
+
+    cache_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    model: Mapped[str] = mapped_column(String(128), nullable=False)
+    result: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    cost_minor: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    cost_currency: Mapped[str | None] = mapped_column(String(3))
+
+
 class JobSighting(Base, Entity):
     __tablename__ = "job_sighting"
     __table_args__ = (UniqueConstraint("job_id", "source_id", "url", name="job_source_url"),)
