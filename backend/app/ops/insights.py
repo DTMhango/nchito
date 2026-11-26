@@ -19,7 +19,7 @@ from collections import defaultdict
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
-from typing import Literal
+from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, Field
@@ -501,18 +501,72 @@ def _exclusions(assessments: list[tuple[Assessment, Job]]) -> list[CountRow]:
     return sorted((CountRow(key=k, count=n) for k, n in counts.items()), key=lambda r: (-r.count, r.key))
 
 
-async def build_insights(session: AsyncSession, f: InsightFilters, *, period: SpendPeriod = "week",
-                         now: datetime | None = None) -> InsightsOut:
-    values = await settings_service.values(session)
+async def _collector(session: AsyncSession, f: InsightFilters, values: dict[str, Any],
+                     now: datetime | None) -> Collector:
+    """The one place the report's date range is settled (default range, swapped ends), so a drill-through
+    lists exactly what the number counted."""
     tz = ZoneInfo(str(values["general.timezone"]))
     today = (now or utcnow()).astimezone(tz).date()
     until = f.until or today
     since = f.since or until - timedelta(days=int(values["insights.default_range_days"]))
     if since > until:
         since, until = until, since
-    min_sample = int(values["insights.min_sample"])
     c = Collector(session, f, since, until, tz)
     await c.load_lookups()
+    return c
+
+
+# ----- drill-through: the rows behind a number ------------------------------------------------------
+
+DrillAppReached = Literal["tailored", "approved", "sent", "reply", "interview", "offer"]
+DrillJobReached = Literal["found", "passed_filters", "scored_above"]
+
+_APP_TESTS: dict[str, Callable[[AppFacts], bool]] = {
+    "tailored": lambda x: x.tailored,
+    "approved": lambda x: x.approved or x.sent,
+    "sent": lambda x: x.sent,
+    "reply": lambda x: x.sent and x.replied,
+    "interview": lambda x: x.interviewed,
+    "offer": lambda x: x.offered,
+}
+
+
+async def drill_application_ids(session: AsyncSession, f: InsightFilters, reached: DrillAppReached | None,
+                                now: datetime | None = None) -> set[uuid.UUID]:
+    """The applications an Insights number counts: same filters, same counting rules."""
+    c = await _collector(session, f, await settings_service.values(session), now)
+    test = _APP_TESTS[reached] if reached else None
+    return {x.app.id for x in await c.applications() if test is None or test(x)}
+
+
+async def drill_job_ids(session: AsyncSession, f: InsightFilters, reached: DrillJobReached | None,
+                        now: datetime | None = None) -> set[uuid.UUID]:
+    """The roles an Insights number counts. With ``reached`` it is a funnel step (assessments in the range);
+    without, the source table's "found" (roles first seen in the range, duplicates left out)."""
+    values = await settings_service.values(session)
+    c = await _collector(session, f, values, now)
+    if reached is None:
+        return {job.id for job in await c.jobs() if job.merged_into_id is None
+                and not (f.source_id and c.job_source.get(job.id) != f.source_id)
+                and not (f.country and country_of(job).lower() != f.country.strip().lower())}
+    threshold = int(values["scoring.threshold_shortlist"])
+    out: set[uuid.UUID] = set()
+    for a, job in await c.assessments():
+        if reached == "passed_filters" and a.state not in (AssessmentState.scored, AssessmentState.parked):
+            continue
+        if reached == "scored_above" and not (a.state == AssessmentState.scored and a.score is not None
+                                              and a.score >= threshold):
+            continue
+        out.add(job.id)
+    return out
+
+
+async def build_insights(session: AsyncSession, f: InsightFilters, *, period: SpendPeriod = "week",
+                         now: datetime | None = None) -> InsightsOut:
+    values = await settings_service.values(session)
+    min_sample = int(values["insights.min_sample"])
+    c = await _collector(session, f, values, now)
+    since, until = c.since, c.until
     apps = await c.applications()
     assessments = await c.assessments()
     jobs = await c.jobs()

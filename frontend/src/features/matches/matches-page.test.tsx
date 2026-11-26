@@ -311,3 +311,17 @@ describe("Why? panel and bulk", () => {
     )
   })
 })
+
+describe("Matches drill-through from Insights", () => {
+  it("narrows by the link's market and clears back to the inbox", async () => {
+    const user = userEvent.setup()
+    const { router } = renderApp("/matches?country=Kenya")
+    const bar = await screen.findByRole("group", {
+      name: "Filters from Insights",
+    })
+    expect(within(bar).getByText("Market: Kenya")).toBeInTheDocument()
+    await user.click(within(bar).getByRole("button", { name: "Clear all" }))
+    await waitFor(() => expect(search(router)).not.toHaveProperty("country"))
+    await ready()
+  })
+})

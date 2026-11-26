@@ -39,6 +39,7 @@ from app.models.search import (
     SkillAlias,
     TagRule,
 )
+from app.ops import insights
 from app.pipeline import bulk, conflicts, custom_facets, filters, normalise, scoring
 from app.pipeline import compare as compare_roles
 from app.pipeline.capture import CaptureError, capture
@@ -171,6 +172,22 @@ class JobQuery(BaseModel):
     sort: str | None = Field(default=None, description="field or -field")
     cursor: str | None = None
     limit: int = Field(default=50, ge=1, le=200)
+    # Insights drill-through: any of these narrows the list to the roles the clicked number counted.
+    since: date | None = None
+    until: date | None = None
+    campaign_id: uuid.UUID | None = None
+    track_id: uuid.UUID | None = None
+    source_id: uuid.UUID | None = None
+    country: str | None = Field(default=None, max_length=100)
+    reached: insights.DrillJobReached | None = Field(
+        default=None, description="Insights funnel step; absent means the source table's roles found")
+
+    def drill(self) -> insights.InsightFilters | None:
+        if all(v is None for v in (self.since, self.until, self.campaign_id, self.track_id, self.source_id,
+                                   self.country, self.reached)):
+            return None
+        return insights.InsightFilters(since=self.since, until=self.until, campaign_id=self.campaign_id,
+                                       track_id=self.track_id, source_id=self.source_id, country=self.country)
 
 
 class JobGroup(BaseModel):
@@ -415,7 +432,9 @@ async def list_jobs(q: Annotated[JobQuery, Query()], session: SessionDep) -> Job
     if sort is None and view_body and view_body.sort:
         first = view_body.sort[0]
         sort = ("-" if first.direction == "desc" else "") + first.field
-    records = await _records(session)
+    drill = q.drill()
+    records = await _records(session, sorted(await insights.drill_job_ids(session, drill, q.reached))
+                             if drill else None)
     by_id = {r["id"]: (job, r) for job, r in records}
     try:
         result = filters.query_jobs([r for _, r in records], conditions, group=group, sort=sort, cursor=q.cursor,

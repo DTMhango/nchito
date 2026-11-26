@@ -6,6 +6,7 @@
 import { queryOptions } from "@tanstack/react-query"
 import { api, toFormData, unwrap } from "@/lib/api/client"
 import type { components } from "@/lib/api/types"
+import type { AppDrill } from "@/features/insights/drill-search"
 
 export const gen = api
 
@@ -35,10 +36,18 @@ export const appKeys = {
   campaigns: ["campaigns", "names"] as const,
 }
 
-export const listApplications = () =>
+/**
+ * The list, or with an Insights drill the rows the clicked number counted (snoozed ones
+ * included, as Insights counts them).
+ */
+export const listApplications = (drill?: AppDrill) =>
   unwrap(
     gen.GET("/api/applications", {
-      params: { query: { limit: 200, hide_snoozed: true } },
+      params: {
+        query: drill
+          ? { limit: 500, ...drill }
+          : { limit: 200, hide_snoozed: true },
+      },
     })
   )
 /** Keep the files the owner sent after "I applied myself" (their record, not evidence). */
@@ -108,8 +117,14 @@ export const listNewJobs = () =>
   )
 export const listCampaigns = () => unwrap(gen.GET("/api/campaigns"))
 
-export const applicationsQuery = () =>
-  queryOptions({ queryKey: appKeys.list, queryFn: listApplications })
+/** The list's cache key: the plain list, or one entry per drill (all share the `list` prefix). */
+export const applicationsKey = (drill?: AppDrill) =>
+  drill ? ([...appKeys.list, drill] as const) : appKeys.list
+export const applicationsQuery = (drill?: AppDrill) =>
+  queryOptions({
+    queryKey: applicationsKey(drill),
+    queryFn: () => listApplications(drill),
+  })
 export const timelineQuery = (id: string) =>
   queryOptions({
     queryKey: appKeys.timeline(id),

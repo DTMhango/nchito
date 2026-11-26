@@ -369,6 +369,10 @@ export const matchesHandlers = [
     const triage = p.get("triage")
     let list = visible(set, p.get("q"))
     if (triage) list = list.filter((j) => j.triage === triage)
+    // Insights drill-through, roughly: the mock narrows by market only (the server by every filter).
+    const country = p.get("country")?.toLowerCase()
+    if (country)
+      list = list.filter((j) => j.location.country?.toLowerCase() === country)
     list = sortJobs(list, p.get("sort"))
     const limit = Math.min(200, Number(p.get("limit") ?? 50))
     const start = Number(p.get("cursor") ?? 0)

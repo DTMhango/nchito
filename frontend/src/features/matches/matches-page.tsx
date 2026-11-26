@@ -37,6 +37,8 @@ import type { BulkAction } from "@/features/bulk/api"
 import { useEmployerChips } from "@/features/employers/api"
 import { BulkBar, RescoreDialog, type BulkKind } from "./bulk"
 import { CorrectionDialog, type Correction } from "./corrections"
+import { DrillBar } from "@/features/insights/drill"
+import { pickDrill, withoutDrill } from "@/features/insights/drill-search"
 import { FilterBar } from "./filter-bar"
 import {
   TABS,
@@ -86,6 +88,7 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
   const activeView = views.find((v) => v.id === search.view)
   const counts = useTabCounts(search)
   const list = useJobList(search)
+  const drill = pickDrill(search)
 
   const update = useCallback(
     (patch: Partial<MatchesSearch>, replace = false) =>
@@ -464,6 +467,13 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
                 ) : undefined
               }
             />
+            <DrillBar
+              className="mx-3 mt-2 mb-0 md:ml-5.5"
+              drill={drill}
+              note="Tab counts include these filters."
+              onRemove={(k) => onSearch(withoutDrill(search, k))}
+              onClear={() => onSearch(withoutDrill(search))}
+            />
           </div>
           <div className="min-h-0 flex-1">
             <SplitView
@@ -490,13 +500,17 @@ export function MatchesPage({ search, onSearch }: MatchesPageProps) {
         subject="jobs"
         scope={{
           ids: [...checked],
-          view: {
-            count: counts[search.tab] ?? null,
-            selection: {
-              conditions: JSON.stringify(listParams(search).conditions),
-              q: search.q?.trim() || undefined,
-            },
-          },
+          // A drill narrows the list on the server; "every role in this view" would not, so
+          // bulk actions take only the ticked roles while a drill is on.
+          view: drill
+            ? undefined
+            : {
+                count: counts[search.tab] ?? null,
+                selection: {
+                  conditions: JSON.stringify(listParams(search).conditions),
+                  q: search.q?.trim() || undefined,
+                },
+              },
         }}
         initialAction={
           bulk && bulk !== "rescore" && bulk !== "more"

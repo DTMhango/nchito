@@ -7,6 +7,7 @@ import {
   queryOptions,
   type QueryClient,
 } from "@tanstack/react-query"
+import type { JobDrill } from "@/features/insights/drill-search"
 import { api, ApiError, unwrap } from "@/lib/api/client"
 import type {
   AppliedMyselfIn,
@@ -29,6 +30,8 @@ type AnyConditions = never
 
 export type ListParams = {
   conditions: ConditionSet
+  /** Insights drill-through: narrows to the roles the clicked number counted. */
+  drill?: JobDrill
   q?: string
   group_by?: string
   sort?: string
@@ -39,6 +42,7 @@ const PAGE = 100
 
 function listQuery(p: ListParams, cursor?: string, limit = PAGE) {
   return {
+    ...p.drill,
     conditions: JSON.stringify(p.conditions),
     q: p.q?.trim() || undefined,
     group_by: p.group_by || undefined,

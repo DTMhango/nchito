@@ -2559,7 +2559,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Applications List */
+        /**
+         * Applications List
+         * @description Applications. ``since``, ``until``, ``track_id``, ``source_id``, ``country`` or ``reached`` switch on the
+         *     Insights drill-through: the list is exactly the applications the clicked number counted (same filters,
+         *     same counting rules, ``campaign_id`` and ``channel`` included).
+         */
         get: operations["applications_list"];
         put?: never;
         /** Applications Create */
@@ -8792,6 +8797,11 @@ export interface components {
             updated: number;
             /** Needs Review */
             needs_review: number;
+            /**
+             * Themes Need Review
+             * @description Imported themes whose body text fails WCAG AA: kept, marked needs review, never applied
+             */
+            themes_need_review: components["schemas"]["ThemeRefOut"][];
         };
         /** ImportDiffItem */
         ImportDiffItem: {
@@ -14266,6 +14276,19 @@ export interface components {
              */
             can_redo: boolean;
             contrast_waiver: components["schemas"]["ContrastWaiver"] | null;
+            /**
+             * Needs Review
+             * @description Body text below WCAG AA without the owner's acceptance (arrived in a Kit import): cannot be made active or default until saved in the theme studio (fixed, or accepted)
+             * @default false
+             */
+            needs_review: boolean;
+        };
+        /** ThemeRefOut */
+        ThemeRefOut: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
         };
         /** ThemeRevisionOut */
         ThemeRevisionOut: {
@@ -16083,6 +16106,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ThemeOut"];
                 };
+            };
+            /** @description The theme needs review (body text below AA, not accepted) */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -20631,6 +20661,14 @@ export interface operations {
                 sort?: string | null;
                 cursor?: string | null;
                 limit?: number;
+                since?: string | null;
+                until?: string | null;
+                campaign_id?: string | null;
+                track_id?: string | null;
+                source_id?: string | null;
+                country?: string | null;
+                /** @description Insights funnel step; absent means the source table's roles found */
+                reached?: ("found" | "passed_filters" | "scored_above") | null;
             };
             header?: never;
             path?: never;
@@ -22839,6 +22877,13 @@ export interface operations {
                 hide_snoozed?: boolean;
                 cursor?: string | null;
                 limit?: number;
+                since?: string | null;
+                until?: string | null;
+                track_id?: string | null;
+                source_id?: string | null;
+                country?: string | null;
+                /** @description Insights drill-through: the funnel step the roles reached */
+                reached?: ("tailored" | "approved" | "sent" | "reply" | "interview" | "offer") | null;
             };
             header?: never;
             path?: never;

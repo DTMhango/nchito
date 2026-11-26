@@ -127,3 +127,40 @@ describe("Board and table toggle", () => {
     expect(await within(drawer).findByText(/Last events/i)).toBeInTheDocument()
   })
 })
+
+describe("Applications drill-through from Insights", () => {
+  it("narrows to the link's filters, shows one chip each, removes one and clears all", async () => {
+    const user = userEvent.setup()
+    const { router } = renderApp(
+      "/applications?reached=offer&channel=email&since=2026-11-01"
+    )
+    const bar = await screen.findByRole("group", {
+      name: "Filters from Insights",
+    })
+    expect(within(bar).getByText("Step: Reached offer")).toBeInTheDocument()
+    expect(within(bar).getByText("Channel: Email")).toBeInTheDocument()
+    expect(within(bar).getByText("From 2026-11-01")).toBeInTheDocument()
+    const offers = applicationsMock().apps.filter(
+      (a) => ["offer", "accepted"].includes(a.stage) && a.channel === "email"
+    )
+    expect(offers.length).toBeGreaterThan(0)
+    await screen.findByText(new RegExp(offers[0].employer))
+    expect(screen.queryByText("Luangwa Re")).toBeNull() // tailoring: not an offer
+
+    await user.click(
+      within(bar).getByRole("button", { name: "Remove Channel: Email" })
+    )
+    await waitFor(() =>
+      expect(router.state.location.search).not.toHaveProperty("channel")
+    )
+    expect(router.state.location.search).toMatchObject({ reached: "offer" })
+
+    await user.click(within(bar).getByRole("button", { name: "Clear all" }))
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("group", { name: "Filters from Insights" })
+      ).toBeNull()
+    )
+    expect(await screen.findAllByText("Luangwa Re")).not.toHaveLength(0)
+  })
+})

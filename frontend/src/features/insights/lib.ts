@@ -33,7 +33,7 @@ export function activeFilterCount(f: InsightsFilters): number {
 /** What a clicked number links to: the Applications or Matches list carrying the same filters. */
 export type Drill =
   | { to: "/applications"; search: Record<string, string> }
-  | { to: "/matches"; search: Record<string, unknown> }
+  | { to: "/matches"; search: Record<string, string> }
 
 const clean = (o: Record<string, string | undefined>) =>
   Object.fromEntries(
@@ -42,37 +42,29 @@ const clean = (o: Record<string, string | undefined>) =>
 
 /**
  * A number about applications opens Applications with the page's filters plus the cell's own
- * (`reached`: how far the roles got; the dimension of the row). Numbers about roles that have
- * no application yet open Matches, which filters by country.
+ * (`reached`: the funnel step; the dimension of the row). Numbers about roles that have no
+ * application yet (found, passed filters, scored above) open Matches the same way; the lists
+ * narrow server-side to exactly the rows the number counted. Matches has no channel.
  */
 export function drill(
   filters: InsightsFilters,
-  cell: { reached?: string; stage?: string } & Partial<InsightsFilters>,
+  cell: { reached?: string } & Partial<InsightsFilters>,
   list: "applications" | "matches" = "applications"
 ): Drill {
   const merged = { ...filters, ...cell }
-  if (list === "matches") {
-    return {
-      to: "/matches",
-      search: merged.country
-        ? { tab: "new", f: { country: { i: [merged.country] } } }
-        : { tab: "new" },
-    }
-  }
-  return {
-    to: "/applications",
-    search: clean({
-      since: merged.since,
-      until: merged.until,
-      campaign_id: merged.campaign_id,
-      track_id: merged.track_id,
-      source_id: merged.source_id,
-      country: merged.country,
-      channel: merged.channel,
-      reached: cell.reached,
-      stage: cell.stage,
-    }),
-  }
+  const search = clean({
+    since: merged.since,
+    until: merged.until,
+    campaign_id: merged.campaign_id,
+    track_id: merged.track_id,
+    source_id: merged.source_id,
+    country: merged.country,
+    channel: list === "applications" ? merged.channel : undefined,
+    reached: cell.reached,
+  })
+  return list === "matches"
+    ? { to: "/matches", search }
+    : { to: "/applications", search }
 }
 
 /** The dimension a rate row stands for, as a filter. */

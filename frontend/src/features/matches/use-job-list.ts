@@ -14,6 +14,7 @@ import {
   type MatchesSearch,
   type TabId,
 } from "./filters"
+import { pickDrill } from "@/features/insights/drill-search"
 import type { ListJob } from "./format"
 import type { Condition } from "./types"
 
@@ -36,6 +37,7 @@ export function listParams(
     ]),
     q: search.q?.trim() || undefined,
     sort: search.sort,
+    drill: pickDrill(search),
   }
 }
 

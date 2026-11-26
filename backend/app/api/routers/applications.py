@@ -53,6 +53,7 @@ from app.models.applications import (
     TailoringRequest,
 )
 from app.models.search import Assessment, Job
+from app.ops import insights
 from app.pipeline import bulk, corrections
 from app.pipeline.checks import findings as checks_findings
 from app.pipeline.tailoring import service as tailoring_service
@@ -603,8 +604,20 @@ async def list_applications(
     session: SessionDep, stage: StageT | None = None, campaign_id: uuid.UUID | None = None,
     channel: ChannelT | None = None, q: str | None = None, pinned: bool | None = None,
     hide_snoozed: bool = False, cursor: str | None = None, limit: int = Query(default=100, ge=1, le=500),
+    since: date | None = None, until: date | None = None, track_id: uuid.UUID | None = None,
+    source_id: uuid.UUID | None = None, country: str | None = Query(default=None, max_length=100),
+    reached: insights.DrillAppReached | None = Query(
+        default=None, description="Insights drill-through: the funnel step the roles reached"),
 ) -> Page[ApplicationSummary]:
+    """Applications. ``since``, ``until``, ``track_id``, ``source_id``, ``country`` or ``reached`` switch on the
+    Insights drill-through: the list is exactly the applications the clicked number counted (same filters,
+    same counting rules, ``campaign_id`` and ``channel`` included)."""
     conds = _filters(stage, campaign_id, channel, q, pinned)
+    if any(v is not None for v in (since, until, track_id, source_id, country, reached)):
+        ids = await insights.drill_application_ids(session, insights.InsightFilters(
+            since=since, until=until, campaign_id=campaign_id, track_id=track_id, source_id=source_id,
+            country=country, channel=Channel(channel) if channel else None), reached)
+        conds.append(Application.id.in_(ids))
     if hide_snoozed:
         conds.append(not_(_snoozed_sql(utcnow(), await _imminent_days(session))))
     try:

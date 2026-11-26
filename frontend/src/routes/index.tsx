@@ -25,6 +25,7 @@ import {
 import { lazy, type ComponentType } from "react"
 import { z } from "zod"
 import { insightsSearchSchema } from "@/features/insights/lib"
+import { appDrillSchema, pickDrill } from "@/features/insights/drill-search"
 import {
   requireNoOwner,
   requireSession,
@@ -305,11 +306,23 @@ const matchesRoute = createRoute({
     )
   },
 })
-const applicationsRoute = page(
-  "/applications",
-  "Applications",
-  ApplicationsPage
-)
+/** Insights links carry their filters (`?campaign_id=&reached=sent`...): the list narrows to them. */
+const applicationsRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/applications",
+  staticData: { title: "Applications" },
+  validateSearch: appDrillSchema,
+  component: function ApplicationsRoute() {
+    const search = applicationsRoute.useSearch()
+    const navigate = applicationsRoute.useNavigate()
+    return (
+      <ApplicationsPage
+        drill={pickDrill(search)}
+        onDrill={(next) => void navigate({ search: next ?? {} })}
+      />
+    )
+  },
+})
 const employersRoute = page("/employers", "Employers", EmployersPage)
 const employerRoute = createRoute({
   getParentRoute: () => shellRoute,

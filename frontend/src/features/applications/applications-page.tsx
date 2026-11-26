@@ -28,9 +28,16 @@ import { BulkDialog } from "@/features/bulk/bulk-dialog"
 import type { BulkAction } from "@/features/bulk/api"
 import { useEmployerChips } from "@/features/employers/api"
 import { EmployerChip } from "@/features/employers/employer-chip"
+import { DrillBar } from "@/features/insights/drill"
+import {
+  pickDrill,
+  withoutDrill,
+  type AppDrill,
+} from "@/features/insights/drill-search"
 import { meQuery } from "@/lib/api/endpoints"
 import {
   appKeys,
+  applicationsKey,
   applicationsQuery,
   campaignsQuery,
   changeStage,
@@ -54,12 +61,22 @@ export { BOARD_COLUMNS }
 
 const ALL = "all"
 
-/** Applications: board and table of every role you are pursuing (DESIGN 10.3). */
-export function ApplicationsPage() {
+/**
+ * Applications: board and table of every role you are pursuing (DESIGN 10.3). `drill` comes from
+ * an Insights link: the list is then exactly the applications that number counted.
+ */
+export function ApplicationsPage({
+  drill,
+  onDrill,
+}: {
+  drill?: AppDrill
+  onDrill?: (next: AppDrill | undefined) => void
+} = {}) {
   const qc = useQueryClient()
   const me = useQuery(meQuery())
   const timeZone = me.data?.timezone
-  const apps = useQuery(applicationsQuery())
+  const listKey = applicationsKey(drill)
+  const apps = useQuery(applicationsQuery(drill))
   const campaigns = useQuery(campaignsQuery())
   const [layout, setLayout] = useLayoutPreference()
 
@@ -112,13 +129,13 @@ export function ApplicationsPage() {
     mutationFn: ({ id, stage }: { id: string; stage: Stage }) =>
       changeStage(id, stage),
     onMutate: async ({ id, stage }) => {
-      await qc.cancelQueries({ queryKey: appKeys.list })
-      const before = qc.getQueryData(appKeys.list)
-      patchList(qc, id, { stage })
+      await qc.cancelQueries({ queryKey: listKey })
+      const before = qc.getQueryData(listKey)
+      patchList(qc, listKey, id, { stage })
       return { before }
     },
     onError: (e, _v, ctx) => {
-      if (ctx?.before) qc.setQueryData(appKeys.list, ctx.before)
+      if (ctx?.before) qc.setQueryData(listKey, ctx.before)
       setRefusal(e.message)
       toast.error(e.message)
     },
@@ -285,6 +302,11 @@ export function ApplicationsPage() {
         </span>
       </div>
 
+      <DrillBar
+        drill={drill}
+        onRemove={(k) => onDrill?.(pickDrill(withoutDrill(drill ?? {}, k)))}
+        onClear={() => onDrill?.(undefined)}
+      />
       <div
         role="search"
         aria-label="Filter applications"
@@ -514,11 +536,12 @@ const isDone = (s: Stage) =>
 
 function patchList(
   qc: QueryClient,
+  key: ReturnType<typeof applicationsKey>,
   id: string,
   patch: Partial<ApplicationSummary>
 ) {
   qc.setQueryData<{ items: ApplicationSummary[] } | undefined>(
-    appKeys.list,
+    key,
     (old) =>
       old && {
         ...old,

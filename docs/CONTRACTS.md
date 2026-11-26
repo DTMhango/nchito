@@ -1008,6 +1008,7 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
 - Query: `since`, `until` (default `insights.default_range_days` back from today), `campaign_id`, `track_id`, `source_id`, `country`, `channel`, `period` (week or month).
 - Counting: a role counts once (merged jobs and second applications ignored; skipped and never-sent closed are not applications); sent = `applied_at` set (includes "I applied myself"); reply = reached screening, interview, offer or accepted, or rejected after sending.
 - Settings: `insights.min_sample`, `insights.default_range_days`, `insights.week_start`.
+- Drill-through (integration): `GET /api/applications` also takes `since`, `until`, `track_id`, `source_id`, `country` and `reached` (`tailored`, `approved`, `sent`, `reply`, `interview`, `offer`); any of them makes the list exactly the applications the Insights number counted (`campaign_id` and `channel` join the same filter). `GET /api/jobs` takes `since`, `until`, `campaign_id`, `track_id`, `source_id`, `country` and `reached` (`found`, `passed_filters`, `scored_above`; absent = the source table's roles found). Both go through `app.ops.insights.drill_application_ids` / `drill_job_ids`, the report's own counting code. The Applications and Matches screens read these from the URL and show them as removable chips; while a drill is on, Matches bulk actions take only ticked roles.
 
 ## Wave 4 themes additions
 
@@ -1030,7 +1031,13 @@ Theme studio (DESIGN 10.4). Code: `backend/app/themes/` (`tokens.py`, `colour.py
   import refuse a theme with a blocking pair: 422 `{"detail": {"code": "theme_low_contrast", "reason", "pairs":
   [{mode, fg, bg, ratio}]}}` unless `accept_low_contrast` is true (body field on `ThemeIn`, query param on import);
   the acceptance is stored as `ThemeOut.contrast_waiver {pairs, accepted_at, accepted_by}` and audited
-  (`theme.contrast_accepted`). Kit import does not check (restoring the owner's own data).
+  (`theme.contrast_accepted`). **Kit import (integration)** runs the same token validation (`KitTheme` is
+  `ThemeBody`) and contrast check (`service.blocking_pairs`): a Kit carries no acceptance, so a theme whose body text
+  fails lands without one and `ThemeOut.needs_review` is true (derived: owner theme, no waiver, a blocking pair). It
+  cannot be made active (`PUT /api/settings/appearance[.theme_id]` 422) or default (409 `theme_needs_review`); if the
+  active theme is one, the app goes back to the default theme. The preview lists it in `notices`; `ImportCommitOut`
+  gains `themes_need_review [{id, name}]`; audited `theme.needs_review`. Saving it in the studio (fixed, or accepted)
+  clears the flag; a duplicate of it needs review too.
   `POST /api/themes/contrast` (`ThemeBody`) -> `ContrastPairOut[] {mode, fg, bg, use, ratio, aa, aaa, blocking}`.
 - **`ThemeOut` gains** `is_default`, `revision`, `can_undo`, `can_redo`, `contrast_waiver`. `ThemeIn` rejects them
   (extra fields forbidden): send the `ThemeBody` fields.
