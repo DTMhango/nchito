@@ -10,7 +10,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Page, Timestamps, not_implemented
 from app.api.crud import add_crud
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.core import audit
@@ -303,24 +303,7 @@ async def compare(job_ids: str) -> CompareOut:
     not_implemented(3, AREA)
 
 
-@router.post("/jobs/{job_id}/applied-myself", response_model=Ok, name="jobs_applied_myself")
-async def applied_myself(job_id: uuid.UUID, body: AppliedMyselfIn) -> Ok:
-    not_implemented(WAVE, "corrections")
-
-
-@router.post("/jobs/{job_id}/merge", response_model=JobDetail, name="jobs_merge")
-async def merge(job_id: uuid.UUID, body: MergeIn) -> JobDetail:
-    not_implemented(WAVE, "corrections")
-
-
-@router.post("/jobs/{job_id}/split", response_model=JobDetail, name="jobs_split")
-async def split(job_id: uuid.UUID, body: SplitIn) -> JobDetail:
-    not_implemented(WAVE, "corrections")
-
-
-@router.post("/jobs/{job_id}/employer", response_model=JobDetail, name="jobs_fix_employer")
-async def fix_employer(job_id: uuid.UUID, body: EmployerFixIn) -> JobDetail:
-    not_implemented(WAVE, "corrections")
+# applied-myself, merge, split and employer fixes live in jobs_corrections.py
 
 
 @router.post("/jobs/{job_id}/release", response_model=JobDetail, name="jobs_release_held")

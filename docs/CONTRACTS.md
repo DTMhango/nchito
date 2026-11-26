@@ -369,3 +369,22 @@ the registry under its own group prefix only.
 | Browser-channel reconciliation, posting change alerts, compare roles | Sonnet | `app/apply/channels/browser.py`, `app/pipeline/changes.py`, `jobs_compare` |
 | Sign-in handoff, portal accounts | Sonnet | `app/apply/accounts.py`, portal-account endpoints (add to `applications.py`) |
 | Interview pack | Opus (generation, truth checks) + Sonnet (tab) | `app/pipeline/interview/`, interview endpoints, `src/features/job/interview/` |
+
+---
+
+## Wave 1 tracking additions
+
+- Stages change only through `app/apply/stages.py` (`transition`); every change writes an `ApplicationEvent`
+  (`stage_change`: from, to, why, via). The owner cannot move a role into `applying` or a submitted state; "I applied
+  myself" (`POST /api/applications/applied-myself`, `POST /api/jobs/{id}/applied-myself`) is the only manual way.
+  Refused moves answer 409 `{code: "illegal_transition", reason, from, to}`.
+- New: `GET /api/applications/board`, `POST /api/applications/import/{preview,confirm}` (history CSV, multipart;
+  confirm takes `content_hash` from the preview), `POST|GET /api/applications/{id}/files` (owner's own files),
+  `POST /api/pending-actions/{id}/{dismiss,snooze,answer}`. `resolve` handles `dismissed` and `answered` (unknown
+  question); other resolutions stay 501 until wave 2.
+- `ApplicationSummary` gains `snoozed_until`, `snoozed`, `deadline`, `origin`, `owner_attested`, `legacy_fit`;
+  detail gains `notes`, `reference`, `apply_url`, `ended_at`, `allowed_next`. `TodayOut` gains `needs_you_groups`,
+  `last_sweep`, `top_matches`. `PendingActionType` gains `follow_up`; settings `tracking.imminent_deadline_days` and
+  `tracking.stale_pending_days`.
+- Corrections live in `api/routers/jobs_corrections.py` (logic in `pipeline/corrections.py`). The conflicts stream
+  registers its re-evaluation with `corrections.set_conflict_reevaluator(fn)` (default no-op).
