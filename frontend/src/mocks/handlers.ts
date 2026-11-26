@@ -16,6 +16,7 @@ import { applicationsHandlers } from "./handlers/applications"
 import { jobHandlers } from "./handlers/jobs"
 import { settingsHandlers } from "./handlers/settings"
 import { matchesHandlers } from "./handlers/matches"
+import { autopilotHandlers } from "./handlers/autopilot"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -25,6 +26,7 @@ const notFound = (what: string) =>
   HttpResponse.json({ detail: `${what} not found.` }, { status: 404 })
 
 export const handlers = [
+  ...autopilotHandlers,
   ...kitHandlers,
   ...sourcesHandlers,
   http.get("*/api/health", () =>
