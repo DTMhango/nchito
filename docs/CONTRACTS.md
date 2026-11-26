@@ -46,7 +46,9 @@ Contents
 - **Lists**: `Page[T] = {items: T[], total: int | null, next_cursor: string | null}`; pass
   `?cursor=` back. The audit list uses `{items, next_before}` (time cursor).
 - **Ids** are UUID strings. **Times** are ISO 8601 UTC (`...Z`); the client displays them in
-  `general.timezone`. **Money** is `*_minor` integer plus a 3-letter `currency`.
+  `general.timezone`. **Money** is `*_minor` integer plus a 3-letter `currency`. **AI cost** fields also carry an exact integer
+  `*_micros` beside every `*_minor` (millionths of the major unit; `*_minor` is the rounded display value, so a
+  sub-cent call shows 0 there and a true figure in `*_micros`). Use `*_micros` for totals and small amounts.
 - **Auth**: one owner. `POST /api/auth/login` sets the session cookie `nchito_session`
   (httpOnly, SameSite=Lax, Secure when `BASE_URL` is https, signed, server-side session row,
   revocable). The SPA sends it automatically (`credentials: "same-origin"`); it never reads it.
@@ -71,7 +73,10 @@ Contents
 | `POST /api/auth/login` | `{email, password, totp?}` | **204** + cookie. 401 `"invalid email or password"`, `"totp_required"`, `"totp_invalid"`; 429 after `LOGIN_RATE_LIMIT_ATTEMPTS` failures in the window |
 | `POST /api/auth/logout` | | **204**, session revoked, cookie cleared |
 | `GET /api/auth/me` | | `Me = {email, display_name, timezone, app_name, totp_enabled}`; 401 when signed out |
-| `POST /api/auth/password` | `{current_password, new_password}` | 204; 403 if current is wrong |
+| `POST /api/auth/password` | `{current_password, new_password}` | 204; 403 if current is wrong. Revokes every other session |
+| `GET /api/auth/sessions` | | `[{id, created_at, last_seen_at, user_agent, ip, current}]`, active sessions, newest first |
+| `DELETE /api/auth/sessions/{id}` | | **204**; 404 if not an active session of the owner. Revoking the current one signs out. A revoked session gets 401 on its next request |
+| `POST /api/auth/sessions/revoke-others` | | `{revoked: n}` |
 | `POST /api/auth/totp/setup` | | `{secret, otpauth_uri}` (inactive until enabled) |
 | `POST /api/auth/totp/enable` | `{code}` | 204; 422 if the code does not match |
 | `POST /api/auth/totp/disable` | `{password, code}` | 204 |
@@ -136,7 +141,7 @@ New event names follow `<entity>.<past tense verb>` and are added to this table.
 ## 4. Settings registry
 
 `backend/app/core/settings/registry.py` is the **only** place a business setting and its
-default exist. 83 settings in groups `general, appearance, schedule, scoring, matching,
+default exist. 85 settings in groups `general, appearance, schedule, scoring, matching,
 automation, answers, reconcile, ai, budget, documents, retention, backups, notifications,
 runners`. Read them with `await settings_service.values(session)` (one query) or
 `get_value(session, key)`; write with `set_value(session, key, value, actor=..., reason=...)`,
@@ -314,7 +319,7 @@ any override) and `mode` (after the unconfirmed-campaign ceiling). Unknown-data 
 keep a non-mandatory `unknown` that blocks automation (the first also deducts
 `scoring.unknown_penalty`); `fail` fails the gate. Permit purpose: wave 2 supplies
 `application["permit_checks"]` (`{name: (outcome, reason)}`); without it the permit is refused.
-Records come from `pipeline/filters.job_record` / `campaign_record`. Campaigns carry
+Records come from `pipeline/filters.job_record` / `campaign_record`. **Work rights** come from the Kit: `job_record` carries `kit_work_rights` (`app/kit/work_rights.py`), resolved from the CONFIRMED answers about right to work, sponsorship and relocation, honouring each answer's conditions for the country the job requires. Unconfirmed, due-for-review, `never`-class, per-application or per-employer answers never count, and disagreeing answers are unknown. The `work_rights` gate passes (right held, or sponsorship offered), fails (right required and none held) or is unknown under the campaign's unknown-data policy, and its reason names the answer used. Without `kit_work_rights` the old campaign `work_rights` list is used. A dry run raises no pending actions: conflict choices a real run would ask for are collected on `run.config_versions.dry_run_choices` and listed first in `proposed_actions` (`action: "ask_owner"`). Campaigns carry
 `unconfirmed` criteria items (confirmed one by one, `POST /campaigns/{id}/confirm/{item}`);
 backtest is two steps (`/rubrics/backtest/estimate`, then `/rubrics/backtest`).
 
@@ -400,3 +405,25 @@ the registry under its own group prefix only.
   `tracking.stale_pending_days`.
 - Corrections live in `api/routers/jobs_corrections.py` (logic in `pipeline/corrections.py`). The conflicts stream
   registers its re-evaluation with `corrections.set_conflict_reevaluator(fn)` (default no-op).
+
+## Wave 1 leftovers
+
+- **Sessions**: see section 2 (`/api/auth/sessions*`). Sign-in already creates the record; sign-out, revoke and a
+  password change end sessions; audited `auth.session_revoked`, `auth.sessions_revoked_others`.
+- **Micros**: every cost field gains `*_micros` (runs `cost_micros`, assessments `cost_micros`, `SpendSummary`
+  and its buckets and days, `SpendMeter`, `LastSweep`, connection test, backtest and custom-facet estimates).
+  Caps: settings `budget.monthly_cap_micros` and `budget.per_run_cap_micros` (nullable). Either form is accepted
+  on input; setting micros also sets the rounded minor value, setting minor clears micros; micros wins when both exist.
+- **Recheck**: `POST /api/jobs/{id}/recheck` returns `RecheckOut = {job: JobDetail, availability_before,
+  availability_after, content_changed, changed_fields, reassessed, note}` (was `JobDetail`). A failed check is `unknown`,
+  never `closed`. Changed fields compared: title, text, deadline, pay, apply link, place. A change is re-extracted
+  (cached by content hash) and reassessed against every active campaign.
+- **Skill aliases**: create, update and delete re-canonicalise stored job skills (facets and requirements) from the
+  extraction cache, with no fetch and no model call; audited `skill_alias.recanonicalised`.
+- **Answers in use**: `AnswerOut.pending_applications_using` counts applications before submission whose newest live
+  packet or open pending action (`detail.answer_id`) uses the answer; `GET /api/kit/answers/{id}/usage` lists them
+  (`application_id, job_id, job_title, employer, stage, via`).
+- **Guardrail waivers**: `POST /api/kit/guardrails/{id}/waivers {application_id, reason}` (409 unless the rule is
+  `block, waivable once`; 409 if already waived; 422 blank reason), `GET /api/kit/guardrail-waivers?application_id=`,
+  `DELETE /api/kit/guardrail-waivers/{id}`. `POST /api/kit/guardrails/check` takes an optional `application_id`: a waived
+  violation shows `waived: true` and no longer sets `blocked`. Audited `kit.guardrail.waived`, `kit.guardrail.waiver_removed`.

@@ -3871,6 +3871,201 @@
         }
       }
     },
+    "/api/kit/guardrails/{item_id}/waivers": {
+      "post": {
+        "tags": [
+          "kit"
+        ],
+        "summary": "Kit Guardrails Waive",
+        "description": "Waive a 'block, waivable once' guardrail for ONE application, with a reason. Audited.",
+        "operationId": "kit_guardrails_waive",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WaiverIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaiverOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not waivable (always block, or only advises), or already waived"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kit/guardrail-waivers": {
+      "get": {
+        "tags": [
+          "kit"
+        ],
+        "summary": "Kit Guardrail Waivers List",
+        "operationId": "kit_guardrail_waivers_list",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "guardrail_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Guardrail Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WaiverOut"
+                  },
+                  "title": "Response Kit Guardrail Waivers List"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/kit/guardrail-waivers/{waiver_id}": {
+      "delete": {
+        "tags": [
+          "kit"
+        ],
+        "summary": "Kit Guardrail Waivers Delete",
+        "description": "Take a waiver back: the guardrail blocks that application again. Audited.",
+        "operationId": "kit_guardrail_waivers_delete",
+        "parameters": [
+          {
+            "name": "waiver_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Waiver Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/kit/answers/match": {
       "post": {
         "tags": [
@@ -19308,6 +19503,19 @@
             },
             "type": "array",
             "title": "File Names"
+          },
+          "application_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Application Id",
+            "description": "Take this application's waivers of 'block, waivable once' guardrails into account"
           }
         },
         "type": "object",
@@ -29438,6 +29646,76 @@
           "sensitivity"
         ],
         "title": "VaultDocumentUpdate"
+      },
+      "WaiverIn": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "description": "Why this application may break the rule"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "reason"
+        ],
+        "title": "WaiverIn"
+      },
+      "WaiverOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "guardrail_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Guardrail Id"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "waived_by": {
+            "type": "string",
+            "title": "Waived By"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "guardrail_id",
+          "application_id",
+          "reason",
+          "waived_by"
+        ],
+        "title": "WaiverOut"
       },
       "WatchedEmployerFromUrl": {
         "properties": {
