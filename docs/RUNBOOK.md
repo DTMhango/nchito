@@ -70,11 +70,15 @@ app (Settings) and are versioned and audited. Deployment settings are env vars l
       # decrypt the dump, then:
       docker compose exec -T db pg_restore -U nchito -d nchito --clean --if-exists < nchito.dump
       # restore the files volume from the same backup
+      docker compose run --rm web python -m app.cli restored --backup-taken-at 2026-11-25T02:00:00+00:00
       docker compose up -d
 
-- **An instance started from a restored backup starts paused**, reconciles its outbox against
-  the mailbox's sent items, and waits for the owner to resume (DESIGN.md 18.3). Never resume
-  before checking the reconciliation list.
+- **An instance started from a restored backup starts paused** (`app.cli restored`): sends that were
+  in flight at backup time become uncertain and are reconciled against the mailbox's sent items, and
+  approvals of roles that were ready but unsent are withdrawn (the old instance may have sent them
+  after the backup). `GET /api/autopilot/restore` lists what is outstanding; `POST
+  /api/autopilot/resume-after-restore` is refused until it is empty (settle any by hand with a
+  dispatch's `reconcile`). Never resume before checking the reconciliation list.
 
 ## Incidents
 

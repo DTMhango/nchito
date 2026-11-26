@@ -10203,6 +10203,7 @@
           "applications"
         ],
         "summary": "Applications Packets",
+        "description": "Every packet version, newest first (invalidated ones say why).",
         "operationId": "applications_packets",
         "parameters": [
           {
@@ -10254,12 +10255,135 @@
         }
       }
     },
+    "/api/applications/{application_id}/packet": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Packet Get",
+        "description": "The current packet: exactly what would be sent.",
+        "operationId": "applications_packet_get",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacketOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No current packet"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Packet Build",
+        "description": "Snapshot what would be sent. Identical contents return the current packet; any change makes a new\nversion and invalidates the old one and its approval. Then the automation policy runs: automatic\napproval when every gate passes, an approval request when the mode lets the system apply.",
+        "operationId": "applications_packet_build",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PacketBuildIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacketBuildOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The application has gone out"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/{application_id}/receipt": {
       "get": {
         "tags": [
           "applications"
         ],
         "summary": "Applications Receipt",
+        "description": "The approval receipt for the current packet, with the gates an approval would check.",
         "operationId": "applications_receipt",
         "parameters": [
           {
@@ -10313,6 +10437,7 @@
           "applications"
         ],
         "summary": "Applications Approve",
+        "description": "Approve exactly this packet (version and hash) for this channel. Refused (409, with the gates) when\nthe packet changed, the role is excluded or held in its employer group, a document check blocks, or\nthe mode does not let the system apply.",
         "operationId": "applications_approve",
         "parameters": [
           {
@@ -10373,12 +10498,147 @@
         }
       }
     },
+    "/api/applications/{application_id}/reject": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Reject",
+        "description": "Say no at approval: the role is skipped and the next role in its employer group is promoted.",
+        "operationId": "applications_reject",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot be rejected now"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/request-changes": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Request Changes",
+        "description": "Retire the packet and send the application back to tailoring with a note.",
+        "operationId": "applications_request_changes",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestChangesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot be changed now"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/{application_id}/dispatches": {
       "get": {
         "tags": [
           "applications"
         ],
         "summary": "Applications Dispatches",
+        "description": "Every dispatch attempt, newest first: what was reserved, handed over, sent (with evidence), failed,\ncancelled or is uncertain.",
         "operationId": "applications_dispatches",
         "parameters": [
           {
@@ -10428,6 +10688,68 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Dispatch Create",
+        "description": "Send the current approved packet: a submit permit (every gate), then the attempt, in one transaction.\nEmail waits ``automation.email_send_delay_minutes`` (cancellable) and is sent by the worker; the manual\nchannel hands the kit to the owner at once.",
+        "operationId": "applications_dispatch_create",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchCreateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchCreateOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/applications/{application_id}/dispatches/{dispatch_id}/cancel": {
@@ -10436,6 +10758,7 @@
           "applications"
         ],
         "summary": "Applications Cancel Dispatch",
+        "description": "Cancel a queued send before it is handed to its channel (during the send delay).",
         "operationId": "applications_cancel_dispatch",
         "parameters": [
           {
@@ -10480,6 +10803,86 @@
               }
             }
           },
+          "409": {
+            "description": "Already handed over"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/dispatches/{dispatch_id}/reconcile": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Reconcile Dispatch",
+        "description": "Settle an uncertain send: ask its channel now, or say it went out (with the reference) or did not.\nAn uncertain send is never resent automatically.",
+        "operationId": "applications_reconcile_dispatch",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "dispatch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dispatch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not uncertain"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -10499,6 +10902,7 @@
           "applications"
         ],
         "summary": "Applications Manual Handoff",
+        "description": "The manual handoff kit for the current packet: posting link, files, answers sheet, remaining steps.",
         "operationId": "applications_manual_handoff",
         "parameters": [
           {
@@ -10552,6 +10956,7 @@
           "applications"
         ],
         "summary": "Applications Mark Submitted",
+        "description": "The owner submitted it: closes the open send (manual hand-off, or an uncertain one) as sent with the\nowner's evidence, or sends the approved manual packet through permit and attempt first. Duplicate\nprotection then holds exactly as after an automatic send.",
         "operationId": "applications_mark_submitted",
         "parameters": [
           {
@@ -10595,6 +11000,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Nothing approved to submit"
           },
           "422": {
             "description": "Validation Error",
@@ -11331,7 +11739,7 @@
           "applications"
         ],
         "summary": "Autopilot Set",
-        "description": "Pause stops every new outward action at once and cancels queued sends; the response\nlists what was cancelled, paused, and already out. Resume clears the pause. Audited.",
+        "description": "Pause stops every new outward action at once and cancels queued sends; the response\nlists what was cancelled, paused, and already out. Resume clears the pause (409 while paused for a\nrestore: use resume-after-restore). Audited.",
         "operationId": "autopilot_set",
         "requestBody": {
           "content": {
@@ -11377,13 +11785,45 @@
         }
       }
     },
+    "/api/autopilot/restore": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Autopilot Restore State",
+        "description": "Paused for a restore from backup: what is still to reconcile before sending can resume (18.3).",
+        "operationId": "autopilot_restore_state",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreStateOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/autopilot/resume-after-restore": {
       "post": {
         "tags": [
           "applications"
         ],
         "summary": "Autopilot Resume After Restore",
-        "description": "A restored instance starts paused and reconciles its outbox first (18.3).",
+        "description": "A restored instance starts paused and reconciles its outbox first (18.3). Refused (409, with the\noutstanding dispatch ids) until every send in flight at backup time is settled.",
         "operationId": "autopilot_resume_after_restore",
         "responses": {
           "200": {
@@ -11405,6 +11845,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Sends from before the backup are not reconciled yet"
           }
         }
       }
@@ -11826,7 +12269,7 @@
           "pending_actions"
         ],
         "summary": "Pending Actions Resolve",
-        "description": "'I've signed in, continue' returns the task to the same runner (8.4). Wave 2 (apply) handles the\ntypes that need a runner; dismissing and answering an unknown question work now.",
+        "description": "Settle a decision: ``dismissed``; ``answered`` (unknown question); ``approved`` (approve the packet the\naction names, if it is still current); ``chosen`` (conflict choice, with ``chosen_job_id``); ``continue``\n('I've signed in, continue': the task returns to the same runner, 8.4). ``confirmed``\n(``confirm_submission``): the uncertain send went out; settles it as sent with the owner's evidence\n(``reference`` if given). ``approved`` on an action whose ``detail.kind`` is a registered proposal (for\nexample ``mail_stage_proposal``) applies that proposal; 501 when its module is not in this build. To\nsay an uncertain send did not go out, use the dispatch's ``reconcile`` (``not_sent``).",
         "operationId": "pending_actions_resolve",
         "parameters": [
           {
@@ -15377,6 +15820,46 @@
         "title": "AppliedMyselfIn",
         "description": "\"I applied myself\": counts at once for duplicates, employer limits and follow-ups. No evidence is\ncreated; the application is marked owner-attested."
       },
+      "ApprovalStatusOut": {
+        "properties": {
+          "approved": {
+            "type": "boolean",
+            "title": "Approved"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "wait_for_owner",
+              "denied"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "pending_action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Action Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approved",
+          "status",
+          "reason"
+        ],
+        "title": "ApprovalStatusOut"
+      },
       "ApproveIn": {
         "properties": {
           "packet_version": {
@@ -15821,6 +16304,30 @@
             ],
             "title": "Paused At"
           },
+          "paused_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused By",
+            "description": "Who paused (owner, system or a runner name)"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why it was paused, as given"
+          },
           "summary": {
             "$ref": "#/components/schemas/PauseSummary",
             "description": "What the last pause did. Empty until something has been queued"
@@ -15839,6 +16346,18 @@
           "paused": {
             "type": "boolean",
             "title": "Paused"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "type": "object",
@@ -18157,6 +18676,64 @@
         "type": "object",
         "title": "DismissIn"
       },
+      "DispatchCreateIn": {
+        "properties": {},
+        "type": "object",
+        "title": "DispatchCreateIn",
+        "description": "Queue the current approved packet now (permit, then the attempt; email waits the send delay)."
+      },
+      "DispatchCreateOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "wait_for_owner",
+              "denied"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "dispatch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DispatchOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/GateResult"
+            },
+            "type": "array",
+            "title": "Gates"
+          },
+          "pending_action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Action Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "DispatchCreateOut"
+      },
       "DispatchOut": {
         "properties": {
           "id": {
@@ -18258,6 +18835,52 @@
               }
             ],
             "title": "Error"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Handed to the channel (in flight from here)"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Evidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uncertain": {
+            "type": "boolean",
+            "title": "Uncertain",
+            "description": "Handed over with no final outcome: reconcile, never resend",
+            "default": false
+          },
+          "reconcile_attempts": {
+            "type": "integer",
+            "title": "Reconcile Attempts",
+            "default": 0
+          },
+          "last_reconciled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reconciled At"
           }
         },
         "type": "object",
@@ -19357,6 +19980,22 @@
               }
             ],
             "title": "Detail"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "fail",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
           }
         },
         "additionalProperties": false,
@@ -19365,7 +20004,8 @@
           "gate",
           "passed"
         ],
-        "title": "GateResult"
+        "title": "GateResult",
+        "description": "One gate's result. ``outcome`` is the three-state answer (unknown is never a pass); ``passed`` is\nkept for compatibility and is true only when ``outcome`` is ``pass``."
       },
       "Group-Input": {
         "properties": {
@@ -21610,7 +22250,7 @@
             },
             "type": "array",
             "title": "Files",
-            "description": "Signed download URLs for the final PDFs"
+            "description": "Download links for the final files (behind the owner's session), or the share links the packet records"
           },
           "answers": {
             "items": {
@@ -21956,6 +22596,161 @@
         ],
         "title": "PacketAnswer"
       },
+      "PacketAnswerIn": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Question"
+          },
+          "answer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Id"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "PacketAnswerIn",
+        "description": "An answer from the bank (``answer_id``: value and materiality are read from the bank) or typed for\nthis packet only (``value``; counted as material)."
+      },
+      "PacketBuildIn": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "browser",
+              "manual"
+            ],
+            "title": "Channel"
+          },
+          "destination_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Url",
+            "description": "Apply URL (browser, manual)"
+          },
+          "sending_identity": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Sending Identity",
+            "description": "Mailbox or name the application is sent as"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/PacketAnswerIn"
+            },
+            "type": "array",
+            "title": "Answers"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PacketEmail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/PacketFile"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "link_permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Link Permissions"
+          },
+          "requisition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requisition"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel",
+          "sending_identity"
+        ],
+        "title": "PacketBuildIn",
+        "description": "What would be sent. The server sets the destination domain, ``verified`` and ``trusted``, the\nrequisition (from the job unless given) and the job version."
+      },
+      "PacketBuildOut": {
+        "properties": {
+          "packet": {
+            "$ref": "#/components/schemas/PacketOut"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "False when the contents were identical to the current packet"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/PacketChange"
+            },
+            "type": "array",
+            "title": "Changes",
+            "description": "What changed from the previous version"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalStatusOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the automation policy did with the new packet (None: nothing to do)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "packet",
+          "created"
+        ],
+        "title": "PacketBuildOut"
+      },
       "PacketChange": {
         "properties": {
           "path": {
@@ -22032,6 +22827,35 @@
             },
             "type": "array",
             "title": "Link Permissions"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "email",
+                  "browser",
+                  "manual"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel",
+            "description": "The channel this packet is sent through"
+          },
+          "job_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Version",
+            "description": "Content hash of the job as it was packed"
           }
         },
         "additionalProperties": false,
@@ -24691,6 +25515,71 @@
         ],
         "title": "RecheckOut"
       },
+      "ReconcileIn": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "check",
+              "sent",
+              "not_sent"
+            ],
+            "title": "Decision",
+            "description": "check: ask the channel now; sent: it went out (reference kept as evidence); not_sent: it never left (the role goes back to ready; nothing is resent automatically)"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "ReconcileIn"
+      },
+      "ReconcileOut": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "not_sent",
+              "waiting"
+            ],
+            "title": "Result"
+          },
+          "dispatch": {
+            "$ref": "#/components/schemas/DispatchOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "result",
+          "dispatch"
+        ],
+        "title": "ReconcileOut"
+      },
       "ReferenceIn": {
         "properties": {
           "name": {
@@ -24909,6 +25798,23 @@
         ],
         "title": "Reframe"
       },
+      "RejectIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "RejectIn"
+      },
       "ReleaseHeldIn": {
         "properties": {
           "reason": {
@@ -24949,6 +25855,20 @@
         ],
         "title": "ReleaseRecord",
         "description": "What a runner was given and what it reports having entered (18.1)."
+      },
+      "RequestChangesIn": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "RequestChangesIn"
       },
       "RequireWording": {
         "properties": {
@@ -25148,6 +26068,19 @@
             ],
             "title": "Chosen Application Id"
           },
+          "chosen_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Job Id",
+            "description": "conflict_choice: the role chosen (one of the two in the action's detail)"
+          },
           "note": {
             "anyOf": [
               {
@@ -25158,6 +26091,19 @@
               }
             ],
             "title": "Note"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference",
+            "description": "confirmed: the employer's reference number, kept as evidence"
           }
         },
         "type": "object",
@@ -25165,6 +26111,59 @@
           "resolution"
         ],
         "title": "ResolveIn"
+      },
+      "RestoreStateOut": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "entered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entered At"
+          },
+          "backup_taken_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Taken At"
+          },
+          "outstanding": {
+            "items": {
+              "$ref": "#/components/schemas/DispatchOut"
+            },
+            "type": "array",
+            "title": "Outstanding",
+            "description": "Sends from before the backup still to reconcile"
+          },
+          "held_application_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Held Application Ids",
+            "description": "Approvals withdrawn at restore, to approve again"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active"
+        ],
+        "title": "RestoreStateOut"
       },
       "ReviewDecision": {
         "properties": {

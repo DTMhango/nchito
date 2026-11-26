@@ -247,6 +247,24 @@ _int("automation.open_check_max_age_hours", "Open-check freshness",
      "A role must have been confirmed open within this many hours to be applied to automatically.",
      24, 12, 1, 168, "hours")
 _int("automation.agent_max_steps", "Agent step limit", "Maximum steps an agent task may take.", 80, 120, 5, 500)
+_int("automation.permit_valid_minutes", "Submit permit validity",
+     "A submit permit is single use and expires this many minutes after it is granted.", 10, 5, 1, 60, "minutes")
+_enum("automation.permit_unknown_open", "Posting not confirmed open",
+      "At permit time, when the role has not been confirmed open recently: refuse until it is rechecked, or let an "
+      "application the owner approved go ahead. Automatic approvals always need a recent check.",
+      "refuse", "allow_when_owner_approved", ("refuse", "allow_when_owner_approved"))
+_int("automation.dispatch_max_retries", "Send retries",
+     "How many times a send that definitely failed before leaving (for example the mailbox refused it) is tried "
+     "again, each time with a new permit. An uncertain send is never retried.", 1, 2, 0, 5)
+_add("automation.receipt_pay_terms", "list", "Receipt: pay questions",
+     "Words that put a form answer under 'pay' on the approval receipt.",
+     ["salary", "pay", "compensation", "remuneration", "rate"], ["salary", "expected pay"], list[str],
+     validators=(unique_items,), invalid_example=["salary", "salary"], has_invalid_example=True)
+_add("automation.receipt_work_rights_terms", "list", "Receipt: work-rights questions",
+     "Words that put a form answer under 'work rights' on the approval receipt.",
+     ["visa", "sponsor", "right to work", "work permit", "authorised", "authorized", "relocat"],
+     ["visa", "work permit"], list[str], validators=(unique_items,), invalid_example=["visa", "visa"],
+     has_invalid_example=True)
 
 # Tracking (4, 18.4)
 _int("tracking.imminent_deadline_days", "Imminent deadline",
@@ -269,6 +287,12 @@ _add("answers.match_similarity", "float", "Question match similarity",
 # Reconciliation (8.5)
 _int("reconcile.confirmation_wait_hours", "Wait for confirmation",
      "Watch the mailbox this long for a confirmation before asking the owner.", 24, 48, 1, 336, "hours")
+_int("reconcile.check_every_minutes", "Reconcile interval",
+     "How often an uncertain send is checked again with its channel (sent items, confirmations).",
+     15, 30, 1, 1440, "minutes")
+_int("reconcile.in_flight_timeout_minutes", "In-flight timeout",
+     "A send handed to its channel with no outcome recorded after this long (a worker stopped) becomes "
+     "uncertain. It is reconciled, never resent.", 15, 30, 1, 1440, "minutes")
 
 # AI (11)
 _enum("ai.provider", "Provider", "Default LLM provider.", "anthropic", "openai_compatible",

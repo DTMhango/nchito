@@ -220,6 +220,12 @@ class DispatchAttempt(Base, Entity):
     gate_results: Mapped[list[GateResult]] = mapped_column(PydanticJSON(list[GateResult]), nullable=False,
                                                            default=list)
     error: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), doc="Committed before the channel is called: an attempt started with no outcome is "
+                                     "in flight, and after a crash it is uncertain, never resent")
+    evidence: Mapped[Evidence | None] = mapped_column(PydanticJSON(Evidence), doc="Required for sent (8.5)")
+    reconcile_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_reconciled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AgentTaskType(enum.StrEnum):

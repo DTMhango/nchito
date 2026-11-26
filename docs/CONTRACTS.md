@@ -427,3 +427,73 @@ the registry under its own group prefix only.
   `block, waivable once`; 409 if already waived; 422 blank reason), `GET /api/kit/guardrail-waivers?application_id=`,
   `DELETE /api/kit/guardrail-waivers/{id}`. `POST /api/kit/guardrails/check` takes an optional `application_id`: a waived
   violation shows `waived: true` and no longer sets `blocked`. Audited `kit.guardrail.waived`, `kit.guardrail.waiver_removed`.
+
+## Wave 2 apply-policy additions
+
+- **Decision table (section 10).** `resolve_mode(campaign, channel, *, default_mode, default_version) -> ModeResolution`
+  is the one place the automation mode is resolved: campaign `automation.per_channel[channel]`, else `automation.mode`,
+  else setting `automation.default_mode`; capped at `prepare` while the campaign is unconfirmed; `reason` names rule,
+  value, source and version. `DecisionInput.application["channel"]` selects the channel's mode. With purpose `permit`,
+  `application` = `{approval: "owner"|"auto"|None, channel, permit_checks: {name: (outcome, reason[, owner_settles])},
+  for_approval}` and `Decision` gains `permit` (`granted` / `wait_for_owner` / `denied`) and `permit_reason`. An
+  excluded role is always denied. Gates an owner approval settles: `auto_threshold`, `known_data`, `pay_stated`,
+  `always_ask_first`, any check flagged `owner_settles`, and `role_open` when `automation.permit_unknown_open` is
+  `allow_when_owner_approved`. `for_approval` leaves timing gates (`global_pause`, caps, `quiet_hours`, `budget`) to the
+  permit. Owner approvals let the system send only from `ask_then_apply` (any mode for `manual`).
+- **Python API (`app/apply/`).** `policy.for_application`; `packets.build(session, app, PacketDraft) -> BuildResult`,
+  `packets.current/history/diff/content_hash/invalidate`; `approval.approve/auto_approve/after_packet_built/reject/
+  request_changes`; `gates.evaluate(...) -> Evaluation`; `permits.request(...) -> PermitResult`,
+  `permits.consume(...)` (atomic conditional update; raises `PermitRefused`), `permits.revoke`,
+  `permits.release_stale_claims`, `permits.lock_permits`; `owner_actions.approve_from_action/choose/continue_task`.
+- **`PacketContents`** gains `channel` and `job_version` (job content hash). **`GateResult`** gains
+  `outcome: pass|fail|unknown`; `passed` stays and is true exactly when `outcome` is `pass`.
+- **Endpoints.** `GET /api/applications/{id}/packet` (current, 404 if none); `POST /api/applications/{id}/packet`
+  (`PacketBuildIn` -> `PacketBuildOut {packet, created, changes, approval}`); `GET .../packets`, `GET .../receipt`,
+  `POST .../approve` implemented (409 `{code: "approval_refused", reason, gates?}`); `POST .../reject {reason?}` (skips
+  the role, promotes the next in its employer group); `POST .../request-changes {note}` (retires the packet, back to
+  tailoring). All audited (`packet.built`, `application.approved|approval_refused|auto_approval_declined|rejected|
+  changes_requested`, `permit.granted|denied|wait_for_owner|consumed|refused|revoked`).
+- `POST /api/pending-actions/{id}/resolve`: `approved` (approve), `chosen` (conflict_choice; new field
+  `chosen_job_id`), `continue` (sign_in / create_account / captcha: task requeued for the same runner, siblings in the
+  group close). `confirmed` stays 501 (reconciliation). A decided conflict choice is never raised again.
+- `/api/trusted-sites` list / create / delete implemented (`trusted_by` = owner, domain lower-cased, suffix match).
+- `AutopilotState` gains `paused_by` and `reason` (from the setting revision); `AutopilotWrite` gains `reason`.
+  Pausing revokes outstanding permits, cancels `reserved` dispatch attempts and lists in-flight ones.
+- **Settings:** `automation.permit_valid_minutes` (10), `automation.permit_unknown_open` (`refuse`),
+  `automation.receipt_pay_terms`, `automation.receipt_work_rights_terms`.
+
+## Wave 2 dispatch additions
+
+- **Channel registry** (`app/apply/channels/registry.py`): `register(name, async factory(session) -> Channel)`,
+  `register_lazy(name, "module:attr")`, `get(session, name)`, `available()`, `is_available()`; `manual`
+  (`channels/manual.py`, owner-enforced) is built in lazily. `registry.packet_hash` is `packets.content_hash`: sha256
+  of `json.dumps(PacketContents.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False)`
+  UTF-8. A channel's `failed` means nothing left (retryable); any exception or `unknown` after hand-over is uncertain.
+- **Python API.** `dispatch.queue(session, app_id)` (permit request, then consume + `DispatchAttempt` in one
+  transaction; `wait_for_owner` raises the approval request), `dispatch.run(session, attempt_id)` (recheck at
+  dispatch, commit `started_at`, call the channel, record the outcome), `dispatch.tick` (worker task `apply_tick`
+  every minute: stale permit claims, in-flight timeout, queue approved email packets, due sends, reconcile);
+  `outcomes.record/cancel/settle_sent_by_owner/settle_not_sent`; `reconcile.check/reconcile_due/decide`;
+  `handoff.kit/mark_submitted`; `restore.enter/state/resume` (CLI `python -m app.cli restored [--backup-taken-at]`);
+  `resolvers.register(kind, fn)` for proposal pending actions (`mail_stage_proposal` ->
+  `app.connect.mail_sync:apply_proposal`, lazily). `dispatch.set_open_checker` (tests).
+- **`DispatchAttempt`** gains `started_at` (in flight), `evidence`, `reconcile_attempts`, `last_reconciled_at`
+  (migration `0007_apply_policy`). A started attempt is never claimed again; after
+  `reconcile.in_flight_timeout_minutes` with no outcome it is `unknown`. `unknown` puts the application in
+  `submitted_unconfirmed`; only reconciliation (`via="system"`) may move `submitted_unconfirmed -> ready` (clears
+  `applied_at`).
+- **Endpoints.** `GET .../dispatches` (with `started_at`, `evidence`, `uncertain`, `reconcile_attempts`,
+  `last_reconciled_at`); new `POST /api/applications/{id}/dispatches` (`{}` -> `DispatchCreateOut {status, reason,
+  dispatch, gates, pending_action_id}`; manual is handed off at once); `POST .../dispatches/{d}/cancel` (409 once
+  handed over); new `POST .../dispatches/{d}/reconcile` (`ReconcileIn {decision: check|sent|not_sent, reference?,
+  note?}` -> `ReconcileOut {result: sent|not_sent|waiting, dispatch}`); `GET .../handoff`; `POST .../mark-submitted`
+  (409 when nothing approved is waiting: use "I applied myself"); new `GET /api/autopilot/restore`
+  (`RestoreStateOut`); `POST /api/autopilot/resume-after-restore` (409 `{code: "restore_unreconciled", outstanding}`);
+  `PUT /api/autopilot` resume answers 409 `{code: "restore_paused"}` while paused for a restore.
+- `POST /api/pending-actions/{id}/resolve`: `confirmed` (confirm_submission; new optional `reference`) settles the
+  attempt as sent with the owner's evidence; `approved` on an action whose `detail.kind` has a resolver applies it
+  (501 when its module is not in the build). "Did not go out" is the dispatch's `reconcile` with `not_sent`.
+- **Audit:** `dispatch.reserved|started|sent|handed_off|uncertain|failed|cancelled|not_sent|retry_queued|gave_up|
+  refused`, `reconcile.checked|owner_asked`, `restore.paused|resumed` (each also on the application timeline).
+- **Settings:** `automation.dispatch_max_retries` (1), `reconcile.check_every_minutes` (15),
+  `reconcile.in_flight_timeout_minutes` (15); the give-up age is `reconcile.confirmation_wait_hours` (24).

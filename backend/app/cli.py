@@ -1,4 +1,4 @@
-"""Command line: ``nchito migrate | web | worker | openapi | gen-key``."""
+"""Command line: ``nchito migrate | web | worker | openapi | contracts | gen-key | worker-alive | restored``."""
 
 from __future__ import annotations
 
@@ -90,6 +90,22 @@ async def worker_alive() -> bool:
     return last is not None and (utcnow() - last).total_seconds() <= get_config().worker_stale_after_seconds
 
 
+async def restored(backup_taken_at: str | None) -> None:
+    """Mark this database as restored from a backup: everything pauses until reconciled (DESIGN.md 18.3)."""
+    from datetime import datetime
+
+    from app.apply import restore
+    from app.core.db import dispose_engine, get_sessionmaker
+
+    taken = datetime.fromisoformat(backup_taken_at) if backup_taken_at else None
+    async with get_sessionmaker()() as session:
+        st = await restore.enter(session, backup_taken_at=taken)
+        await session.commit()
+    await dispose_engine()
+    print(f"paused for restore: {len(st.outstanding)} send(s) to reconcile, "
+          f"{len(st.held_application_ids)} approval(s) withdrawn")
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="nchito")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -105,6 +121,8 @@ def main(argv: list[str] | None = None) -> None:
     contracts.add_argument("--docs-dir", default=str(BACKEND_DIR.parent / "docs"))
     sub.add_parser("gen-key", help="Print a new ENCRYPTION_KEY")
     sub.add_parser("worker-alive", help="Exit 0 if a worker heartbeat is fresh (container healthcheck)")
+    rs = sub.add_parser("restored", help="After restoring a backup: start paused until sends are reconciled")
+    rs.add_argument("--backup-taken-at", default=None, help="ISO time the backup was taken")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=get_config().log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -128,6 +146,8 @@ def main(argv: list[str] | None = None) -> None:
         from app.core.crypto import generate_key
 
         print(generate_key())
+    elif args.cmd == "restored":
+        asyncio.run(restored(args.backup_taken_at))
     elif args.cmd == "worker-alive":
         sys.exit(0 if asyncio.run(worker_alive()) else 1)
 

@@ -63,7 +63,7 @@ async def test_autopilot_requires_owner(client):
 
 async def test_autopilot_pause_and_resume(owner_client, session):
     state = (await owner_client.get("/api/autopilot")).json()
-    assert state == {"paused": False, "paused_at": None,
+    assert state == {"paused": False, "paused_at": None, "paused_by": None, "reason": None,
                      "summary": {"cancelled": [], "paused": [], "already_out": []}}
 
     paused = (await owner_client.put("/api/autopilot", json={"paused": True})).json()

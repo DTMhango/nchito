@@ -189,8 +189,11 @@ async def test_answer_errors(owner_client, session) -> None:
             ).status_code == 409
     assert (await owner_client.post(f"/api/pending-actions/{no_country.id}/answer", json={
         "answer_value": "x", "answer_scope": "this_country"})).status_code == 422
+    # Wave 2: "continue" resolves a sign-in; a resolution that does not fit the type is refused.
+    assert (await owner_client.post(f"/api/pending-actions/{wrong.id}/resolve", json={"resolution": "answered"})
+            ).status_code == 422
     assert (await owner_client.post(f"/api/pending-actions/{wrong.id}/resolve", json={"resolution": "continue"})
-            ).status_code == 501
+            ).status_code == 200
     assert (await session.scalar(select(Answer))) is None
 
 
