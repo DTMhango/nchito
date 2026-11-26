@@ -16,8 +16,10 @@ Teamtailor, BambooHR, Recruitee, Workable, iCIMS, Taleo, SuccessFactors, job boa
 - Upload-only forms (CV plus contact details): fine; same rules.
 - Free-text boxes ("Why do you want to work here?", "Anything else?"): only a packet answer
   for that question or a `find_answer` value. Never write your own text.
-- Multi-step forms: any button that might send the application counts as Submit. When in
-  doubt, request the permit before it.
+- Multi-step forms: a "Next" or "Continue" moves on without a permit only when the page shows
+  more steps follow (a step indicator, or later-step fields still to come). Any button that
+  might send the application counts as Submit: request the permit only when it is the last
+  thing left. If fields would still follow a button you cannot classify, `unsupported_form`.
 - Pop-ups (cookie banners, newsletter sign-ups, chat widgets): decline or close them; never
   accept marketing, never type into chat widgets. Cookie banners: choose "reject
   non-essential" or the most limited option.

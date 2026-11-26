@@ -9,7 +9,11 @@ ENV PYTHONUNBUFFERED=1 \
 WORKDIR /app
 COPY pyproject.toml ./
 COPY nchito_runner ./nchito_runner
-RUN pip install . \
+# Playwright's bundled node needs libatomic1 before it can install Chromium's own dependencies.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libatomic1 \
+ && rm -rf /var/lib/apt/lists/* \
+ && pip install . \
  && playwright install --with-deps chromium \
  && useradd --create-home --uid 10001 runner \
  && mkdir -p /data/profile /data/state \

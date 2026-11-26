@@ -75,12 +75,18 @@ async def test_greenhouse_happy_path_submits_once_with_evidence(fake, gw_url, tm
     [res] = fake.results
     assert res["outcome"] == "submitted" and res["permit_id"] == "pmt_1"
     assert res["confirmation_text"] == CONFIRM and res["reference"] == "APP-12345"
-    assert res["screenshot_ref"].startswith("runner-local:") and "sha256=" in res["screenshot_ref"]
-    assert list((tmp_path / "state" / "evidence").glob("t1-*.png"))
+    # evidence went to the gateway through evidence_upload_url + PUT, nothing is kept on the runner
+    assert res["screenshot_ref"].startswith("evidence:t1/")
+    uploaded = fake.uploads[res["screenshot_ref"].rsplit("/", 1)[1]]
+    assert uploaded["content_type"] == "image/png" and uploaded["head"].startswith(b"\x89PNG") and uploaded["bytes"] > 100
+    assert fake.checkpoints["t1"]["data"]["submit_attempted"] is True
+    assert not list(tmp_path.rglob("*.png"))
     [permit_req] = fake.called("request_submit_permit")
     qs = {a["question"]: a["value"] for a in permit_req["entered_answers"]}
-    assert qs["First Name"] == "Test" and qs["Email"] == "test.applicant@example.com"
+    assert qs == {"How did you hear": "Job board"}, "packet field values (name, email) are not answers"
+    assert fake.checkpoints["t1"]["data"]["entered"]["Email"] == "test.applicant@example.com"
     assert len(permit_req["attached_files_sha256"]) == 1
+    assert fake.downloads == ["f-cv"], "the CV came from the gateway, not from the public host in the link"
     assert permit_req["current_url"].startswith(web.base)
     assert not fake.suspended and not fake.blockers
     assert fake.called("save_checkpoint"), "checkpoints are saved along the way"
@@ -131,6 +137,55 @@ async def test_multistep_form_next_needs_no_permit_submit_does(fake, gw_url, tmp
     assert len(web.submissions) == 1 and fake.results[0]["outcome"] == "submitted"
 
 
+async def test_submit_type_next_moves_a_step_without_a_permit(fake, gw_url, tmp_path, web):
+    async def script(box, task):
+        await box.call("get_packet", {})
+        await box.call("open_url", {"url": task["posting_url"]})
+        s1 = await box.call("snapshot", {})
+        await box.call("fill_field", {"ref": ref(s1, name="fn"), "value": "Test Applicant", "question": "Full name"})
+        await box.call("fill_field", {"ref": ref(s1, name="em"), "value": "test.applicant@example.com", "question": "Email"})
+        assert await box.call("click", {"ref": ref(s1, text="Next")}) == "clicked"  # a step, not the submit
+        s2 = await box.call("snapshot", {})
+        assert "Step 2 of 2" in s2 and web.submissions == []
+        await box.call("fill_field", {"ref": ref(s2, name="notice"), "value": "One month", "question": "Notice period"})
+        early = await box.call("click", {"ref": ref(s2, text="Send")})
+        assert early.startswith("REFUSED [submit_without_permit]"), early
+        assert (await box.call("request_submit_permit", {"summary": "two steps"})).startswith("granted")
+        assert "Submit clicked" in await box.call("click", {"ref": ref(s2, text="Send")})
+        await box.call("snapshot", {})
+        await box.call("report_result", {"outcome": "submitted", "confirmation_text": CONFIRM})
+
+    await run_task(fake, gw_url, tmp_path, web, script, posting="/multistep-submit-next")
+    [sent] = web.submissions
+    assert sent["path"] == "/submit"
+    assert fake.results[0]["outcome"] == "submitted" and not fake.suspended
+
+
+async def test_continue_on_the_last_step_is_the_submit(fake, gw_url, tmp_path, web):
+    async def script(box, task):
+        await box.call("open_url", {"url": task["posting_url"]})
+        snap = await box.call("snapshot", {})
+        await box.call("fill_field", {"ref": ref(snap, name="notice"), "value": "One month", "question": "Notice period"})
+        out = await box.call("click", {"ref": ref(snap, text="Continue")})
+        assert out.startswith("REFUSED [submit_without_permit]"), out
+        await box.call("report_result", {"outcome": "failed", "detail": "no permit"})
+
+    await run_task(fake, gw_url, tmp_path, web, script, posting="/last-step")
+    assert web.submissions == []
+
+
+async def test_a_next_that_posts_the_form_is_stopped_as_a_submit(fake, gw_url, tmp_path, web):
+    async def script(box, task):
+        await box.call("open_url", {"url": task["posting_url"]})
+        snap = await box.call("snapshot", {})
+        out = await box.call("click", {"ref": ref(snap, text="Next")})  # "Step 1 of 3", but it posts to the server
+        assert out.startswith("REFUSED [submit_without_permit]") and "counts as the submit" in out, out
+        await box.call("report_result", {"outcome": "failed", "detail": "server-side steps"})
+
+    await run_task(fake, gw_url, tmp_path, web, script, posting="/server-steps")
+    assert web.submissions == [] and not [h for h in web.hits if h[0] == "POST"]
+
+
 # ----- the rails hold --------------------------------------------------------------------------------
 async def test_no_submit_without_permit_and_no_enter_key(fake, gw_url, tmp_path, web):
     async def script(box, task):
@@ -145,11 +200,24 @@ async def test_no_submit_without_permit_and_no_enter_key(fake, gw_url, tmp_path,
         assert again.startswith("REFUSED [submit_without_permit]"), again
         await box.call("raise_blocker", {"type": "declaration", "detail": "owner must review"})
 
-    fake.permit_decision = "wait_for_owner"
+    fake.permit_decision = "denied"
     await run_task(fake, gw_url, tmp_path, web, script)
     assert web.submissions == []
     assert [b["type"] for b in fake.blockers] == ["declaration"]
     assert fake.results == []
+
+
+async def test_wait_for_owner_ends_the_task_without_a_submit(fake, gw_url, tmp_path, web):
+    async def script(box, task):
+        snap = await fill_greenhouse(box, task)
+        out = await box.call("request_submit_permit", {"summary": "x"})
+        assert '"wait_for_owner"' in out and "this task is over" in out, out
+        again = await box.call("click", {"ref": ref(snap, type="submit")})
+        assert again.startswith("STOP"), again
+
+    fake.permit_decision = "wait_for_owner"
+    await run_task(fake, gw_url, tmp_path, web, script)
+    assert web.submissions == [] and fake.results == [] and fake.blockers == [] and fake.released == []
 
 
 async def test_expired_permit_is_refused(fake, gw_url, tmp_path, web):
@@ -269,7 +337,23 @@ async def test_uploads_only_from_the_packet(fake, gw_url, tmp_path, web):
         await box.call("report_result", {"outcome": "failed", "detail": "done"})
 
     await run_task(fake, gw_url, tmp_path, web, script)
-    assert not [h for h in web.hits if "passport" in h[1]]
+    assert not [h for h in web.hits if "passport" in h[1]] and "f-passport" not in fake.downloads
+
+
+async def test_a_file_link_off_the_gateway_is_refused(fake, gw_url, tmp_path, web):
+    pk = packet(web.base)
+    pk["files"][0]["download_url"] = web.base + "/files/cv.pdf"  # not a gateway link
+
+    async def script(box, task):
+        await box.call("get_packet", {})
+        await box.call("open_url", {"url": task["posting_url"]})
+        snap = await box.call("snapshot", {})
+        out = await box.call("upload_file", {"ref": ref(snap, name="resume"), "file_name": "cv.pdf"})
+        assert out.startswith("REFUSED [download_not_gateway]"), out
+        await box.call("report_result", {"outcome": "failed", "detail": "x"})
+
+    await run_task(fake, gw_url, tmp_path, web, script, packet_=pk)
+    assert not [h for h in web.hits if "/files/" in h[1]] and fake.downloads == []
 
 
 async def test_uploaded_file_with_wrong_hash_refused(fake, gw_url, tmp_path, web):
@@ -412,7 +496,8 @@ async def test_graceful_shutdown_checkpoints_and_does_not_fail_the_task(fake, gw
     assert fake.results == [] and web.submissions == []
     assert fake.checkpoints["t1"]["step"] == "paused"
     assert fake.checkpoints["t1"]["data"]["paused_reason"] == "runner shutting down"
-    fake.requeue("t1")  # resumable
+    assert [r["task_id"] for r in fake.released] == ["t1"], "a clean shutdown gives the task back at once"
+    assert fake.queue[0]["task_id"] == "t1" and fake.queue[0]["checkpoint"]["step"] == "paused"  # resumable
 
 
 async def test_heartbeat_pings_during_a_long_task(fake, gw_url, tmp_path, web):
@@ -465,7 +550,7 @@ async def test_day_budget_exhausted_pauses_task_with_checkpoint(fake, gw_url, tm
 
     await run_task(fake, gw_url, tmp_path, web, script, cfg_kw={"day_max_cost_usd": 10.0})
     assert fake.results == [], "a day cap is not the task's failure"
-    assert fake.checkpoints["t1"]["step"] == "paused"
+    assert fake.checkpoints["t1"]["step"] == "paused" and [r["task_id"] for r in fake.released] == ["t1"]
 
 
 async def test_no_task_is_claimed_when_the_day_budget_is_spent(fake, gw_url, tmp_path, web):
@@ -489,3 +574,82 @@ async def test_empty_queue_is_idle(fake, gw_url, tmp_path, web):
         assert await runner.run_one() == "idle"
     finally:
         await runner.gw.close()
+
+
+# ----- owner's settings (get_runner_config) --------------------------------------------------------------
+async def test_owner_caps_apply_under_the_env_ceiling(fake, gw_url, tmp_path, web):
+    fake.config.update(task_cap_minor=20, day_max_tokens=5_000, max_steps=4)
+
+    async def script(box, task):
+        assert box.s.model == "test-model" and box.s.max_steps == 4
+        assert box.budget.caps.task_cost_usd == 0.2 and box.budget.caps.day_tokens == 5_000
+        assert box.budget.caps.day_cost_usd == 2.0  # env (2.0) is lower than the owner's 10.00
+        await box.call("report_result", {"outcome": "failed", "detail": "nothing to do"})
+
+    await run_task(fake, gw_url, tmp_path, web, script, cfg_kw={"day_max_cost_usd": 2.0})
+    assert fake.results[0]["outcome"] == "failed"
+
+
+async def test_a_switched_off_runner_claims_nothing(fake, gw_url, tmp_path, web):
+    fake.config["enabled"] = False
+    _, driver, status = await run_task(fake, gw_url, tmp_path, web, greenhouse_happy)
+    assert status == "disabled" and driver.runs == 0 and fake.called("next_task") == []
+
+
+# ----- dry run ----------------------------------------------------------------------------------------------
+async def test_dry_run_fills_the_form_never_submits_and_releases(fake, gw_url, tmp_path, web):
+    async def script(box, task):
+        snap = await fill_greenhouse(box, task)
+        out = await box.call("request_submit_permit", {"summary": "rehearsal"})
+        assert out.startswith("DRY RUN finished"), out
+        again = await box.call("click", {"ref": ref(snap, type="submit")})
+        assert again.startswith("STOP"), again
+
+    await run_task(fake, gw_url, tmp_path, web, script, cfg_kw={"dry_run": True})
+    assert fake.called("next_task")[0]["dry_run"] is True
+    assert web.submissions == [] and fake.results == []
+    assert [r["task_id"] for r in fake.released] == ["t1"] and fake.queue[0]["task_id"] == "t1"
+
+
+async def test_dry_run_that_ends_early_is_released_too(fake, gw_url, tmp_path, web):
+    async def script(box, task):
+        await box.call("get_packet", {})
+
+    await run_task(fake, gw_url, tmp_path, web, script, cfg_kw={"dry_run": True})
+    assert fake.results == [] and [r["task_id"] for r in fake.released] == ["t1"]
+
+
+# ----- check tasks (report_check) ---------------------------------------------------------------------------
+async def check(box, task, status, evidence):
+    await box.call("open_url", {"url": task["posting_url"]})
+    await box.call("snapshot", {})
+    return await box.call("report_check", {"status": status, "evidence": evidence})
+
+
+async def test_check_task_reports_closed_with_evidence_from_the_page(fake, gw_url, tmp_path, web):
+    async def script(box, task):
+        assert "fill_field" not in box.tools and "request_submit_permit" not in box.tools
+        out = await check(box, task, "closed", "Applications closed")  # not what the page says
+        assert out.startswith("REFUSED [evidence_not_on_page]"), out
+        out = await box.call("report_check", {"status": "closed",
+                                              "evidence": "This position is no longer accepting applications."})
+        assert out.startswith("Recorded (closed)"), out
+
+    fake.add_task("c1", web.base + "/posting-closed", "127.0.0.1", None, type="check_posting")
+    await run_task(fake, gw_url, tmp_path, web, script, posting=None)
+    [c] = fake.checks
+    assert c["status"] == "closed" and c["screenshot_ref"].startswith("evidence:c1/")
+
+
+async def test_check_task_open_and_agent_silence_is_unknown(fake, gw_url, tmp_path, web):
+    async def opens(box, task):
+        await check(box, task, "open", "Applications are open until 30 June.")
+
+    async def says_nothing(box, task):
+        await box.call("open_url", {"url": task["posting_url"]})
+
+    fake.add_task("c1", web.base + "/posting-open", "127.0.0.1", None, type="check_posting")
+    await run_task(fake, gw_url, tmp_path / "a", web, opens, posting=None)
+    fake.add_task("c2", web.base + "/posting-open", "127.0.0.1", None, type="check_posting")
+    await run_task(fake, gw_url, tmp_path / "b", web, says_nothing, posting=None)
+    assert [(c["task_id"], c["recorded"]) for c in fake.checks] == [("c1", "open"), ("c2", "unknown")]

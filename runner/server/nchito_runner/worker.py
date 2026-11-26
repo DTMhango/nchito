@@ -1,8 +1,10 @@
-"""The task loop: next_task, work it, hand it back, repeat. Heartbeat and graceful shutdown.
+"""The task loop: owner's settings, next_task, work it, hand it back, repeat. Heartbeat and graceful shutdown.
 
-Lease semantics (the contract has no release tool): a runner that stops saves a checkpoint and
-stops pinging, and the server returns the stale claim to the queue with that checkpoint. When
-the gateway lists an optional ``release_task`` tool, it is called as well.
+Before every claim the runner reads ``get_runner_config``: a runner the owner switched off (or a suspended one)
+claims nothing, and the owner's caps apply under this deployment's ceiling. A task the runner stops working
+without a result (clean shutdown, day budget, a rehearsal) is given back with ``release_task`` and resumes from
+its checkpoint; a task with a submit click is reported uncertain, never retried. The heartbeat is an MCP
+``ping`` (it updates the runner's last-seen); the task's lease is kept by the tool calls on it.
 """
 
 from __future__ import annotations
@@ -10,39 +12,67 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from datetime import timedelta
+from collections.abc import Callable
+from datetime import datetime, timedelta
 from typing import Any
 
 from .browser import BrowserSession
-from .budget import Budget, BudgetExhausted
+from .budget import Budget, BudgetExhausted, Caps
 from .config import RunnerConfig
 from .driver import Driver
 from .gateway import Gateway, GatewayError
 from .guard import Guard
-from .toolbox import TaskState, Toolbox
+from .toolbox import DEFAULT_EVIDENCE_MAX_BYTES, TaskState, Toolbox
 
 log = logging.getLogger("nchito_runner")
 
 DAY_WAIT_SECONDS = 300.0
+MINOR_PER_MAJOR = {"USD": 100}  # the Agent SDK reports cost in USD; other ledger currencies cannot be compared
+
+
+def owner_caps(server: dict[str, Any], ceiling: Caps) -> Caps:
+    """The owner's caps from ``get_runner_config``. Money caps apply when the ledger is in USD (what the SDK
+    reports); otherwise only the token caps can be compared and the money ceiling stays the environment's."""
+    per = MINOR_PER_MAJOR.get(str(server.get("currency") or "").upper())
+    task_cost = int(server["task_cap_minor"]) / per if per else ceiling.task_cost_usd
+    day_cost = int(server["day_cap_minor"]) / per if per else ceiling.day_cost_usd
+    return Caps(task_cost, day_cost, int(server["task_max_tokens"]), int(server["day_max_tokens"]))
 
 
 class Runner:
-    def __init__(self, cfg: RunnerConfig, gateway: Gateway, driver: Driver, budget: Budget):
+    def __init__(self, cfg: RunnerConfig, gateway: Gateway, driver: Driver, budget: Budget, *,
+                 clock: Callable[[], datetime] | None = None):
         self.cfg = cfg
         self.gw = gateway
         self.driver = driver
         self.budget = budget
+        self.clock = clock  # the permit clock (tests align it with the server's)
         self.stop = asyncio.Event()
+        self.server: dict[str, Any] = {}
+        self._warned_currency = False
+
+    # ----- owner's settings ---------------------------------------------------------------------
+    async def refresh_config(self) -> dict[str, Any]:
+        self.server = await self.gw.call("get_runner_config", {})
+        if self.server.get("currency", "").upper() not in MINOR_PER_MAJOR and not self._warned_currency:
+            log.warning("budget currency %s is not USD: the owner's money caps cannot be compared with the SDK's USD "
+                        "cost, so RUNNER_*_MAX_COST_USD apply; token caps follow the owner", self.server.get("currency"))
+            self._warned_currency = True
+        self.budget.limit_to(owner_caps(self.server, self.budget.ceiling))
+        return self.server
 
     # ----- one task ---------------------------------------------------------------------------
     async def run_one(self) -> str:
-        """Returns 'idle', 'day_budget', or 'worked'."""
+        """Returns 'disabled', 'idle', 'day_budget', or 'worked'."""
+        server = await self.refresh_config()
+        if not server.get("enabled"):
+            return "disabled"
         try:
             self.budget.check_day()
         except BudgetExhausted as exc:
             log.warning("runner paused for the day: %s", exc)
             return "day_budget"
-        task = await self.gw.call("next_task", {"kinds": ["apply"]})
+        task = await self.gw.call("next_task", {"kinds": list(self.cfg.task_kinds), "dry_run": self.cfg.dry_run})
         if not task.get("task_id"):
             return "idle"
         await self._work(task)
@@ -50,6 +80,7 @@ class Runner:
 
     async def _work(self, task: dict[str, Any]) -> None:
         task_id = task["task_id"]
+        kind = task.get("type") or "apply"
         cp = task.get("checkpoint") or {}
         if (cp.get("data") or {}).get("submit_attempted"):
             # A crash after the submit click: the form may have gone through. Never try again.
@@ -59,14 +90,18 @@ class Runner:
             return
         rules = task.get("rules") or {}
         domain = rules.get("stay_on_domain")
-        if not domain:
-            await self.gw.call("report_result", {"task_id": task_id, "outcome": "failed",
-                                                 "detail": "Task carried no stay_on_domain rule."})
+        if not domain or kind not in self.cfg.task_kinds:
+            detail = "Task carried no stay_on_domain rule." if not domain else f"This runner does not work {kind} tasks."
+            with contextlib.suppress(GatewayError):
+                await self.gw.call("release_task", {"task_id": task_id, "reason": detail})
             return
-        guard = Guard([domain], permit_safety=timedelta(seconds=self.cfg.permit_safety_seconds))
-        browser = BrowserSession(guard, self.cfg.profile_dir, self.cfg.state_dir / "evidence", headless=self.cfg.headless)
-        state = TaskState(task_id=task_id, posting_url=task.get("posting_url") or "",
-                          max_steps=int(rules.get("max_steps") or 0) or 1, checkpoint=cp or None)
+        guard = Guard([domain], now=self.clock, permit_safety=timedelta(seconds=self.cfg.permit_safety_seconds))
+        browser = BrowserSession(guard, self.cfg.profile_dir, headless=self.cfg.headless)
+        max_steps = min(int(rules.get("max_steps") or 0) or 1, int(self.server.get("max_steps") or 10**6))
+        state = TaskState(task_id=task_id, posting_url=task.get("posting_url") or "", max_steps=max_steps,
+                          task_type=kind, dry_run=self.cfg.dry_run, model=str(self.server.get("model") or ""),
+                          evidence_max_bytes=int(self.server.get("evidence_max_bytes") or DEFAULT_EVIDENCE_MAX_BYTES),
+                          checkpoint=cp or None)
         self.budget.start_task()
         box: Toolbox | None = None
         heartbeat: asyncio.Task[None] | None = None
@@ -105,10 +140,12 @@ class Runner:
                     reason = str(state.budget_stop)
                 await box.close_out(reason=reason, shutting_down=self.stop.is_set())
                 await box.aclose()
-            else:  # the browser never started: nothing was entered, nothing to resume
+            else:  # the browser never started: nothing was entered; give the task back
                 with contextlib.suppress(GatewayError):
-                    await self.gw.call("report_result", {"task_id": task_id, "outcome": "failed", "detail": reason[:500]})
+                    await self.gw.call("release_task", {"task_id": task_id, "reason": reason[:500]})
             await browser.close()
+        if box is None:  # this runner cannot work right now: back off instead of claiming again at once
+            raise RuntimeError(reason)
 
     async def _heartbeat(self) -> None:
         while True:
@@ -133,11 +170,9 @@ class Runner:
             wait = {"day_budget": DAY_WAIT_SECONDS, "error": min(backoff, 60.0)}.get(status, self.cfg.poll_seconds)
             if status == "error":
                 backoff *= 2
-            if status == "day_budget":
-                with contextlib.suppress(Exception):
-                    await self.gw.ping()  # stay visible as "alive, out of budget"
+            if status == "disabled":
+                log.info("runner switched off by the owner (or suspended); checking again in %ss", wait)
             with contextlib.suppress(asyncio.TimeoutError):
                 await asyncio.wait_for(self.stop.wait(), timeout=wait)
         with contextlib.suppress(Exception):
             await self.gw.close()
-

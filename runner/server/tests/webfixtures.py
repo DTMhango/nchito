@@ -62,6 +62,48 @@ MULTISTEP = _HEAD.format(t="Example Co - Multi-step") + """
   <button type="submit">Submit application</button></div>
 </form></body></html>"""
 
+# A one-page multi-step form whose "Next" is a default (submit-type) button: the page's submit handler moves to
+# step 2 while step 1 is shown, and lets the form post from step 2.
+MULTISTEP_SUBMIT_NEXT = _HEAD.format(t="Example Co - Multi-step (submit-type Next)") + """
+<h1>Field Engineer</h1>
+<form id="f" method="POST" action="/submit" novalidate>
+ <p id="ind">Step 1 of 2</p>
+ <div id="s1"><label for="fn">Full name</label><input id="fn" name="fn" type="text" required>
+  <label for="em">Email</label><input id="em" name="em" type="email" required>
+  <button id="next">Next</button></div>
+ <div id="s2" style="display:none"><label for="notice">Notice period</label>
+  <input id="notice" name="notice" type="text" required>
+  <button id="send">Send</button></div>
+</form>
+<script>
+var step = 1;
+document.getElementById('f').addEventListener('submit', function (e) {
+  if (step === 1) {
+    e.preventDefault(); step = 2;
+    document.getElementById('s1').style.display = 'none';
+    document.getElementById('s2').style.display = 'block';
+    document.getElementById('ind').textContent = 'Step 2 of 2';
+  }
+});
+</script></body></html>"""
+
+# The last step of a form whose final control says "Continue": nothing follows, so it is the submit.
+LAST_STEP_CONTINUE = _HEAD.format(t="Example Co - Last step") + """
+<form method="POST" action="/submit" novalidate><p>Step 2 of 2</p>
+ <label for="notice">Notice period</label><input id="notice" name="notice" type="text" required>
+ <button>Continue</button></form></body></html>"""
+
+# A server-side multi-step form: its "Next" posts the first step to the server.
+SERVER_STEPS = _HEAD.format(t="Example Co - Server steps") + """
+<form method="POST" action="/submit" novalidate><p>Step 1 of 3</p>
+ <label for="fn">Full name</label><input id="fn" name="fn" type="text">
+ <button>Next</button></form></body></html>"""
+
+OPEN_POSTING = _HEAD.format(t="Example Co - Data Analyst") + (
+    "<h1>Data Analyst</h1><p>Applications are open until 30 June.</p><a href='/lever'>Apply now</a></body></html>")
+CLOSED_POSTING = _HEAD.format(t="Example Co - Data Analyst") + (
+    "<h1>Data Analyst</h1><p>This position is no longer accepting applications.</p></body></html>")
+
 CONFIRMATION = _HEAD.format(t="Thank you") + (
     "<h1>Application received</h1><p>Thank you, your application has been received.</p>"
     "<p>Reference: APP-12345</p></body></html>")
@@ -111,6 +153,9 @@ class WebFixtures:
         self.httpd = _Server(("127.0.0.1", 0), _Handler)
         self.httpd.pages = {"/greenhouse": GREENHOUSE, "/lever": LEVER, "/password": PASSWORD,
                             "/injection": INJECTION, "/multistep": MULTISTEP,
+                            "/multistep-submit-next": MULTISTEP_SUBMIT_NEXT, "/last-step": LAST_STEP_CONTINUE,
+                            "/server-steps": SERVER_STEPS, "/posting-open": OPEN_POSTING,
+                            "/posting-closed": CLOSED_POSTING,
                             "/elsewhere": _HEAD.format(t="Elsewhere") + "<p>elsewhere</p></body></html>"}
         self.httpd.hits, self.httpd.submissions = [], []
         self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)

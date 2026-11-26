@@ -2,6 +2,9 @@
 
 The day ledger is a small JSON file on the state volume, so a restart does not reset it.
 A cap of 0 means "no spend allowed" (the runner stops immediately), never "unlimited".
+
+The caps in force are the lower of this deployment's ceiling (environment) and the owner's caps from the
+gateway (``get_runner_config``, refreshed before every claim): the environment can only tighten them.
 """
 
 from __future__ import annotations
@@ -29,9 +32,15 @@ class Caps:
     day_tokens: int
 
 
+def tighter(a: Caps, b: Caps) -> Caps:
+    return Caps(min(a.task_cost_usd, b.task_cost_usd), min(a.day_cost_usd, b.day_cost_usd),
+                min(a.task_tokens, b.task_tokens), min(a.day_tokens, b.day_tokens))
+
+
 class Budget:
     def __init__(self, path: Path, caps: Caps, clock: Callable[[], datetime] | None = None):
         self.path = path
+        self.ceiling = caps
         self.caps = caps
         self._clock = clock or (lambda: datetime.now(UTC))
         self.task_cost = 0.0
@@ -59,6 +68,10 @@ class Budget:
         tmp = self.path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"day": self._day, "cost": self.day_cost, "tokens": self.day_tokens}), "utf-8")
         os.replace(tmp, self.path)
+
+    def limit_to(self, owner: Caps) -> None:
+        """Apply the owner's caps under the deployment ceiling."""
+        self.caps = tighter(self.ceiling, owner)
 
     def start_task(self) -> None:
         self.task_cost = 0.0

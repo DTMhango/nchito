@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tests.fake_gateway import FakeNchito, ServerThread
-from tests.webfixtures import WebFixtures
+from tests.webfixtures import CV_BYTES, WebFixtures
 
 
 def _browser_available() -> str | None:
@@ -48,6 +48,7 @@ def _gateway_server():
 @pytest.fixture
 def fake(_gateway_server):
     _gateway_server.fake.reset()
+    _gateway_server.fake.files["f-cv"] = CV_BYTES
     return _gateway_server.fake
 
 

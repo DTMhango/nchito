@@ -73,22 +73,26 @@ services:
 
   # Optional server runner (DESIGN.md 8.3, Runner B). OFF by default: start with
   #   docker compose --profile runner up -d runner
-  # It spends Anthropic API tokens, so it has its own budget line (RUNNER_*_MAX_*). It exits with a
+  # It spends Anthropic API tokens: the owner's caps apply, under the RUNNER_*_MAX_* ceilings. It exits with a
   # clear error if RUNNER_TOKEN or RUNNER_ANTHROPIC_API_KEY is empty.
   runner:
     profiles: ["runner"]
     build: ./runner/server
     restart: unless-stopped
     environment:
-      NCHITO_MCP_URL: ${RUNNER_MCP_URL:-http://web:8000/mcp}
+      # The instance as the runner reaches it; the runner adds /mcp. Leave unset on the compose network.
+      NCHITO_URL: ${RUNNER_NCHITO_URL:-http://web:8000}
       NCHITO_RUNNER_TOKEN: ${RUNNER_TOKEN:-}
       ANTHROPIC_API_KEY: ${RUNNER_ANTHROPIC_API_KEY:-}
-      RUNNER_MODEL: ${RUNNER_MODEL:-claude-sonnet-5-5}
-      RUNNER_TASK_MAX_COST_USD: ${RUNNER_TASK_MAX_COST_USD:-1.0}
-      RUNNER_DAY_MAX_COST_USD: ${RUNNER_DAY_MAX_COST_USD:-10.0}
-      RUNNER_TASK_MAX_TOKENS: ${RUNNER_TASK_MAX_TOKENS:-600000}
-      RUNNER_DAY_MAX_TOKENS: ${RUNNER_DAY_MAX_TOKENS:-6000000}
-      RUNNER_POLL_SECONDS: ${RUNNER_POLL_SECONDS:-30}
+      # Model, caps and step limit come from the owner's settings (get_runner_config). These are this
+      # deployment's ceilings; empty = the runner's own default (runner/server/nchito_runner/config.py).
+      RUNNER_TASK_MAX_COST_USD: ${RUNNER_TASK_MAX_COST_USD:-}
+      RUNNER_DAY_MAX_COST_USD: ${RUNNER_DAY_MAX_COST_USD:-}
+      RUNNER_TASK_MAX_TOKENS: ${RUNNER_TASK_MAX_TOKENS:-}
+      RUNNER_DAY_MAX_TOKENS: ${RUNNER_DAY_MAX_TOKENS:-}
+      RUNNER_POLL_SECONDS: ${RUNNER_POLL_SECONDS:-}
+      RUNNER_TASK_KINDS: ${RUNNER_TASK_KINDS:-}
+      RUNNER_DRY_RUN: ${RUNNER_DRY_RUN:-}
     volumes:
       - runner_data:/data
     shm_size: "1gb"

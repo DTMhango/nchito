@@ -9,8 +9,16 @@ Rails (DESIGN.md 8.3, 18.1; CONTRACTS.md section 8):
 2. Never navigate off the task's allowed domains (the posting's domain, from the task).
 3. Never click the submit control unless a granted permit for this task is held in memory,
    unexpired and unused. A permit is consumed by the click (single use).
-4. Uploads only from the packet's file URLs, with matching sha256, never to a ``never`` file.
+4. Uploads only from the packet's file URLs, with matching sha256, never to a ``never`` file. Packet files
+   are fetched only from the gateway this runner is connected to (its signed ``/api/gateway/files/`` path);
+   that host is allowed for downloads only, never for the browser.
 5. Enter is refused: it submits a form without clicking the control.
+
+Multi-step forms: a submit-type control is the final submit unless the page shows, by what can be read from
+it, that more steps follow: its label says Next / Continue (and nothing like Submit) AND either the form's
+step indicator says "step N of M" with N < M, or the form still holds required fields that are not shown yet
+(a later step). The form's ``action`` cannot tell the two apart (a one-page multi-step form posts every step's
+fields to the final endpoint), so it is not used. When unsure, it is the submit: the safe side.
 """
 
 from __future__ import annotations
@@ -44,6 +52,9 @@ class ElementInfo:
     role: str = ""
     in_form: bool = False
     contenteditable: bool = False
+    step_current: int = 0  # "Step 1 of 3" read from the form (0 = no indicator)
+    step_total: int = 0
+    hidden_required: int = 0  # required fields in the same form that are not shown yet
 
 
 @dataclass
@@ -58,6 +69,7 @@ _PASSWORD_NAME = re.compile(r"pass(word|wd|code)|(^|[^a-z])pwd([^a-z]|$)", re.I)
 # is navigation (Lever, Greenhouse), so it is only a submit when the markup makes it one.
 _SUBMIT_TEXT = re.compile(r"\b(submit|send application|send my application|finish application|"
                           r"complete application|confirm and send)\b", re.I)
+_NEXT_TEXT = re.compile(r"\b(next|continue|proceed|next step|save and continue)\b", re.I)
 _ENTER_KEYS = {"enter", "numpadenter", "return"}
 
 
@@ -112,12 +124,26 @@ class Guard:
 
     # ----- submit -------------------------------------------------------------------
     @staticmethod
-    def is_submit_control(el: ElementInfo) -> bool:
+    def is_next_step(el: ElementInfo) -> bool:
+        """A submit-type "Next" with more steps to come, as far as the page shows it. Unsure is False."""
+        words = " ".join((el.text, el.value, el.label))
+        if _SUBMIT_TEXT.search(words) or not _NEXT_TEXT.search(words):
+            return False
+        if el.step_total > 0 and el.step_current > 0:
+            return el.step_current < el.step_total
+        return el.hidden_required > 0
+
+    @staticmethod
+    def submits_by_markup(el: ElementInfo) -> bool:
         etype = el.type.lower()
         if el.tag == "input" and etype in {"submit", "image"}:
             return True
-        if el.tag == "button" and (etype == "submit" or (etype == "" and el.in_form)):
-            return True
+        return el.tag == "button" and (etype == "submit" or (etype == "" and el.in_form))
+
+    @classmethod
+    def is_submit_control(cls, el: ElementInfo) -> bool:
+        if cls.submits_by_markup(el):
+            return not cls.is_next_step(el)
         text = " ".join((el.text, el.value, el.label, el.name, el.id))
         return bool(_SUBMIT_TEXT.search(text)) and (el.tag in {"button", "input"} or el.role == "button")
 
@@ -140,6 +166,18 @@ class Guard:
     def check_key(self, key: str) -> None:
         if key.strip().lower() in _ENTER_KEYS:
             raise RailViolation("enter_submits", "Enter can submit a form; click the control instead")
+
+    # ----- files ----------------------------------------------------------------------
+    @staticmethod
+    def gateway_file_url(signed_url: str, gateway_root: str, prefix: str) -> str:
+        """The signed link, on the gateway this runner talks to. The host in the link is the server's public
+        base URL, which may not be how this runner reaches it, so only the signed path is kept."""
+        parts = urlsplit(signed_url)
+        at = parts.path.find(prefix)
+        tail = parts.path[at + len(prefix):] if at >= 0 else ""
+        if parts.scheme not in {"http", "https"} or not tail or "/" in tail or parts.query or parts.fragment:
+            raise RailViolation("download_not_gateway", "files come only from the gateway's signed links")
+        return gateway_root.rstrip("/") + prefix + tail
 
     # ----- uploads ------------------------------------------------------------------
     @staticmethod

@@ -8,12 +8,15 @@ Network-level backstops (the guard also checks before each action):
 * a document-level POST (a classic form submit) is aborted unless the permitted submit click
   is in flight;
 * a capture-phase ``submit`` listener cancels in-page submit events outside that window.
+
+A multi-step form's submit-type "Next" (``Guard.is_next_step``) lets the page's own submit handler run (it
+moves to the next step), while the network backstop stays closed: if that click would post the form to the
+server after all, the post is aborted and the click is refused as a submit without a permit.
 """
 
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -74,31 +77,43 @@ _INFO_JS = """
 (el) => {
   const target = el.closest('button, input, a, [role=button]') || el;
   const labels = target.labels ? Array.from(target.labels).map(l => l.innerText).join(' ') : '';
+  const form = target.form || target.closest('form');
+  let stepCurrent = 0, stepTotal = 0, hiddenRequired = 0;
+  const stepOf = (text) => (text || '').match(/step\\s+(\\d+)\\s*(?:of|\\/)\\s*(\\d+)/i);
+  const m = stepOf(form ? form.innerText : '') || stepOf(document.body ? document.body.innerText : '');
+  if (m) { stepCurrent = parseInt(m[1], 10); stepTotal = parseInt(m[2], 10); }
+  if (form) {
+    for (const f of form.querySelectorAll('input, select, textarea')) {
+      const t = (f.getAttribute('type') || '').toLowerCase();
+      if (['hidden', 'submit', 'button', 'image', 'reset'].includes(t)) continue;
+      const required = f.required || f.getAttribute('aria-required') === 'true';
+      const shown = !!(f.offsetParent || f.getClientRects().length);
+      if (required && !shown) hiddenRequired += 1;
+    }
+  }
   return { tag: target.tagName.toLowerCase(), type: (target.getAttribute('type') || '').toLowerCase(),
     name: target.getAttribute('name') || '', id: target.id || '',
     autocomplete: target.getAttribute('autocomplete') || '',
     label: (labels + ' ' + (target.getAttribute('aria-label') || '') + ' ' + (target.getAttribute('placeholder') || '')).trim(),
     text: (target.innerText || '').trim().slice(0, 200), value: (target.value || '').toString().slice(0, 200),
-    role: target.getAttribute('role') || '', in_form: !!target.closest('form'),
-    contenteditable: target.isContentEditable === true };
+    role: target.getAttribute('role') || '', in_form: !!form,
+    contenteditable: target.isContentEditable === true,
+    step_current: stepCurrent, step_total: stepTotal, hidden_required: hiddenRequired };
 }
 """
 
 
 class BrowserSession:
-    def __init__(self, guard: Guard, profile_dir: Path, evidence_dir: Path, *, headless: bool = True):
+    def __init__(self, guard: Guard, profile_dir: Path, *, headless: bool = True):
         self.guard = guard
         self.profile_dir = profile_dir
-        self.evidence_dir = evidence_dir
         self.headless = headless
         self._pw: Playwright | None = None
         self._ctx: BrowserContext | None = None
         self._page: Page | None = None
-        self._shots = 0
 
     async def start(self) -> None:
         self.profile_dir.mkdir(parents=True, exist_ok=True)
-        self.evidence_dir.mkdir(parents=True, exist_ok=True)
         self._pw = await async_playwright().start()
         self._ctx = await self._pw.chromium.launch_persistent_context(
             str(self.profile_dir), headless=self.headless, accept_downloads=False,
@@ -217,11 +232,19 @@ class BrowserSession:
     async def click(self, ref: int, before_submit: Callable[[], Awaitable[None]] | None = None) -> tuple[ElementInfo, bool]:
         """Returns (element info, was_submit). A submit control needs a held, live permit."""
         loc, info = await self._info(ref)
-        is_submit = self.guard.is_submit_control(info)
-        if not is_submit:
-            await loc.click(timeout=10_000)
-            await self._settle()
-            self._raise_pending_violation_if_off_domain()
+        if not self.guard.is_submit_control(info):
+            next_step = self.guard.submits_by_markup(info)  # a submit-type "Next" with more steps to come
+            seen = len(self.guard.violations)
+            if next_step:
+                await self.page.evaluate("window.__nchitoSubmitOk = true")  # the page's step handler may run
+            try:
+                await loc.click(timeout=10_000)
+                await self._settle()
+            finally:
+                if next_step:
+                    with contextlib.suppress(Exception):
+                        await self.page.evaluate("window.__nchitoSubmitOk = false")
+            self._raise_new_violation(seen)
             return info, False
         self.guard.authorise_submit()  # raises RailViolation when no usable permit; consumes it
         if before_submit:
@@ -237,9 +260,17 @@ class BrowserSession:
                 await self.page.evaluate("window.__nchitoSubmitOk = false")
         return info, True
 
-    def _raise_pending_violation_if_off_domain(self) -> None:
-        if any(v.kind == "off_domain" for v in self.guard.violations):
-            raise next(v for v in self.guard.violations if v.kind == "off_domain")
+    def _raise_new_violation(self, seen: int) -> None:
+        """A click that led off the domain, or posted the form without a permit (it was aborted)."""
+        new = self.guard.violations[seen:]
+        for kind in ("off_domain", "submit_without_permit"):
+            hit = next((v for v in new if v.kind == kind), None)
+            if hit is not None:
+                if kind == "submit_without_permit":
+                    self.guard.violations = self.guard.violations[:seen]
+                    raise RailViolation(kind, "that control posted the form, so it counts as the submit; it was "
+                                              "stopped before anything was sent")
+                raise hit
 
     async def _settle(self) -> None:
         try:
@@ -248,8 +279,17 @@ class BrowserSession:
         except Exception:
             pass
 
-    async def screenshot(self, task_id: str) -> tuple[Path, str]:
-        self._shots += 1
-        path = self.evidence_dir / f"{task_id}-{self._shots}.png"
-        await self.page.screenshot(path=str(path), full_page=True)
-        return path, hashlib.sha256(path.read_bytes()).hexdigest()
+    async def screenshot(self, max_bytes: int) -> tuple[bytes, str]:
+        """Evidence of the page as (bytes, content type): a full-page PNG, or a smaller JPEG of the viewport when
+        the PNG is over ``max_bytes`` (the gateway's ``evidence_max_bytes``). Nothing is kept on disk."""
+        try:
+            png = await self.page.screenshot(full_page=True, type="png")
+        except Exception:  # a full-page capture can fail while the page re-lays out: take the viewport
+            png = await self.page.screenshot(full_page=False, type="png")
+        if len(png) <= max_bytes:
+            return png, "image/png"
+        for quality in (70, 45, 25):
+            jpg = await self.page.screenshot(full_page=False, type="jpeg", quality=quality)
+            if len(jpg) <= max_bytes:
+                return jpg, "image/jpeg"
+        raise ValueError(f"the screenshot is larger than the gateway's {max_bytes} byte limit")

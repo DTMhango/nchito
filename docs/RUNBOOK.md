@@ -124,11 +124,12 @@ The PC runner is Claude Code with the Claude in Chrome extension, working the ga
    `%USERPROFILE%\.nchito-runner`, saves `NCHITO_URL` and the token as user environment variables, never in a file):
    `powershell -NoProfile -ExecutionPolicy Bypass -File runner\local\install.ps1 -Url https://<instance> -SetToken`
    (bash: `runner/local/install.sh`, with both variables already exported).
-4. Open a new terminal. Self-check (config, `/api/health/live`, token against `/mcp`):
+4. Open a new terminal. Self-check (config, `/api/health/live`, the token against `/mcp`: `tools/list` compared with
+   the 12 tools the kit expects, and `get_runner_config` says this runner is not suspended):
    `powershell -File "$env:USERPROFILE\.nchito-runner\check.ps1"`.
 5. First run, a dry run (reads one form, types nothing, requests no permit):
    `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.nchito-runner\start.ps1" -Arguments dry-run`.
-   The task stays claimed by the runner until the gateway releases it.
+   It claims with `next_task(dry_run)`, types and submits nothing, and gives the task back with `release_task`.
 6. Work the queue (one line): `powershell -NoProfile -ExecutionPolicy Bypass -File "$env:USERPROFILE\.nchito-runner\start.ps1"`.
    It stops when the queue is empty. `-Arguments "max=5"` limits a run.
 7. Unattended: `runner/local/UNATTENDED.md` (spike report). Recommended: a sign-in Task Scheduler entry that keeps a
@@ -170,43 +171,75 @@ runner raises a blocker and moves on. Sizing: plan 4 GB RAM on the VPS with it r
    `docker compose up` never starts it.
 4. Settings, Runners shows its last-seen time within a minute. Logs: `docker compose logs -f runner`.
 
-**Environment** (`runner/server/nchito_runner/config.py` holds the one default for each)
+**Environment.** The same two names everywhere (PC runner, server runner, check scripts):
+`NCHITO_URL` (the instance, for example `https://nchito.example.com`; the gateway is `$NCHITO_URL/mcp`) and
+`NCHITO_RUNNER_TOKEN` (`nch_...`). In compose the server runner's come from `RUNNER_NCHITO_URL` (default
+`http://web:8000`, the compose network) and `RUNNER_TOKEN`. `runner/server/nchito_runner/config.py` holds the one
+default for each of the rest; compose leaves them empty unless you set them.
 
-| Variable | Default | Meaning |
+| Variable (compose name) | Default | Meaning |
 |---|---|---|
-| `NCHITO_MCP_URL` | `http://web:8000/mcp` | Gateway endpoint (compose sets it from `RUNNER_MCP_URL`) |
-| `NCHITO_RUNNER_TOKEN` | none, required | Bearer token (`RUNNER_TOKEN` in compose) |
-| `ANTHROPIC_API_KEY` | none, required | Its own key, so its spend is separate (`RUNNER_ANTHROPIC_API_KEY` in compose) |
-| `RUNNER_MODEL` | `claude-sonnet-5-5` | Model id; matches the `ai.model_browser_agent` default |
-| `RUNNER_TASK_MAX_COST_USD` / `RUNNER_DAY_MAX_COST_USD` | 1.0 / 10.0 | Cost caps per task and per UTC day |
-| `RUNNER_TASK_MAX_TOKENS` / `RUNNER_DAY_MAX_TOKENS` | 600000 / 6000000 | Token caps per task and per UTC day |
-| `RUNNER_POLL_SECONDS` | 30 | Idle poll interval (also its last-seen signal) |
+| `NCHITO_URL` (`RUNNER_NCHITO_URL`) | `http://web:8000` in compose | The instance as the runner reaches it, no `/mcp`, no trailing slash |
+| `NCHITO_RUNNER_TOKEN` (`RUNNER_TOKEN`) | none, required | Runner token from Settings, Runners |
+| `ANTHROPIC_API_KEY` (`RUNNER_ANTHROPIC_API_KEY`) | none, required | Its own key, so its spend is separate |
+| `RUNNER_TASK_MAX_COST_USD` / `RUNNER_DAY_MAX_COST_USD` | 1.0 / 10.0 | Ceilings on the owner's cost caps, per task and per UTC day |
+| `RUNNER_TASK_MAX_TOKENS` / `RUNNER_DAY_MAX_TOKENS` | 600000 / 6000000 | Ceilings on the owner's token caps |
+| `RUNNER_POLL_SECONDS` | 30 | Idle poll interval |
+| `RUNNER_TASK_KINDS` | `apply,check_posting` | Task kinds it takes (sweeps stay with the PC runner) |
+| `RUNNER_DRY_RUN` | 0 | 1 = rehearsal: `next_task(dry_run)`, never a permit, every task released at the end |
 
-The gateway contract does not publish budget values, so the runner reads its caps from the environment. The server still
-enforces `automation.agent_max_steps` and `budget.agent_task_ceiling_minor` on every task. A cap of 0 means no spend.
+**Owner's settings first.** Before every claim the runner calls `get_runner_config`: it claims nothing while
+`runners.server_runner_enabled` is off or its token is suspended, drives the browser with `ai.model_browser_agent`,
+stops at `automation.agent_max_steps`, and keeps screenshots under `runners.evidence_max_kb`. Its caps are the owner's
+(`budget.agent_task_ceiling_minor`, `runners.server_day_cap_minor`, `runners.server_task_max_tokens`,
+`runners.server_day_max_tokens`) under the environment ceilings above: the environment can only tighten them. Money
+caps are compared only when `budget.currency` is USD (what the Agent SDK reports); in another currency the cost
+ceilings above apply and the token caps follow the owner. The server enforces steps and the task ceiling again on its
+side. A cap of 0 means no spend.
 
 **What it will not do (enforced in code, not only in the prompt)**
 
 - Never types into a password field, and never creates an account.
 - Never navigates away from the posting's domain; a redirect or off-site link raises `redirect_off_domain` and ends the task.
 - Never clicks the submit control (or presses Enter) without a granted, unexpired, unused permit held in memory for that
-  task; a document-level form POST is also aborted at the network layer without one.
-- Never uploads anything except the task packet's files (matching hash, never a `never` file).
+  task; a document-level form POST is also aborted at the network layer without one. In a multi-step form a
+  submit-type "Next" moves on without a permit only when the page shows more steps follow ("Step 1 of 3", or required
+  fields of a later step not shown yet); if that click would post the form after all, the post is aborted. Unsure is
+  the submit.
+- Never uploads anything except the task packet's files (matching hash, never a `never` file), and fetches them only
+  from the gateway's signed `/api/gateway/files/` links on `NCHITO_URL` (the browser never visits that host).
 - Page text reaches the model only inside a marked untrusted-data block; the model has no shell, file or web tools.
-- After a submit click it records a "submit attempted" checkpoint first. If it restarts and finds that checkpoint, it
+- Before a submit click it records a "submit attempted" checkpoint. If it restarts and finds that checkpoint, it
   reports `uncertain` and never submits again; `uncertain` goes to reconciliation.
 
+**Evidence.** Screenshots (before the submit click, of the confirmation page, of a checked posting) are uploaded
+through `evidence_upload_url` and referenced as `evidence:<task>/<id>`; nothing is kept on the runner's volume.
+
 **Budget exhausted.** At the task cap the task is reported `failed` with "budget line exhausted". At the day cap the
-current task is checkpointed and left to resume, no new task is claimed, and the runner waits (the ledger is
-`/data/state/budget.json`, so a restart does not reset it). Raise the cap or wait for the next UTC day.
+current task is checkpointed and released (`release_task`) to resume later, no new task is claimed, and the runner
+waits (the ledger is `/data/state/budget.json`, so a restart does not reset it).
 
-**Stopping.** `docker compose stop runner` (SIGTERM) saves a checkpoint for the task in hand and stops pinging; the
-server returns the stale claim to the queue with that checkpoint. Volumes: `/data/profile` (Chromium profile) and
-`/data/state` (budget ledger and evidence screenshots).
+**Stopping.** `docker compose stop runner` (SIGTERM) saves a checkpoint for the task in hand and gives it back with
+`release_task`; it resumes from that checkpoint. A task already cleared to submit is never released: it is reported
+(`uncertain` after a click, `failed` before one). Volumes: `/data/profile` (Chromium profile), `/data/state` (budget
+ledger). The heartbeat is an MCP ping (last-seen); a task's lease (`runners.task_lease_minutes`) is kept by its tool
+calls.
 
-**Known gaps (wave 3).** The contract has no heartbeat, lease-release or screenshot-upload tool. The runner uses an MCP
-ping and its idle `next_task` poll as last-seen, calls `release_task` only if the server offers it, and reports the
-screenshot as `runner-local:<file>#sha256=<hash>` with the file kept on `/data/state/evidence`.
+**Testing against the real gateway.** `backend/tests/integration/test_runner_gateway.py` drives the runner's own
+gateway client, worker and Toolbox against the backend app in process (test database on 127.0.0.1:55442) with a
+scripted model and a static form in real headless Chromium: one submit with the CV and evidence, the application
+`submitted` and its audit chain; a dry run denied and released; a new question held for the owner; a second runner
+neither claims nor gets a permit. It needs the backend and the runner in one environment on one `mcp` 1.x (the runner
+pins `mcp>=1.30,<2`, the version the gateway runs); the backend's normal suite skips it when `nchito_runner` is not
+installed:
+
+    python -m venv .venv-runner-it
+    .venv-runner-it/Scripts/pip install -e "./backend[dev]" -e "./runner/server[dev]"   # bin/ on Linux
+    .venv-runner-it/Scripts/playwright install chromium
+    cd backend && ../.venv-runner-it/Scripts/python -m pytest tests/integration/test_runner_gateway.py
+
+The runner's own tests (`cd runner/server`, a venv at `runner/server/.venv` with `pip install -e ".[dev]"` and
+`playwright install chromium`, then `pytest -n 4`) use a fake gateway with the same tool list.
 
 ## Incidents
 
