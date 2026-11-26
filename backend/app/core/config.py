@@ -30,6 +30,10 @@ class EnvConfig(BaseSettings):
     base_url: str = Field(default="http://localhost:8000")
     app_name: str = Field(default="Nchito", description="Default app name; the UI setting overrides it.")
     files_dir: Path = Field(default=Path("./data/files"))
+    backup_dir: Path = Field(default=Path("./data/backups"), description="Where backups are written (BACKUP_DIR).")
+    pg_bin_dir: Path | None = Field(default=None, description="Folder holding pg_dump and pg_restore, if not on PATH.")
+    google_client_id: str | None = Field(default=None, description="Google OAuth client (Drive connection).")
+    google_client_secret: str | None = None
     spa_dir: Path = Field(default=Path("/app/static"), description="Built SPA served at / when present.")
     csrf_trusted_origins: list[str] = Field(default_factory=list)
 

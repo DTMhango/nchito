@@ -956,6 +956,82 @@
         }
       }
     },
+    "/api/health/live": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Live",
+        "description": "Liveness: the process answers. Touches nothing, so a database outage does not restart the web tier.",
+        "operationId": "health_live",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Live"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Ready",
+        "description": "Readiness: the database answers and is migrated. A stale worker does not make the web tier unready.",
+        "operationId": "health_ready",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ready"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database down or not migrated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ready"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/detail": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Detail",
+        "description": "Worker heartbeat age, last successful sweep and backup, disk, queue depth, per-connection status.",
+        "operationId": "health_detail",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailedHealth"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/kit/person": {
       "get": {
         "tags": [
@@ -13467,6 +13543,7 @@
           "data"
         ],
         "summary": "Data Backups List",
+        "description": "Backups on this server (newest first), plus the copy in the remote store where one was made.",
         "operationId": "data_backups_list",
         "responses": {
           "200": {
@@ -13500,6 +13577,7 @@
           "data"
         ],
         "summary": "Data Backups Create",
+        "description": "Back up now (the same job as the nightly one). Returns when the archive is written.",
         "operationId": "data_backups_create",
         "responses": {
           "202": {
@@ -13531,6 +13609,7 @@
           "data"
         ],
         "summary": "Data Retention Run",
+        "description": "Run retention now: role text and archive rules, old notifications, temp files, surplus backups.\nDuplicate-protection history, the audit and applications are never deleted.",
         "operationId": "data_retention_run",
         "responses": {
           "202": {
@@ -13562,6 +13641,7 @@
           "data"
         ],
         "summary": "Data Config History",
+        "description": "Versioned configuration changes, newest first: rules, prompts, rubrics, routing, automation policy\n(``kind`` = their kinds) and every settings change (``kind=setting``).",
         "operationId": "data_config_history",
         "parameters": [
           {
@@ -17242,6 +17322,64 @@
         ],
         "title": "CompareOut"
       },
+      "Component": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "warn",
+              "down",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "Component"
+      },
       "ConditionResult": {
         "properties": {
           "matched": {
@@ -17547,6 +17685,53 @@
           "label"
         ],
         "title": "ConnectionCreate"
+      },
+      "ConnectionHealth": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "health": {
+            "type": "string",
+            "title": "Health"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "label",
+          "enabled",
+          "health",
+          "last_checked_at"
+        ],
+        "title": "ConnectionHealth"
       },
       "ConnectionOut": {
         "properties": {
@@ -18153,6 +18338,63 @@
         ],
         "title": "DecisionGroup",
         "description": "Shared blockers grouped on Today (18.4): 'signing in here unlocks two applications'."
+      },
+      "DetailedHealth": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ],
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/Component"
+            },
+            "type": "array",
+            "title": "Components"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/QueueDepth"
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionHealth"
+            },
+            "type": "array",
+            "title": "Connections"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerHealth"
+            },
+            "type": "array",
+            "title": "Workers",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "time",
+          "components",
+          "queue",
+          "connections"
+        ],
+        "title": "DetailedHealth"
       },
       "DetectIn": {
         "properties": {
@@ -21500,6 +21742,17 @@
         ],
         "title": "LimitRule"
       },
+      "Live": {
+        "properties": {
+          "alive": {
+            "type": "boolean",
+            "title": "Alive",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "Live"
+      },
       "LocationRule": {
         "properties": {
           "place": {
@@ -24615,6 +24868,27 @@
         ],
         "title": "ProposedAction"
       },
+      "QueueDepth": {
+        "properties": {
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting",
+            "default": 0
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "QueueDepth"
+      },
       "RangeFilter": {
         "properties": {
           "type": {
@@ -24686,6 +24960,29 @@
         "additionalProperties": false,
         "type": "object",
         "title": "RateLimit"
+      },
+      "Ready": {
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "title": "Ready"
+          },
+          "database": {
+            "type": "boolean",
+            "title": "Database"
+          },
+          "migrated": {
+            "type": "boolean",
+            "title": "Migrated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ready",
+          "database",
+          "migrated"
+        ],
+        "title": "Ready"
       },
       "ReceiptOut": {
         "properties": {

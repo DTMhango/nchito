@@ -90,6 +90,41 @@ async def worker_alive() -> bool:
     return last is not None and (utcnow() - last).total_seconds() <= get_config().worker_stale_after_seconds
 
 
+def backup_now() -> int:
+    """Write one encrypted backup to the backup folder (no remote copy). Prints its path."""
+    from app.ops import backup
+
+    info = asyncio.run(backup.create_backup())
+    print(f"backup written: {info.path} ({info.size_bytes} bytes, {info.files} files)")
+    return 0
+
+
+def restore(path: str, *, database_url: str | None, files_dir: str | None, pause: bool, inspect: bool,
+            yes: bool) -> int:
+    """Restore a backup. Without --yes it only shows what the backup holds and what would be replaced."""
+    from app.ops import restore as restore_mod
+
+    target_db = database_url or get_config().libpq_url
+    target_files = Path(files_dir) if files_dir else get_config().files_dir
+    manifest = restore_mod.describe(Path(path))
+    print(f"backup made {manifest['created_at']} (schema {manifest.get('alembic_revision')}, "
+          f"{manifest.get('vault_files')} files)")
+    if inspect:
+        return 0
+    if not yes:
+        print(f"This REPLACES the data in {target_db.rsplit('@', 1)[-1]} and moves {target_files} aside. "
+              "Run again with --yes to proceed.")
+        return 2
+    result = asyncio.run(restore_mod.restore_backup(Path(path), database_url=target_db, files_dir=target_files,
+                                                    pause=pause))
+    print(f"restored: {result.tables_checked} tables verified, {result.files_restored} files."
+          + (f" Previous files kept in {result.files_moved_to}." if result.files_moved_to else "")
+          + (" The instance is PAUSED: check the reconciliation list, then resume." if result.paused else ""))
+    if result.app_revision:
+        print(f"Run `nchito migrate` if this release is newer than schema {result.app_revision}.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="nchito")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -104,6 +139,14 @@ def main(argv: list[str] | None = None) -> None:
     contracts = sub.add_parser("contracts", help="Write docs/openapi.json and docs/schemas/*.json")
     contracts.add_argument("--docs-dir", default=str(BACKEND_DIR.parent / "docs"))
     sub.add_parser("gen-key", help="Print a new ENCRYPTION_KEY")
+    sub.add_parser("backup", help="Write an encrypted backup to the backup folder now")
+    rs = sub.add_parser("restore", help="Restore an encrypted backup (database and files)")
+    rs.add_argument("file", help="Path of a .backup file")
+    rs.add_argument("--database-url", default=None, help="libpq URL of the target database (default: DATABASE_URL)")
+    rs.add_argument("--files-dir", default=None, help="Folder to restore files into (default: FILES_DIR)")
+    rs.add_argument("--no-pause", action="store_true", help="Do not pause automation after the restore")
+    rs.add_argument("--inspect", action="store_true", help="Only print what the backup holds")
+    rs.add_argument("--yes", action="store_true", help="Confirm that existing data may be replaced")
     sub.add_parser("worker-alive", help="Exit 0 if a worker heartbeat is fresh (container healthcheck)")
     args = parser.parse_args(argv)
 
@@ -128,6 +171,11 @@ def main(argv: list[str] | None = None) -> None:
         from app.core.crypto import generate_key
 
         print(generate_key())
+    elif args.cmd == "backup":
+        sys.exit(backup_now())
+    elif args.cmd == "restore":
+        sys.exit(restore(args.file, database_url=args.database_url, files_dir=args.files_dir,
+                         pause=not args.no_pause, inspect=args.inspect, yes=args.yes))
     elif args.cmd == "worker-alive":
         sys.exit(0 if asyncio.run(worker_alive()) else 1)
 

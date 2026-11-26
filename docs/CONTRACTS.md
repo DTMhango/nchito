@@ -451,3 +451,39 @@ the registry under its own group prefix only.
   `campaign_exists`, `criteria_confirmed`, `mail_connected`), plus `complete` and `next_step`.
 - Settings (group `data`): `import_max_zip_mb`, `import_max_file_mb`, `import_max_files`,
   `import_staging_hours`, `export_link_minutes`, `old_kit_ai_extraction` (default off).
+
+## Wave 2 ops additions
+
+- **Health**: `GET /api/health/live` (public, process answers), `GET /api/health/ready` (public; 503 unless the database
+  answers and is migrated), `GET /api/health/detail` (owner): components `database`, `worker`, `sweep`, `backup`, `disk`,
+  `connections` (each `ok | warn | down | unknown`), queue depth (`waiting`, `running`, `failed`), per-worker heartbeat
+  age, per-connection status. `GET /api/health` is unchanged. One `health` notification per persistent failure and one on
+  recovery.
+- **Connections**: `telegram` (config `chat_id`, secret `bot_token`), `webhook` (config `url`, secret `signing_secret`,
+  at least 16 characters) and `gdrive` use the existing create/update/delete/test endpoints. `gdrive` is created only
+  by the OAuth callback (`POST /api/connections/oauth/gdrive/start`, `GET .../callback`, 307 to
+  `/settings/connections?connected=gdrive`); start answers 409 when `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` are not set.
+  Drive uses the `drive.file` scope (only files Nchito creates, in one folder). Tokens are Fernet-encrypted in
+  `Connection.secrets_enc` and shown masked; a refreshed token and the root folder id are written back.
+- **Webhook signature**: headers `X-Nchito-Timestamp`, `X-Nchito-Event-Id` (idempotency key), `X-Nchito-Signature` =
+  `sha256=` + HMAC-SHA256(secret, `"<timestamp>.<raw body>"`). Receivers reject a timestamp more than 300 s old
+  (`app.connect.webhook.verify_signature`).
+- **Notifier interface** `app.connect.notifier` (`Notifier.send(OutboundMessage)`, `register_notifier_factory(channel,
+  factory)`): the mail stream registers `email` the same way. `app.ops.digest.render_digest(session, since=, until=)`
+  returns `Digest(title, body, counts, is_empty)` for the email digest. Messages carry title, short body and links only.
+  Notification state lives on `Notification` (`dedupe_key` = event id, `channels_sent`, `payload._delivery`); no table
+  changed.
+- **Backups**: `GET /api/data/backups` (local archives, plus a row for the remote copy), `POST /api/data/backups` (runs the
+  nightly job now, answers when written; 503 if `pg_dump` is missing), `POST /api/data/retention/run`. Archives are
+  `nchito-<UTC>.backup` (Fernet-encrypted tar: `manifest.json`, `db.dump`, `files/`), written to `BACKUP_DIR`.
+  CLI: `python -m app.cli backup`, `python -m app.cli restore <file> [--yes] [--inspect] [--database-url] [--files-dir]
+  [--no-pause]`. A restore leaves the instance paused (`automation.paused`).
+- **Config history**: `GET /api/data/config-history` lists `ConfigRevision` rows and every setting change
+  (`kind=setting`, `diff = {key, old, new}`), newest first, keyset cursor. Rollback stays 501.
+- Backup, retention and digest runs are recorded as `Run` rows (`kind` backup, retention, digest) and audited
+  (`backup.completed`, `backup.failed`, `backup.restored`, `filestore.share_link_created`, `notification.delivery_failed`).
+- **Settings added**: `notifications.{events, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, detail_level,
+  needs_you_title, alert_title, digest_title, digest_time, digest_skip_empty, digest_max_items, lookback_hours,
+  retry_attempts, retry_minutes}`, `retention.{cron, notifications_days, temp_files_days}`,
+  `health.{sweep_stale_hours, backup_stale_hours, disk_min_free_mb}` (new group `health`). Env: `BACKUP_DIR`, `PG_BIN_DIR`,
+  `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
