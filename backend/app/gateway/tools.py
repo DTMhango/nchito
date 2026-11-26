@@ -24,7 +24,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.schemas.json_types import AgentTaskState
+from app.schemas.json_types import AgentTaskState, AgentTaskTypeName
 
 
 class _M(BaseModel):
@@ -35,7 +35,7 @@ class _M(BaseModel):
 
 
 class NextTaskIn(_M):
-    kinds: list[Literal["apply", "sweep_site", "check_posting"]] | None = None
+    kinds: list[AgentTaskTypeName] | None = None
     dry_run: bool = Field(default=False, description="Rehearsal: the claim is given back when the task ends, "
                                                       "submit permits are always refused and nothing is recorded "
                                                       "on the application")
@@ -54,7 +54,7 @@ class TaskRules(_M):
 
 class NextTaskOut(_M):
     task_id: str | None = Field(description="None when the queue is empty")
-    type: Literal["apply", "sweep_site", "check_posting"] | None = None
+    type: AgentTaskTypeName | None = None
     instructions: str | None = None
     posting_url: str | None = None
     checkpoint: AgentTaskState | None = None

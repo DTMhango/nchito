@@ -31442,8 +31442,8 @@
                 "type": "string",
                 "enum": [
                   "apply",
-                  "check_posting",
-                  "sweep_site"
+                  "sweep_site",
+                  "check_posting"
                 ]
               },
               {

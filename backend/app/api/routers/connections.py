@@ -27,6 +27,7 @@ from app.llm.deps import llm_service
 from app.llm.money import micros_to_minor
 from app.llm.service import LLMService
 from app.models.platform import ApiToken, Connection
+from app.schemas.json_types import AgentTaskTypeName
 
 connections_router = APIRouter(prefix="/api/connections", tags=["connections"], dependencies=[RequireOwner],
                                responses=NOT_IMPLEMENTED_RESPONSES)
@@ -104,7 +105,7 @@ class RunnerStatus(BaseModel):
     online: bool
     current_task_id: uuid.UUID | None
     current_task_title: str | None = Field(default=None, description="The role (title at employer) or site")
-    current_task_type: Literal["apply", "check_posting", "sweep_site"] | None = None
+    current_task_type: AgentTaskTypeName | None = None
 
 
 def _out(conn: Connection) -> ConnectionOut:

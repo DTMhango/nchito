@@ -54,3 +54,16 @@ async def test_later_wave_endpoints_answer_501(owner_client, method, path):
 
 async def test_later_wave_endpoints_still_require_owner(client):
     assert (await client.get("/api/kit/facts")).status_code == 401
+
+
+@pytest.mark.nodb
+def test_equal_literals_have_one_spelling():
+    """Literals equal as sets share a typing cache entry, so the first spelling imported wins; the task
+    type is therefore defined once and the OpenAPI enum order cannot depend on import order."""
+    from app.api.routers.connections import RunnerStatus
+    from app.gateway.tools import NextTaskIn
+    from app.schemas.json_types import AgentTaskTypeName
+
+    assert RunnerStatus.model_fields["current_task_type"].annotation.__args__[0] == AgentTaskTypeName
+    assert NextTaskIn.model_json_schema()["properties"]["kinds"]["anyOf"][0]["items"]["enum"] == list(
+        AgentTaskTypeName.__args__)

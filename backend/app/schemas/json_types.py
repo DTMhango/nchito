@@ -471,4 +471,8 @@ class AgentTaskState(Shape):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
+# One definition, one order: equal Literals in different orders share a typing cache entry, so a second
+# spelling would make the generated OpenAPI depend on import order.
+AgentTaskTypeName = Literal["apply", "sweep_site", "check_posting"]
+
 JsonDict = dict[str, Any]
