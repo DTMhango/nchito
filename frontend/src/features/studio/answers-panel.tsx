@@ -1,26 +1,14 @@
 import { Link } from "@tanstack/react-router"
-import {
-  BookOpen,
-  CircleHelp,
-  Lock,
-  ShieldCheck,
-  UserRound,
-} from "lucide-react"
+import { BookOpen, CircleHelp, Lock, ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/chip"
 import { cn } from "@/lib/utils"
 import { needsOwner, type ScreeningRow } from "./draft"
 
-const CLASS_LABEL = {
-  auto: "Reused freely",
-  ask_first: "Ask first",
-  never: "Never answered",
-  owner_only: "Only you",
-} as const
-
 /**
- * The form's screening questions, each with its source in the answer bank. Unknown is not
- * yes: a question without a confirmed answer shows no value at all, only that it needs you.
+ * The form's screening questions as the draft answered them (`DraftAnswer`). Unknown is not
+ * yes: a question waiting on the owner shows no value at all, only that it needs them, with a
+ * link to the pending action that asks.
  */
 export function AnswersPanel({
   rows,
@@ -46,7 +34,7 @@ export function AnswersPanel({
     <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">
         {open.length === 0
-          ? "Every question has a confirmed answer."
+          ? "Every question has an answer or is left out by your rule."
           : `${open.length} of ${rows.length} question${rows.length === 1 ? "" : "s"} need${open.length === 1 ? "s" : ""} you before this can be sent.`}
       </p>
       <ul
@@ -64,7 +52,6 @@ export function AnswersPanel({
 function AnswerRow({ row }: { row: ScreeningRow }) {
   const s = row.standing
   const owner = needsOwner(row)
-  const answer = "answer" in s ? s.answer : null
   return (
     <li
       role="group"
@@ -80,7 +67,7 @@ function AnswerRow({ row }: { row: ScreeningRow }) {
         {row.material && <Chip tone="warn">Material</Chip>}
       </div>
 
-      {s.kind === "confirmed" && (
+      {s.kind === "value" && (
         <div className="flex flex-wrap items-center gap-2">
           <ShieldCheck aria-hidden="true" className="size-4 text-good" />
           <span className="font-medium">{s.value}</span>
@@ -96,46 +83,27 @@ function AnswerRow({ row }: { row: ScreeningRow }) {
       )}
       {owner && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          {s.kind === "owner_only" ? (
-            <UserRound aria-hidden="true" className="size-4 text-info" />
-          ) : (
-            <CircleHelp aria-hidden="true" className="size-4 text-info" />
-          )}
-          <span className="font-medium text-info">
-            {s.kind === "unknown"
-              ? "Needs your answer"
-              : s.kind === "owner_only"
-                ? "Only you can answer this"
-                : "Needs your confirmation"}
-          </span>
+          <CircleHelp aria-hidden="true" className="size-4 text-info" />
+          <span className="font-medium text-info">Needs your answer</span>
           <span className="text-muted-foreground">
-            {s.kind === "unknown"
-              ? "Not in your answer bank. Nothing is filled in until you answer."
-              : s.kind === "unconfirmed"
-                ? `${s.reason}. Nothing is filled in until you confirm.`
-                : "Nothing is filled in for you."}
+            Nothing is filled in until you answer.
           </span>
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
-        {answer ? (
-          <span className="inline-flex items-center gap-1">
-            <BookOpen aria-hidden="true" className="size-3.5" />
-            Answer bank: “{answer.patterns.canonical}” ·{" "}
-            {CLASS_LABEL[answer.answer_class ?? "ask_first"]}
-            {answer.confirmed_at && (
-              <> · confirmed {answer.confirmed_at.slice(0, 10)}</>
-            )}
-          </span>
-        ) : (
-          <span>No answer bank entry</span>
-        )}
+        <span className="inline-flex items-center gap-1">
+          <BookOpen aria-hidden="true" className="size-3.5" />
+          {row.fromBank ? "From your answer bank" : "No answer bank entry"}
+          {row.reason && <> · {row.reason}</>}
+        </span>
         {owner && (
           <span className="ml-auto flex gap-1.5">
-            {row.action && (
+            {row.actionId && (
               <Button asChild size="xs" variant="outline">
-                <Link to="/today">Answer on Today</Link>
+                <Link to="/today" data-action-id={row.actionId}>
+                  Answer the question on Today
+                </Link>
               </Button>
             )}
             <Button asChild size="xs" variant="ghost">

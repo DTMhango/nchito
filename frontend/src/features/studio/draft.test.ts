@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import type {
-  AnswerOut,
   CheckResult,
+  DraftAnswer,
   FactOut,
   GuardrailOut,
   TemplateOut,
@@ -13,7 +13,6 @@ import {
   groupChecks,
   indexFacts,
   keywordCoverage,
-  limitWarnings,
   mentions,
   move,
   requirementRows,
@@ -22,8 +21,10 @@ import {
   toSpec,
   traceClaim,
   waivability,
+  needsOwner,
   type DraftItem,
 } from "./draft"
+import { defaultTemplate, templateOptions } from "./templates"
 
 const fact = (code: string, text: string, status = "approved") =>
   ({ id: `id-${code}`, code, text, status }) as FactOut
@@ -134,33 +135,36 @@ describe("the job side", () => {
   })
 })
 
-describe("template limits", () => {
-  it("warns when a role has more bullets or the letter more paragraphs than allowed", () => {
-    const d = toDraft({
-      headline: null,
-      summary: null,
-      competencies: [],
-      skills: [],
-      requirement_match: [],
-      experience: [
-        {
-          experience_id: "e",
-          title: "Lead",
-          bullets: [1, 2, 3].map((n) => ({ text: `b${n}` })),
-        },
-      ],
-      letter: [1, 2].map((n) => ({ text: `p${n}` })),
-    })
-    const cv = {
-      name: "Compact",
-      limits: { bullets_per_role: 2 },
-    } as TemplateOut
-    const letter = { name: "Short", limits: { paragraphs: 1 } } as TemplateOut
-    expect(limitWarnings(d, cv, letter).map((w) => w.doc)).toEqual([
-      "cv",
-      "letter",
+describe("templates", () => {
+  it("lists the built-ins, renamed or extended by Kit rows", () => {
+    const rows = [
+      { kind: "cv", key: "compact", name: "Tight", limits: { pages: 1 } },
+      { kind: "cv", key: "board", name: "Board pack", limits: {} },
+      { kind: "letter", key: "letter-plain", name: "Mine", limits: {} },
+    ] as TemplateOut[]
+    expect(templateOptions("cv", rows)).toEqual([
+      { key: "classic", name: "Classic", pages: null },
+      { key: "compact", name: "Tight", pages: 1 },
+      { key: "modern", name: "Modern", pages: null },
+      { key: "board", name: "Board pack", pages: null },
     ])
-    expect(limitWarnings(d, undefined, undefined)).toEqual([])
+    expect(templateOptions("letter", []).map((t) => t.key)).toEqual([
+      "letter-plain",
+    ])
+  })
+  it("defaults to the track's template, then the setting, then the first built-in", () => {
+    expect(defaultTemplate("cv", "modern", "compact")).toEqual({
+      key: "modern",
+      source: "track",
+    })
+    expect(defaultTemplate("cv", null, "compact")).toEqual({
+      key: "compact",
+      source: "setting",
+    })
+    expect(defaultTemplate("letter", null, undefined)).toEqual({
+      key: "letter-plain",
+      source: "built-in",
+    })
   })
 })
 
@@ -200,66 +204,36 @@ describe("checks", () => {
 })
 
 describe("screening answers", () => {
-  const answer = (o: Partial<AnswerOut>) =>
-    ({
-      id: "a",
-      value: "Yes",
-      answer_class: "auto",
-      settled: true,
-      review_state: "confirmed",
-      review_after: null,
-      patterns: { canonical: "Q" },
-      ...o,
-    }) as AnswerOut
-  const today = "2026-11-26"
-  const q = (answer_id: string | null) => ({
+  const a = (o: Partial<DraftAnswer>): DraftAnswer => ({
     question: "Q",
+    outcome: "value",
     value: "Yes",
-    answer_id,
+    select: null,
+    answer_id: "an-1",
     material: false,
+    reason: "from the answer bank",
+    pending_action_id: null,
+    ...o,
   })
 
-  it("shows a value only for a confirmed bank answer", () => {
-    expect(answerStanding(q("a"), [answer({})], today)).toMatchObject({
-      kind: "confirmed",
-      value: "Yes",
-    })
+  it("shows a value only when the outcome is value and one is there", () => {
+    expect(answerStanding(a({}))).toEqual({ kind: "value", value: "Yes" })
+    expect(answerStanding(a({ value: "  " })).kind).toBe("ask_owner")
+    expect(answerStanding(a({ value: null })).kind).toBe("ask_owner")
   })
-  it("treats no bank entry as unknown, whatever the packet holds", () => {
-    expect(answerStanding(q(null), [], today).kind).toBe("unknown")
-    expect(answerStanding(q("gone"), [answer({})], today).kind).toBe("unknown")
+  it("never shows a value for a question waiting on the owner, whatever it holds", () => {
+    const row = screeningRows([
+      a({ outcome: "ask_owner", value: "Yes", pending_action_id: "pa-1" }),
+    ])[0]
+    expect(row.standing).toEqual({ kind: "ask_owner" })
+    expect(row.actionId).toBe("pa-1")
+    expect(needsOwner(row)).toBe(true)
   })
-  it("asks again for ask-first, imported or overdue answers", () => {
-    for (const o of [
-      { answer_class: "ask_first" as const, settled: false },
-      { review_state: "needs_review" as const },
-      { review_after: "2026-11-01" },
-    ])
-      expect(answerStanding(q("a"), [answer(o)], today).kind).toBe(
-        "unconfirmed"
+  it("keeps a declined question declined, with its forced choice", () => {
+    expect(
+      answerStanding(
+        a({ outcome: "do_not_answer", select: "Prefer not to say" })
       )
-  })
-  it("adds an open question from a pending action that the packet lacks", () => {
-    const rows = screeningRows(
-      [],
-      [],
-      [
-        {
-          id: "p",
-          type: "unknown_question",
-          application_id: "app",
-          status: "open",
-          title: "New question",
-          detail: { question: "Willing to travel 50%?" },
-        } as never,
-      ],
-      "app",
-      today
-    )
-    expect(rows).toHaveLength(1)
-    expect(rows[0]).toMatchObject({
-      question: "Willing to travel 50%?",
-      standing: { kind: "unknown" },
-    })
+    ).toEqual({ kind: "declined", select: "Prefer not to say" })
   })
 })

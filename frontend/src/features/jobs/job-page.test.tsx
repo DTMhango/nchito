@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event"
 import { renderApp } from "@/test/render"
 import { matchesMock } from "@/mocks/handlers/matches"
 import { heldSentence } from "./conflict-status"
+import { appliedJobId } from "@/mocks/dataset/jobs"
 
 // The whole app mounts per test; give a busy machine room.
 configure({ asyncUtilTimeout: 6000 })
@@ -116,5 +117,32 @@ describe("heldSentence", () => {
     expect(heldSentence("Head of Risk", null, 74, null)).toBe(
       "held: outranked by Head of Risk"
     )
+  })
+})
+
+describe("messages tab", () => {
+  it("lists the application's mail threads with their classification, as plain text", async () => {
+    renderApp(`/jobs/${appliedJobId(3)}?tab=messages`)
+    const list = await screen.findByRole("list", { name: "Threads" })
+    const rows = within(list).getAllByRole("listitem")
+    expect(rows.map((r) => r.dataset.classification)).toEqual([
+      "information_request",
+      "confirmation",
+    ])
+    expect(
+      within(rows[0]).getByText("They ask for information")
+    ).toBeInTheDocument()
+    expect(rows[0]).toHaveTextContent("From talent@luangwa-re.example.com")
+    expect(within(rows[0]).getByText("Check the link")).toBeInTheDocument()
+    // markup in a subject is shown as text, never rendered
+    expect(
+      within(rows[1]).getByText(
+        "We received your application <b>LR-2026-114</b>"
+      )
+    ).toBeInTheDocument()
+    expect(rows[1].querySelector("b b")).toBeNull()
+    expect(
+      screen.getByText(/proposes the change, and the proposal waits for you/)
+    ).toBeInTheDocument()
   })
 })

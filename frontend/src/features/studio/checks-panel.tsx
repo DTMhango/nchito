@@ -40,6 +40,8 @@ type Props = {
   results: CheckResult[]
   guardrails: GuardrailOut[]
   checkState: CheckState
+  /** Why the server says the last check no longer holds (`SpecStateOut.stale_reasons`). */
+  staleReasons: string[]
   rechecking: boolean
   onRecheck: () => void
   /** Claims in the draft, for the live fact-tracing list. */
@@ -61,14 +63,15 @@ const STATE_TEXT: Record<
 
 /**
  * The checks for this application (DESIGN 5.3, 9.3): blocking results first, then warnings,
- * then what passed. Fact tracing of the draft on screen is shown live; the server's results
- * are marked stale as soon as the draft changes.
+ * then what passed. Fact tracing of the draft on screen is shown live; whether the server's
+ * results still hold comes from the spec state (unsaved edits count as stale too).
  */
 export function ChecksPanel({
   applicationId,
   results,
   guardrails,
   checkState,
+  staleReasons,
   rechecking,
   onRecheck,
   claims,
@@ -87,7 +90,10 @@ export function ChecksPanel({
     const t = traceClaim(c.item, index)
     return t.state !== "traced" || t.strayFigures.length > 0
   })
-  const state = STATE_TEXT[checkState]
+  const state =
+    checkState === "stale" && staleReasons.length > 0
+      ? { chip: "Out of date", tone: "warn" as const }
+      : STATE_TEXT[checkState]
 
   return (
     <section aria-labelledby="checks-title" className="grid gap-3 panel p-4">
@@ -116,10 +122,23 @@ export function ChecksPanel({
       </div>
 
       {checkState === "stale" && (
-        <p className="rounded-sm bg-warn-soft px-2.5 py-1.5 text-sm text-warn">
-          You edited the draft after the last check. The results below are for
-          the earlier version; re-check before sending.
-        </p>
+        <div className="grid gap-1 rounded-sm bg-warn-soft px-2.5 py-1.5 text-sm text-warn">
+          <p>
+            {staleReasons.length > 0
+              ? "The results below no longer describe this draft; re-check before sending."
+              : "You edited the draft after the last check. The results below are for the earlier version; re-check before sending."}
+          </p>
+          {staleReasons.length > 0 && (
+            <ul
+              className="m-0 list-disc pl-5"
+              aria-label="Why the check is out of date"
+            >
+              {staleReasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
 
       <div className="grid gap-1.5">

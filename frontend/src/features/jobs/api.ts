@@ -21,6 +21,7 @@ export type ContactIn = S["ContactIn"]
 export type PendingAction = S["PendingActionOut"]
 export type AuditEvent = S["AuditEventOut"]
 export type JobFacets = S["JobFacets"]
+export type MailThread = S["MailThreadOut"]
 
 export const jobKeys = {
   job: (id: string) => ["jobs", id] as const,
@@ -28,6 +29,7 @@ export const jobKeys = {
   assessments: (id: string) => ["jobs", id, "assessments"] as const,
   application: (id: string) => ["applications", id] as const,
   timeline: (id: string) => ["applications", id, "timeline"] as const,
+  mail: (id: string) => ["applications", id, "mail-threads"] as const,
   pending: ["pending-actions"] as const,
   audit: (id: string) => ["jobs", id, "audit"] as const,
   contacts: ["contacts"] as const,
@@ -88,6 +90,21 @@ export const timelineQuery = (appId: string | null | undefined) =>
           params: { path: { application_id: appId! } },
         })
       ),
+  })
+
+/** Mail threads linked to one application, newest first (CONTRACTS, wave 2 email). */
+export const mailThreadsQuery = (appId: string | null | undefined) =>
+  queryOptions({
+    queryKey: jobKeys.mail(appId ?? "none"),
+    enabled: !!appId,
+    queryFn: async () =>
+      (
+        await unwrap(
+          gen.GET("/api/mail-threads", {
+            params: { query: { application_id: appId!, limit: 100 } },
+          })
+        )
+      ).items,
   })
 
 export const pendingActionsQuery = () =>

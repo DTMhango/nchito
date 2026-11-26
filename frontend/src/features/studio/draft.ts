@@ -1,21 +1,18 @@
 /**
  * Pure Studio rules: the editable draft of a spec, claim tracing against the Kit, keyword
- * coverage, requirement evidence, template limits, check grouping and answer standing.
- * No React here, so every rule is unit-tested on its own.
+ * coverage, requirement evidence, check grouping and answer standing. Layout limits are the
+ * renderer's (its warnings come from the server). No React here, so every rule is unit-tested.
  */
 import type {
-  AnswerOut,
   CheckResult,
+  DraftAnswer,
   FactOut,
   GuardrailOut,
   JobDetail,
-  PacketAnswer,
-  PendingAction,
   RequirementMatch,
   Spec,
   SpecInput,
   SpecItem,
-  TemplateOut,
 } from "./api"
 
 // ---------------------------------------------------------------------------
@@ -284,34 +281,6 @@ export function mentions(text: string, keyword: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Template limits (DESIGN 5.3 `limit`, 9 rendering). Counted exactly where the spec allows.
-// ---------------------------------------------------------------------------
-
-export type LimitWarning = { doc: "cv" | "letter"; text: string }
-export function limitWarnings(
-  d: Draft,
-  cv: TemplateOut | undefined,
-  letter: TemplateOut | undefined
-): LimitWarning[] {
-  const out: LimitWarning[] = []
-  const perRole = cv?.limits?.bullets_per_role
-  if (perRole)
-    for (const e of d.experience)
-      if (e.bullets.length > perRole)
-        out.push({
-          doc: "cv",
-          text: `${e.title ?? "A role"} has ${e.bullets.length} bullets; ${cv!.name} allows ${perRole}.`,
-        })
-  const paras = letter?.limits?.paragraphs
-  if (paras && d.letter.length > paras)
-    out.push({
-      doc: "letter",
-      text: `The letter has ${d.letter.length} paragraphs; ${letter!.name} allows ${paras}.`,
-    })
-  return out
-}
-
-// ---------------------------------------------------------------------------
 // Checks (DESIGN 5.3, 9.3): grouped by severity; waivers only where the rule allows one.
 // ---------------------------------------------------------------------------
 
@@ -372,99 +341,46 @@ export function groupChecks(results: CheckResult[]): CheckGroups {
 }
 
 // ---------------------------------------------------------------------------
-// Screening answers (DESIGN 5.4). Unknown is not yes: only a confirmed bank answer shows
-// a value as the answer.
+// Screening answers (DESIGN 5.4), as the draft holds them (`DraftAnswer`). Unknown is not
+// yes: only an answer whose outcome is `value` and which carries a value shows one.
 // ---------------------------------------------------------------------------
 
 export type AnswerStanding =
-  | { kind: "confirmed"; value: string; answer: AnswerOut }
-  | { kind: "declined"; select: string | null; answer: AnswerOut }
-  | { kind: "unconfirmed"; reason: string; answer: AnswerOut }
-  | { kind: "owner_only"; answer: AnswerOut }
-  | { kind: "unknown" }
+  | { kind: "value"; value: string }
+  | { kind: "declined"; select: string | null }
+  | { kind: "ask_owner" }
 
 export type ScreeningRow = {
   question: string
   material: boolean
+  /** Why the drafter answered, declined or asked (server wording). */
+  reason: string
   standing: AnswerStanding
-  /** The open pending action that asks the owner, when there is one. */
-  action?: PendingAction
+  /** The `unknown_question` pending action that asks the owner, when one was raised. */
+  actionId: string | null
+  /** Filled from the answer bank (not written by the drafter). */
+  fromBank: boolean
 }
 
-const dueForReview = (a: AnswerOut, today: string) =>
-  !!a.review_after && a.review_after <= today
-
-export function answerStanding(
-  pa: PacketAnswer,
-  bank: AnswerOut[],
-  today: string
-): AnswerStanding {
-  const a = pa.answer_id ? bank.find((x) => x.id === pa.answer_id) : undefined
-  if (!a) return { kind: "unknown" }
-  if (a.answer_class === "never")
-    return { kind: "declined", select: a.forced_choice ?? null, answer: a }
-  if (a.answer_class === "owner_only") return { kind: "owner_only", answer: a }
-  if (a.review_state === "needs_review")
-    return {
-      kind: "unconfirmed",
-      reason: "Imported, not reviewed yet",
-      answer: a,
-    }
-  if (dueForReview(a, today))
-    return { kind: "unconfirmed", reason: "Due for review", answer: a }
-  if (a.answer_class === "ask_first" && !a.settled)
-    return {
-      kind: "unconfirmed",
-      reason: "Ask first: confirm it for this application",
-      answer: a,
-    }
-  if (a.value == null || a.value === "") return { kind: "unknown" }
-  return { kind: "confirmed", value: a.value, answer: a }
+export function answerStanding(a: DraftAnswer): AnswerStanding {
+  if (a.outcome === "do_not_answer")
+    return { kind: "declined", select: a.select ?? null }
+  if (a.outcome === "value" && a.value != null && a.value.trim() !== "")
+    return { kind: "value", value: a.value }
+  return { kind: "ask_owner" }
 }
 
-const QUESTION_ACTIONS = new Set<PendingAction["type"]>([
-  "unknown_question",
-  "declaration",
-  "assessment",
-])
-const actionQuestion = (p: PendingAction) =>
-  typeof p.detail?.question === "string" ? p.detail.question : p.title
-
-/** The form's questions: the packet's answers plus any question still waiting on the owner. */
-export function screeningRows(
-  answers: PacketAnswer[],
-  bank: AnswerOut[],
-  pending: PendingAction[],
-  applicationId: string,
-  today: string
-): ScreeningRow[] {
-  const open = pending.filter(
-    (p) =>
-      p.application_id === applicationId &&
-      p.status === "open" &&
-      QUESTION_ACTIONS.has(p.type)
-  )
-  const rows: ScreeningRow[] = answers.map((pa) => ({
-    question: pa.question,
-    material: !!pa.material,
-    standing: answerStanding(pa, bank, today),
-    action: open.find((p) => norm(actionQuestion(p)) === norm(pa.question)),
+export const screeningRows = (answers: DraftAnswer[]): ScreeningRow[] =>
+  answers.map((a) => ({
+    question: a.question,
+    material: a.material,
+    reason: a.reason,
+    standing: answerStanding(a),
+    actionId: a.pending_action_id ?? null,
+    fromBank: !!a.answer_id,
   }))
-  for (const p of open)
-    if (!rows.some((r) => r.action === p))
-      rows.push({
-        question: actionQuestion(p),
-        material: true,
-        standing: { kind: "unknown" },
-        action: p,
-      })
-  return rows
-}
 
-export const needsOwner = (r: ScreeningRow) =>
-  r.standing.kind === "unknown" ||
-  r.standing.kind === "unconfirmed" ||
-  r.standing.kind === "owner_only"
+export const needsOwner = (r: ScreeningRow) => r.standing.kind === "ask_owner"
 
 // ---------------------------------------------------------------------------
 // Moving items.

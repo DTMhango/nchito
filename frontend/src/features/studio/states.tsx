@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/chip"
 import { formatCost, microsOf } from "@/lib/cost"
 import { cn } from "@/lib/utils"
-import type { RunOut } from "./api"
+import type { RunOut, TailoringStatus } from "./api"
 
 export const runCost = (run: RunOut | undefined) =>
   run ? formatCost(microsOf(run, "cost")) : null
@@ -31,9 +31,15 @@ const STEPS = [
   },
 ]
 
-/** Tailoring in progress: the run is polled, and the SSE stream nudges a refetch. */
-export function TailoringProgress({ run }: { run: RunOut | undefined }) {
-  const step = run?.status === "running" ? 1 : 0
+/** Tailoring in progress: the spec state is polled, and the SSE stream nudges a refetch. */
+export function TailoringProgress({
+  status,
+  run,
+}: {
+  status: TailoringStatus | undefined
+  run: RunOut | undefined
+}) {
+  const step = status === "running" ? 1 : 0
   return (
     <section
       aria-live="polite"
@@ -49,7 +55,7 @@ export function TailoringProgress({ run }: { run: RunOut | undefined }) {
           Tailoring this application
         </h3>
         <Chip tone="info" className="ml-auto">
-          {run?.status === "running" ? "Drafting" : "Queued"}
+          {status === "running" ? "Drafting" : "Queued"}
         </Chip>
       </div>
       <ol className="m-0 grid list-none gap-2.5 p-0">
@@ -93,13 +99,15 @@ export function TailoringProgress({ run }: { run: RunOut | undefined }) {
   )
 }
 
-/** The monthly AI budget stopped the run (CONTRACTS: a budget refusal ends it `paused`). */
+/** The monthly AI budget refused tailoring (CONTRACTS: the request is parked `paused`). */
 export function BudgetPaused({
   run,
+  error,
   onRetry,
   retrying,
 }: {
-  run: RunOut
+  run: RunOut | undefined
+  error: string | null
   onRetry: () => void
   retrying: boolean
 }) {
@@ -116,15 +124,17 @@ export function BudgetPaused({
         </h3>
       </div>
       <p className="text-muted-foreground">
-        {run.error ??
-          "Tailoring stopped at the spending cap before it drafted anything."}
+        {error ??
+          "Tailoring stopped at the spending cap before it drafted anything. It resumes on its own when the cap is raised or the month turns."}
       </p>
-      <p className="text-sm">
-        Cost of this tailoring so far:{" "}
-        <b className="num" data-testid="tailor-cost">
-          {runCost(run)}
-        </b>
-      </p>
+      {run && (
+        <p className="text-sm">
+          Cost of this tailoring so far:{" "}
+          <b className="num" data-testid="tailor-cost">
+            {runCost(run)}
+          </b>
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button asChild>
           <Link to="/settings/ai">Review the budget in Settings › AI</Link>
@@ -139,10 +149,12 @@ export function BudgetPaused({
 
 export function TailorFailed({
   run,
+  error,
   onRetry,
   retrying,
 }: {
-  run: RunOut
+  run: RunOut | undefined
+  error: string | null
   onRetry: () => void
   retrying: boolean
 }) {
@@ -156,11 +168,13 @@ export function TailorFailed({
         <h3 className="text-md">Tailoring did not finish</h3>
       </div>
       <p className="text-muted-foreground">
-        {run.error ?? "The run stopped with an error."} Nothing was sent.
+        {error ?? "Tailoring stopped with an error."} Nothing was sent.
       </p>
-      <p className="text-sm">
-        Cost of this attempt: <b className="num">{runCost(run)}</b>
-      </p>
+      {run && (
+        <p className="text-sm">
+          Cost of this attempt: <b className="num">{runCost(run)}</b>
+        </p>
+      )}
       <div>
         <Button disabled={retrying} onClick={onRetry}>
           Try again

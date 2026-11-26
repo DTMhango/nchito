@@ -1,7 +1,8 @@
 /**
- * Fictional Studio data for the mock backend: tailored specs, check results, packets and
- * tailoring runs for three of the seeded applications. Everyone and everything here is
- * invented. Facts are cited by code (F-101..F-106 from data/jobs, F-112.. from data/kit).
+ * Fictional Studio data for the mock backend: spec versions, check state, draft answers,
+ * tailoring requests, rendered documents, packets and mail threads for three of the seeded
+ * applications. Everyone and everything here is invented. Facts are cited by code
+ * (F-101..F-106 from data/jobs, F-112.. from data/kit).
  */
 import type { Schemas } from "@/lib/api/types"
 import { applicationIdFor } from "./jobs"
@@ -11,14 +12,30 @@ type CheckResult = Schemas["CheckResult"]
 type PacketOut = Schemas["PacketOut"]
 type RunOut = Schemas["RunOut"]
 type Requirement = Schemas["Requirement"]
+type DraftAnswer = Schemas["DraftAnswer"]
+type DocumentOut = Schemas["DocumentOut"]
+type MailThreadOut = Schemas["MailThreadOut"]
+type VersionSummary = Schemas["SpecVersionSummary"]
+type Tailoring = NonNullable<Schemas["SpecStateOut"]["tailoring"]>
 
-/** A tailoring run. The contract's `RunKind` has no tailoring kind yet; the UI never reads it. */
+/** A tailoring run. The contract's `RunKind` has no tailoring kind; the UI reads only its cost. */
 export type TailorRun = Omit<RunOut, "kind"> & { kind: string }
 
 export type StudioEntry = {
   spec: Spec
   check_results: CheckResult[]
+  /** The spec fingerprint the checks last ran on; checked while it matches the spec. */
+  checked_print: string | null
+  /** Reasons the server gives when cited facts changed after the check (tests set these). */
+  stale_reasons: string[]
+  versions: VersionSummary[]
+  answers: DraftAnswer[]
+  tailoring: Tailoring | null
+  tailoring_error: string | null
+  /** The run of the open tailoring request, advanced on each spec poll. */
+  run_id: string | null
   packets: PacketOut[]
+  documents: DocumentOut[]
   /** What the next "Tailor" does: draft a spec, or stop at the monthly AI budget. */
   outcome: "draft" | "budget_paused"
 }
@@ -26,8 +43,7 @@ export type StudioEntry = {
 export type MockStudio = {
   entries: Record<string, StudioEntry>
   runs: TailorRun[]
-  /** Polls of each live run; a run finishes on its second poll. */
-  polls: Record<string, number>
+  mail: MailThreadOut[]
 }
 
 /** Pricing Actuary at Luangwa Re: drafted, with problems to fix. */
@@ -36,6 +52,9 @@ export const STUDIO_DRAFTED = applicationIdFor(3)
 export const STUDIO_BUDGET = applicationIdFor(4)
 /** Head of Data at Kafue Analytics: not tailored yet; tailoring drafts a spec. */
 export const STUDIO_FRESH = applicationIdFor(1)
+
+export const BUDGET_ERROR =
+  "This month's AI budget is used up, so tailoring stopped before drafting. It resumes when the cap is raised or the month turns."
 
 const T0 = "2026-11-20T08:00:00Z"
 const empty = (): Spec => ({
@@ -152,104 +171,140 @@ export function draftedSpec(reqs: Requirement[]): Spec {
   }
 }
 
-/** The questions on Luangwa Re's form, as the packet holds them. */
-function draftedPacket(app: string): PacketOut {
-  return {
-    id: "b0000000-0000-4000-8000-000000000301",
-    created_at: T0,
-    updated_at: T0,
+/** The questions on Luangwa Re's form, as the drafter answered them. */
+export function draftedAnswers(): DraftAnswer[] {
+  const a = (o: Partial<DraftAnswer> & { question: string }): DraftAnswer => ({
+    outcome: "ask_owner",
+    value: null,
+    select: null,
+    answer_id: null,
+    material: true,
+    reason: "Not in your answer bank.",
+    pending_action_id: null,
+    ...o,
+  })
+  return [
+    a({
+      question: "What is your notice period?",
+      outcome: "value",
+      value: "One month",
+      answer_id: "an-1",
+      material: false,
+      reason: "From your answer bank.",
+    }),
+    a({
+      question: "Do you require visa sponsorship?",
+      reason: "Ask first: confirm it for this application.",
+      answer_id: "an-2",
+      pending_action_id: "c0000000-0000-4000-8000-000000000401",
+    }),
+    a({
+      question: "Are you willing to relocate to Kitwe?",
+      pending_action_id: "c0000000-0000-4000-8000-000000000402",
+    }),
+    a({
+      question: "What is your gender?",
+      outcome: "do_not_answer",
+      select: "Prefer not to say",
+      answer_id: "an-3",
+      material: false,
+      reason: "Never answered, by your rule.",
+    }),
+  ]
+}
+
+const at = (h: number) => new Date(Date.parse(T0) - h * 3_600_000).toISOString()
+
+/** Mail about Luangwa Re's role: the sender and subject are untrusted text. */
+function mailFor(app: string): MailThreadOut[] {
+  const t = (
+    n: number,
+    o: Partial<MailThreadOut> & Pick<MailThreadOut, "classification">
+  ): MailThreadOut => ({
+    id: `d0000000-0000-4000-8000-00000000050${n}`,
+    created_at: at(n * 20),
+    updated_at: at(n * 20),
     application_id: app,
-    version: 1,
-    content_hash: "3f".repeat(32),
-    approved_at: null,
-    approved_by: null,
-    invalidated_at: null,
-    invalidated_reason: null,
-    contents: {
-      requisition: "LR-2026-114",
-      destination: {
-        url: "https://careers.example.com/luangwa-re/apply",
-        domain: "careers.example.com",
-        verified: true,
-        trusted: false,
-      },
-      sending_identity: "owner@example.com",
-      answers: [
-        {
-          question: "What is your notice period?",
-          value: "One month",
-          answer_id: "an-1",
-          material: false,
-        },
-        {
-          question: "Do you require visa sponsorship?",
-          value: "No",
-          answer_id: "an-2",
-          material: true,
-        },
-        {
-          question: "Are you willing to relocate to Kitwe?",
-          value: "Yes",
-          answer_id: null,
-          material: true,
-        },
-        {
-          question: "What is your gender?",
-          value: "Prefer not to say",
-          answer_id: "an-3",
-          material: false,
-        },
-        {
-          question: "Please sign the declaration below.",
-          value: "",
-          answer_id: "an-4",
-          material: true,
-        },
-      ],
-      email: null,
-      files: [],
-      link_permissions: [],
-    },
-  }
+    subject: null,
+    match_confidence: 0.92,
+    needs_review: false,
+    sender: null,
+    last_message_at: at(n * 20),
+    ...o,
+  })
+  return [
+    t(1, {
+      classification: "information_request",
+      subject: "Pricing Actuary: please send your certificates",
+      sender: "talent@luangwa-re.example.com",
+      needs_review: true,
+      match_confidence: 0.71,
+    }),
+    t(2, {
+      classification: "confirmation",
+      subject: "We received your application <b>LR-2026-114</b>",
+      sender: "no-reply@careers.example.com",
+    }),
+  ]
 }
 
 export function seedStudio(
   reqsFor: (app: string) => Requirement[],
-  check: (app: string, spec: Spec) => CheckResult[]
+  check: (app: string, spec: Spec) => CheckResult[],
+  print: (spec: Spec) => string
 ): MockStudio {
   const drafted = draftedSpec(reqsFor(STUDIO_DRAFTED))
+  const blank = (outcome: StudioEntry["outcome"]): StudioEntry => ({
+    spec: empty(),
+    check_results: [],
+    checked_print: null,
+    stale_reasons: [],
+    versions: [],
+    answers: [],
+    tailoring: null,
+    tailoring_error: null,
+    run_id: null,
+    packets: [],
+    documents: [],
+    outcome,
+  })
+  const results = check(STUDIO_DRAFTED, drafted)
   return {
     entries: {
       [STUDIO_DRAFTED]: {
+        ...blank("draft"),
         spec: drafted,
-        check_results: check(STUDIO_DRAFTED, drafted),
-        packets: [draftedPacket(STUDIO_DRAFTED)],
-        outcome: "draft",
+        check_results: results,
+        checked_print: print(drafted),
+        versions: [
+          {
+            version: 1,
+            origin: "tailor",
+            content_hash: "3f".repeat(32),
+            created_at: T0,
+            created_by: "system",
+            status: results.some((r) => r.status === "block" && !r.waived)
+              ? "block"
+              : "warn",
+          },
+        ],
+        answers: draftedAnswers(),
+        tailoring: "done",
       },
-      [STUDIO_BUDGET]: {
-        spec: empty(),
-        check_results: [],
-        packets: [],
-        outcome: "budget_paused",
-      },
-      [STUDIO_FRESH]: {
-        spec: empty(),
-        check_results: [],
-        packets: [],
-        outcome: "draft",
-      },
+      [STUDIO_BUDGET]: blank("budget_paused"),
+      [STUDIO_FRESH]: blank("draft"),
     },
     runs: [],
-    polls: {},
+    mail: mailFor(STUDIO_DRAFTED),
   }
 }
 
 export function newTailorRun(id: string, paused: boolean): TailorRun {
-  const at = new Date().toISOString()
+  const now = new Date().toISOString()
   return {
     id,
-    created_at: at,
-    updated_at: at,
+    created_at: now,
+    updated_at: now,
     kind: "tailor",
     trigger: "manual",
     campaign_id: null,
@@ -263,10 +318,8 @@ export function newTailorRun(id: string, paused: boolean): TailorRun {
     cost_micros: paused ? 4_200 : 0,
     config_versions: {},
     status: paused ? "paused" : "queued",
-    started_at: at,
-    finished_at: paused ? at : null,
-    error: paused
-      ? "This month's AI budget is used up, so tailoring stopped before drafting. It resumes when the cap is raised or the month turns."
-      : null,
+    started_at: now,
+    finished_at: paused ? now : null,
+    error: paused ? BUDGET_ERROR : null,
   }
 }

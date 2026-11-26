@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router"
-import { FileText, Mail, MessagesSquare, type LucideIcon } from "lucide-react"
+import { FileText, MessagesSquare, type LucideIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/chip"
 import { EmptyState } from "@/components/empty-state"
@@ -22,17 +22,6 @@ const COMING = {
       "The CV and letter as sent",
       "Attachments, with their checksums",
       "A link to open the draft in the Studio",
-    ],
-  },
-  messages: {
-    icon: Mail,
-    wave: 2,
-    title: "Email about this role",
-    body: "Threads linked to this role appear with their classification: confirmation, rejection or interview. You can draft a reply or a follow-up from here.",
-    items: [
-      "Threads with a classification chip",
-      "Replies and follow-ups drafted from your facts",
-      "Threads that need your review",
     ],
   },
   interview: {
