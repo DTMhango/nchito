@@ -58,6 +58,13 @@ const BLOCKS: Block[] = [
     lead: "Any other place to send notifications to, as a signed web request.",
     add: <ConnectForm provider="webhook" label="Webhook" />,
   },
+  {
+    id: "search",
+    title: "Search API",
+    providers: ["search_api"],
+    lead: "The key the web search source uses. Any search provider that answers in JSON works: say where the key goes and where the result links are. Test runs one search.",
+    add: <ConnectForm provider="search_api" label="Search API" />,
+  },
 ]
 
 /** Where Google sends the owner back after consent: `?connected=gmail|gdrive`. */
@@ -75,7 +82,7 @@ export function ConnectionsPage() {
     <div className="grid gap-6">
       <PageHeader
         title="Connections"
-        description="Mail, storage and chat accounts. Each shows what you allowed and what the app really reads. Passwords and tokens are encrypted and never shown again."
+        description="Mail, storage, chat and search accounts. Each shows what you allowed and what the app really reads. Passwords and tokens are encrypted and never shown again."
       />
       {returned && (
         <p

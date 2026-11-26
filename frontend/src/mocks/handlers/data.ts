@@ -136,6 +136,32 @@ function checkConnection(
     if ((creating || secret) && secret.length < 16)
       return "signing_secret must be at least 16 characters"
   }
+  if (provider === "search_api") {
+    // search_api.py: known config keys only, endpoint http(s), the key as header or param.
+    const known = [
+      "endpoint",
+      "query_param",
+      "limit_param",
+      "key_header",
+      "key_param",
+      "result_path",
+      "url_field",
+      "title_field",
+    ]
+    const unknown = Object.keys(config).filter((k) => !known.includes(k))
+    if (unknown.length)
+      return `unknown config keys: ${unknown.sort().join(", ")} (the key goes in 'secrets')`
+    const endpoint = String(config.endpoint ?? "")
+    if (
+      (creating || "endpoint" in config) &&
+      !/^https?:\/\/[^/\s]+/.test(endpoint)
+    )
+      return `'${endpoint}' is not an http(s) URL`
+    if (config.key_header && config.key_param)
+      return "give the key as a header or a query parameter, not both"
+    if (creating && !(secrets.api_key ?? "").trim())
+      return "api_key is required"
+  }
   if (provider === "imap_smtp" && creating) {
     const missing = ["from_address", "imap_host", "smtp_host"].filter(
       (k) => !config[k]
@@ -150,7 +176,14 @@ const now = () => new Date().toISOString()
 const unauthorized = () =>
   HttpResponse.json({ detail: "Not signed in." }, { status: 401 })
 const mask = (s: string) => "********" + s.slice(-4)
-const OWN = ["gmail", "imap_smtp", "gdrive", "telegram", "webhook"]
+const OWN = [
+  "gmail",
+  "imap_smtp",
+  "gdrive",
+  "telegram",
+  "webhook",
+  "search_api",
+]
 
 const READS: Record<string, string> = {
   gmail: "Only the label or search you choose. Nothing else is opened.",
@@ -158,6 +191,8 @@ const READS: Record<string, string> = {
   gdrive: "Only the files this app puts in its own folder.",
   telegram: "Nothing. It only sends messages to your chat.",
   webhook: "Nothing. It only sends signed messages.",
+  search_api:
+    "Sends search phrases built from your campaigns' titles and places to the search provider. Reads only the result links.",
 }
 const SCOPES: Record<string, string[]> = {
   gmail: [
@@ -449,6 +484,18 @@ export const dataHandlers = [
     const conn = aiMockState().connections.find((c) => c.id === params.id)
     if (!conn || !OWN.includes(conn.provider)) return undefined
     conn.last_checked_at = now()
+    if (conn.provider === "search_api") {
+      // One search for a neutral phrase; an endpoint on a ".invalid" host stands for a refusal.
+      const ok = !String(conn.config.endpoint ?? "").includes(".invalid")
+      conn.health = ok ? "ok" : "failing"
+      return HttpResponse.json({
+        ok,
+        detail: ok
+          ? "the provider answered (1 result)"
+          : "ConnectError: could not reach the search provider",
+        cost_minor: 0,
+      })
+    }
     conn.health = "ok"
     return HttpResponse.json({ ok: true, detail: "Reached it.", cost_minor: 0 })
   }),

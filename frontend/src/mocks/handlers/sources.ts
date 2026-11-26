@@ -12,6 +12,8 @@ import type {
 } from "@/features/sources/api"
 import { db } from "../db"
 import { PROPOSED, store, tickRun, withNext } from "@/mocks/dataset/sources"
+import { settingValues } from "@/mocks/dataset/settings"
+import { aiMockState } from "./ai"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -78,6 +80,66 @@ function detect(url: string): Detected {
   }
 }
 
+/** How each wave 3 connector reads (the server refuses any other access). */
+const WAVE3_ACCESS: Record<string, Source["access"]> = {
+  jobspy: "html",
+  careers_page: "html",
+  web_search: "api",
+}
+const httpUrl = (v: unknown) => /^https?:\/\/[^/\s]+/.test(String(v ?? ""))
+
+/** The connector's `validate_config` (jobspy.py, careers_page.py, web_search.py), in short. */
+function checkSource(body: SourceInput): string | null {
+  const access = WAVE3_ACCESS[body.connector]
+  if (!access) return null
+  if (body.access !== access)
+    return `connector '${body.connector}' reads by ${access}, not ${body.access}`
+  const c = body.config ?? {}
+  if (body.connector === "jobspy" && !store.jobspyInstalled)
+    return "JobSpy is not installed on this server (pip install 'nchito[jobspy]')"
+  if (body.connector === "careers_page") {
+    const list = (c.employers ?? c.urls) as unknown
+    if (!Array.isArray(list) || !list.length)
+      return "employers must list at least one careers page URL"
+    for (const e of list) {
+      const url = typeof e === "string" ? e : (e as { url?: unknown }).url
+      if (!httpUrl(url)) return `'${String(url)}' is not an http(s) URL`
+    }
+  }
+  if (body.connector === "web_search") {
+    if (!httpUrl(c.endpoint))
+      return `'${String(c.endpoint ?? "")}' is not an http(s) URL`
+    if (c.key_header && c.key_param)
+      return "give the key as a header or a query parameter, not both"
+  }
+  return null
+}
+
+/** The search API key a web search source would get (its connection, else the first enabled one). */
+function hasSearchKey(config: Record<string, unknown>): boolean {
+  const search = aiMockState().connections.filter(
+    (c) => c.provider === "search_api"
+  )
+  const own = config.connection_id
+    ? search.find((c) => c.id === config.connection_id)
+    : search.find((c) => c.enabled)
+  return !!own?.enabled
+}
+
+/** A wave 3 connector's test failure, as the server words it, or null. */
+function wave3TestError(s: Source): string | null {
+  if (s.connector === "jobspy") {
+    if (!store.jobspyInstalled)
+      return "ValueError: JobSpy is not installed on this server (pip install 'nchito[jobspy]')"
+    const on = s.config?.enabled ?? settingValues["sources.jobspy.enabled"]
+    if (!on)
+      return "SourceError: JobSpy is switched off (setting sources.jobspy.enabled)"
+  }
+  if (s.connector === "web_search" && !hasSearchKey(s.config ?? {}))
+    return "SourceError: no API key: connect the search provider first"
+  return null
+}
+
 export const sourcesHandlers = [
   // ---- missed-run policy ----
 
@@ -86,6 +148,34 @@ export const sourcesHandlers = [
     if (!db.get().session) return unauthorized()
     await latency()
     return page(store.sources)
+  }),
+  http.post("*/api/sources", async ({ request }) => {
+    if (!db.get().session) return unauthorized()
+    await latency()
+    const body = (await request.json()) as SourceInput
+    const err = checkSource(body)
+    if (err) return HttpResponse.json({ detail: err }, { status: 422 })
+    const created: Source = {
+      id: id("src"),
+      created_at: now(),
+      updated_at: now(),
+      connector: body.connector,
+      name: body.name,
+      access: body.access,
+      config: body.config ?? {},
+      access_notes: body.access_notes ?? null,
+      rate_limit: body.rate_limit ?? { requests_per_minute: 10, burst: 2 },
+      permitted_actions: body.permitted_actions ?? [
+        "search",
+        "fetch",
+        "check_open",
+      ],
+      enabled: body.enabled ?? true,
+      health: { status: "unknown", consecutive_failures: 0, last_error: null },
+      last_success_at: null,
+    }
+    store.sources = [...store.sources, created]
+    return HttpResponse.json(created, { status: 201 })
   }),
   http.post("*/api/sources/detect", async ({ request }) => {
     if (!db.get().session) return unauthorized()
@@ -99,6 +189,8 @@ export const sourcesHandlers = [
     const body = (await request.json()) as SourceInput
     const cur = store.sources.find((s) => s.id === params.id)
     if (!cur) return notFound("Source")
+    const err = checkSource(body)
+    if (err) return HttpResponse.json({ detail: err }, { status: 422 })
     const next: Source = { ...cur, ...body, updated_at: now() } as Source
     store.sources = store.sources.map((s) => (s.id === cur.id ? next : s))
     return HttpResponse.json(next)
@@ -108,6 +200,14 @@ export const sourcesHandlers = [
     await delay(import.meta.env.MODE === "test" ? 0 : 700)
     const s = store.sources.find((x) => x.id === params.id)
     if (!s) return notFound("Source")
+    const wave3 = wave3TestError(s)
+    if (wave3)
+      return HttpResponse.json({
+        ok: false,
+        sample_count: 0,
+        sample_titles: [],
+        error: wave3,
+      })
     if (s.health.status === "failing")
       return HttpResponse.json({
         ok: false,

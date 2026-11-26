@@ -353,6 +353,8 @@ type Store = {
   runs: Run[]
   /** run id -> epoch ms the mock run started, for simulated progress. */
   live: Map<string, number>
+  /** Whether the optional JobSpy extra is installed on the mock server. */
+  jobspyInstalled: boolean
 }
 
 export const LIVE_RUN_MS = 9000
@@ -364,6 +366,7 @@ function fresh(): Store {
     schedules: schedules().map(withNext),
     runs: runs(),
     live: new Map(),
+    jobspyInstalled: true,
   }
 }
 

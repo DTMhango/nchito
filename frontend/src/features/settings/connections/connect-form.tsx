@@ -29,7 +29,7 @@ export function ConnectForm({
 }) {
   const qc = useQueryClient()
   const uid = useId()
-  const { fields, cta } = FORMS[provider]
+  const { fields, cta, check } = FORMS[provider]
   const initial = () =>
     Object.fromEntries(
       fields
@@ -65,13 +65,14 @@ export function ConnectForm({
     const n = (values[f.name] ?? "").length
     return f.minLength !== undefined && n > 0 && n < f.minLength
   })
+  const conflict = check?.(values) ?? null
   return (
     <form
       aria-label={existing ? `Change ${existing.label}` : `Add ${label}`}
       className="grid max-w-[520px] gap-3"
       onSubmit={(e) => {
         e.preventDefault()
-        if (!missing && !tooShort) save.mutate()
+        if (!missing && !tooShort && !conflict) save.mutate()
       }}
     >
       {fields.map((f) => (
@@ -122,10 +123,15 @@ export function ConnectForm({
           {tooShort.label} must be at least {tooShort.minLength} characters.
         </p>
       )}
+      {conflict && (
+        <p role="alert" className="text-sm text-danger">
+          {conflict}
+        </p>
+      )}
       <div className="flex gap-2">
         <Button
           type="submit"
-          disabled={missing || !!tooShort || save.isPending}
+          disabled={missing || !!tooShort || !!conflict || save.isPending}
         >
           {existing ? "Save changes" : cta}
         </Button>

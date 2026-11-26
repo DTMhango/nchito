@@ -1,21 +1,14 @@
 import type { ReactNode } from "react"
 import { SectionHeader } from "@/components/page-header"
-import { TOKEN_ENV } from "./token-dialog"
-
-/**
- * Commands as documented for `runner/local` and the `runner` compose profile (DESIGN 8.3).
- * They are kept here as constants so they can be corrected in one place if the kits change.
- */
-export const LOCAL_COMMANDS = {
-  install: "cd runner/local\n./install.sh",
-  installWindows: "cd runner\\local\n.\\install.ps1",
-  start: "./start.sh",
-  startWindows: ".\\start.ps1",
-} as const
-export const SERVER_COMMANDS = {
-  start: "docker compose --profile runner up -d",
-  stop: "docker compose --profile runner down",
-} as const
+import {
+  COMPOSE_ENV,
+  COMPOSE_PROFILE,
+  INSTANCE_PLACEHOLDER,
+  LOCAL_COMMANDS,
+  RUNNER_ENV,
+  SERVER_COMMANDS,
+  SERVER_RUNNER_SETTING,
+} from "./setup-constants"
 
 const Code = ({ children }: { children: ReactNode }) => (
   <pre className="overflow-x-auto rounded-md border border-border bg-sunken p-2.5 text-sm">
@@ -59,10 +52,13 @@ export function RunnerRules() {
   )
 }
 
-/** Step-by-step guides for the two kinds of runner. */
+/** This instance's address, as the runner kits want it (no trailing slash). */
+const instanceUrl = () =>
+  typeof window === "undefined" ? INSTANCE_PLACEHOLDER : window.location.origin
+
+/** Step-by-step guides for the two kinds of runner. Commands live in setup-constants.ts. */
 export function SetupGuides() {
-  const mcpUrl =
-    typeof window === "undefined" ? "/mcp" : `${window.location.origin}/mcp`
+  const url = instanceUrl()
   return (
     <section aria-labelledby="guides-h" className="grid gap-3">
       <SectionHeader
@@ -86,25 +82,37 @@ export function SetupGuides() {
               Copy it.
             </li>
             <li>
-              Install Claude Code and the Claude in Chrome extension, and sign
-              in to Claude with your subscription. An API key does not work for
-              the Chrome connection.
+              Install Claude Code and the Claude in Chrome extension, sign in to
+              both with your Claude subscription (not an API key: Chrome stays
+              off with one), and run <code>/chrome</code> once in Claude Code.
             </li>
             <li>
-              Set the token in your environment as <code>{TOKEN_ENV}</code>.
+              From the Nchito folder, install the kit. It copies the skill "work
+              the Nchito queue" and an MCP config pointing at{" "}
+              <code>{url}/mcp</code>, and saves <code>{RUNNER_ENV.url}</code>{" "}
+              and <code>{RUNNER_ENV.token}</code> as your user environment
+              variables (never in a file). It asks for the token without showing
+              it.
+              <Code>{LOCAL_COMMANDS.installWindows(url)}</Code>
+              On macOS, Linux or Git Bash, export both variables first (paste
+              your token in place of the placeholder):
+              <Code>{LOCAL_COMMANDS.installBash(url)}</Code>
             </li>
             <li>
-              Install the kit from the Nchito folder. It adds the skill "work
-              the Nchito queue" and an <code>.mcp.json</code> pointing at{" "}
-              <code>{mcpUrl}</code>.<Code>{LOCAL_COMMANDS.install}</Code>
-              On Windows:
-              <Code>{LOCAL_COMMANDS.installWindows}</Code>
+              Open a new terminal and run the self-check (settings, server and
+              token).
+              <Code>{LOCAL_COMMANDS.checkWindows}</Code>
+              Or: <Code>{LOCAL_COMMANDS.checkBash}</Code>
+            </li>
+            <li>
+              First time, a dry run: it reads one form and enters nothing.
+              <Code>{LOCAL_COMMANDS.dryRunWindows}</Code>
+              Or: <Code>{LOCAL_COMMANDS.dryRunBash}</Code>
             </li>
             <li>
               Start it. It works the queue until it is empty or blocked.
-              <Code>{LOCAL_COMMANDS.start}</Code>
-              On Windows:
               <Code>{LOCAL_COMMANDS.startWindows}</Code>
+              Or: <Code>{LOCAL_COMMANDS.startBash}</Code>
             </li>
             <li>
               Come back to this page. The runner should show as Online within a
@@ -113,8 +121,10 @@ export function SetupGuides() {
           </ol>
           <p className="text-muted-foreground">
             It works while that window is open. Close it and the runner shows as
-            not responding here.
+            not responding here. To keep it going when you sign in to Windows,
+            register the scheduled task (the PC must stay awake):
           </p>
+          <Code>{LOCAL_COMMANDS.registerTaskWindows}</Code>
         </div>
       </details>
       <details className="panel p-4">
@@ -128,15 +138,22 @@ export function SetupGuides() {
           <ol className="grid list-decimal gap-2 pl-5">
             <li>
               Create a token above with <b>Where it runs</b> set to Server. Copy
-              it.
+              it. Turn on the setting <code>{SERVER_RUNNER_SETTING}</code>.
             </li>
             <li>
-              Add the token as <code>{TOKEN_ENV}</code> in the server's
-              environment, together with your API key.
+              Add the token as <code>{COMPOSE_ENV.token}</code> and its own API
+              key as <code>{COMPOSE_ENV.apiKey}</code> in the server's
+              environment (paste your values in place of the placeholders). The
+              container reads them as <code>{RUNNER_ENV.token}</code> and{" "}
+              <code>{RUNNER_ENV.serverApiKey}</code>.
+              <Code>{SERVER_COMMANDS.env}</Code>
             </li>
             <li>
-              Start it with the compose profile.
+              Start it with the <code>{COMPOSE_PROFILE}</code> compose profile.
+              Plain <code>docker compose up</code> never starts it.
               <Code>{SERVER_COMMANDS.start}</Code>
+              Follow its log:
+              <Code>{SERVER_COMMANDS.logs}</Code>
               Stop it any time with:
               <Code>{SERVER_COMMANDS.stop}</Code>
             </li>

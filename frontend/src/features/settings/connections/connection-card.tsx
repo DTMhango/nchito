@@ -35,6 +35,9 @@ const HEALTH = {
   unknown: { tone: "neutral", label: "Not checked yet" },
 } as const
 
+/** Providers whose masked key end is shown, so the owner can tell which key is saved. */
+const SHOW_MASKED: readonly string[] = ["search_api"]
+
 const checked = (iso: string | null) =>
   iso
     ? `Checked ${new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`
@@ -97,6 +100,25 @@ export function ConnectionCard({ c }: { c: Connection }) {
         <p className="text-sm text-muted-foreground">
           Saved and hidden:{" "}
           {saved.map((k) => k.replaceAll("_", " ")).join(", ")}.
+        </p>
+      )}
+      {SHOW_MASKED.includes(c.provider) && saved.length > 0 && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 text-sm">
+          {saved.map((k) => (
+            <div key={k} className="contents">
+              <dt className="text-muted-foreground">
+                {k.replaceAll("_", " ")}
+              </dt>
+              <dd>
+                <code>{c.secrets_masked[k]}</code>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {c.provider === "search_api" && typeof c.config.endpoint === "string" && (
+        <p className="text-sm text-muted-foreground">
+          Searches go to <code>{c.config.endpoint}</code>.
         </p>
       )}
       {result && (

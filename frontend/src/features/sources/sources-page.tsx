@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/page-header"
 import { View } from "@/components/view"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DiscoverySettings } from "./discovery-settings"
 import { EmployersPanel } from "./employers-panel"
 import { SchedulesPanel } from "./schedules-panel"
 import { SourceList } from "./source-list"
@@ -29,6 +30,7 @@ export function SourcesPage() {
           <TabsTrigger value="sources">Sources</TabsTrigger>
           <TabsTrigger value="employers">Watched employers</TabsTrigger>
           <TabsTrigger value="schedules">Schedules</TabsTrigger>
+          <TabsTrigger value="settings">Discovery settings</TabsTrigger>
         </TabsList>
         <TabsContent value="sources">
           <SourceList />
@@ -38,6 +40,9 @@ export function SourcesPage() {
         </TabsContent>
         <TabsContent value="schedules">
           <SchedulesPanel />
+        </TabsContent>
+        <TabsContent value="settings">
+          <DiscoverySettings />
         </TabsContent>
       </Tabs>
     </View>
