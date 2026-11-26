@@ -55,7 +55,7 @@ function UploadForm() {
   return (
     <form
       aria-label="Upload a document"
-      className="mb-5 grid gap-3 rounded-lg border border-border bg-surface-2 p-3.5 sm:grid-cols-[1fr_1fr_auto]"
+      className="mb-5 grid items-start gap-3 rounded-lg border border-border bg-surface-2 p-3.5 sm:grid-cols-[1fr_1fr_auto]"
       onSubmit={(e) => {
         e.preventDefault()
         if (!file || !title.trim()) return
@@ -221,7 +221,7 @@ function DocRow({
           aria-hidden="true"
           className="size-5 shrink-0 text-muted-foreground"
         />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <input
             aria-label={`Title of ${d.title}`}
             defaultValue={d.title}

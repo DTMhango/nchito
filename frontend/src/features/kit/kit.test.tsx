@@ -145,7 +145,7 @@ describe("Kit guardrails", () => {
       (x) => x.id === "gr-1"
     ) as unknown as GuardrailOut
     expect(summarise(g)).toBe(
-      'Never mention "headcount ratio", "staff-to-site ratio" in cv and letter.'
+      'Never mention "headcount ratio", "staff-to-site ratio" in CV and letter.'
     )
   })
 

@@ -182,7 +182,10 @@ export function summarise(g: GuardrailOut): string {
   const where =
     !g.scope || g.scope.length === 0 || g.scope.includes("everywhere")
       ? "anywhere"
-      : "in " + g.scope.map((s) => SCOPES[s].toLowerCase()).join(" and ")
+      : "in " +
+        g.scope
+          .map((s) => (s === "cv" ? "CV" : SCOPES[s].toLowerCase()))
+          .join(" and ")
   switch (p.type) {
     case "never_mention": {
       const terms = [

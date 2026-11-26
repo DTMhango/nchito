@@ -77,6 +77,7 @@ export function LibraryPage() {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Segmented<Tab>
           aria-label="Library section"
+          className="max-w-full overflow-x-auto"
           value={tab}
           onValueChange={setTab}
           options={[
