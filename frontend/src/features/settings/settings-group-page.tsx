@@ -42,6 +42,26 @@ export const SETTINGS_PAGES = {
     lead: "How long to wait for a confirmation before asking you.",
     groups: ["reconcile"],
   },
+  tracking: {
+    title: "Tracking",
+    lead: "Which roles are watched for posting changes, and how often they are checked.",
+    groups: ["tracking"],
+  },
+  interview: {
+    title: "Interview",
+    lead: "Which sections an interview pack has, the models it uses, and when a pack is offered.",
+    groups: ["interview"],
+  },
+  accounts: {
+    title: "Portal accounts",
+    lead: "Which portals need an account, which runner signs in, and when you are reminded.",
+    groups: ["accounts"],
+  },
+  sources: {
+    title: "Discovery",
+    lead: "Limits for JobSpy, careers pages and web search sources.",
+    groups: ["sources"],
+  },
   notifications: {
     title: "Notifications",
     lead: "What reaches you and where. Nothing goes out until a channel is connected.",

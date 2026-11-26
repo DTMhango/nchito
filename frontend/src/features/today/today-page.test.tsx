@@ -191,4 +191,13 @@ describe("Today: Needs you", () => {
     expect(hrefs.some((h) => h.includes("?tab=changes"))).toBe(true)
     expect(hrefs.some((h) => h.startsWith("/today?action="))).toBe(true)
   })
+
+  it("sends a notification's /today?action= link for a blocker to its handoff page", async () => {
+    const { router } = renderApp(`/today?action=${ACTION.captcha}`)
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/accounts/handoff/${ACTION.captcha}`
+      )
+    )
+  })
 })

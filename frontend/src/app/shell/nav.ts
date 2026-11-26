@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bot,
   Briefcase,
   Columns3,
   FileCheck2,
@@ -99,6 +100,12 @@ export const NAV_SETUP: NavItem[] = [
     keywords: ["sign in", "login", "account", "portal", "workday", "handoff"],
   },
   {
+    to: "/settings/runners",
+    label: "Runners",
+    icon: Bot,
+    keywords: ["runner", "agent", "token", "browser", "pc", "server", "mcp"],
+  },
+  {
     to: "/insights",
     label: "Insights",
     icon: BarChart3,
@@ -133,6 +140,10 @@ export const SETTINGS_SECTIONS = [
   { to: "/settings/documents", label: "Documents" },
   { to: "/settings/retention", label: "Retention" },
   { to: "/settings/reconcile", label: "Reconcile" },
+  { to: "/settings/tracking", label: "Tracking" },
+  { to: "/settings/interview", label: "Interview" },
+  { to: "/settings/sources", label: "Discovery" },
+  { to: "/settings/accounts", label: "Portal accounts" },
   { to: "/settings/ai", label: "AI" },
   { to: "/settings/connections", label: "Connections" },
   { to: "/settings/notifications", label: "Notifications" },

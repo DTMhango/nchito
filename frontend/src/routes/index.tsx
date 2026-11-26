@@ -8,7 +8,7 @@
  *       /today?action= /matches /applications /jobs/$id?tab= /compare?ids= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
- *       /settings/{appearance,ai,connections,notifications,runners,data,health,security,activity,history}
+ *       /settings/{appearance,ai,connections,notifications,runners,tracking,interview,accounts,sources,data,health,security,activity,history}
  *       /dev/components                   dev builds only
  *
  * To add a screen: write the page in src/features/<area>/, add a createRoute below under
@@ -449,6 +449,10 @@ const groupRoutes = [
   groupRoute("documents"),
   groupRoute("retention"),
   groupRoute("reconcile"),
+  groupRoute("tracking"),
+  groupRoute("interview"),
+  groupRoute("accounts"),
+  groupRoute("sources"),
 ] as const
 const ownRoute = (
   path:

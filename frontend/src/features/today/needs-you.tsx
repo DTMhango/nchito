@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
+import { Link, useNavigate } from "@tanstack/react-router"
 import {
   CheckCircle2,
   ChevronDown,
@@ -285,6 +285,20 @@ export function NeedsYou({ focusAction }: { focusAction?: string } = {}) {
   const holds = (g: DecisionGroup) =>
     !!focusAction && g.actions.some((a) => a.id === focusAction)
   const missing = !!focusAction && q.isSuccess && !groups.some(holds)
+  // Notifications link blockers to `/today?action=`; their choices live on the handoff page.
+  const navigate = useNavigate()
+  const blocker = focusAction
+    ? groups.flatMap((g) => g.actions).find((a) => a.id === focusAction)
+    : undefined
+  const toHandoff = blocker && isHandoff(blocker) ? blocker.id : null
+  useEffect(() => {
+    if (toHandoff)
+      void navigate({
+        to: "/accounts/handoff/$actionId",
+        params: { actionId: toHandoff },
+        replace: true,
+      })
+  }, [toHandoff, navigate])
   return (
     <section aria-labelledby="needs-title" className="elev py-1.5">
       <div className="flex items-center gap-2.5 px-4.5 pt-2.5 pb-2">
