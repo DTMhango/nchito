@@ -8,6 +8,7 @@ from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -27,6 +28,7 @@ from app.schemas.json_types import (
     AgentTaskState,
     ApplicationSpec,
     CheckResult,
+    DraftAnswer,
     Evidence,
     GateResult,
     PacketContents,
@@ -116,6 +118,64 @@ class ApplicationEvent(Base, IdMixin):
         doc="stage_change, edit, approval, agent_step, email, sent, acknowledged, bounced")
     actor: Mapped[str] = mapped_column(String(120), nullable=False, doc="owner, system, or runner name")
     detail: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+
+
+class TailoringStatus(enum.StrEnum):
+    queued = "queued"
+    running = "running"
+    paused = "paused"  # refused by the budget; resumes when the cap allows
+    done = "done"
+    failed = "failed"
+
+
+class TailoringRequest(Base, Entity):
+    """One request to tailor an application, idempotent per (application, spec version, Kit facts)."""
+
+    __tablename__ = "tailoring_request"
+    __table_args__ = (UniqueConstraint("application_id", "request_key", name="application_request_key"),
+                      Index("ix_tailoring_request_status", "status"))
+
+    application_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("application.id", ondelete="CASCADE"))
+    request_key: Mapped[str] = mapped_column(String(64), nullable=False,
+                                             doc="sha256 of the spec version it starts from and the Kit facts")
+    from_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("run.id", ondelete="SET NULL"))
+    status: Mapped[TailoringStatus] = mapped_column(str_enum(TailoringStatus), nullable=False,
+                                                    default=TailoringStatus.queued)
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    result_version: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    paused_mark: Mapped[dict[str, Any] | None] = mapped_column(JSONB, doc="Budget state when it paused")
+    requested_by: Mapped[str] = mapped_column(String(120), nullable=False, default="system")
+
+
+class ApplicationSpecVersion(Base, Entity):
+    """Every version of an application's document spec, with the checks run on its exact content."""
+
+    __tablename__ = "application_spec_version"
+    __table_args__ = (UniqueConstraint("application_id", "version", name="application_spec_version_number"),)
+
+    application_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("application.id", ondelete="CASCADE"))
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, doc="tailor or owner")
+    request_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("tailoring_request.id", ondelete="SET NULL"), unique=True,
+        doc="The tailoring request that produced it: one version per request")
+    parent_version: Mapped[int | None] = mapped_column(Integer)
+    spec: Mapped[ApplicationSpec] = mapped_column(PydanticJSON(ApplicationSpec), nullable=False)
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    answers: Mapped[list[DraftAnswer]] = mapped_column(PydanticJSON(list[DraftAnswer]), nullable=False,
+                                                       default=list)
+    check_results: Mapped[list[CheckResult]] = mapped_column(PydanticJSON(list[CheckResult]), nullable=False,
+                                                             default=list)
+    checked_hash: Mapped[str | None] = mapped_column(String(64), doc="content_hash the checks ran on")
+    checked_facts: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict,
+                                                          doc="fact code -> fact hash at check time")
+    checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    model: Mapped[str | None] = mapped_column(String(128))
+    prompt_version: Mapped[str | None] = mapped_column(String(40))
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
 
 
 class PendingActionType(enum.StrEnum):

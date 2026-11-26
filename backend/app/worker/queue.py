@@ -102,3 +102,7 @@ async def scheduler_tick(timestamp: int) -> None:
     if result.enqueued or result.skipped_overlap or result.skipped_missed:
         log.info("tick: enqueued=%d overlap=%d missed=%d", len(result.enqueued), len(result.skipped_overlap),
                  len(result.skipped_missed))
+
+
+# Stream task modules register themselves on ``queue_app`` when imported.
+from app.pipeline.tailoring import tasks as _tailoring_tasks  # noqa: E402, F401

@@ -247,6 +247,20 @@ class ApplicationSpec(Shape):
     requirement_match: list[RequirementMatch] = Field(default_factory=list)
 
 
+class DraftAnswer(Shape):
+    """A screening question and what the answer bank says about it (5.4). Only ``outcome == "value"``
+    carries an answer; ``ask_owner`` raised a pending action, ``do_not_answer`` is a ``never`` answer."""
+
+    question: str
+    outcome: Literal["value", "ask_owner", "do_not_answer"]
+    value: str | None = None
+    select: str | None = None
+    answer_id: str | None = None
+    material: bool = False
+    reason: str = ""
+    pending_action_id: str | None = None
+
+
 class CheckResult(Shape):
     check: str
     status: Literal["pass", "warn", "block"]
