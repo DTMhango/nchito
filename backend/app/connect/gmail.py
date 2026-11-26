@@ -170,23 +170,31 @@ class GmailMailbox:
         return None  # 5xx or an unreadable answer: unknown
 
     async def list_messages(self, since: datetime, *, limit: int = 200) -> list[MailMessage]:
+        """The oldest ``limit`` messages since ``since``, oldest first (the sync pages forward from them).
+
+        Gmail lists newest first, so every id in the window is listed (ids only, cheap) and the oldest
+        ``limit`` are fetched."""
         query = self._read_query(since)
-        found: list[MailMessage] = []
+        ids: list[str] = []
         token: str | None = None
-        while len(found) < limit:
-            params: dict[str, Any] = {"q": query, "maxResults": min(LIST_PAGE, limit - len(found))}
+        while True:
+            params: dict[str, Any] = {"q": query, "maxResults": LIST_PAGE}
             if token:
                 params["pageToken"] = token
             r = await self._call("GET", "/messages", params=params)
             data = self._ok(r, "list messages")
-            for ref in data.get("messages", []):
-                message = await self._get(str(ref["id"]))
-                if message is not None:
-                    found.append(message)
+            ids.extend(str(ref["id"]) for ref in data.get("messages", []))
             token = data.get("nextPageToken")
             if not token:
                 break
-        return found[:limit]
+        found: list[MailMessage] = []
+        for message_id in reversed(ids):
+            if len(found) >= limit:
+                break
+            message = await self._get(message_id)
+            if message is not None:
+                found.append(message)
+        return sorted(found, key=lambda m: m.received_at)
 
     async def find_sent(self, idempotency_key: str) -> MailMessage | None:
         wanted = strip_brackets(message_id_for(idempotency_key, self.from_address))

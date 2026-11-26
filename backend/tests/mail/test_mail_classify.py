@@ -99,3 +99,18 @@ async def test_rules_never_call_the_model(session):
     assert llm.calls == []
     off = await classify(session, llm, inbound(body="Something unclear."), use_llm=False, max_chars=6000)
     assert off.category == "other" and llm.calls == []
+
+
+@pytest.mark.nodb
+def test_phrase_lists_are_settings():
+    from app.connect.mail_classify import PHRASE_KEYS, phrases_from
+    from app.core.settings.registry import REGISTRY
+
+    values = {key: REGISTRY[key].default for key in (*PHRASE_KEYS, "mail.bounce_senders")}
+    msg = inbound(subject="Hello", body="We would love a quick video catch-up with you on Tuesday.")
+    assert classify_rules(msg, phrases_from(values)) is None
+    values["mail.interview_phrases"] = [*values["mail.interview_phrases"], r"video catch-?up"]
+    result = classify_rules(msg, phrases_from(values))
+    assert result is not None and result.category == "interview"
+    bounce = inbound(subject="Hi", body="x", sender="bounces@mail.example.com")
+    assert classify_rules(bounce, phrases_from({**values, "mail.bounce_senders": ["bounces"]})).bounce

@@ -266,3 +266,17 @@ async def test_apply_proposal_carries_out_the_stage_change(session):
     await session.commit()
     app = await session.get(Application, setup.app.id)
     assert app.stage == Stage.rejected
+
+
+async def test_a_full_page_is_followed_by_the_next_so_nothing_in_the_window_is_missed(session):
+    await settings_service.set_value(session, "mail.max_messages_per_check", 2, actor="owner")
+    conn = await connection(session)
+    messages = [inbound(subject=f"Note {i}", body="Just checking in about lunch.", thread_id=f"t-{i}",
+                        received=NOW - timedelta(minutes=50 - i)) for i in range(5)]
+    box = FakeMailbox()
+    box.inbox = list(reversed(messages))
+    result = await mail_sync.sync_connection(session, conn, box, None, now=NOW + timedelta(hours=1))
+    await session.commit()
+    assert result.fetched == 5 and result.new == 5 and box.list_calls >= 3
+    assert len(await threads(session)) == 5
+    assert conn.config["checkpoint_at"] == messages[-1].received_at.isoformat()

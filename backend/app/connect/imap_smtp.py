@@ -73,7 +73,7 @@ class ImapSmtpMailbox:
         if not self.config.read_folder:
             raise MailConfigError("set the folder this connection may read")
         raws = await self._imap.fetch_since(self.config.read_folder, since, limit)
-        return [parse_rfc822(r.raw) for r in raws]
+        return sorted((parse_rfc822(r.raw) for r in raws), key=lambda m: m.received_at)
 
     async def find_sent(self, idempotency_key: str) -> MailMessage | None:
         for raw in await self._imap.find_by_header(self.config.sent_folder, IDEMPOTENCY_HEADER, idempotency_key):
@@ -164,15 +164,22 @@ class StdlibImap:
         return await asyncio.to_thread(self._fetch_since, folder, since, limit)
 
     def _fetch_since(self, folder: str, since: datetime, limit: int) -> list[RawMail]:
+        """The oldest ``limit`` messages received at or after ``since`` (UIDs ascend with arrival)."""
         client = self._connect(folder)
+        out: list[RawMail] = []
         try:
             day = (since - timedelta(days=1)).astimezone(UTC).strftime(IMAP_DATE)  # SINCE has day precision
             status, data = client.uid("SEARCH", None, "SINCE", day)
             uids = data[0].split() if status == "OK" and data and data[0] else []
-            mails = self._fetch(client, uids, limit)
+            for uid in uids:
+                if len(out) >= limit:
+                    break
+                for mail in self._fetch(client, [uid], 1):
+                    if parse_rfc822(mail.raw).received_at >= since:
+                        out.append(mail)
         finally:
             client.logout()
-        return [m for m in mails if parse_rfc822(m.raw).received_at >= since]
+        return out
 
     async def find_by_header(self, folder: str, header: str, value: str) -> list[RawMail]:
         return await asyncio.to_thread(self._find_by_header, folder, header, value)

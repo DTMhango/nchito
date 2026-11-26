@@ -104,7 +104,7 @@ class FakeMailbox:
 
     async def list_messages(self, since: datetime, *, limit: int = 200) -> list[MailMessage]:
         self.list_calls += 1
-        return [m for m in self.inbox if m.received_at >= since][:limit]
+        return sorted((m for m in self.inbox if m.received_at >= since), key=lambda m: m.received_at)[:limit]
 
     async def find_sent(self, idempotency_key: str) -> MailMessage | None:
         message_id = self.sent_ids.get(idempotency_key)

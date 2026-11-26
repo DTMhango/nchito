@@ -75,6 +75,8 @@ class Mailbox(Protocol):
         ...
 
     async def list_messages(self, since: datetime, *, limit: int = 200) -> list[MailMessage]:
+        """The oldest ``limit`` messages received at or after ``since``, oldest first. A full page means
+        there may be more: the caller asks again from the newest one it got."""
         ...
 
     async def find_sent(self, idempotency_key: str) -> MailMessage | None:

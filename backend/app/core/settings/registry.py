@@ -340,6 +340,59 @@ _bool("mail.llm_classify", "Use AI for unclear replies",
 _int("mail.llm_body_max_chars", "Reply text sent to AI",
      "Longest part of a reply's text given to the model, as untrusted data.", 6000, 3000, 500, 50_000, "characters")
 
+def _patterns_check(value: Any) -> None:
+    for item in value:
+        if not str(item).strip():
+            raise SettingValueError("phrases cannot be blank")
+        try:
+            re.compile(str(item))
+        except re.error as exc:
+            raise SettingValueError(f"{item!r} is not a valid pattern: {exc}") from exc
+
+
+def _phrases(key: str, label: str, description: str, default: list[str], example: list[str]) -> None:
+    _add(key, "list", label, description + " Each entry is a case-insensitive regular expression.", default, example,
+         list[str], validators=(unique_items, _patterns_check), invalid_example=["(unclosed"],
+         has_invalid_example=True)
+
+
+_phrases("mail.rejection_phrases", "Rejection wording", "Wording that marks a reply as a rejection.", [
+    r"\bunfortunately\b", r"regret to (inform|tell|let)", r"not (been )?(selected|successful|shortlisted)",
+    r"(will|would) not be (moving|proceeding|progressing) (forward|further|with)",
+    r"decided to (move|go|proceed) (forward )?with (other|another|different)", r"pursue (other|another) candidate",
+    r"position (has been|is now) filled", r"your application was unsuccessful",
+    r"not (be )?(taking|moving) .{0,30}forward"], [r"\bunfortunately\b"])
+_phrases("mail.interview_phrases", "Interview wording", "Wording that marks a reply as an interview invitation.", [
+    r"invit\w+ you to (an? |a )?(\w+ )?interview", r"interview (invitation|invite|request)",
+    r"(schedule|arrange|set up|book) (an? |your |a )?(\w+ )?(interview|call|phone screen|chat|meeting)",
+    r"(would|like) to (speak|talk|meet) with you", r"calendly\.com", r"your availability (for|this|next)",
+    r"available for (an? )?(interview|call|chat)"], [r"interview (invitation|invite)"])
+_phrases("mail.info_request_phrases", "Information request wording",
+         "Wording that marks a reply as a request for more information or documents.", [
+             r"(please|kindly) (provide|send|share|submit|upload|attach|supply)\b",
+             r"could you (please )?(provide|send|share|submit)",
+             r"we (still )?need (some |the |your )?(additional |further |more )?"
+             r"(information|documents|details|certificates)",
+             r"(additional|further|missing) (information|documents|details) (is|are)? ?(required|needed)"],
+         [r"please (provide|send)"])
+_phrases("mail.confirmation_phrases", "Acknowledgement wording",
+         "Wording that marks a reply as a confirmation that the application arrived.", [
+             r"(thank you|thanks) for (applying|your application|your interest|submitting)",
+             r"we (have |'ve )?(successfully )?received your (application|cv|resume)",
+             r"your application (has been |was )?(successfully )?(received|submitted|sent)",
+             r"application (received|confirmation)",
+             r"successfully (applied|submitted)"], [r"thank you for applying"])
+_phrases("mail.auto_reply_phrases", "Automatic reply wording", "Wording of out-of-office and automatic replies.",
+         [r"out of (the )?office", r"automatic reply", r"auto-?reply", r"away from (my|the) (desk|office)"],
+         [r"out of (the )?office"])
+_phrases("mail.bounce_subject_phrases", "Delivery failure subjects", "Subjects of delivery failure notices.",
+         [r"delivery status notification", r"undeliverable", r"delivery (has )?failed",
+          r"mail delivery (failed|subsystem)", r"returned mail", r"could not be delivered"], [r"undeliverable"])
+_add("mail.bounce_senders", "list", "Delivery failure senders",
+     "Sender names (the part before @) that send delivery failure notices.", ["mailer-daemon", "postmaster"],
+     ["mailer-daemon"], list[str], validators=(unique_items, _patterns_check),
+     invalid_example=["mailer-daemon", "mailer-daemon"], has_invalid_example=True)
+
 # AI (11)
 _enum("ai.provider", "Provider", "Default LLM provider.", "anthropic", "openai_compatible",
       ("anthropic", "openai_compatible", "claude_cli"))

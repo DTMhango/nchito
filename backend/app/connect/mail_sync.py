@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.apply import stages
 from app.apply.stages import IllegalTransition
 from app.connect import mail_connections
-from app.connect.mail_classify import Classification, classify
+from app.connect.mail_classify import Classification, classify, phrases_from
 from app.connect.mail_common import key_from_ids, sender_matches, strip_brackets
 from app.connect.mailbox import Mailbox, MailError, MailMessage
 from app.core import audit
@@ -290,7 +290,8 @@ async def process_message(session: AsyncSession, conn: Connection, msg: MailMess
     match = await match_message(session, msg, conn.id)
     use_llm = bool(values["mail.llm_classify"]) and match.application is not None
     cls: Classification = await classify(session, llm, msg, use_llm=use_llm,
-                                         max_chars=int(values["mail.llm_body_max_chars"]))
+                                         max_chars=int(values["mail.llm_body_max_chars"]),
+                                         phrases=phrases_from(values))
     if cls.bounce:
         await _bounce(session, msg, now)
     if thread is None:
@@ -339,16 +340,26 @@ async def sync_connection(session: AsyncSession, conn: Connection, mailbox: Mail
     checkpoint = conn.config.get("checkpoint_at")
     since = datetime.fromisoformat(checkpoint) if checkpoint else now - timedelta(
         days=int(values["mail.initial_lookback_days"]))
-    messages = await mailbox.list_messages(since, limit=int(values["mail.max_messages_per_check"]))
-    res = SyncResult(fetched=len(messages))
+    page_size = int(values["mail.max_messages_per_check"])
+    res = SyncResult()
     ignore = await _ignored_senders(session)
     newest = since
-    for msg in sorted(messages, key=lambda m: m.received_at):
-        newest = max(newest, msg.received_at)
-        if sender_matches(msg.sender, ignore):
-            res.skipped += 1  # job-alert mail belongs to the alert source, not to an application
-            continue
-        await process_message(session, conn, msg, llm, values, res, now)
+    seen: set[str] = set()
+    cursor = since
+    while True:  # a full page means more may be waiting: page forward until a page is not full
+        messages = await mailbox.list_messages(cursor, limit=page_size)
+        fresh = [m for m in messages if m.provider_message_id not in seen]
+        res.fetched += len(fresh)
+        for msg in sorted(fresh, key=lambda m: m.received_at):
+            seen.add(msg.provider_message_id)
+            newest = max(newest, msg.received_at)
+            if sender_matches(msg.sender, ignore):
+                res.skipped += 1  # job-alert mail belongs to the alert source, not to an application
+                continue
+            await process_message(session, conn, msg, llm, values, res, now)
+        if len(messages) < page_size or not fresh:
+            break
+        cursor = max(m.received_at for m in messages)
     conn.config = {**conn.config, "checkpoint_at": newest.isoformat(), "last_sync_at": now.isoformat(),
                    "last_error": None}
     conn.health, conn.last_checked_at = "ok", now

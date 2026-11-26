@@ -10,13 +10,16 @@ kind in settings, a stage change.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal
+from functools import lru_cache
+from typing import Any, Literal
 
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.connect.mailbox import MailMessage
+from app.core.settings.registry import REGISTRY
 from app.llm.client import BudgetExceeded, LLMClient, LLMError, Message, TextPart
 from app.llm.prompts import active_prompt
 from app.llm.untrusted import data_block
@@ -26,36 +29,37 @@ CATEGORIES: tuple[str, ...] = ("confirmation", "rejection", "interview", "inform
 RULE_TEXT_LIMIT = 20_000  # technical bound on regex work, not a business value
 
 
-def _rx(*patterns: str) -> re.Pattern[str]:
+def _rx(patterns: Sequence[str]) -> re.Pattern[str]:
     return re.compile("|".join(f"(?:{p})" for p in patterns), re.I)
 
 
-REJECTION = _rx(
-    r"\bunfortunately\b", r"regret to (inform|tell|let)", r"not (been )?(selected|successful|shortlisted)",
-    r"(will|would) not be (moving|proceeding|progressing) (forward|further|with)",
-    r"decided to (move|go|proceed) (forward )?with (other|another|different)", r"pursue (other|another) candidate",
-    r"position (has been|is now) filled", r"your application was unsuccessful",
-    r"not (be )?(taking|moving) .{0,30}forward")
-INTERVIEW = _rx(
-    r"invit\w+ you to (an? |a )?(\w+ )?interview", r"interview (invitation|invite|request)",
-    r"(schedule|arrange|set up|book) (an? |your |a )?(\w+ )?(interview|call|phone screen|chat|meeting)",
-    r"(would|like) to (speak|talk|meet) with you", r"calendly\.com", r"your availability (for|this|next)",
-    r"available for (an? )?(interview|call|chat)")
-INFO_REQUEST = _rx(
-    r"(please|kindly) (provide|send|share|submit|upload|attach|supply)\b",
-    r"could you (please )?(provide|send|share|submit)",
-    r"we (still )?need (some |the |your )?(additional |further |more )?(information|documents|details|certificates)",
-    r"(additional|further|missing) (information|documents|details) (is|are)? ?(required|needed)")
-CONFIRMATION = _rx(
-    r"(thank you|thanks) for (applying|your application|your interest|submitting)",
-    r"we (have |'ve )?(successfully )?received your (application|cv|resume)",
-    r"your application (has been |was )?(successfully )?(received|submitted|sent)",
-    r"application (received|confirmation)",
-    r"successfully (applied|submitted)")
-AUTO_REPLY = _rx(r"out of (the )?office", r"automatic reply", r"auto-?reply", r"away from (my|the) (desk|office)")
-BOUNCE_SUBJECT = _rx(r"delivery status notification", r"undeliverable", r"delivery (has )?failed",
-                     r"mail delivery (failed|subsystem)", r"returned mail", r"could not be delivered")
-BOUNCE_SENDERS = ("mailer-daemon", "postmaster")
+@dataclass(frozen=True)
+class Phrases:
+    """The wording the rules look for: settings ``mail.*_phrases`` and ``mail.bounce_senders``."""
+
+    rejection: re.Pattern[str]
+    interview: re.Pattern[str]
+    info_request: re.Pattern[str]
+    confirmation: re.Pattern[str]
+    auto_reply: re.Pattern[str]
+    bounce_subject: re.Pattern[str]
+    bounce_senders: tuple[str, ...]
+
+
+PHRASE_KEYS = ("mail.rejection_phrases", "mail.interview_phrases", "mail.info_request_phrases",
+               "mail.confirmation_phrases", "mail.auto_reply_phrases", "mail.bounce_subject_phrases")
+
+
+def phrases_from(values: Mapping[str, Any]) -> Phrases:
+    rx = [_rx(list(values[key])) for key in PHRASE_KEYS]
+    return Phrases(*rx, bounce_senders=tuple(str(v).lower() for v in values["mail.bounce_senders"]))
+
+
+@lru_cache(maxsize=1)
+def default_phrases() -> Phrases:
+    return phrases_from({key: REGISTRY[key].default for key in (*PHRASE_KEYS, "mail.bounce_senders")})
+
+
 QUOTED_LINE = re.compile(r"^\s*>.*$", re.M)
 
 
@@ -73,20 +77,22 @@ def _text_of(msg: MailMessage) -> str:
     return f"{msg.subject}\n{body}"[:RULE_TEXT_LIMIT]
 
 
-def is_bounce(msg: MailMessage) -> bool:
-    local = msg.sender.split("@", 1)[0]
-    return local.startswith(BOUNCE_SENDERS) or bool(BOUNCE_SUBJECT.search(msg.subject or ""))
+def is_bounce(msg: MailMessage, phrases: Phrases | None = None) -> bool:
+    p = phrases or default_phrases()
+    local = msg.sender.split("@", 1)[0].lower()
+    return local.startswith(p.bounce_senders) or bool(p.bounce_subject.search(msg.subject or ""))
 
 
-def classify_rules(msg: MailMessage) -> Classification | None:
+def classify_rules(msg: MailMessage, phrases: Phrases | None = None) -> Classification | None:
     """A decided classification; ``source == "none"`` when the wording conflicts; ``None`` when nothing matched."""
-    if is_bounce(msg):
+    p = phrases or default_phrases()
+    if is_bounce(msg, p):
         return Classification("other", "rules", "delivery failure notice", bounce=True)
     text = _text_of(msg)
-    if AUTO_REPLY.search(text) or "auto-replied" in msg.headers.get("auto-submitted", "").lower():
+    if p.auto_reply.search(text) or "auto-replied" in msg.headers.get("auto-submitted", "").lower():
         return Classification("other", "rules", "automatic reply")
-    hits = {name for name, rx in (("rejection", REJECTION), ("interview", INTERVIEW),
-                                  ("information_request", INFO_REQUEST), ("confirmation", CONFIRMATION))
+    hits = {name for name, rx in (("rejection", p.rejection), ("interview", p.interview),
+                                  ("information_request", p.info_request), ("confirmation", p.confirmation))
             if rx.search(text)}
     if not hits:
         return None
@@ -135,8 +141,8 @@ async def classify_with_model(session: AsyncSession, llm: LLMClient, msg: MailMe
 
 
 async def classify(session: AsyncSession, llm: LLMClient | None, msg: MailMessage, *, use_llm: bool,
-                   max_chars: int) -> Classification:
-    decided = classify_rules(msg)
+                   max_chars: int, phrases: Phrases | None = None) -> Classification:
+    decided = classify_rules(msg, phrases)
     if decided is not None and decided.source == "rules":
         return decided
     if use_llm and llm is not None:
