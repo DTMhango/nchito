@@ -10,6 +10,7 @@ import type {
 import { db } from "./db"
 import { aiHandlers } from "./handlers/ai"
 import { kitHandlers } from "./handlers/kit"
+import { sourcesHandlers } from "./handlers/sources"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -20,6 +21,7 @@ const notFound = (what: string) =>
 
 export const handlers = [
   ...kitHandlers,
+  ...sourcesHandlers,
   http.get("*/api/health", () =>
     HttpResponse.json({ status: "ok", mock: true })
   ),

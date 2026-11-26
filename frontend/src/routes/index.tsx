@@ -41,6 +41,8 @@ import { AutopilotPage } from "@/features/autopilot/autopilot-page"
 import { KitLayout, KitSection } from "@/features/kit/kit-pages"
 import { CampaignsPage } from "@/features/campaigns/campaigns-page"
 import { SourcesPage } from "@/features/sources/sources-page"
+import { RunsPage } from "@/features/sources/runs/runs-page"
+import { RunDetailPage } from "@/features/sources/runs/run-detail-page"
 import { InsightsPage } from "@/features/insights/insights-page"
 import {
   SettingsLayout,
@@ -140,6 +142,15 @@ const applicationsRoute = page(
 )
 const studioRoute = page("/studio", "Studio", StudioPage)
 const autopilotRoute = page("/autopilot", "Autopilot", AutopilotPage)
+const runsRoute = page("/autopilot/runs", "Run history", RunsPage)
+const runDetailRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/autopilot/runs/$runId",
+  staticData: { title: "Run" },
+  component: function RunDetailRoute() {
+    return <RunDetailPage runId={runDetailRoute.useParams().runId} />
+  },
+})
 const campaignsRoute = page("/campaigns", "Campaigns", CampaignsPage)
 const sourcesRoute = page("/sources", "Sources", SourcesPage)
 const insightsRoute = page("/insights", "Insights", InsightsPage)
@@ -270,6 +281,8 @@ export const routeTree = rootRoute.addChildren([
       jobRoute,
       studioRoute,
       autopilotRoute,
+      runsRoute,
+      runDetailRoute,
       kitRoute.addChildren([kitIndex, ...kitChildren]),
       campaignsRoute,
       sourcesRoute,
