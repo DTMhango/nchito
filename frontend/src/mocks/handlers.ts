@@ -19,6 +19,7 @@ import { settingsHandlers } from "./handlers/settings"
 import { matchesHandlers } from "./handlers/matches"
 import { studioHandlers } from "./handlers/studio"
 import { autopilotHandlers } from "./handlers/autopilot"
+import { runnersHandlers } from "./handlers/runners"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -33,6 +34,7 @@ export const handlers = [
   //    applications it has packets for and returns undefined otherwise.
   // 2. Autopilot: approvals, packets, dispatches, pause; beats the wave 0 autopilot stub below.
   ...studioHandlers,
+  ...runnersHandlers,
   ...autopilotHandlers,
   // Data, non-AI connections and health: before the AI handlers (they fall through for LLM providers).
   ...dataHandlers,

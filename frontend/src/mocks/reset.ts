@@ -1,6 +1,7 @@
 /** Reset every mock store to its seed (each test starts from the same fictional dataset). */
 import { resetAiMock } from "./handlers/ai"
 import { resetAutopilotMock } from "./handlers/autopilot"
+import { resetRunnersMock } from "./handlers/runners"
 import { resetApplicationsMock } from "./handlers/applications"
 import { resetDataMock } from "./handlers/data"
 import { resetCampaignMocks } from "./handlers/campaigns"
@@ -18,6 +19,7 @@ export function resetAllMocks() {
   resetCampaignMocks()
   resetApplicationsMock()
   resetAutopilotMock()
+  resetRunnersMock()
   resetJobsMock()
   resetKitMock()
   resetSourcesMock()

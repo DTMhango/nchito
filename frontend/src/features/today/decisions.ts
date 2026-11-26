@@ -79,9 +79,18 @@ export function actionKit(
         secondary: { label: `Skip ${these}`, resolution: "dismissed" },
       }
     case "sign_in":
-    case "create_account":
       return {
         primary: { label: "I've signed in", resolution: "continue" },
+        secondary: { label: "Open portal", resolution: "link" },
+      }
+    case "create_account":
+      return {
+        primary: { label: "I created the account", resolution: "continue" },
+        secondary: { label: "Open portal", resolution: "link" },
+      }
+    case "captcha":
+      return {
+        primary: { label: "I solved it", resolution: "continue" },
         secondary: { label: "Open portal", resolution: "link" },
       }
     case "approve":

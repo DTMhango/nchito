@@ -17,6 +17,7 @@ import {
   type PendingAction,
   type ResolveIn,
 } from "./api"
+import { isHandoff } from "@/features/accounts/logic"
 import { answerOptions, pendingInfo, roleChoices } from "./logic"
 
 type Scope = NonNullable<ResolveIn["answer_scope"]>
@@ -246,6 +247,16 @@ function PendingRow({ action }: { action: PendingAction }) {
                 It did not go out
               </Button>
             )}
+          {isHandoff(action) && (
+            <Button asChild type="button" variant="outline">
+              <Link
+                to="/accounts/handoff/$actionId"
+                params={{ actionId: action.id }}
+              >
+                Details and other choices
+              </Link>
+            </Button>
+          )}
           <Button
             type="button"
             variant="ghost"
