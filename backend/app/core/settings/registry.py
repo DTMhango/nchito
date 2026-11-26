@@ -762,6 +762,35 @@ _int("data.export_link_minutes", "Export link lifetime", "How long a prepared ex
      60, 15, 1, 1440, "minutes")
 _int("data.import_staging_hours", "Import preview lifetime",
      "How long a previewed import waits for confirmation before it is discarded.", 24, 48, 1, 168, "hours")
+def _header_synonyms_check(value: Any) -> None:
+    for entry in value:
+        name, sep, words = str(entry).partition(":")
+        if not sep or not name.strip() or not [w for w in words.split(",") if w.strip()]:
+            raise SettingValueError("each entry reads 'column: word, word' (the column the words stand for)")
+
+
+_add("data.old_kit_tracker_headers", "list", "Old tracker column names",
+     "How column headings in an old tracker spreadsheet map to the columns the history importer reads. Each entry "
+     "is 'column: heading, heading'; a heading that matches none is kept in the notes. Add your own wording here.",
+     ["company: company, employer, organisation, organization, org, firm, company name",
+      "role: role, title, job title, position, job, vacancy, role title",
+      "location: location, city, place",
+      "link: link, url, posting, job link, advert, ad link",
+      "source: source, found via, board, found on",
+      "date_found: date found, found, date seen, seen",
+      "closes: closes, closing date, deadline, close date",
+      "status: status, stage, outcome, state, progress",
+      "date_tailored: date tailored, tailored on",
+      "date_applied: date applied, applied, applied on, applied date, application date, date sent",
+      "next_step: next step, next action, follow up",
+      "next_step_due: next step due, follow up date, next action date, due",
+      "last_update: last update, updated, last updated, last contact",
+      "notes: notes, comments, remarks",
+      "id: id, ref, reference, no, number",
+      "track: track, category",
+      "fit_1to5: fit, score, rating"],
+     ["company: employer, firm"], list[str], validators=(_header_synonyms_check,),
+     invalid_example=["company employer"], has_invalid_example=True)
 _bool("data.old_kit_ai_extraction", "AI for unrecognised old-kit files",
       "Send old-kit files the built-in parser does not recognise to your chosen AI provider, as data, to propose "
       "facts. Off means only the built-in parser runs.", False)

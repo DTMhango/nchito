@@ -234,7 +234,8 @@ async def import_preview(
             codes, next_no = await _existing_facts(session)
             if source == "old_kit_zip":
                 result = await oldkit.build(data, limits, existing_fact_codes=codes, next_fact_number=next_no,
-                                            llm=llm, use_ai=bool(values["data.old_kit_ai_extraction"]))
+                                            llm=llm, use_ai=bool(values["data.old_kit_ai_extraction"]),
+                                            tracker_headers=values["data.old_kit_tracker_headers"])
             else:
                 name = file.filename or "free-form text"
                 text = office.to_text(name, data, limits) if office.is_office(name) else data.decode(
