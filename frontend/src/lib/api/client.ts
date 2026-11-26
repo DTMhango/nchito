@@ -18,6 +18,8 @@ function messageFrom(status: number, body: ApiErrorBody | undefined): string {
   const d = body?.detail
   if (typeof d === "string") return d
   if (Array.isArray(d) && d[0]?.msg) return d[0].msg
+  // A coded refusal (`{code, reason}`): the reason is the plain-words message.
+  if (d && !Array.isArray(d) && typeof d.reason === "string") return d.reason
   if (status === 401) return "Your session has ended. Sign in again."
   if (status === 429) return "Too many attempts. Wait a minute and try again."
   if (status >= 500) return "The server had a problem. Try again in a moment."

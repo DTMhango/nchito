@@ -14,7 +14,11 @@ export type paths = GeneratedPaths
 export type Schemas = components["schemas"]
 
 export type ApiErrorBody = {
-  detail?: string | { msg: string; loc?: (string | number)[] }[]
+  detail?:
+    | string
+    | { msg: string; loc?: (string | number)[] }[]
+    /** A coded refusal from the apply layer (`@/lib/api/refusals`). */
+    | { code?: string; reason?: string; [extra: string]: unknown }
 }
 
 export type SetupStatus = Schemas["SetupStatus"]
