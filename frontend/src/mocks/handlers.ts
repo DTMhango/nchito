@@ -8,6 +8,7 @@ import type {
   ThemeInput,
 } from "@/lib/api/types"
 import { db } from "./db"
+import { matchesHandlers } from "./handlers/matches"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -187,4 +188,6 @@ export const handlers = [
     })
     return HttpResponse.json(db.get().autopilot)
   }),
+
+  ...matchesHandlers,
 ]
