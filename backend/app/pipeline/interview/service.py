@@ -497,6 +497,28 @@ async def set_favourite(session: AsyncSession, pack: InterviewPack, story_id: st
     return await edit(session, pack, "stories", updated.model_dump(mode="json"), actor=actor)
 
 
+STORY_TEXT_FIELDS = ("title", "requirement", "situation", "task", "action", "result")
+
+
+async def edit_story(session: AsyncSession, pack: InterviewPack, story_id: str, changes: Mapping[str, str], *,
+                     actor: str, base_version: int | None = None) -> InterviewSectionVersion:
+    """The owner rewrites one story's text: a new ``stories`` version, checked like any edit (an invented figure
+    still blocks). ``base_version`` guards against overwriting a newer version (409 ``version_conflict``)."""
+    current = await current_versions(session, pack.id)
+    if "stories" not in current:
+        raise InterviewError("the pack has no story bank yet", 404, "not_found")
+    row = current["stories"]
+    if base_version is not None and base_version != row.version:
+        raise InterviewError(f"the stories changed since version {base_version} (now {row.version})", 409,
+                             "version_conflict")
+    stories = sh.Stories.model_validate(row.content)
+    if not any(s.id == story_id for s in stories.items):
+        raise InterviewError(f"no story {story_id!r}", 404, "not_found")
+    patch = {k: v for k, v in changes.items() if k in STORY_TEXT_FIELDS and v is not None}
+    updated = sh.Stories(items=[s.model_copy(update=patch) if s.id == story_id else s for s in stories.items])
+    return await edit(session, pack, "stories", updated.model_dump(mode="json"), actor=actor)
+
+
 async def set_note(session: AsyncSession, pack: InterviewPack, section: str, note: str | None, *, actor: str) -> None:
     if section not in sh.SHAPES:
         raise InterviewError(f"unknown section {section!r}", 404, "unknown_section")

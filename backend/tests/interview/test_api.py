@@ -77,6 +77,15 @@ async def test_generate_get_edit_export_and_rounds(owner_client, queued, fake_ll
     fav = await owner_client.put(f"{base}/stories/s1/favourite", json={"favourite": True})
     assert fav.status_code == 200 and fav.json()["content"]["items"][0]["favourite"] is True
     assert (await owner_client.put(f"{base}/stories/s9/favourite", json={})).status_code == 404
+    story_version = fav.json()["version"]
+    story = await owner_client.put(f"{base}/stories/s1", json={"situation": "A quarterly report was late.",
+                                                               "base_version": story_version})
+    assert story.status_code == 200 and story.json()["version"] == story_version + 1
+    item = story.json()["content"]["items"][0]
+    assert item["situation"] == "A quarterly report was late." and item["favourite"] is True
+    stale = await owner_client.put(f"{base}/stories/s1", json={"result": "x", "base_version": story_version})
+    assert stale.status_code == 409 and stale.json()["detail"]["code"] == "version_conflict"
+    assert (await owner_client.put(f"{base}/stories/s9", json={"title": "x"})).status_code == 404
 
     regen = await owner_client.post(f"{base}/sections/why_you/regenerate")
     assert regen.status_code == 202 and regen.json()["pending_sections"] == ["why_you", "crib_sheet"]

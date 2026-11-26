@@ -88,6 +88,18 @@ class FavouriteIn(ApiModel):
     favourite: bool = True
 
 
+class StoryEditIn(ApiModel):
+    """Only the fields given change. ``base_version``: the ``stories`` version the edit was made on."""
+
+    title: str | None = Field(default=None, min_length=1, max_length=300)
+    requirement: str | None = Field(default=None, max_length=2000)
+    situation: str | None = Field(default=None, max_length=2000)
+    task: str | None = Field(default=None, max_length=2000)
+    action: str | None = Field(default=None, max_length=2000)
+    result: str | None = Field(default=None, max_length=2000)
+    base_version: int | None = None
+
+
 class PracticeIn(ApiModel):
     question: str = Field(min_length=1, max_length=2000)
     category: Literal["behavioural", "technical", "role", "motivation", "logistics"] | None = None
@@ -274,6 +286,23 @@ async def story_favourite(job_id: uuid.UUID, story_id: str, body: FavouriteIn, p
     pack = await _pack(session, job_id, lock=True)
     try:
         row = await service.set_favourite(session, pack, story_id, body.favourite, actor=principal.actor)
+    except service.InterviewError as exc:
+        raise _error(exc) from exc
+    await session.refresh(row)
+    return InterviewSectionOut.model_validate(row)
+
+
+@router.put("/jobs/{job_id}/interview-pack/stories/{story_id}", response_model=InterviewSectionOut,
+            name="interview_story_edit")
+async def story_edit(job_id: uuid.UUID, story_id: str, body: StoryEditIn, principal: PrincipalDep,
+                     session: SessionDep) -> InterviewSectionOut:
+    """Rewrite one story (STAR text, title): stored as a new ``stories`` version and checked like any edit. 409
+    ``version_conflict`` when ``base_version`` is not the current version."""
+    pack = await _pack(session, job_id, lock=True)
+    changes = body.model_dump(exclude={"base_version"}, exclude_none=True)
+    try:
+        row = await service.edit_story(session, pack, story_id, changes, actor=principal.actor,
+                                       base_version=body.base_version)
     except service.InterviewError as exc:
         raise _error(exc) from exc
     await session.refresh(row)
