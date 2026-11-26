@@ -15447,6 +15447,718 @@
         }
       }
     },
+    "/api/jobs/{job_id}/interview-pack/mock-sessions": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock List",
+        "operationId": "interview_mock_list",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Round Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MockSessionOut"
+                  },
+                  "title": "Response Interview Mock List"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Start",
+        "description": "Start a session and ask the first question. A budget refusal stores it paused (resume it later).",
+        "operationId": "interview_mock_start",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockSessionIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockSessionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/mock-sessions/estimate": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Estimate",
+        "description": "What a session would cost at most, shown before it starts.",
+        "operationId": "interview_mock_estimate",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "behavioural",
+                "technical",
+                "role",
+                "mixed",
+                "tough"
+              ],
+              "type": "string",
+              "title": "Mode"
+            }
+          },
+          {
+            "name": "length",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Length"
+            }
+          },
+          {
+            "name": "use_pack_questions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Use Pack Questions"
+            }
+          },
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Round Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockEstimateOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/jobs/{job_id}/interview-pack/mock-progress": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Progress",
+        "operationId": "interview_mock_progress",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "round_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Round Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockProgressOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-mock/{session_id}": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Get",
+        "operationId": "interview_mock_get",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockSessionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Delete",
+        "operationId": "interview_mock_delete",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-mock/{session_id}/answer": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Answer",
+        "description": "Answer (or skip) the open question; the interviewer replies with a probe, the next question or, after the\nlast one, the final feedback. 409 not_your_turn when the session is not waiting for an answer.",
+        "operationId": "interview_mock_answer",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockAnswerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockSessionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-mock/{session_id}/finish": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Finish",
+        "description": "I'm done: end now and get feedback on what was answered.",
+        "operationId": "interview_mock_finish",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockSessionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-mock/{session_id}/resume": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Resume",
+        "description": "Run the step a budget pause or failure left pending; nothing already written is written again.",
+        "operationId": "interview_mock_resume",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/MockResumeIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockSessionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-mock/{session_id}/export": {
+      "get": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Export",
+        "operationId": "interview_mock_export",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "fmt",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "pdf",
+                "docx",
+                "txt"
+              ],
+              "type": "string",
+              "default": "txt",
+              "title": "Fmt"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "application/pdf": {},
+              "text/plain; charset=utf-8": {},
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-mock/{session_id}/turns/{turn_id}/claims/{claim_id}": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Claim",
+        "description": "Something you said that is not in your Kit: add it as a draft fact (reviewed in the library) or dismiss.",
+        "operationId": "interview_mock_claim",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            }
+          },
+          {
+            "name": "claim_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Claim Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockClaimIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MockTurnOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/interview-mock/{session_id}/turns/{turn_id}/story": {
+      "post": {
+        "tags": [
+          "interview"
+        ],
+        "summary": "Interview Mock Save Story",
+        "description": "Save an answer, in your words, to the pack's story bank, linked to the facts it rests on (checked).",
+        "operationId": "interview_mock_save_story",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          },
+          {
+            "name": "turn_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Turn Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MockStoryIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InterviewSectionOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data/export/preview": {
       "post": {
         "tags": [
@@ -24026,7 +24738,8 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "Notes",
+            "description": "The owner's notes, including pasted interviewer notes"
           },
           "learnt": {
             "anyOf": [
@@ -24038,6 +24751,33 @@
               }
             ],
             "title": "Learnt"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "screen",
+                  "technical",
+                  "panel",
+                  "final",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "Screen, technical, panel, final or other"
+          },
+          "focus": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Focus",
+            "description": "What this round concentrates on"
           }
         },
         "type": "object",
@@ -24114,7 +24854,8 @@
                 "type": "null"
               }
             ],
-            "title": "Notes"
+            "title": "Notes",
+            "description": "The owner's notes, including pasted interviewer notes"
           },
           "learnt": {
             "anyOf": [
@@ -24126,6 +24867,33 @@
               }
             ],
             "title": "Learnt"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "screen",
+                  "technical",
+                  "panel",
+                  "final",
+                  "other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind",
+            "description": "Screen, technical, panel, final or other"
+          },
+          "focus": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Focus",
+            "description": "What this round concentrates on"
           },
           "pack_id": {
             "type": "string",
@@ -25733,6 +26501,676 @@
           "duplicate_ids"
         ],
         "title": "MergeIn"
+      },
+      "MockAnswerIn": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": ""
+          },
+          "skip": {
+            "type": "boolean",
+            "title": "Skip",
+            "default": false
+          },
+          "turn_key": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 40
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turn Key",
+            "description": "The session's expects; a repeat is ignored"
+          }
+        },
+        "type": "object",
+        "title": "MockAnswerIn"
+      },
+      "MockCategoryOut": {
+        "properties": {
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "answers": {
+            "type": "integer",
+            "title": "Answers"
+          },
+          "average": {
+            "type": "number",
+            "title": "Average"
+          },
+          "weak": {
+            "type": "boolean",
+            "title": "Weak"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "answers",
+          "average",
+          "weak"
+        ],
+        "title": "MockCategoryOut"
+      },
+      "MockClaimIn": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "add_draft",
+              "dismiss"
+            ],
+            "title": "Action"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "Corrected wording for the draft fact"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "title": "MockClaimIn"
+      },
+      "MockClaimOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "unverified",
+              "added",
+              "dismissed"
+            ],
+            "title": "Status"
+          },
+          "fact_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "text",
+          "status"
+        ],
+        "title": "MockClaimOut"
+      },
+      "MockEstimateOut": {
+        "properties": {
+          "parts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parts",
+            "description": "Upper-bound cost per step kind, micros"
+          },
+          "total_micros": {
+            "type": "integer",
+            "title": "Total Micros"
+          },
+          "budget_micros": {
+            "type": "integer",
+            "title": "Budget Micros",
+            "description": "What the session may spend before it pauses and asks"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "parts",
+          "total_micros",
+          "budget_micros",
+          "currency"
+        ],
+        "title": "MockEstimateOut"
+      },
+      "MockNextOut": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "category",
+          "reason"
+        ],
+        "title": "MockNextOut"
+      },
+      "MockProgressOut": {
+        "properties": {
+          "sessions": {
+            "type": "integer",
+            "title": "Sessions"
+          },
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/MockCategoryOut"
+            },
+            "type": "array",
+            "title": "Categories"
+          },
+          "weak": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Weak"
+          },
+          "practise_next": {
+            "items": {
+              "$ref": "#/components/schemas/MockNextOut"
+            },
+            "type": "array",
+            "title": "Practise Next"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sessions",
+          "categories",
+          "weak",
+          "practise_next"
+        ],
+        "title": "MockProgressOut"
+      },
+      "MockResumeIn": {
+        "properties": {
+          "budget_micros": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Micros",
+            "description": "Raise the session cap first"
+          }
+        },
+        "type": "object",
+        "title": "MockResumeIn"
+      },
+      "MockSessionIn": {
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "behavioural",
+              "technical",
+              "role",
+              "mixed",
+              "tough"
+            ],
+            "title": "Mode"
+          },
+          "length": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Length",
+            "description": "Main questions; default interview.mock.default_length"
+          },
+          "use_pack_questions": {
+            "type": "boolean",
+            "title": "Use Pack Questions",
+            "description": "Ask the pack's likely questions first",
+            "default": true
+          },
+          "feedback_each": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback Each",
+            "description": "Feedback after each answer as well as at the end"
+          },
+          "timer_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 3600.0,
+                "minimum": 10.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timer Seconds",
+            "description": "Optional answer timer (shown only)"
+          },
+          "round_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Id",
+            "description": "The round this session targets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mode"
+        ],
+        "title": "MockSessionIn"
+      },
+      "MockSessionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "pack_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Pack Id"
+          },
+          "round_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Id"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "behavioural",
+              "technical",
+              "role",
+              "mixed",
+              "tough"
+            ],
+            "title": "Mode"
+          },
+          "length": {
+            "type": "integer",
+            "title": "Length"
+          },
+          "use_pack_questions": {
+            "type": "boolean",
+            "title": "Use Pack Questions"
+          },
+          "feedback_each": {
+            "type": "boolean",
+            "title": "Feedback Each"
+          },
+          "timer_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timer Seconds"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "paused",
+              "failed",
+              "done"
+            ],
+            "title": "Status"
+          },
+          "pending_step": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ask",
+                  "reply",
+                  "final"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Step"
+          },
+          "expects": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expects",
+            "description": "Pass as turn_key with the next answer; null when the session is not waiting for one"
+          },
+          "question_index": {
+            "type": "integer",
+            "title": "Question Index"
+          },
+          "probes": {
+            "type": "integer",
+            "title": "Probes"
+          },
+          "estimate_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Estimate Micros"
+          },
+          "budget_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Micros"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback",
+            "description": "Final feedback: summary, overall, answers"
+          },
+          "scores": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Scores"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "turns": {
+            "items": {
+              "$ref": "#/components/schemas/MockTurnOut"
+            },
+            "type": "array",
+            "title": "Turns"
+          },
+          "unverified_prompt": {
+            "type": "string",
+            "title": "Unverified Prompt",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "pack_id",
+          "round_id",
+          "mode",
+          "length",
+          "use_pack_questions",
+          "feedback_each",
+          "timer_seconds",
+          "status",
+          "question_index",
+          "probes",
+          "estimate_micros",
+          "budget_micros",
+          "cost_micros",
+          "error",
+          "finished_at"
+        ],
+        "title": "MockSessionOut"
+      },
+      "MockStoryIn": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "fact_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Ids",
+            "description": "Default: the facts the answer rests on"
+          }
+        },
+        "type": "object",
+        "title": "MockStoryIn"
+      },
+      "MockTurnOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "seq": {
+            "type": "integer",
+            "title": "Seq"
+          },
+          "step_key": {
+            "type": "string",
+            "title": "Step Key"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "interviewer",
+              "owner",
+              "coach"
+            ],
+            "title": "Role"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "question",
+              "probe",
+              "answer",
+              "skip",
+              "feedback"
+            ],
+            "title": "Kind"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "question_index": {
+            "type": "integer",
+            "title": "Question Index"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feedback",
+            "description": "Checked feedback: structure, relevance, specificity, strong, tighten, scores, suggested (with sources), removed (flagged)"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/MockClaimOut"
+            },
+            "type": "array",
+            "title": "Claims",
+            "description": "Statements not in your Kit"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "seq",
+          "step_key",
+          "role",
+          "kind",
+          "text",
+          "question_index",
+          "category",
+          "created_at"
+        ],
+        "title": "MockTurnOut"
       },
       "NeverMention": {
         "properties": {

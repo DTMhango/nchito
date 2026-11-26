@@ -1001,3 +1001,45 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   files; a mismatch raises the per-task blocker kind `field_mismatch` (pending type `unsupported_form`, continuable).
   The server runner's toolbox sends it (`fill_field` / `select_option` take an optional `packet_key`); the PC runner
   skill asks for it.
+
+## Wave 4 mock-interview additions
+
+Code: `backend/app/pipeline/interview/mock/` (`session` steps and budget, `prompt`, `checks`, `library` for progress,
+story bank, draft facts and export, `shapes`); endpoints in `backend/app/api/routers/interview.py`. Migration
+`0019_mock_interview`: tables `interview_mock_session`, `interview_mock_turn` (unique `(session, seq)` and
+`(session, step_key)`), and `interview_round.kind` / `interview_round.focus`. Shared Literals in `json_types`:
+`RoundKind`, `MockMode`, `MockStatus`.
+
+- **Rounds.** `InterviewRoundIn/Out` gain `kind` (`screen|technical|panel|final|other`, optional) and `focus`
+  (list). A session with `round_id` sees only that round's kind, focus, interviewers and notes (data blocks). A
+  pack without rounds works as in wave 3.
+- **Flow (code-driven).** Steps `ask` (opening question; none when it comes from the pack), `reply` (after each
+  answer or skip: answer analysis, at most `interview.mock.max_probes` probes per question, next question,
+  feedback when `feedback_each`), `final` (summary, per-answer feedback, scores). Plan: the pack's likely
+  questions for the mode first (logistics excluded), then interviewer-written ones. `expects` = the answer key
+  (`a<q>.<probe>`); posting it again as `turn_key` is ignored (no duplicate turn or call); any other answer
+  while not waiting is 409 `not_your_turn`.
+- **Truth.** Suggested answers are `Claim`s citing Kit codes or the owner's answers in the session (`A<seq>`);
+  each runs the pack's checks (`fact_trace`, `claim_drift`, keep-out, guardrails) with the answers as citable
+  sources, and must cite something. Failures move to `removed` (`text` null when a keep-out fact was involved);
+  kept items carry `sources` (`fact` / `your_words`). Scores are clamped to the rubric keys and 1..`score_max`.
+  Statements in an answer not in the Kit (model list plus every unsupported figure, by code) are `claims`
+  (`unverified` -> `added` draft fact `needs_review` / `dismissed`); never facts on their own.
+- **Untrusted.** Posting, mail, owner notes, round focus/notes/interviewers and the transcript (owner answers
+  included) are `DataBlock`s; the system text is fixed per mode and round.
+- **Budget.** Stage `interview`, models `interview.mock.model_interviewer` / `model_feedback`. Start stores
+  `estimate_micros` (ask + replies at the longest answer x (1 + probes) x length + final) and `budget_micros` =
+  estimate x `interview.mock.budget_headroom_pct`. Each call reserves its own estimate; over the session cap or
+  the ledger -> `paused` with the step pending; LLM failure -> `failed`, pending kept. Resume reruns the step
+  (`budget_micros` may raise the cap, never lower it); turns are get-or-add by `step_key`.
+- **Endpoints** (`{code, reason}` errors): `GET|POST /api/jobs/{job_id}/interview-pack/mock-sessions`
+  (`MockSessionIn`; `?round_id=`), `GET .../mock-sessions/estimate?mode&length&use_pack_questions&round_id`,
+  `GET .../mock-progress?round_id=` (`categories`, `weak`, `practise_next`), `GET|DELETE /api/interview-mock/{id}`,
+  `POST .../answer` `{text, skip, turn_key}`, `POST .../finish`, `POST .../resume` `{budget_micros?}`,
+  `GET .../export?fmt=pdf|docx|txt`, `POST .../turns/{turn_id}/claims/{claim_id}` `{action: add_draft|dismiss,
+  text?}`, `POST .../turns/{turn_id}/story` `{title?, fact_ids?}` (an owner `stories` version, checked; story id
+  `m<n>`, the answer as the action).
+- **Settings** `interview.mock.*`: `model_interviewer`, `model_feedback`, `default_length`, `max_length`,
+  `max_probes`, `answer_max_chars`, `rubric` (`key|label`), `score_max`, `weak_below`, `practise_next`,
+  `feedback_each_default`, `budget_headroom_pct`, `unverified_prompt`. Streaming: none (`LLMService` has no
+  streaming); turn at a time.
