@@ -202,7 +202,8 @@ async def snapshot(session: AsyncSession, *, exported_at: datetime | None = None
     tracks = []
     for t in track_rows:
         tracks.append(KitTrack.model_validate(_cols(
-            t, ("key", "name", "priority", "example_titles", "lead_fact_codes", "summary_fact_code", "tone_notes"))))
+            t, ("key", "name", "priority", "example_titles", "lead_fact_codes", "summary_fact_code", "tone_notes",
+                "cv_template", "letter_template"))))
         mark("track", t.key, t)
 
     guardrails = []

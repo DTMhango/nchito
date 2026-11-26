@@ -40,7 +40,8 @@ from app.kit import service as kit_service
 from app.models.applications import Application
 from app.models.base import ReviewState
 from app.models.documents import ApplicationDocument
-from app.models.kit import Experience, Fact, FactKind, FactStatus, Template
+from app.models.kit import Experience, Fact, FactKind, FactStatus, Template, Track
+from app.models.search import Campaign
 
 # Bump when an emitter changes what it writes for the same input; old rows keep their files.
 RENDERER_VERSION = "1"
@@ -90,6 +91,15 @@ def _default_template_key(kind: str, values: dict[str, Any]) -> str:
     return values["documents.cv_template" if kind == "cv" else "documents.letter_template"]
 
 
+async def _track_template_key(session: AsyncSession, app: Application, kind: str) -> str | None:
+    """The template chosen on the application's campaign track, if any (else the documents setting applies)."""
+    campaign = await session.get(Campaign, app.campaign_id) if app.campaign_id else None
+    track = await session.get(Track, campaign.track_id) if campaign is not None and campaign.track_id else None
+    if track is None:
+        return None
+    return track.cv_template if kind == "cv" else track.letter_template
+
+
 async def _template(session: AsyncSession, kind: DocKind, key: str, values: dict[str, Any]) -> TemplateDef:
     row = await session.scalar(select(Template).where(Template.key == key))
     resolved = resolve_template(key, kind, row)
@@ -134,7 +144,8 @@ async def _education(session: AsyncSession) -> list[str]:
 async def prepare(session: AsyncSession, app: Application, kind: DocKind, template_key: str | None = None) -> Prepared:
     """Build the document model, lay it out once (page count) and compute the hashes."""
     values = await settings_service.values(session)
-    template = await _template(session, kind, template_key or _default_template_key(kind, values), values)
+    key = template_key or await _track_template_key(session, app, kind) or _default_template_key(kind, values)
+    template = await _template(session, kind, key, values)
     spec = app.spec
     person = await _person(session)
     if kind == "cv":
