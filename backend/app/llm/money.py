@@ -18,3 +18,13 @@ def minor_to_micros(minor: int) -> int:
 def micros_to_minor(micros: int) -> int:
     """For display only: nearest minor unit, halves rounded up."""
     return (int(micros) + MICROS_PER_MINOR // 2) // MICROS_PER_MINOR
+
+
+def effective_cap_micros(values: dict, which: str) -> int | None:
+    """The cap in micros. ``which`` is ``monthly`` or ``per_run``. A micros value wins over the
+    minor-unit value; both unset means no cap."""
+    micros = values.get(f"budget.{which}_cap_micros")
+    if micros is not None:
+        return int(micros)
+    minor = values.get(f"budget.{which}_cap_minor")
+    return None if minor is None else minor_to_micros(minor)

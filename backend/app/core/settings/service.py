@@ -72,7 +72,29 @@ async def get_value(session: AsyncSession, key: str) -> Any:
     return _effective(definition, row)
 
 
+# Caps can be entered in minor units or micros; the two are kept in step (micros wins when set).
+_CAP_PAIRS = {"budget.monthly_cap_minor": "budget.monthly_cap_micros",
+              "budget.per_run_cap_minor": "budget.per_run_cap_micros"}
+_CAP_PAIRS_REV = {v: k for k, v in _CAP_PAIRS.items()}
+
+
 async def set_value(
+    session: AsyncSession, key: str, raw: Any, *, actor: str, reason: str | None = None,
+    check_combination: bool = True,
+) -> SettingState:
+    """Validate and store a value, keeping a cap's minor and micros forms in step."""
+    state = await _set_one(session, key, raw, actor=actor, reason=reason, check_combination=check_combination)
+    if key in _CAP_PAIRS:
+        await _set_one(session, _CAP_PAIRS[key], None, actor=actor, reason=reason, check_combination=False)
+    elif key in _CAP_PAIRS_REV:
+        from app.llm.money import micros_to_minor
+
+        minor = None if state.value is None else micros_to_minor(state.value)
+        await _set_one(session, _CAP_PAIRS_REV[key], minor, actor=actor, reason=reason, check_combination=False)
+    return state
+
+
+async def _set_one(
     session: AsyncSession, key: str, raw: Any, *, actor: str, reason: str | None = None,
     check_combination: bool = True,
 ) -> SettingState:

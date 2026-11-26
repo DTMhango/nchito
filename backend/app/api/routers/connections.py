@@ -60,6 +60,7 @@ class ConnectionTestOut(BaseModel):
     ok: bool
     detail: str | None = None
     cost_minor: int = 0
+    cost_micros: int = 0
 
 
 class OAuthStartOut(BaseModel):
@@ -169,7 +170,8 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
     await checks.record(session, result, actor=principal.actor)
     conn.health = "ok" if result.ok else "failing"
     conn.last_checked_at = utcnow()
-    return ConnectionTestOut(ok=result.ok, detail=result.detail, cost_minor=micros_to_minor(result.cost_micros))
+    return ConnectionTestOut(ok=result.ok, detail=result.detail, cost_minor=micros_to_minor(result.cost_micros),
+                             cost_micros=result.cost_micros)
 
 
 @connections_router.post("/oauth/{provider}/start", response_model=OAuthStartOut, name="connections_oauth_start")

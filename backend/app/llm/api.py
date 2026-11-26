@@ -187,4 +187,6 @@ async def spend_meter(session: SessionDep, ledger: LedgerDep) -> SpendMeter:
     """The top-bar meter. Refetch on the ``spend.updated`` event."""
     s = await ledger.summary(session)
     return SpendMeter(month_to_date_minor=s.month_to_date_minor, reserved_minor=s.reserved_minor,
-                      cap_minor=s.cap_minor, currency=s.currency, estimated_unbilled_minor=s.estimated_unbilled_minor)
+                      cap_minor=s.cap_minor, currency=s.currency, estimated_unbilled_minor=s.estimated_unbilled_minor,
+                      month_to_date_micros=s.month_to_date_micros, reserved_micros=s.reserved_micros,
+                      cap_micros=s.cap_micros, estimated_unbilled_micros=s.estimated_unbilled_micros)

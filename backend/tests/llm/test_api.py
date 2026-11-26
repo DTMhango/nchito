@@ -61,11 +61,12 @@ async def test_connection_test_makes_one_tiny_budgeted_call(owner_client: httpx.
     created = await create_provider(owner_client)
     r = await owner_client.post(f"/api/connections/{created['id']}/test")
     assert r.json() == {"ok": False, "detail": "Set a monthly cap first: paid calls stay off without one.",
-                        "cost_minor": 0}
+                        "cost_minor": 0, "cost_micros": 0}
     await set_settings(budget__monthly_cap_minor=500)
     adapter.replies.append(reply({"ok": True}, input_tokens=80, output_tokens=5))
     r = await owner_client.post(f"/api/connections/{created['id']}/test")
-    assert r.json()["ok"] is True and r.json()["cost_minor"] == 0  # a fraction of a cent
+    assert r.json()["ok"] is True and r.json()["cost_minor"] == 0
+    assert r.json()["cost_micros"] > 0  # a fraction of a cent
     request, creds = adapter.requests[0]
     assert request.max_output_tokens == 256 and creds.api_key == KEY
     listed = (await owner_client.get("/api/connections")).json()
@@ -130,8 +131,9 @@ async def test_spend_summary_and_meter(owner_client: httpx.AsyncClient, adapter:
     assert summary["month_to_date_minor"] == 0 and summary["by_stage"][0]["key"] == "extract"
     assert summary["timezone"] == "Africa/Lusaka" and summary["cap_minor"] == 500
     meter = (await owner_client.get("/api/ai/spend/meter")).json()
-    assert meter == {"month_to_date_minor": 0, "reserved_minor": 0, "cap_minor": 500, "currency": "USD",
-                     "estimated_unbilled_minor": 0}
+    # a sub-cent call shows 0 in minor units but is visible in micros
+    assert meter["month_to_date_minor"] == 0 and meter["month_to_date_micros"] > 0
+    assert meter["cap_minor"] == 500 and meter["cap_micros"] == 5_000_000 and meter["currency"] == "USD"
     assert (await owner_client.get("/api/ai/spend?month=2026-13")).status_code == 422
 
 

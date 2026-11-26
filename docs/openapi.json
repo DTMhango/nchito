@@ -274,6 +274,96 @@
         }
       }
     },
+    "/api/auth/sessions": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sessions List",
+        "description": "Active (not revoked, not expired) sessions of the owner, newest first.",
+        "operationId": "auth_sessions_list",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/SessionOut"
+                  },
+                  "type": "array",
+                  "title": "Response Auth Sessions List"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions/revoke-others": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sessions Revoke Others",
+        "operationId": "auth_sessions_revoke_others",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "integer"
+                  },
+                  "type": "object",
+                  "title": "Response Auth Sessions Revoke Others"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/sessions/{session_id}": {
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Sessions Revoke",
+        "operationId": "auth_sessions_revoke",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Session Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "No such active session"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/settings": {
       "get": {
         "tags": [
@@ -15133,6 +15223,11 @@
             "type": "integer",
             "title": "Cost Minor"
           },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
+            "default": 0
+          },
           "cost_currency": {
             "anyOf": [
               {
@@ -15462,6 +15557,11 @@
             "type": "integer",
             "title": "Estimated Cost Minor"
           },
+          "estimated_cost_micros": {
+            "type": "integer",
+            "title": "Estimated Cost Micros",
+            "default": 0
+          },
           "currency": {
             "type": "string",
             "title": "Currency"
@@ -15508,6 +15608,11 @@
           "estimated_cost_minor": {
             "type": "integer",
             "title": "Estimated Cost Minor"
+          },
+          "estimated_cost_micros": {
+            "type": "integer",
+            "title": "Estimated Cost Micros",
+            "default": 0
           },
           "cost_currency": {
             "type": "string",
@@ -15572,6 +15677,11 @@
           "estimated_cost_minor": {
             "type": "integer",
             "title": "Estimated Cost Minor"
+          },
+          "estimated_cost_micros": {
+            "type": "integer",
+            "title": "Estimated Cost Micros",
+            "default": 0
           },
           "cost_currency": {
             "type": "string",
@@ -17194,6 +17304,11 @@
           "cost_minor": {
             "type": "integer",
             "title": "Cost Minor",
+            "default": 0
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
             "default": 0
           }
         },
@@ -20894,6 +21009,11 @@
           "cost_minor": {
             "type": "integer",
             "title": "Cost Minor"
+          },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
+            "default": 0
           }
         },
         "type": "object",
@@ -25450,6 +25570,11 @@
             "type": "integer",
             "title": "Cost Minor"
           },
+          "cost_micros": {
+            "type": "integer",
+            "title": "Cost Micros",
+            "default": 0
+          },
           "config_versions": {
             "additionalProperties": true,
             "type": "object",
@@ -25987,6 +26112,59 @@
           "points"
         ],
         "title": "Series"
+      },
+      "SessionOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_seen_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Last Seen At"
+          },
+          "user_agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Agent"
+          },
+          "ip": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ip"
+          },
+          "current": {
+            "type": "boolean",
+            "title": "Current",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "last_seen_at"
+        ],
+        "title": "SessionOut"
       },
       "SettingGroupOut": {
         "properties": {
@@ -26942,6 +27120,16 @@
             "title": "Unbilled Minor",
             "default": 0
           },
+          "billed_micros": {
+            "type": "integer",
+            "title": "Billed Micros",
+            "default": 0
+          },
+          "unbilled_micros": {
+            "type": "integer",
+            "title": "Unbilled Micros",
+            "default": 0
+          },
           "calls": {
             "type": "integer",
             "title": "Calls",
@@ -26969,6 +27157,16 @@
           "unbilled_minor": {
             "type": "integer",
             "title": "Unbilled Minor",
+            "default": 0
+          },
+          "billed_micros": {
+            "type": "integer",
+            "title": "Billed Micros",
+            "default": 0
+          },
+          "unbilled_micros": {
+            "type": "integer",
+            "title": "Unbilled Micros",
             "default": 0
           }
         },
@@ -27006,6 +27204,32 @@
           "estimated_unbilled_minor": {
             "type": "integer",
             "title": "Estimated Unbilled Minor"
+          },
+          "month_to_date_micros": {
+            "type": "integer",
+            "title": "Month To Date Micros",
+            "default": 0
+          },
+          "reserved_micros": {
+            "type": "integer",
+            "title": "Reserved Micros",
+            "default": 0
+          },
+          "cap_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Micros"
+          },
+          "estimated_unbilled_micros": {
+            "type": "integer",
+            "title": "Estimated Unbilled Micros",
+            "default": 0
           }
         },
         "type": "object",
@@ -27080,6 +27304,54 @@
               }
             ],
             "title": "Remaining Minor"
+          },
+          "cap_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap Micros"
+          },
+          "per_run_cap_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Per Run Cap Micros"
+          },
+          "month_to_date_micros": {
+            "type": "integer",
+            "title": "Month To Date Micros",
+            "default": 0
+          },
+          "reserved_micros": {
+            "type": "integer",
+            "title": "Reserved Micros",
+            "default": 0
+          },
+          "estimated_unbilled_micros": {
+            "type": "integer",
+            "title": "Estimated Unbilled Micros",
+            "default": 0
+          },
+          "remaining_micros": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remaining Micros"
           },
           "warning_reached": {
             "type": "boolean",

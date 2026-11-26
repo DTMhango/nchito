@@ -136,6 +136,7 @@ class BacktestEstimateOut(BaseModel):
     jobs: int = Field(description="Roles in the backtest")
     to_score: int = Field(description="Roles that need a model call (not filtered out, not cached)")
     estimated_cost_minor: int
+    estimated_cost_micros: int = 0
     cost_currency: str
 
 
@@ -153,6 +154,7 @@ class BacktestRow(BaseModel):
 class BacktestOut(BaseModel):
     rows: list[BacktestRow]
     estimated_cost_minor: int
+    estimated_cost_micros: int = 0
     cost_currency: str
 
 
@@ -531,6 +533,7 @@ async def backtest_estimate(body: BacktestIn, session: SessionDep) -> BacktestEs
     result = await _backtest(session, body, estimate_only=True)
     return BacktestEstimateOut(jobs=len(result.rows), to_score=result.to_score,
                                estimated_cost_minor=micros_to_minor(result.estimated_cost_micros),
+                               estimated_cost_micros=result.estimated_cost_micros,
                                cost_currency=result.currency)
 
 
@@ -545,4 +548,5 @@ async def backtest(body: BacktestIn, session: SessionDep, principal: PrincipalDe
                                "estimated_cost_minor": micros_to_minor(result.estimated_cost_micros)})
     return BacktestOut(rows=[BacktestRow.model_validate(r) for r in result.rows],
                        estimated_cost_minor=micros_to_minor(result.estimated_cost_micros),
-                               cost_currency=result.currency)
+                       estimated_cost_micros=result.estimated_cost_micros,
+                       cost_currency=result.currency)

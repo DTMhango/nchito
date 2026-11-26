@@ -300,7 +300,7 @@ _int("ai.max_retries", "Retries", "Retries after a failed or invalid model reply
 _int("ai.route_test_valid_minutes", "Route test validity",
      "A model route can be activated only after a successful test within this window.", 60, 240, 1, 10_080, "minutes")
 
-# Budget (11)
+# Budget (13)
 _add("budget.currency", "currency", "Budget currency", "Currency of the spend ledger.",
      "USD", "EUR", str, validators=(currency_code,), invalid_example="dollars", has_invalid_example=True)
 _int("budget.monthly_cap_minor", "Monthly cap",
@@ -308,6 +308,12 @@ _int("budget.monthly_cap_minor", "Monthly cap",
      "minor units", nullable=True)
 _int("budget.per_run_cap_minor", "Per-run cap", "Spend cap per run in minor units. Unset means no per-run cap.",
      None, 200, 0, 10_000_000, "minor units", nullable=True)
+_int("budget.monthly_cap_micros", "Monthly cap (micro-units)",
+     "Monthly cap in millionths of the major unit; when set it wins over the minor-unit cap, which is kept in "
+     "step (rounded).", None, 20_000_000, 0, 100_000_000_000, "micros", nullable=True)
+_int("budget.per_run_cap_micros", "Per-run cap (micro-units)",
+     "Per-run cap in millionths of the major unit; when set it wins over the minor-unit cap.",
+     None, 2_000_000, 0, 100_000_000_000, "micros", nullable=True)
 _int("budget.warning_percent", "Warning", "Warn when month-to-date spend passes this share of the cap.",
      80, 90, 1, 100, "%")
 _int("budget.agent_task_ceiling_minor", "Agent task ceiling", "Maximum spend for one agent task, in minor units.",

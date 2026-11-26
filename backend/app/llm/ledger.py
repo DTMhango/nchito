@@ -39,7 +39,7 @@ from app.core.db import get_sessionmaker
 from app.core.events import publish
 from app.core.settings import service as settings_service
 from app.llm.client import BudgetExhausted
-from app.llm.money import micros_to_minor, minor_to_micros
+from app.llm.money import effective_cap_micros, micros_to_minor
 from app.models.platform import AuditEvent, LedgerEntry, LedgerKind
 
 LEDGER_LOCK_KEY = 0x4E43_4C44  # "NCLD": one advisory lock for every reservation
@@ -62,6 +62,8 @@ class SpendBucket(BaseModel):
     key: str
     billed_minor: int = 0
     unbilled_minor: int = 0
+    billed_micros: int = 0
+    unbilled_micros: int = 0
     calls: int = 0
 
 
@@ -69,6 +71,8 @@ class SpendDay(BaseModel):
     day: date
     billed_minor: int = 0
     unbilled_minor: int = 0
+    billed_micros: int = 0
+    unbilled_micros: int = 0
 
 
 class SpendSummary(BaseModel):
@@ -82,6 +86,12 @@ class SpendSummary(BaseModel):
     reserved_minor: int
     estimated_unbilled_minor: int
     remaining_minor: int | None
+    cap_micros: int | None = None
+    per_run_cap_micros: int | None = None
+    month_to_date_micros: int = 0
+    reserved_micros: int = 0
+    estimated_unbilled_micros: int = 0
+    remaining_micros: int | None = None
     warning_reached: bool
     by_stage: list[SpendBucket]
     by_model: list[SpendBucket]
@@ -149,18 +159,16 @@ class Ledger:
     async def _check_caps(self, session: AsyncSession, values: dict, now: datetime, amount: int,
                           run_id: uuid.UUID | None) -> BudgetExhausted | None:
         currency = values["budget.currency"]
-        cap_minor = values["budget.monthly_cap_minor"]
-        if cap_minor is None:
+        cap = effective_cap_micros(values, "monthly")
+        if cap is None:
             return BudgetExhausted("no_cap", needed_micros=amount, available_micros=None, currency=currency)
-        cap = minor_to_micros(cap_minor)
         start, end, _ = month_bounds(now, values["general.timezone"])
         committed = await self._committed(session, start, end)
         if committed + amount > cap:
             return BudgetExhausted("monthly", needed_micros=amount, available_micros=max(cap - committed, 0),
                                    currency=currency)
-        run_cap_minor = values["budget.per_run_cap_minor"]
-        if run_id is not None and run_cap_minor is not None:
-            run_cap = minor_to_micros(run_cap_minor)
+        run_cap = effective_cap_micros(values, "per_run")
+        if run_id is not None and run_cap is not None:
             used = await self._run_committed(session, run_id)
             if used + amount > run_cap:
                 return BudgetExhausted("per_run", needed_micros=amount, available_micros=max(run_cap - used, 0),
@@ -234,16 +242,16 @@ class Ledger:
 
     async def _warn_once(self, session: AsyncSession) -> None:
         values = await settings_service.values(session)
-        cap_minor = values["budget.monthly_cap_minor"]
-        if not cap_minor:
+        cap = effective_cap_micros(values, "monthly")
+        if not cap:
             return
-        cap = minor_to_micros(cap_minor)
         start, end, month = month_bounds(self.clock.now(), values["general.timezone"])
         spent = await self._spent(session, start, end)
         if spent * 100 < values["budget.warning_percent"] * cap or await self._already_told(
                 session, "budget.warning", start):
             return
-        detail = {"month": month, "spent_minor": micros_to_minor(spent), "cap_minor": cap_minor,
+        detail = {"month": month, "spent_minor": micros_to_minor(spent), "cap_minor": micros_to_minor(cap),
+                  "spent_micros": spent, "cap_micros": cap,
                   "percent": values["budget.warning_percent"]}
         await audit.record(session, actor=SYSTEM_ACTOR, action="budget.warning", subject_type="budget",
                            subject_id=month, detail=detail)
@@ -289,32 +297,37 @@ class Ledger:
                 bucket = table.setdefault(key, SpendBucket(key=key))
                 bucket.calls += 1
                 if row.billed:
-                    bucket.billed_minor += row.amount_micros
+                    bucket.billed_micros += row.amount_micros
                 else:
-                    bucket.unbilled_minor += row.amount_micros
+                    bucket.unbilled_micros += row.amount_micros
             day = row.created_at.astimezone(tz).date()
             entry = daily[day]
             entry.day = day
             if row.billed:
-                entry.billed_minor += row.amount_micros
+                entry.billed_micros += row.amount_micros
                 billed_total += row.amount_micros
             else:
-                entry.unbilled_minor += row.amount_micros
+                entry.unbilled_micros += row.amount_micros
                 unbilled_total += row.amount_micros
         reserved = sum(r.amount_micros for r in open_rows if r.billed)
-        cap_minor = values["budget.monthly_cap_minor"]
-        cap = None if cap_minor is None else minor_to_micros(cap_minor)
+        cap = effective_cap_micros(values, "monthly")
+        run_cap = effective_cap_micros(values, "per_run")
         # Buckets were summed in micros; convert once, for display.
         for item in [*stage.values(), *model.values(), *run.values(), *daily.values()]:
-            item.billed_minor, item.unbilled_minor = micros_to_minor(item.billed_minor), micros_to_minor(
-                item.unbilled_minor)
+            item.billed_minor, item.unbilled_minor = micros_to_minor(item.billed_micros), micros_to_minor(
+                item.unbilled_micros)
 
         def ordered(table: dict[str, SpendBucket]) -> list[SpendBucket]:
-            return sorted(table.values(), key=lambda b: (-(b.billed_minor + b.unbilled_minor), b.key))
+            return sorted(table.values(), key=lambda b: (-(b.billed_micros + b.unbilled_micros), b.key))
 
         return SpendSummary(
-            month=label, timezone=tz_name, currency=values["budget.currency"], cap_minor=cap_minor,
-            per_run_cap_minor=values["budget.per_run_cap_minor"], warning_percent=values["budget.warning_percent"],
+            month=label, timezone=tz_name, currency=values["budget.currency"],
+            cap_minor=None if cap is None else micros_to_minor(cap),
+            per_run_cap_minor=None if run_cap is None else micros_to_minor(run_cap),
+            cap_micros=cap, per_run_cap_micros=run_cap, month_to_date_micros=billed_total,
+            reserved_micros=reserved, estimated_unbilled_micros=unbilled_total,
+            remaining_micros=None if cap is None else max(cap - billed_total - reserved, 0),
+            warning_percent=values["budget.warning_percent"],
             month_to_date_minor=micros_to_minor(billed_total), reserved_minor=micros_to_minor(reserved),
             estimated_unbilled_minor=micros_to_minor(unbilled_total),
             remaining_minor=None if cap is None else micros_to_minor(max(cap - billed_total - reserved, 0)),

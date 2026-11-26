@@ -268,6 +268,7 @@ class BackfillEstimate(BaseModel):
 
     jobs: int
     estimated_cost_minor: int
+    estimated_cost_micros: int = 0
     currency: str
     remaining: int = 0
     paused_for_budget: str | None = Field(default=None, description="Budget scope that stopped the backfill")
@@ -693,11 +694,13 @@ async def backfill_custom_facet(item_id: uuid.UUID, session: SessionDep, confirm
     currency = await settings_service.get_value(session, "budget.currency")
     if not confirm:
         cost = await custom_facets.estimate(client, facet, jobs)
-        return BackfillEstimate(jobs=len(jobs), estimated_cost_minor=micros_to_minor(cost), currency=currency)
+        return BackfillEstimate(jobs=len(jobs), estimated_cost_minor=micros_to_minor(cost),
+                              estimated_cost_micros=cost, currency=currency)
     done = await custom_facets.backfill(client, facet, jobs)
     await audit.record(session, actor="owner", action="custom_facet.backfilled", subject_type="custom_facet",
                        subject_id=facet.id, detail={"answered": done.answered, "remaining": done.remaining,
                                                     "budget": done.budget.scope if done.budget else None})
     return BackfillEstimate(jobs=done.answered, estimated_cost_minor=micros_to_minor(done.cost_micros),
+                            estimated_cost_micros=done.cost_micros,
                             currency=currency, remaining=done.remaining,
                             paused_for_budget=done.budget.scope if done.budget else None)
