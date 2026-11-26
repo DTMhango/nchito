@@ -20,6 +20,23 @@ from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 
+class MailError(RuntimeError):
+    """A mailbox call failed. Messages never contain tokens, passwords or message bodies."""
+
+
+class MailConfigError(MailError):
+    """The connection is not configured for this call (for example no label or query to read)."""
+
+
+class MailAuthError(MailError):
+    """Credentials are missing, revoked or refused. The connection needs to be reconnected."""
+
+
+class MailSendError(MailError):
+    """The provider definitely refused the message before accepting it (safe to say nothing left).
+    An outcome that is merely unknown is not an error: ``send`` returns ``None``."""
+
+
 @dataclass(frozen=True)
 class Attachment:
     file_name: str
@@ -47,7 +64,8 @@ class MailMessage:
     subject: str
     received_at: datetime
     body_text: str
-    headers: dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)  # lower-cased names; Message-ID, References, ...
+    body_html: str = ""
 
 
 @runtime_checkable
@@ -57,6 +75,8 @@ class Mailbox(Protocol):
         ...
 
     async def list_messages(self, since: datetime, *, limit: int = 200) -> list[MailMessage]:
+        """The oldest ``limit`` messages received at or after ``since``, oldest first. A full page means
+        there may be more: the caller asks again from the newest one it got."""
         ...
 
     async def find_sent(self, idempotency_key: str) -> MailMessage | None:

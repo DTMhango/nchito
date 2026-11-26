@@ -1,0 +1,3 @@
+id,company,role,location,track,fit_1to5,link,source,date_found,closes,status,date_tailored,date_applied,claimed_by,next_step,next_step_due,last_update,notes
+1,Kafue Analytics (Fictional),Data Analyst,Lusaka,data,4,https://careers.example.com/1,manual,2026-01-05,,applied,2026-01-06,2026-01-07,,,,2026-01-07,
+2,Luangwa Bank (Fictional),BI Developer,Lusaka,data,3,https://careers.example.com/2,manual,2026-01-10,,rejected,2026-01-11,2026-01-12,,,,2026-02-01,

@@ -105,6 +105,10 @@ class KitTrack(_K):
     lead_fact_codes: list[str] = Field(default_factory=list)
     summary_fact_code: str | None = None
     tone_notes: str | None = None
+    cv_template: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,59}$",
+                                    description="CV template key for this track; null uses the documents setting")
+    letter_template: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9_-]{0,59}$",
+                                        description="Letter template key; null uses the documents setting")
 
 
 class KitGuardrail(_K):

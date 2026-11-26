@@ -3,6 +3,7 @@ Job Hunting.zip
 *.kit.zip
 data/
 **/data/
+!frontend/src/features/settings/data/
 
 .git
 .github

@@ -427,3 +427,313 @@ the registry under its own group prefix only.
   `block, waivable once`; 409 if already waived; 422 blank reason), `GET /api/kit/guardrail-waivers?application_id=`,
   `DELETE /api/kit/guardrail-waivers/{id}`. `POST /api/kit/guardrails/check` takes an optional `application_id`: a waived
   violation shows `waived: true` and no longer sets `blocked`. Audited `kit.guardrail.waived`, `kit.guardrail.waiver_removed`.
+
+## Wave 2 kit-io additions
+
+- `POST /api/data/export` and `/export/preview`: `ExportIn` gains `acknowledge_personal_details`
+  (default false). A `share_setup` whose scan finds personal details returns 409 until the owner
+  removes them or acknowledges. Share setup also drops campaign pay floors and seniority, track
+  lead facts, and every guardrail type except `format`, `limit`, `attach_policy`.
+- `GET /api/data/exports/{export_id}`: downloads a prepared export (`download_url` points here);
+  404 once `data.export_link_minutes` has passed. Files live under `FILES_DIR/exports/`.
+- `POST /api/data/import` (`kit_file`, `old_kit_zip`, `history_csv`, `free_form`) stages the upload
+  under `FILES_DIR/imports/<id>/` and writes nothing to the database; `/import/commit` re-reads
+  and re-validates the staged bytes, applies in one transaction, and consumes the staging.
+  `exclude_keys` entries are `entity:key` as shown in the preview diff. `change` is `conflict`
+  when the incoming item differs from one the owner already confirmed.
+- Kit file zip rules: only `kit.json` and `vault/<file>` (no subfolders); every vault file listed
+  with a matching sha256; a newer `schema_version` is refused, an older one runs through
+  `kitfile.MIGRATIONS`. Vault paths are `vault/<sha256><ext>`.
+- Setup sections that can act on their own import inert: sources disabled, campaigns draft with
+  every criteria group unconfirmed and automation lowered to `prepare`, rubrics and prompts as
+  inactive new versions.
+- `GET /api/data/onboarding`: computed wizard state (`kit_present`, `facts_confirmed`,
+  `campaign_exists`, `criteria_confirmed`, `mail_connected`), plus `complete` and `next_step`.
+- Settings (group `data`): `import_max_zip_mb`, `import_max_file_mb`, `import_max_files`,
+  `import_staging_hours`, `export_link_minutes`, `old_kit_ai_extraction` (default off).
+
+## Wave 2 ops additions
+
+- **Health**: `GET /api/health/live` (public, process answers), `GET /api/health/ready` (public; 503 unless the database
+  answers and is migrated), `GET /api/health/detail` (owner): components `database`, `worker`, `sweep`, `backup`, `disk`,
+  `connections` (each `ok | warn | down | unknown`), queue depth (`waiting`, `running`, `failed`), per-worker heartbeat
+  age, per-connection status. `GET /api/health` is unchanged. One `health` notification per persistent failure and one on
+  recovery.
+- **Connections**: `telegram` (config `chat_id`, secret `bot_token`), `webhook` (config `url`, secret `signing_secret`,
+  at least 16 characters) and `gdrive` use the existing create/update/delete/test endpoints. `gdrive` is created only
+  by the OAuth callback (`POST /api/connections/oauth/gdrive/start`, `GET .../callback`, 307 to
+  `/settings/connections?connected=gdrive`); start answers 409 when `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` are not set.
+  Drive uses the `drive.file` scope (only files Nchito creates, in one folder). Tokens are Fernet-encrypted in
+  `Connection.secrets_enc` and shown masked; a refreshed token and the root folder id are written back.
+- **Webhook signature**: headers `X-Nchito-Timestamp`, `X-Nchito-Event-Id` (idempotency key), `X-Nchito-Signature` =
+  `sha256=` + HMAC-SHA256(secret, `"<timestamp>.<raw body>"`). Receivers reject a timestamp more than 300 s old
+  (`app.connect.webhook.verify_signature`).
+- **Notifier interface** `app.connect.notifier` (`Notifier.send(OutboundMessage)`, `register_notifier_factory(channel,
+  factory)`): the mail stream registers `email` the same way. `app.ops.digest.render_digest(session, since=, until=)`
+  returns `Digest(title, body, counts, is_empty)` for the email digest. Messages carry title, short body and links only.
+  Notification state lives on `Notification` (`dedupe_key` = event id, `channels_sent`, `payload._delivery`); no table
+  changed.
+- **Backups**: `GET /api/data/backups` (local archives, plus a row for the remote copy), `POST /api/data/backups` (runs the
+  nightly job now, answers when written; 503 if `pg_dump` is missing), `POST /api/data/retention/run`. Archives are
+  `nchito-<UTC>.backup` (Fernet-encrypted tar: `manifest.json`, `db.dump`, `files/`), written to `BACKUP_DIR`.
+  CLI: `python -m app.cli backup`, `python -m app.cli restore <file> [--yes] [--inspect] [--database-url] [--files-dir]
+  [--no-pause]`. A restore leaves the instance paused (`automation.paused`).
+- **Config history**: `GET /api/data/config-history` lists `ConfigRevision` rows and every setting change
+  (`kind=setting`, `diff = {key, old, new}`), newest first, keyset cursor. Rollback stays 501.
+- Backup, retention and digest runs are recorded as `Run` rows (`kind` backup, retention, digest) and audited
+  (`backup.completed`, `backup.failed`, `backup.restored`, `filestore.share_link_created`, `notification.delivery_failed`).
+- **Settings added**: `notifications.{events, quiet_hours_enabled, quiet_hours_start, quiet_hours_end, detail_level,
+  needs_you_title, alert_title, digest_title, digest_time, digest_skip_empty, digest_max_items, lookback_hours,
+  retry_attempts, retry_minutes}`, `retention.{cron, notifications_days, temp_files_days}`,
+  `health.{sweep_stale_hours, backup_stale_hours, disk_min_free_mb}` (new group `health`). Env: `BACKUP_DIR`, `PG_BIN_DIR`,
+  `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`.
+
+## Wave 2 render additions
+
+Code: `backend/app/docs/` (`api.py` router included by `applications.py`, `service.py`, `layouts.py`, `model.py`,
+`emit_pdf|docx|html|text.py`, `store.py`). Table `application_document` (migration `0007_render`).
+
+- `GET /api/applications/{id}/documents` -> `DocumentOut[]` (newest first; files from earlier spec versions stay).
+- `POST /api/applications/{id}/documents/render` `{kind: cv|letter, template_key?, formats?: [pdf, docx, txt, html]}`
+  (default pdf, docx, txt) -> `{documents: DocumentOut[], warnings: RenderWarning[]}`. Idempotent: the same spec,
+  Kit rows, template and renderer version return the rows already stored (`input_hash`, unique per application,
+  kind and format).
+- `GET /api/applications/{id}/documents/{kind}?fmt=pdf|docx|txt|html&template=` downloads the current spec's file
+  (rendering it if needed). `fmt` gained `txt`. Headers: `X-Content-SHA256`, `X-Document-Id`, `X-Render-Warnings`
+  (count). `kind=answers` stays 501 (the apply stream builds it from the packet).
+- `GET /api/applications/{id}/document-files/{document_id}` downloads a stored file exactly as rendered.
+- `DocumentOut`: `spec_hash` (sha256 of the canonical spec JSON it came from), `content_hash` (sha256 of the stored
+  file; a packet's `PacketFile.sha256` and `document_id` come from here), `page_count`, `warnings`.
+- `RenderWarning {code, message, detail, severity: "warn"}`; codes: `page_limit`, `paragraph_limit`,
+  `bullets_per_role`, `section_omitted`, `unknown_experience`, `no_name`, `empty`, `font_substituted`. Content is
+  never trimmed to fit.
+- Templates: built-ins `classic`, `compact`, `modern` (cv) and `letter-plain` (letter), defined as data in
+  `app/docs/layouts.py`. A `Template` row with the same key overrides section order, limits, accent and name; a row
+  with a new key starts from `classic` / `letter-plain`. Empty limits fall back to `documents.cv_pages`,
+  `documents.letter_pages`, `documents.letter_paragraphs`. Default template per kind: `documents.cv_template`,
+  `documents.letter_template`; the render request's `template_key` overrides it.
+- New settings: `documents.letter_template`, `documents.letter_salutation`, `documents.letter_signoff`.
+- The CV header shows only `show_on_cv` person fields. Education lines come from approved, confirmed `education` facts.
+- PDF is produced with ReportLab (no headless browser) and DOCX with python-docx; both are byte-stable for equal input.
+
+
+## Wave 2 tailoring additions
+
+- **Spec versions**: table `application_spec_version` (migration `0007_tailoring`). Every tailored draft and every
+  owner edit is a new version `{version, origin: tailor|owner, parent_version, spec, content_hash, answers,
+  check_results, checked_hash, checked_facts}`; `Application.spec` and `Application.check_results` mirror the latest.
+  `content_hash` is sha256 of the spec's canonical JSON (`app.pipeline.checks.items.content_hash`). A spec is
+  **checked** only while `checked_hash == content_hash` and every cited fact still has the hash it had at check time.
+  The `ApplicationSpec` shape is unchanged.
+- **Tailoring requests**: table `tailoring_request`, unique per (application, sha256 of starting spec version and the
+  digest of usable Kit facts). `POST /applications/{id}/tailor` returns the same request while it is open
+  (`queued` true) and moves a shortlisted application to `tailoring`; 409 after submission. A budget refusal parks the
+  request `paused`; the periodic task `tailoring_resume` re-queues it when a cap is set and the cap or month changed.
+  Queue task `tailor_application(request_id)` under lock `tailor:<application id>`; one spec version per request.
+  Runs call `app.pipeline.tailoring.tasks.tailor(session, application_id, run_id=...)`, commit, then `enqueue(req)`.
+- **`GET /applications/{id}/spec?version=`** (new) -> `SpecStateOut {application_id, version, origin, content_hash,
+  spec, check_results, checked, status, stale_reasons, answers: DraftAnswer[], tailoring, tailoring_error,
+  versions[]}`.
+- **`PUT /applications/{id}/spec`** stores an owner version, runs the code checks, invalidates an approved packet
+  (`invalidated_reason` names the spec version); 409 once the application has gone out.
+  **`POST /applications/{id}/check`** re-runs the code checks plus the model claim check (stage `claim_check`, when
+  `tailoring.claim_check_enabled`); 409 when there is no draft. The model pass only adds findings.
+- **Check results**: `check` is one of `fact_trace`, `claim_drift`, `keep_out`, `guardrails.<type>` (pass row
+  `guardrails`), `limits`, `skills`, `requirement_match`, `answers`, `claim_check`; `detail` starts with the item path
+  (`experience[0].bullets[1]: ...`). For whole-packet checks the apply stream calls
+  `app.pipeline.checks.service.deterministic(spec, kit, cfg, answers=, extra_documents=, file_names=, attachments=,
+  released=, waived=)`.
+- **`DraftAnswer`** (json shape): `{question, outcome: value|ask_owner|do_not_answer, value, select, answer_id,
+  material, reason, pending_action_id}`. Only `value` carries an answer; `ask_owner` raised an `unknown_question`
+  pending action (one per question per application, `group_key` `question:<normalised>`).
+- **Settings** (group `tailoring`): `max_facts`, `claim_check_enabled`, `claim_check_severity`,
+  `ownership_weak_terms`, `ownership_strong_terms`, `scope_terms`, `period_terms`, `qualification_terms`.
+
+## Wave 2 apply-policy additions
+
+- **Decision table (section 10).** `resolve_mode(campaign, channel, *, default_mode, default_version) -> ModeResolution`
+  is the one place the automation mode is resolved: campaign `automation.per_channel[channel]`, else `automation.mode`,
+  else setting `automation.default_mode`; capped at `prepare` while the campaign is unconfirmed; `reason` names rule,
+  value, source and version. `DecisionInput.application["channel"]` selects the channel's mode. With purpose `permit`,
+  `application` = `{approval: "owner"|"auto"|None, channel, permit_checks: {name: (outcome, reason[, owner_settles])},
+  for_approval}` and `Decision` gains `permit` (`granted` / `wait_for_owner` / `denied`) and `permit_reason`. An
+  excluded role is always denied. Gates an owner approval settles: `auto_threshold`, `known_data`, `pay_stated`,
+  `always_ask_first`, any check flagged `owner_settles`, and `role_open` when `automation.permit_unknown_open` is
+  `allow_when_owner_approved`. `for_approval` leaves timing gates (`global_pause`, caps, `quiet_hours`, `budget`) to the
+  permit. Owner approvals let the system send only from `ask_then_apply` (any mode for `manual`).
+- **Python API (`app/apply/`).** `policy.for_application`; `packets.build(session, app, PacketDraft) -> BuildResult`,
+  `packets.current/history/diff/content_hash/invalidate`; `approval.approve/auto_approve/after_packet_built/reject/
+  request_changes`; `gates.evaluate(...) -> Evaluation`; `permits.request(...) -> PermitResult`,
+  `permits.consume(...)` (atomic conditional update; raises `PermitRefused`), `permits.revoke`,
+  `permits.release_stale_claims`, `permits.lock_permits`; `owner_actions.approve_from_action/choose/continue_task`.
+- **`PacketContents`** gains `channel` and `job_version` (job content hash). **`GateResult`** gains
+  `outcome: pass|fail|unknown`; `passed` stays and is true exactly when `outcome` is `pass`.
+- **Endpoints.** `GET /api/applications/{id}/packet` (current, 404 if none); `POST /api/applications/{id}/packet`
+  (`PacketBuildIn` -> `PacketBuildOut {packet, created, changes, approval}`); `GET .../packets`, `GET .../receipt`,
+  `POST .../approve` implemented (409 `{code: "approval_refused", reason, gates?}`); `POST .../reject {reason?}` (skips
+  the role, promotes the next in its employer group); `POST .../request-changes {note}` (retires the packet, back to
+  tailoring). All audited (`packet.built`, `application.approved|approval_refused|auto_approval_declined|rejected|
+  changes_requested`, `permit.granted|denied|wait_for_owner|consumed|refused|revoked`).
+- `POST /api/pending-actions/{id}/resolve`: `approved` (approve), `chosen` (conflict_choice; new field
+  `chosen_job_id`), `continue` (sign_in / create_account / captcha: task requeued for the same runner, siblings in the
+  group close). `confirmed` stays 501 (reconciliation). A decided conflict choice is never raised again.
+- `/api/trusted-sites` list / create / delete implemented (`trusted_by` = owner, domain lower-cased, suffix match).
+- `AutopilotState` gains `paused_by` and `reason` (from the setting revision); `AutopilotWrite` gains `reason`.
+  Pausing revokes outstanding permits, cancels `reserved` dispatch attempts and lists in-flight ones.
+- **Settings:** `automation.permit_valid_minutes` (10), `automation.permit_unknown_open` (`refuse`),
+  `automation.receipt_pay_terms`, `automation.receipt_work_rights_terms`.
+
+## Wave 2 dispatch additions
+
+- **Channel registry** (`app/apply/channels/registry.py`): `register(name, async factory(session) -> Channel)`,
+  `register_lazy(name, "module:attr")`, `get(session, name)`, `available()`, `is_available()`; `manual`
+  (`channels/manual.py`, owner-enforced) is built in lazily. `registry.packet_hash` is `packets.content_hash`: sha256
+  of `json.dumps(PacketContents.model_dump(mode="json"), sort_keys=True, separators=(",", ":"), ensure_ascii=False)`
+  UTF-8. A channel's `failed` means nothing left (retryable); any exception or `unknown` after hand-over is uncertain.
+- **Python API.** `dispatch.queue(session, app_id)` (permit request, then consume + `DispatchAttempt` in one
+  transaction; `wait_for_owner` raises the approval request), `dispatch.run(session, attempt_id)` (recheck at
+  dispatch, commit `started_at`, call the channel, record the outcome), `dispatch.tick` (worker task `apply_tick`
+  every minute: stale permit claims, in-flight timeout, queue approved email packets, due sends, reconcile);
+  `outcomes.record/cancel/settle_sent_by_owner/settle_not_sent`; `reconcile.check/reconcile_due/decide`;
+  `handoff.kit/mark_submitted`; `restore.enter/state/resume` (CLI `python -m app.cli restored [--backup-taken-at]`);
+  `resolvers.register(kind, fn)` for proposal pending actions (`mail_stage_proposal` ->
+  `app.connect.mail_sync:apply_proposal`, lazily). `dispatch.set_open_checker` (tests).
+- **`DispatchAttempt`** gains `started_at` (in flight), `evidence`, `reconcile_attempts`, `last_reconciled_at`
+  (migration `0007_apply_policy`). A started attempt is never claimed again; after
+  `reconcile.in_flight_timeout_minutes` with no outcome it is `unknown`. `unknown` puts the application in
+  `submitted_unconfirmed`; only reconciliation (`via="system"`) may move `submitted_unconfirmed -> ready` (clears
+  `applied_at`).
+- **Endpoints.** `GET .../dispatches` (with `started_at`, `evidence`, `uncertain`, `reconcile_attempts`,
+  `last_reconciled_at`); new `POST /api/applications/{id}/dispatches` (`{}` -> `DispatchCreateOut {status, reason,
+  dispatch, gates, pending_action_id}`; manual is handed off at once); `POST .../dispatches/{d}/cancel` (409 once
+  handed over); new `POST .../dispatches/{d}/reconcile` (`ReconcileIn {decision: check|sent|not_sent, reference?,
+  note?}` -> `ReconcileOut {result: sent|not_sent|waiting, dispatch}`); `GET .../handoff`; `POST .../mark-submitted`
+  (409 when nothing approved is waiting: use "I applied myself"); new `GET /api/autopilot/restore`
+  (`RestoreStateOut`); `POST /api/autopilot/resume-after-restore` (409 `{code: "restore_unreconciled", outstanding}`);
+  `PUT /api/autopilot` resume answers 409 `{code: "restore_paused"}` while paused for a restore.
+- `POST /api/pending-actions/{id}/resolve`: `confirmed` (confirm_submission; new optional `reference`) settles the
+  attempt as sent with the owner's evidence; `approved` on an action whose `detail.kind` has a resolver applies it
+  (501 when its module is not in the build). "Did not go out" is the dispatch's `reconcile` with `not_sent`.
+- **Audit:** `dispatch.reserved|started|sent|handed_off|uncertain|failed|cancelled|not_sent|retry_queued|gave_up|
+  refused`, `reconcile.checked|owner_asked`, `restore.paused|resumed` (each also on the application timeline).
+- **Settings:** `automation.dispatch_max_retries` (1), `reconcile.check_every_minutes` (15),
+  `reconcile.in_flight_timeout_minutes` (15); the give-up age is `reconcile.confirmation_wait_hours` (24).
+
+## Wave 2 email additions
+
+- `MailClassification` gains `information_request` (migration `0007_email`, which also adds
+  `mail_thread.sender` and `mail_thread.last_message_at`). `MailThreadOut` gains `sender` and
+  `last_message_at`; `MailThreadLink.classification` and `MailThreadOut.classification` accept the new value.
+- `GET /api/mail-threads` and `PUT /api/mail-threads/{id}` are real. Linking a thread proposes a stage change
+  (pending action) exactly as an automatic match would; it never changes a stage silently.
+- Mailbox connections: `POST /api/connections` accepts `imap_smtp` (config: `from_address`, `username`, `imap_host`,
+  `imap_port`, `imap_security`, `read_folder`, `sent_folder`, `smtp_host`, `smtp_port`, `smtp_security`; secret:
+  `password`). Gmail connects only through `POST /api/connections/oauth/gmail/start` and the callback (config:
+  `from_address`, `read_label`, `read_query`, optional `client_id`; env `GOOGLE_OAUTH_CLIENT_ID` and
+  `GOOGLE_OAUTH_CLIENT_SECRET`). `PUT` merges config; sync bookkeeping keys are server-written. `/test` runs the
+  mailbox health check. The OAuth callback redirects (307) to `/settings/connections?connected=gmail`.
+- `Mailbox`: `MailMessage` gains `body_html`; errors are `MailError`, `MailConfigError`, `MailAuthError`,
+  `MailSendError` (a definite refusal; an unknown outcome is `send` returning `None`).
+- `EmailChannel(attachments=..., resolver=..., hasher=...)` in `app/apply/channels/email.py`. It reads the
+  `DispatchAttempt`, requires a consumed `SubmitPermit` for the same packet hash, and writes nothing: the apply
+  layer records the `DispatchOutcome`. Packet hash default: sha256 of canonical JSON (sorted keys, compact
+  separators) of `PacketContents.model_dump(mode="json")`; pass `hasher=` if the apply stream's differs.
+- Stage proposals from mail are `PendingAction` rows with `detail.kind == "mail_stage_proposal"`
+  (`confirm_submission` for acknowledgements, `follow_up` otherwise). The apply stream's resolve flow should call
+  `app.connect.mail_sync.apply_proposal(session, action, actor=...)` when the owner approves one.
+- Source connector `alert_email` (config `connection_id`, `senders`). Settings group `mail.*`.
+- Periodic task `mail_check` (system queue, every minute, gated by `mail.check_interval_minutes`).
+
+## Wave 2 integration
+
+- **Migrations** chain linearly: `0007_render` -> `0008_tailoring` -> `0009_apply` -> `0010_email` ->
+  `0011_track_templates` (nullable `track.cv_template` / `track.letter_template`; null uses `documents.*_template`;
+  `TrackIn` and the kit file's `KitTrack` gain both fields).
+- **One Google OAuth client**: env `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` for both Gmail and Drive
+  (`GOOGLE_CLIENT_*` is gone). One `FileStore` default: `app.connect.local_store.default_file_store`.
+- **Email channel** registered built-in (`app.apply.channels.email:factory`): the mailbox whose `from_address` is the
+  packet's sending identity, attachments loaded by `PacketFile.document_id` (`application_document.file_key`, or
+  `vault_document.file_path` for vault files), hash `registry.packet_hash`. `registry.unregister` of a built-in puts
+  its default back. The mail proposal resolver (`mail_stage_proposal`) and an `email` notifier (the owner's own
+  mailbox, idempotency key `notify-<event id>`) are registered.
+- **Checked spec gate** (`app.apply.prepare.spec_gate`, permit gate `spec_checked`): a packet holding generated files
+  (`cv`, `letter`) is built (else 409), approved, permitted and dispatched only while the latest spec version is
+  checked (not stale) and not blocking, and each such file names (`document_id`) an `application_document` of this
+  application rendered from that version (`spec_hash`) with the same sha256.
+- **Pipeline**: after scoring, a real (non-dry) sweep requests tailoring for each role whose verdict is `tailor`,
+  `ask_owner` or `auto_apply` (`app.pipeline.advance.tailor_winners`; held roles never), creating a shortlisted
+  application (`origin = system`) when the role has none. A finished draft whose checks pass is rendered (PDF and
+  text), packed by `app.apply.prepare.prepare_packet` (email when the posting has `apply_email` and a mailbox is
+  connected, body = the letter text, subject = setting `automation.email_subject_template`; else manual with
+  `apply_url`), and handed to `approval.after_packet_built`; `apply_tick` dispatches. Not built (audited
+  `packet.not_built`) while an answer waits for the owner. No `RunKind` for tailoring.
+- **Dispatch** re-checks quiet hours at send time: a due send inside `automation.quiet_hours_*` is deferred to their
+  end (`dispatch.deferred`); unknown quiet hours or time zone cancel it.
+- **Settings API**: `PUT /api/settings/automation.paused` answers 409; only `PUT /api/autopilot` and
+  `POST /api/autopilot/resume-after-restore` change it. `nchito restore --yes` enters paused-for-restore itself
+  (`app.apply.restore.enter`); `nchito restored` repeats that by hand.
+- **Mail**: the classification wording is settings `mail.{rejection,interview,info_request,confirmation,auto_reply,
+  bounce_subject}_phrases` (regular expressions) and `mail.bounce_senders`. `Mailbox.list_messages` returns the
+  oldest `limit` messages since `since`, oldest first; a full page makes the sync ask again from the newest one.
+- **Handoff**: kit file links for rendered documents use `/api/applications/{id}/document-files/{document_id}`;
+  `GET /api/applications/{id}/documents/answers` returns the current packet's answers as text (404 without one).
+
+## Wave 2 send-flow additions
+
+- **Application address** (`app/apply/target.py`, migration `0012_apply_email`: `job.apply_email_owner`,
+  `apply_email_confirmed`, `apply_email_confirmed_at`, `apply_email_confirmed_by`). `Job.apply_email` stays what the
+  pipeline found in the posting; the owner's address (`apply_email_owner`) wins over it. An address is **usable** only
+  while the owner has confirmed that exact address, or its domain is on the trusted-sites list (suffix match). A
+  posting's address is unconfirmed until then: unknown is not yes.
+- `JobDetail` gains `apply_email: ApplyEmailOut | null` (`address`, `found_in: posting_text | posting_link | owner`,
+  `evidence` (the posting's sentence), `confirmed`, `confirmed_by`, `confirmed_at`, `trusted_domain`, `usable`) and
+  `apply_channel_candidates: [{channel: email | browser | manual, available, reason}]`.
+- `PUT /api/jobs/{id}/apply-email` `ApplyEmailIn {address?: string | null, confirmed: bool = true}` -> `JobDetail`.
+  `address` null keeps (or returns to) the posting's address; `confirmed` confirms the resulting address, false
+  withdraws a confirmation. 422 `{code: invalid_address | no_address, reason}`. Audited `job.apply_email_set`; a
+  changed address retires a current packet addressed elsewhere.
+- Permit gate `recipient_confirmed` (email packets): every recipient must be the role's usable address; otherwise
+  `unknown`, settled only by an owner approval, so an automatic approval never sends to an unconfirmed address.
+  `prepare_packet` picks email only for a usable address with a connected mailbox; otherwise manual (to `apply_url`,
+  or `mailto:<address>` when the posting gives only an address).
+- **Error codes** (`app/apply/errors.py`, one list `CODES`): every 409/422 the packet build, prepare, approve, reject,
+  request-changes, dispatch, cancel, reconcile, handoff and mark-submitted endpoints raise is
+  `{"detail": {"code", "reason", ...}}` (FastAPI's own request-validation 422 list is unchanged). Clients switch on
+  `code`, never on `reason`. Codes include `no_spec`, `check_stale`, `check_blocking`, `document_not_rendered`,
+  `answers_waiting`, `no_destination`, `no_identity`, `invalid_packet`, `no_packet`, `packet_superseded`,
+  `packet_changed`, `channel_mismatch`, `illegal_stage`, `not_approved`, `mode_not_allowed`, `excluded`,
+  `held_by_conflict`, `employer_cooldown`, `paused`, `quiet_hours`, `cap_reached`, `budget`, `duplicate`,
+  `permit_outstanding`, `posting_changed`, `role_closed`, `deadline_passed`, `email_unconfirmed`,
+  `destination_unverified`, `untrusted_site`, `answers_not_automatic`, `already_handed_over`, `already_settled`,
+  `not_uncertain`, `not_started`, `still_queued`, `nothing_to_submit`, `system_channel`, `unknown_template`,
+  `below_auto_threshold`, `unknown_data`, `pay_not_stated`, `always_ask_first`, `campaign_unconfirmed`; anything else
+  is `refused`.
+  A gate refusal takes its first blocking gate's code (`GATE_CODES`). The approve refusal's code was
+  `approval_refused` for every case; it is now the specific code (the `gates` list is still attached).
+  `DispatchCreateOut.code` and `ApprovalStatusOut.code` carry the same codes for a 200 that did not queue or approve.
+- **Prepare** `POST /api/applications/{id}/packet/prepare` `PacketPrepareIn {channel: auto | manual = auto,
+  cv_template?, letter_template?}` -> `PacketPrepareOut {channel: email | manual, packet, created, changes, approval}`.
+  It runs `app.apply.prepare.prepare_packet`, the function the pipeline uses: checked spec only, renders the CV and
+  letter (PDF and text; the template keys override the track and documents settings), picks the channel (`auto`:
+  email when the role's address is usable and a mailbox is connected, else manual), builds, then
+  `approval.after_packet_built`. Nothing built: 409 `{code, reason}` (`no_spec`, `check_stale`, `check_blocking`,
+  `answers_waiting`, `no_destination`, `no_identity`, `unknown_template`, `illegal_stage`, or a packet code); the
+  reason is audited `packet.not_built` with the code. The Studio's "Send for approval" calls this, not
+  `POST .../packet`.
+- **Templates** `GET /api/document-templates?application_id=` -> `DocumentTemplatesOut {templates: [{key, kind: cv |
+  letter, name, builtin, overridden, section_order, limits}], defaults: {cv, letter: {key, source: track | setting}}}`:
+  built-ins in shipped order, then the owner's Kit templates (a Kit row with a built-in key overrides it), limits
+  as a render applies them (the template's, else `documents.*`). The Studio picker reads this; the frontend keeps no
+  list of its own.
+- **Deferred sends**: `DispatchOut` gains `deferred_reason: "quiet_hours" | null` and `deferred_until` (the attempt's
+  `send_after`) while a reserved, not yet started attempt has been postponed by the send-time quiet-hours check
+  (`dispatch.deferred`, whose detail now carries `code`). The UI reads these, not the timeline.
+- **Studio answers**: an `ask_owner` `DraftAnswer` carries its `pending_action_id`; the Studio links to that action.
+- **Demo seed** (manual testing only): `python -m app.cli demo-job` inserts one fictional open role
+  (`app/ops/demo.py`: an `example.com` employer and application address, tag `demo`, unconfirmed address), scores it
+  against every campaign through `scoring.score_jobs` with an in-process stand-in for the score model (no provider
+  call, no spend; `Assessment.model = "demo (no model call)"`), opens a shortlisted application and audits
+  `job.demo_created`. Refused (exit 2) when `ENVIRONMENT=production` (or `ENV=production`).
+- **Exit test** (`tests/integration/test_wave2_exit.py`): besides the pipeline path, an API-only path (set and
+  confirm the address, prepare, approve and dispatch through the endpoints; one email in the fake mailbox) and a test
+  that a posting's unconfirmed address is packed for manual hand-off and never sent automatically.

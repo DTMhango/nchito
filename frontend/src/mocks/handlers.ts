@@ -9,6 +9,7 @@ import type {
 } from "@/lib/api/types"
 import { db } from "./db"
 import { aiHandlers } from "./handlers/ai"
+import { dataHandlers } from "./handlers/data"
 import { kitHandlers } from "./handlers/kit"
 import { sourcesHandlers } from "./handlers/sources"
 import { campaignHandlers } from "./handlers/campaigns"
@@ -16,6 +17,8 @@ import { applicationsHandlers } from "./handlers/applications"
 import { jobHandlers } from "./handlers/jobs"
 import { settingsHandlers } from "./handlers/settings"
 import { matchesHandlers } from "./handlers/matches"
+import { studioHandlers } from "./handlers/studio"
+import { autopilotHandlers } from "./handlers/autopilot"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -25,6 +28,14 @@ const notFound = (what: string) =>
   HttpResponse.json({ detail: `${what} not found.` }, { status: 404 })
 
 export const handlers = [
+  // Explicit order (MSW: first matching handler that returns a response wins).
+  // 1. Studio: spec, checks, tailor, documents; its packets handler answers only for
+  //    applications it has packets for and returns undefined otherwise.
+  // 2. Autopilot: approvals, packets, dispatches, pause; beats the wave 0 autopilot stub below.
+  ...studioHandlers,
+  ...autopilotHandlers,
+  // Data, non-AI connections and health: before the AI handlers (they fall through for LLM providers).
+  ...dataHandlers,
   ...kitHandlers,
   ...sourcesHandlers,
   http.get("*/api/health", () =>
@@ -189,15 +200,7 @@ export const handlers = [
     if (!db.get().session) return unauthorized()
     return HttpResponse.json(db.get().autopilot)
   }),
-  http.put("*/api/autopilot", async ({ request }) => {
-    if (!db.get().session) return unauthorized()
-    const { paused } = (await request.json()) as { paused: boolean }
-    db.update((s) => {
-      s.autopilot.paused = paused
-      s.autopilot.paused_at = paused ? new Date().toISOString() : null
-    })
-    return HttpResponse.json(db.get().autopilot)
-  }),
+  // PUT /api/autopilot is served by the autopilot handlers (pause effects, restore lock).
   ...aiHandlers,
   ...campaignHandlers,
 

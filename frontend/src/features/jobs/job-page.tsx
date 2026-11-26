@@ -40,6 +40,7 @@ import { ActivityTab } from "./tabs/activity-tab"
 import { ApplicationTab } from "./tabs/application-tab"
 import { ComingTab } from "./tabs/coming-tab"
 import { FitTab } from "./tabs/fit-tab"
+import { MessagesTab } from "./tabs/messages-tab"
 import { OverviewTab } from "./tabs/overview-tab"
 import { PeopleTab } from "./tabs/people-tab"
 import { PostingTab } from "./tabs/posting-tab"
@@ -128,7 +129,7 @@ export function JobPage({ id, tab }: { id: string; tab: JobTab }) {
           <ComingTab tab="documents" applicationId={job.data.application_id} />
         )}
         {tab === "application" && <ApplicationTab job={job.data} />}
-        {tab === "messages" && <ComingTab tab="messages" />}
+        {tab === "messages" && <MessagesTab job={job.data} />}
         {tab === "people" && <PeopleTab job={job.data} />}
         {tab === "interview" && <ComingTab tab="interview" />}
         {tab === "activity" && <ActivityTab job={job.data} />}
@@ -214,7 +215,9 @@ function JobHeader({ job }: { job: JobDetail }) {
         )}
         {application && (
           <Button asChild size="sm" variant="outline">
-            <Link to="/studio">Open in Studio</Link>
+            <Link to="/studio" search={{ application: application.id }}>
+              Open in Studio
+            </Link>
           </Button>
         )}
         <Button

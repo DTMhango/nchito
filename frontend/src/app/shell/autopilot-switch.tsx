@@ -12,54 +12,59 @@ import {
 } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
 import { EmptyState } from "@/components/empty-state"
-import { autopilotQuery, keys, setAutopilotPaused } from "@/lib/api/endpoints"
-import { isApiError } from "@/lib/api/client"
+import { autopilotQuery, keys } from "@/lib/api/endpoints"
 import type { AutopilotState, PauseItem } from "@/lib/api/types"
 import { cn } from "@/lib/utils"
+import { apKeys, refusalOf, writeAutopilot } from "@/features/autopilot/api"
 
 const EMPTY: AutopilotState = {
   paused: false,
   paused_at: null,
+  paused_by: null,
+  reason: null,
   summary: { cancelled: [], paused: [], already_out: [] },
 }
 
 /**
  * The global pause (DESIGN 8.1): one tap stops every new outward action, cancels queued
- * sends, then shows three lists: cancelled, paused, and already handed over.
- * The endpoint is PENDING CONTRACT; without it the switch keeps local state and says so.
+ * sends, then shows three lists: cancelled, paused, and already handed over. Only
+ * `PUT /api/autopilot` changes it (the generic settings write refuses `automation.paused`).
+ * While paused for a restore, resume is refused (409 `restore_paused`): the owner resumes from
+ * the restore panel once every uncertain send is settled.
  */
 export function useAutopilot() {
   const qc = useQueryClient()
   const q = useQuery(autopilotQuery())
-  const [local, setLocal] = useState<AutopilotState | null>(null)
-  const unsupported = isApiError(q.error, 404)
-  const state = local ?? q.data ?? EMPTY
+  const state = q.data ?? EMPTY
 
   const m = useMutation({
-    mutationFn: setAutopilotPaused,
-    onSuccess: (data) => {
+    mutationFn: (v: { paused: boolean; reason?: string | null }) =>
+      writeAutopilot(v.paused, v.reason),
+    onSuccess: (data, v) => {
       qc.setQueryData(keys.autopilot, data)
-      setLocal(null)
+      void qc.invalidateQueries({ queryKey: apKeys.restore })
+      if (!v.paused)
+        toast.success("Autopilot resumed. Scheduled work picks up from here.")
     },
-    onError: (e, paused) => {
-      if (isApiError(e, 404)) {
-        setLocal({
-          ...state,
-          paused,
-          paused_at: paused ? new Date().toISOString() : null,
-        })
+    onError: (e, v) => {
+      const r = refusalOf(e)
+      if (r?.code === "restore_paused") {
+        toast.error(
+          "Paused for a restore. Settle the uncertain sends, then resume from the Autopilot page."
+        )
+        void qc.invalidateQueries({ queryKey: apKeys.restore })
         return
       }
       toast.error(
-        paused ? "Couldn't pause. Try again." : "Couldn't resume. Try again."
+        v.paused ? "Couldn't pause. Try again." : "Couldn't resume. Try again."
       )
     },
   })
   return {
     state,
-    setPaused: (p: boolean) => m.mutate(p),
+    setPaused: (paused: boolean, reason?: string | null) =>
+      m.mutate({ paused, reason }),
     pending: m.isPending,
-    unsupported,
   }
 }
 
@@ -74,7 +79,6 @@ export function AutopilotSwitch() {
       setSheetOpen(true)
     } else {
       setPaused(false)
-      toast.success("Autopilot resumed. Scheduled work picks up from here.")
     }
   }
 
@@ -118,7 +122,6 @@ export function AutopilotSwitch() {
         onResume={() => {
           setPaused(false)
           setSheetOpen(false)
-          toast.success("Autopilot resumed.")
         }}
       />
     </>

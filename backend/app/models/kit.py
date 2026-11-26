@@ -140,6 +140,9 @@ class Track(Base, Entity, KitMixin):
     lead_fact_codes: Mapped[list[str]] = mapped_column(ARRAY(String(20)), nullable=False, default=list)
     summary_fact_code: Mapped[str | None] = mapped_column(String(20))
     tone_notes: Mapped[str | None] = mapped_column(Text)
+    # Template keys for this track's documents; null falls back to documents.cv_template / letter_template.
+    cv_template: Mapped[str | None] = mapped_column(String(60))
+    letter_template: Mapped[str | None] = mapped_column(String(60))
 
 
 class GuardrailType(enum.StrEnum):

@@ -13,11 +13,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Timestamps
-from app.api.crud import add_crud
 from app.api.crud_db import add_db_crud
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
 from app.core import audit
-from app.models.search import EmployerAlias, Source, SourceAccess, WatchedEmployer
+from app.models.search import EmployerAlias, Source, SourceAccess, TrustedSite, WatchedEmployer
 from app.pipeline import orchestrator
 from app.schemas.json_types import RateLimit, SourceHealth
 from app.sources.base import SearchContext, connector_class, registered_connectors
@@ -108,6 +107,13 @@ class TrustedSiteOut(TrustedSiteIn, Timestamps):
     trusted_by: str
 
 
+async def prepare_trusted_site(session: Any, data: dict[str, Any], existing: TrustedSite | None) -> dict[str, Any]:
+    """Only the owner edits this list (the router requires the owner); the domain is matched as a suffix."""
+    data["domain"] = data["domain"].strip().lower().removeprefix("www.")
+    data["trusted_by"] = "owner"
+    return data
+
+
 async def _prepare_source(session: Any, data: dict[str, Any], existing: Source | None) -> dict[str, Any]:
     name = data["connector"]
     if name not in registered_connectors():
@@ -160,8 +166,9 @@ add_db_crud(router, "/watched-employers", "watched_employers", orm=WatchedEmploy
 add_db_crud(router, "/employer-aliases", "employer_aliases", orm=EmployerAlias, model_in=AliasIn, model_out=AliasOut,
             audit_prefix="employer_alias", order_by=[EmployerAlias.canonical, EmployerAlias.alias],
             ops=("list", "create", "update", "delete"))
-add_crud(router, "/trusted-sites", "trusted_sites", TrustedSiteIn, TrustedSiteOut, wave=2, area="apply",
-         ops=("list", "create", "delete"))
+add_db_crud(router, "/trusted-sites", "trusted_sites", orm=TrustedSite, model_in=TrustedSiteIn,
+            model_out=TrustedSiteOut, audit_prefix="trusted_site", order_by=[TrustedSite.domain],
+            prepare=prepare_trusted_site, ops=("list", "create", "delete"))
 
 
 def get_fetcher() -> Any:

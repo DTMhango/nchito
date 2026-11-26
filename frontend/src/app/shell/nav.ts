@@ -2,6 +2,7 @@ import {
   BarChart3,
   Briefcase,
   Columns3,
+  FileCheck2,
   FileText,
   Gauge,
   Inbox,
@@ -54,6 +55,12 @@ export const NAV_MAIN: NavItem[] = [
     label: "Studio",
     icon: FileText,
     keywords: ["cv", "letter", "tailor", "documents"],
+  },
+  {
+    to: "/approvals",
+    label: "Approvals",
+    icon: FileCheck2,
+    keywords: ["approve", "packet", "review", "send", "needs you"],
   },
   {
     to: "/autopilot",
@@ -124,6 +131,7 @@ export const SETTINGS_SECTIONS = [
   { to: "/settings/notifications", label: "Notifications" },
   { to: "/settings/runners", label: "Runners" },
   { to: "/settings/data", label: "Data" },
+  { to: "/settings/health", label: "System health" },
   { to: "/settings/security", label: "Security" },
   { to: "/settings/activity", label: "Activity log" },
   { to: "/settings/history", label: "Configuration history" },

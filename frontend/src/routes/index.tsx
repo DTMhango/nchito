@@ -5,10 +5,10 @@
  *   (authed)                              guard: owner exists and signed in
  *     /onboarding?step=                   full-screen set-up guide
  *     (shell)                             AppShell: sidebar, top bar, palette
- *       /today /matches /applications /jobs/$id?tab= /studio /autopilot
+ *       /today?action= /matches /applications /jobs/$id?tab= /studio?application=&run= /autopilot
  *       /kit/{library,tracks,guardrails,answers,documents,templates}
  *       /campaigns /sources /insights
- *       /settings/{appearance,ai,connections,notifications,runners,data,security,activity,history}
+ *       /settings/{appearance,ai,connections,notifications,runners,data,health,security,activity,history}
  *       /dev/components                   dev builds only
  *
  * To add a screen: write the page in src/features/<area>/, add a createRoute below under
@@ -35,6 +35,7 @@ import { SetupPage } from "@/features/auth/setup-page"
 import { SignInPage } from "@/features/auth/sign-in-page"
 import { matchesSearchSchema } from "@/features/matches/filters"
 import { JOB_TABS } from "@/features/jobs/job-tabs"
+import { studioSearchSchema } from "@/features/studio/search"
 import type { SettingsPageKey } from "@/features/settings/settings-group-page"
 import { OnboardingPage } from "@/features/onboarding/onboarding-page"
 
@@ -69,6 +70,14 @@ const StudioPage = lazyPage(
 const AutopilotPage = lazyPage(
   () => import("@/features/autopilot/autopilot-page"),
   "AutopilotPage"
+)
+const ApprovalsPage = lazyPage(
+  () => import("@/features/approvals/approvals-page"),
+  "ApprovalsPage"
+)
+const ApprovalReviewPage = lazyPage(
+  () => import("@/features/approvals/review-page"),
+  "ReviewPage"
 )
 const KitLayout = lazyPage(
   () => import("@/features/kit/kit-pages"),
@@ -130,6 +139,22 @@ const HistoryPage = lazyPage(
   () => import("@/features/settings/history-page"),
   "HistoryPage"
 )
+const ConnectionsPage = lazyPage(
+  () => import("@/features/settings/connections/connections-page"),
+  "ConnectionsPage"
+)
+const DataPage = lazyPage(
+  () => import("@/features/settings/data/data-page"),
+  "DataPage"
+)
+const NotificationsPage = lazyPage(
+  () => import("@/features/settings/notifications/notifications-page"),
+  "NotificationsPage"
+)
+const HealthPanel = lazyPage(
+  () => import("@/features/settings/health/health-panel"),
+  "HealthPanel"
+)
 const SecurityPage = lazyPage(
   () => import("@/features/settings/security-page"),
   "SecurityPage"
@@ -177,7 +202,7 @@ const authedRoute = createRoute({
 })
 
 const onboardingSearch = z.object({
-  step: z.coerce.number().int().min(1).max(6).catch(2).default(2),
+  step: z.coerce.number().int().min(1).max(8).catch(1).default(1),
 })
 const onboardingRoute = createRoute({
   getParentRoute: () => authedRoute,
@@ -216,7 +241,18 @@ const page = <P extends string>(
     component: () => <Component />,
   })
 
-const todayRoute = page("/today", "Today", TodayPage)
+/** `?action=<pending action id>`: Today opens that decision (the Studio's question links). */
+const todaySearch = z.object({ action: z.string().optional().catch(undefined) })
+const todayRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/today",
+  staticData: { title: "Today" },
+  validateSearch: todaySearch,
+  component: function TodayRoute() {
+    const { action } = todayRoute.useSearch()
+    return <TodayPage focusAction={action} />
+  },
+})
 const matchesRoute = createRoute({
   getParentRoute: () => shellRoute,
   path: "/matches",
@@ -240,8 +276,36 @@ const applicationsRoute = page(
   "Applications",
   ApplicationsPage
 )
-const studioRoute = page("/studio", "Studio", StudioPage)
+const studioRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/studio",
+  staticData: { title: "Studio" },
+  validateSearch: studioSearchSchema,
+  component: function StudioRoute() {
+    const search = studioRoute.useSearch()
+    const navigate = studioRoute.useNavigate()
+    return (
+      <StudioPage
+        search={search}
+        onSearch={(next) => void navigate({ search: next, replace: true })}
+      />
+    )
+  },
+})
 const autopilotRoute = page("/autopilot", "Autopilot", AutopilotPage)
+const approvalsRoute = page("/approvals", "Approvals", ApprovalsPage)
+const approvalReviewRoute = createRoute({
+  getParentRoute: () => shellRoute,
+  path: "/approvals/$applicationId",
+  staticData: { title: "Review" },
+  component: function ApprovalReviewRoute() {
+    return (
+      <ApprovalReviewPage
+        applicationId={approvalReviewRoute.useParams().applicationId}
+      />
+    )
+  },
+})
 const runsRoute = page("/autopilot/runs", "Run history", RunsPage)
 const runDetailRoute = createRoute({
   getParentRoute: () => shellRoute,
@@ -330,7 +394,7 @@ const appearanceRoute = createRoute({
   staticData: { title: "Appearance" },
   component: AppearancePage,
 })
-type SettingsKey = "ai" | "connections" | "runners" | "data"
+type SettingsKey = "runners"
 const groupRoute = (path: SettingsPageKey) =>
   createRoute({
     getParentRoute: () => settingsRoute,
@@ -345,10 +409,16 @@ const groupRoutes = [
   groupRoute("documents"),
   groupRoute("retention"),
   groupRoute("reconcile"),
-  groupRoute("notifications"),
 ] as const
 const ownRoute = (
-  path: "security" | "activity" | "history",
+  path:
+    | "security"
+    | "activity"
+    | "history"
+    | "connections"
+    | "data"
+    | "notifications"
+    | "health",
   C: ComponentType
 ) =>
   createRoute({
@@ -360,6 +430,10 @@ const ownRoutes = [
   ownRoute("security", SecurityPage),
   ownRoute("activity", ActivityPage),
   ownRoute("history", HistoryPage),
+  ownRoute("connections", ConnectionsPage),
+  ownRoute("data", DataPage),
+  ownRoute("notifications", NotificationsPage),
+  ownRoute("health", HealthPanel),
 ] as const
 const settingsChild = (path: SettingsKey) =>
   createRoute({
@@ -373,12 +447,7 @@ const aiRoute = createRoute({
   staticData: { title: "AI" },
   component: AiSettingsPage,
 })
-const settingsChildren = [
-  aiRoute,
-  settingsChild("connections"),
-  settingsChild("runners"),
-  settingsChild("data"),
-] as const
+const settingsChildren = [aiRoute, settingsChild("runners")] as const
 
 // ---- dev ----
 const devComponentsRoute = createRoute({
@@ -407,6 +476,8 @@ export const routeTree = rootRoute.addChildren([
       jobRoute,
       studioRoute,
       autopilotRoute,
+      approvalsRoute,
+      approvalReviewRoute,
       runsRoute,
       runDetailRoute,
       kitRoute.addChildren([kitIndex, ...kitChildren]),

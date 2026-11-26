@@ -135,11 +135,22 @@ async def get_setting(key: str, _: PrincipalDep, session: SessionDep) -> Setting
     return _out((await service.get_all(session))[key])
 
 
+# Settings with their own endpoint, which enforces what the generic write cannot (the restore lock and the
+# pause effects): an invariant, not a setting.
+OWN_ENDPOINT = {
+    "automation.paused": "use PUT /api/autopilot (and POST /api/autopilot/resume-after-restore after a restore)",
+}
+
+
 @router.put("/{key}", response_model=SettingOut, operation_id="settings_put",
-            responses={404: {"description": "Unknown setting"}, 422: {"description": "Invalid value"}})
+            responses={404: {"description": "Unknown setting"},
+                       409: {"description": "Changed only by its own endpoint"},
+                       422: {"description": "Invalid value"}})
 async def put_setting(key: str, body: SettingWrite, principal: PrincipalDep, session: SessionDep) -> SettingOut:
     if key not in REGISTRY:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="unknown setting")
+    if key in OWN_ENDPOINT:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=f"{key} cannot be changed here: {OWN_ENDPOINT[key]}")
     try:
         if key == "appearance.theme_id" and await get_theme(session, str(body.value)) is None:
             raise SettingValueError("unknown theme")

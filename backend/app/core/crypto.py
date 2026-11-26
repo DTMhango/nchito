@@ -32,6 +32,11 @@ def _fernet() -> Fernet:
         raise CryptoError("ENCRYPTION_KEY is not a valid Fernet key") from exc
 
 
+def fernet() -> Fernet:
+    """The configured Fernet, for streaming encryption of large payloads (backups)."""
+    return _fernet()
+
+
 def generate_key() -> str:
     return Fernet.generate_key().decode()
 

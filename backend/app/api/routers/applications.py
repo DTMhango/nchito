@@ -5,42 +5,67 @@ from __future__ import annotations
 
 import hashlib
 import uuid
+from collections.abc import Awaitable, Callable
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Form, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Response, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Ok, Page, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.apply import autopilot, stages
+from app.apply import approval, autopilot, stages
+from app.apply import dispatch as apply_dispatch
+from app.apply import errors as apply_errors
+from app.apply import handoff as apply_handoff
+from app.apply import outcomes as apply_outcomes
+from app.apply import packets as apply_packets
+from app.apply import receipt as apply_receipt
+from app.apply import reconcile as apply_reconcile
+from app.apply import restore as apply_restore
 from app.apply.autopilot import AutopilotState, AutopilotWrite
+from app.connect.mail_sync import SyncResult, act_on_thread
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.config import get_config
 from app.core.events import publish
 from app.core.settings import service as settings_service
+from app.docs.api import StoreDep as DocStoreDep
+from app.docs.api import router as documents_router
 from app.kit.importers import history
+from app.llm.deps import llm_service
+from app.llm.service import LLMService
 from app.models.applications import (
     Application,
     ApplicationEvent,
+    ApplicationPacket,
     Channel,
     Contact,
+    DispatchAttempt,
+    MailClassification,
+    MailThread,
     PendingAction,
     PendingStatus,
     Stage,
+    TailoringRequest,
 )
 from app.models.search import Assessment, Job
 from app.pipeline import corrections
+from app.pipeline.checks import findings as checks_findings
+from app.pipeline.tailoring import service as tailoring_service
+from app.pipeline.tailoring import studio
 from app.schemas.json_types import (
     ApplicationSpec,
     CheckResult,
+    DraftAnswer,
     Evidence,
     GateResult,
     PacketContents,
+    PacketEmail,
+    PacketFile,
     SubmittedSnapshot,
 )
 
@@ -192,6 +217,35 @@ class TailorOut(BaseModel):
     queued: bool
 
 
+class SpecVersionSummary(BaseModel):
+    version: int
+    origin: Literal["tailor", "owner"]
+    content_hash: str
+    created_at: datetime
+    created_by: str
+    status: Literal["pass", "warn", "block"]
+
+
+class SpecStateOut(BaseModel):
+    """The Studio's view of the documents: the spec, its checks and whether they still apply."""
+
+    application_id: uuid.UUID
+    version: int | None = Field(description="Spec version shown; null before the first draft")
+    origin: Literal["tailor", "owner"] | None = None
+    content_hash: str | None = None
+    spec: ApplicationSpec
+    check_results: list[CheckResult]
+    checked: bool = Field(description="The stored checks ran on exactly this content and these Kit facts")
+    status: Literal["pass", "warn", "block"] | None = Field(
+        default=None, description="Worst stored result (an unwaived block is block)")
+    stale_reasons: list[str] = Field(default_factory=list)
+    answers: list[DraftAnswer] = Field(default_factory=list,
+                                       description="Screening questions and what the answer bank says")
+    tailoring: Literal["queued", "running", "paused", "done", "failed"] | None = None
+    tailoring_error: str | None = None
+    versions: list[SpecVersionSummary] = Field(default_factory=list)
+
+
 class PacketOut(Timestamps):
     application_id: uuid.UUID
     version: int
@@ -227,6 +281,74 @@ class ReceiptOut(BaseModel):
     gates: list[GateResult]
 
 
+class PacketAnswerIn(BaseModel):
+    """An answer from the bank (``answer_id``: value and materiality are read from the bank) or typed for
+    this packet only (``value``; counted as material)."""
+
+    question: str = Field(min_length=1)
+    answer_id: uuid.UUID | None = None
+    value: str | None = None
+
+
+class PacketBuildIn(BaseModel):
+    """What would be sent. The server sets the destination domain, ``verified`` and ``trusted``, the
+    requisition (from the job unless given) and the job version."""
+
+    channel: ChannelT
+    destination_url: str | None = Field(default=None, description="Apply URL (browser, manual)")
+    sending_identity: str = Field(min_length=1, description="Mailbox or name the application is sent as")
+    answers: list[PacketAnswerIn] = Field(default_factory=list)
+    email: PacketEmail | None = None
+    files: list[PacketFile] = Field(default_factory=list)
+    link_permissions: list[str] = Field(default_factory=list)
+    requisition: str | None = None
+
+
+class ApprovalStatusOut(BaseModel):
+    approved: bool
+    status: Literal["granted", "wait_for_owner", "denied"]
+    reason: str
+    pending_action_id: uuid.UUID | None = None
+    code: str | None = Field(default=None, description="Why not approved: a machine code (CONTRACTS, wave 2 "
+                                                       "send-flow); None when approved")
+
+
+class PacketBuildOut(BaseModel):
+    packet: PacketOut
+    created: bool = Field(description="False when the contents were identical to the current packet")
+    changes: list[PacketChange] = Field(default_factory=list,
+                                        description="What changed from the previous version")
+    approval: ApprovalStatusOut | None = Field(
+        default=None, description="What the automation policy did with the new packet (None: nothing to do)")
+
+
+class PacketPrepareIn(BaseModel):
+    """Prepare the packet the way the pipeline does. ``auto``: email when the role's application address is
+    usable (confirmed, or a trusted domain) and a mailbox is connected, else manual. ``manual``: the owner
+    applies. Template keys override the track and documents settings (``GET /api/document-templates``)."""
+
+    channel: Literal["auto", "manual"] = "auto"
+    cv_template: str | None = Field(default=None, max_length=60)
+    letter_template: str | None = Field(default=None, max_length=60)
+
+
+class PacketPrepareOut(BaseModel):
+    channel: Literal["email", "manual"]
+    packet: PacketOut
+    created: bool = Field(description="False when the contents were identical to the current packet")
+    changes: list[PacketChange] = Field(default_factory=list)
+    approval: ApprovalStatusOut | None = Field(
+        default=None, description="What the automation policy did with the new packet (None: nothing to do)")
+
+
+class RejectIn(BaseModel):
+    reason: str | None = None
+
+
+class RequestChangesIn(BaseModel):
+    note: str = Field(min_length=1)
+
+
 class ApproveIn(BaseModel):
     packet_version: int
     packet_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
@@ -245,11 +367,56 @@ class DispatchOut(Timestamps):
     outcome_at: datetime | None
     gate_results: list[GateResult]
     error: str | None
+    started_at: datetime | None = Field(default=None, description="Handed to the channel (in flight from here)")
+    evidence: Evidence | None = None
+    uncertain: bool = Field(default=False, description="Handed over with no final outcome: reconcile, never resend")
+    reconcile_attempts: int = 0
+    last_reconciled_at: datetime | None = None
+    deferred_reason: Literal["quiet_hours"] | None = Field(
+        default=None, description="Queued but postponed by the send-time check (quiet hours); null otherwise")
+    deferred_until: datetime | None = Field(default=None, description="When a deferred send becomes due again")
+
+
+class DispatchCreateIn(BaseModel):
+    """Queue the current approved packet now (permit, then the attempt; email waits the send delay)."""
+
+
+class DispatchCreateOut(BaseModel):
+    status: Literal["queued", "wait_for_owner", "denied"]
+    reason: str
+    dispatch: DispatchOut | None = None
+    gates: list[GateResult] = Field(default_factory=list)
+    pending_action_id: uuid.UUID | None = None
+    code: str | None = Field(default=None, description="Why not queued: a machine code (CONTRACTS, wave 2 send-flow)")
+
+
+class ReconcileIn(BaseModel):
+    decision: Literal["check", "sent", "not_sent"] = Field(
+        description="check: ask the channel now; sent: it went out (reference kept as evidence); not_sent: it never "
+                    "left (the role goes back to ready; nothing is resent automatically)")
+    reference: str | None = Field(default=None, max_length=200)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class ReconcileOut(BaseModel):
+    result: Literal["sent", "not_sent", "waiting"]
+    dispatch: DispatchOut
+
+
+class RestoreStateOut(BaseModel):
+    active: bool
+    entered_at: datetime | None = None
+    backup_taken_at: str | None = None
+    outstanding: list[DispatchOut] = Field(default_factory=list,
+                                           description="Sends from before the backup still to reconcile")
+    held_application_ids: list[uuid.UUID] = Field(default_factory=list,
+                                                  description="Approvals withdrawn at restore, to approve again")
 
 
 class ManualHandoffOut(BaseModel):
     posting_url: str | None
-    files: list[str] = Field(description="Signed download URLs for the final PDFs")
+    files: list[str] = Field(description="Download links for the final files (behind the owner's session), or "
+                                         "the share links the packet records")
     answers: list[dict[str, str]]
     remaining_steps: list[str]
 
@@ -288,17 +455,22 @@ class ContactOut(ContactIn, Timestamps):
     origin: str
 
 
+MailClassT = Literal["confirmation", "rejection", "interview", "information_request", "other"]
+
+
 class MailThreadOut(Timestamps):
     application_id: uuid.UUID | None
     subject: str | None
-    classification: Literal["confirmation", "rejection", "interview", "other"]
+    classification: MailClassT
     match_confidence: float | None
     needs_review: bool
+    sender: str | None = None
+    last_message_at: datetime | None = None
 
 
 class MailThreadLink(BaseModel):
     application_id: uuid.UUID | None
-    classification: Literal["confirmation", "rejection", "interview", "other"] | None = None
+    classification: MailClassT | None = None
 
 
 class InterviewPackOut(Timestamps):
@@ -686,69 +858,403 @@ async def timeline(application_id: uuid.UUID, session: SessionDep) -> list[Timel
             for e in rows]
 
 
+TailorEnqueue = Callable[[TailoringRequest], Awaitable[None]]
+
+
+async def get_tailor_enqueue() -> TailorEnqueue:
+    """Defers a tailoring request to the worker (tests replace this dependency)."""
+
+    async def enqueue(req: TailoringRequest) -> None:
+        from app.pipeline.tailoring.tasks import enqueue as defer
+        from app.worker.queue import queue_app
+
+        async with queue_app.open_async():
+            await defer(req)
+
+    return enqueue
+
+
+def _tailoring_error(exc: tailoring_service.TailoringError) -> HTTPException:
+    return HTTPException(exc.status_code, detail=str(exc))
+
+
 @router.post("/applications/{application_id}/tailor", response_model=TailorOut,
-             status_code=status.HTTP_202_ACCEPTED, name="applications_tailor")
-async def tailor(application_id: uuid.UUID) -> TailorOut:
-    not_implemented(2, "tailoring")
+             status_code=status.HTTP_202_ACCEPTED, name="applications_tailor",
+             responses={409: {"description": "The application can no longer be tailored"}})
+async def tailor(application_id: uuid.UUID, principal: PrincipalDep, session: SessionDep,
+                 enqueue: Annotated[TailorEnqueue, Depends(get_tailor_enqueue)]) -> TailorOut:
+    """Queue a tailored draft. Idempotent per spec version and Kit facts: asking again returns the same
+    request (``queued`` is false once it is done)."""
+    app = await session.get(Application, application_id, with_for_update=True)
+    if app is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="application not found")
+    try:
+        req, needs_queue = await tailoring_service.request(session, app, actor=principal.actor)
+    except tailoring_service.TailoringError as exc:
+        raise _tailoring_error(exc) from exc
+    await _changed(session, app.id)
+    await session.commit()
+    if needs_queue:
+        await enqueue(req)
+    return TailorOut(run_id=req.run_id, queued=req.status in tailoring_service.OPEN)
 
 
-@router.put("/applications/{application_id}/spec", response_model=ApplicationDetail, name="applications_put_spec")
-async def put_spec(application_id: uuid.UUID, body: SpecUpdate) -> ApplicationDetail:
+@router.get("/applications/{application_id}/spec", response_model=SpecStateOut, name="applications_get_spec")
+async def get_spec(application_id: uuid.UUID, session: SessionDep,
+                   version: Annotated[int | None, Query(ge=1)] = None) -> SpecStateOut:
+    app = await _load(session, application_id)
+    try:
+        got = await studio.spec_state(session, app, version)
+    except tailoring_service.TailoringError as exc:
+        raise _tailoring_error(exc) from exc
+    v, st, req = got.version, got.state, got.request
+    return SpecStateOut(
+        application_id=app.id, version=v.version if v else None, origin=v.origin if v else None,  # type: ignore[arg-type]
+        content_hash=v.content_hash if v else None, spec=v.spec if v else app.spec,
+        check_results=v.check_results if v else [], checked=bool(st and st.checked),
+        status=st.status if st and v and v.checked_hash else None, stale_reasons=st.stale_reasons if st else [],
+        answers=v.answers if v else [], tailoring=req.status.value if req else None,
+        tailoring_error=req.error if req else None,
+        versions=[SpecVersionSummary(version=r.version, origin=r.origin, content_hash=r.content_hash,  # type: ignore[arg-type]
+                                     created_at=r.created_at, created_by=r.created_by,
+                                     status=checks_findings.worst(r.check_results)) for r in got.versions])
+
+
+@router.put("/applications/{application_id}/spec", response_model=ApplicationDetail, name="applications_put_spec",
+            responses={409: {"description": "The documents can no longer be edited"}})
+async def put_spec(application_id: uuid.UUID, body: SpecUpdate, principal: PrincipalDep,
+                   session: SessionDep) -> ApplicationDetail:
     """Owner edits; re-runs the checks; invalidates an approved packet if material."""
-    not_implemented(2, "tailoring")
+    app = await session.get(Application, application_id, with_for_update=True)
+    if app is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="application not found")
+    try:
+        await studio.owner_edit(session, app, body.spec, actor=principal.actor)
+    except tailoring_service.TailoringError as exc:
+        raise _tailoring_error(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
 
 
 @router.post("/applications/{application_id}/check", response_model=list[CheckResult],
-             name="applications_check")
-async def run_checks(application_id: uuid.UUID) -> list[CheckResult]:
-    not_implemented(2, "tailoring")
+             name="applications_check", responses={409: {"description": "There is no draft to check"}})
+async def run_checks(application_id: uuid.UUID, principal: PrincipalDep, session: SessionDep,
+                     service: Annotated[LLMService, Depends(llm_service)]) -> list[CheckResult]:
+    """Re-run every check on the latest spec version, including the model claim check when enabled."""
+    app = await _load(session, application_id)
+    try:
+        results = await studio.recheck(session, app, service, actor=principal.actor)
+    except tailoring_service.TailoringError as exc:
+        raise _tailoring_error(exc) from exc
+    await _changed(session, app.id)
+    return results
 
 
-@router.get("/applications/{application_id}/documents/{kind}", name="applications_document",
-            responses={200: {"content": {"application/pdf": {}, "text/html": {}}}})
-async def document(application_id: uuid.UUID, kind: Literal["cv", "letter", "answers"],
-                   fmt: Literal["pdf", "docx", "html"] = "pdf") -> None:
-    not_implemented(2, "documents")
+# Documents (list, render, download): app/docs/api.py
+router.include_router(documents_router)
+
+
+def _packet_out(p: ApplicationPacket) -> PacketOut:
+    return PacketOut(id=p.id, created_at=p.created_at, updated_at=p.updated_at, application_id=p.application_id,
+                     version=p.version, content_hash=p.content_hash, contents=p.contents, approved_at=p.approved_at,
+                     approved_by=p.approved_by, invalidated_at=p.invalidated_at,
+                     invalidated_reason=p.invalidated_reason)
+
+
+def _approval_error(exc: approval.ApprovalError) -> HTTPException:
+    return HTTPException(exc.status, detail={"code": exc.code, "reason": exc.message, **exc.detail})
+
+
+def _coded(exc: Any) -> HTTPException:
+    """``{code, reason}`` for an apply-layer refusal (``app.apply.errors``)."""
+    return HTTPException(exc.status, detail=apply_errors.detail(exc.code, exc.message))
+
+
+def _approval_status(outcome: approval.ApprovalOutcome) -> ApprovalStatusOut:
+    code = None if outcome.approved else apply_errors.for_permit_reason(
+        outcome.reason, (str(g.get("gate")) for g in outcome.gates))
+    return ApprovalStatusOut(approved=outcome.approved, status=outcome.status, reason=outcome.reason,  # type: ignore[arg-type]
+                             pending_action_id=outcome.pending_action_id, code=code)
 
 
 @router.get("/applications/{application_id}/packets", response_model=list[PacketOut], name="applications_packets")
-async def packets(application_id: uuid.UUID) -> list[PacketOut]:
-    not_implemented(2, "apply")
+async def packets(application_id: uuid.UUID, session: SessionDep) -> list[PacketOut]:
+    """Every packet version, newest first (invalidated ones say why)."""
+    await _load(session, application_id)
+    return [_packet_out(p) for p in await apply_packets.history(session, application_id)]
+
+
+@router.get("/applications/{application_id}/packet", response_model=PacketOut, name="applications_packet_get",
+            responses={404: {"description": "No current packet"}})
+async def current_packet(application_id: uuid.UUID, session: SessionDep) -> PacketOut:
+    """The current packet: exactly what would be sent."""
+    await _load(session, application_id)
+    packet = await apply_packets.current(session, application_id)
+    if packet is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no packet has been built")
+    return _packet_out(packet)
+
+
+@router.post("/applications/{application_id}/packet", response_model=PacketBuildOut,
+             name="applications_packet_build", responses={409: {"description": "The application has gone out"}})
+async def build_packet(application_id: uuid.UUID, body: PacketBuildIn, principal: PrincipalDep,
+                       session: SessionDep) -> PacketBuildOut:
+    """Snapshot what would be sent. Identical contents return the current packet; any change makes a new
+    version and invalidates the old one and its approval. Then the automation policy runs: automatic
+    approval when every gate passes, an approval request when the mode lets the system apply."""
+    app = await _load(session, application_id)
+    if app.stage not in approval.APPROVABLE_STAGES:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=apply_errors.detail(
+            "illegal_stage", f"an application in {app.stage.value} cannot be repacked"))
+    draft = apply_packets.PacketDraft(
+        channel=body.channel, destination_url=body.destination_url or "", sending_identity=body.sending_identity,
+        answers=[apply_packets.DraftAnswer(question=a.question, value=a.value, answer_id=a.answer_id)
+                 for a in body.answers],
+        email=body.email, files=list(body.files), link_permissions=list(body.link_permissions),
+        requisition=body.requisition)
+    try:
+        built = await apply_packets.build(session, app, draft, actor=principal.actor)
+    except apply_packets.PacketError as exc:
+        raise _coded(exc) from exc
+    outcome = await approval.after_packet_built(session, app, built.packet) if built.created else None
+    await _changed(session, app.id)
+    await session.refresh(built.packet)
+    return PacketBuildOut(
+        packet=_packet_out(built.packet), created=built.created,
+        changes=[PacketChange(**c) for c in built.changes] if built.previous else [],
+        approval=None if outcome is None else _approval_status(outcome))
+
+
+@router.post("/applications/{application_id}/packet/prepare", response_model=PacketPrepareOut,
+             name="applications_packet_prepare",
+             responses={409: {"description": "Nothing built: {code, reason} (spec not checked, answers waiting, "
+                                             "nowhere to apply, or the application has gone out)"}})
+async def prepare_packet(application_id: uuid.UUID, body: PacketPrepareIn, principal: PrincipalDep,
+                         session: SessionDep, store: DocStoreDep) -> PacketPrepareOut:
+    """Prepare the packet exactly as the pipeline does (``app.apply.prepare.prepare_packet``): render the
+    checked spec's CV and letter, pick the channel (email to a usable application address when a mailbox is
+    connected, else manual; ``channel: manual`` always hands it to the owner), build, then let the automation
+    policy act (an approval request, or automatic approval)."""
+    from app.apply import prepare as apply_prepare
+
+    app = await _load(session, application_id)
+    if app.stage not in approval.APPROVABLE_STAGES:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=apply_errors.detail(
+            "illegal_stage", f"an application in {app.stage.value} cannot be repacked"))
+    templates = {k: v for k, v in (("cv", body.cv_template), ("letter", body.letter_template)) if v}
+    prepared = await apply_prepare.prepare_packet(session, store, app, actor=principal.actor, channel=body.channel,
+                                                  templates=templates)
+    if not prepared.built or prepared.packet_id is None:
+        await session.commit()  # keep the audited reason
+        raise HTTPException(status.HTTP_409_CONFLICT,
+                            detail=apply_errors.detail(prepared.code or "refused", prepared.reason))
+    await _changed(session, app.id)
+    packet = await session.get(ApplicationPacket, prepared.packet_id, populate_existing=True)
+    assert packet is not None
+    return PacketPrepareOut(
+        channel=prepared.channel, packet=_packet_out(packet), created=prepared.created,  # type: ignore[arg-type]
+        changes=[PacketChange(**c) for c in prepared.changes],
+        approval=None if prepared.approval is None else _approval_status(prepared.approval))
 
 
 @router.get("/applications/{application_id}/receipt", response_model=ReceiptOut, name="applications_receipt")
-async def receipt(application_id: uuid.UUID) -> ReceiptOut:
-    not_implemented(2, "apply")
+async def receipt(application_id: uuid.UUID, session: SessionDep) -> ReceiptOut:
+    """The approval receipt for the current packet, with the gates an approval would check."""
+    app = await _load(session, application_id)
+    built = await apply_receipt.build(session, app)
+    if built is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="no packet has been built")
+    return ReceiptOut(
+        application_id=app.id, packet=_packet_out(built.packet), employer=built.employer,
+        destination=built.destination, role=built.role, pay_answers=built.pay_answers,
+        work_rights_answers=built.work_rights_answers, attachments=built.attachments,
+        unusual_disclosures=built.unusual_disclosures,
+        changes_since_last_look=[PacketChange(**c) for c in built.changes_since_last_look],
+        action_label=built.action_label, gates=[GateResult(**g) for g in built.gates])
 
 
 @router.post("/applications/{application_id}/approve", response_model=ApplicationDetail,
              name="applications_approve", responses={409: {"description": "Packet changed since it was shown"}})
-async def approve(application_id: uuid.UUID, body: ApproveIn) -> ApplicationDetail:
-    not_implemented(2, "apply")
+async def approve(application_id: uuid.UUID, body: ApproveIn, principal: PrincipalDep,
+                  session: SessionDep) -> ApplicationDetail:
+    """Approve exactly this packet (version and hash) for this channel. Refused (409, with the gates) when
+    the packet changed, the role is excluded or held in its employer group, a document check blocks, or
+    the mode does not let the system apply."""
+    app = await _load(session, application_id)
+    try:
+        await approval.approve(session, app, packet_version=body.packet_version, packet_hash=body.packet_hash,
+                               channel=body.channel, actor=principal.actor, waiver_ids=body.waivers,
+                               waiver_reason=body.waiver_reason)
+    except approval.ApprovalError as exc:
+        raise _approval_error(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
+
+
+@router.post("/applications/{application_id}/reject", response_model=ApplicationDetail,
+             name="applications_reject", responses={409: {"description": "Cannot be rejected now"}})
+async def reject(application_id: uuid.UUID, body: RejectIn, principal: PrincipalDep,
+                 session: SessionDep) -> ApplicationDetail:
+    """Say no at approval: the role is skipped and the next role in its employer group is promoted."""
+    app = await _load(session, application_id)
+    try:
+        await approval.reject(session, app, actor=principal.actor, reason=body.reason)
+    except approval.ApprovalError as exc:
+        raise _approval_error(exc) from exc
+    except stages.IllegalTransition as exc:
+        raise _illegal(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
+
+
+@router.post("/applications/{application_id}/request-changes", response_model=ApplicationDetail,
+             name="applications_request_changes", responses={409: {"description": "Cannot be changed now"}})
+async def request_changes(application_id: uuid.UUID, body: RequestChangesIn, principal: PrincipalDep,
+                          session: SessionDep) -> ApplicationDetail:
+    """Retire the packet and send the application back to tailoring with a note."""
+    app = await _load(session, application_id)
+    try:
+        await approval.request_changes(session, app, actor=principal.actor, note=body.note)
+    except approval.ApprovalError as exc:
+        raise _approval_error(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
+
+
+async def _deferrals(session: AsyncSession, attempts: list[DispatchAttempt]) -> dict[str, str]:
+    """Attempts still waiting after a send-time deferral, and why (from their ``dispatch_deferred`` events)."""
+    waiting = {str(a.id): a for a in attempts if a.status.value == "reserved" and a.started_at is None}
+    if not waiting:
+        return {}
+    events = await session.scalars(select(ApplicationEvent).where(
+        ApplicationEvent.application_id.in_({a.application_id for a in waiting.values()}),
+        ApplicationEvent.kind == "dispatch_deferred"))
+    return {str(e.detail.get("attempt_id")): str(e.detail.get("code") or "quiet_hours") for e in events
+            if str(e.detail.get("attempt_id")) in waiting}
+
+
+def _dispatch_out(a: DispatchAttempt, deferred: dict[str, str] | None = None) -> DispatchOut:
+    reason = (deferred or {}).get(str(a.id))
+    return DispatchOut(deferred_reason=reason, deferred_until=a.send_after if reason else None,  # type: ignore[arg-type]
+                       id=a.id, created_at=a.created_at, updated_at=a.updated_at, application_id=a.application_id,
+                       packet_hash=a.packet_hash, channel=a.channel.value, status=a.status.value,
+                       send_after=a.send_after, provider_message_id=a.provider_message_id, outcome_at=a.outcome_at,
+                       gate_results=a.gate_results, error=a.error, started_at=a.started_at, evidence=a.evidence,
+                       uncertain=apply_outcomes.is_uncertain(a), reconcile_attempts=a.reconcile_attempts,
+                       last_reconciled_at=a.last_reconciled_at)
+
+
+async def _attempt(session: AsyncSession, application_id: uuid.UUID, dispatch_id: uuid.UUID) -> DispatchAttempt:
+    attempt = await session.get(DispatchAttempt, dispatch_id, with_for_update=True)
+    if attempt is None or attempt.application_id != application_id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="dispatch not found")
+    return attempt
 
 
 @router.get("/applications/{application_id}/dispatches", response_model=list[DispatchOut],
             name="applications_dispatches")
-async def dispatches(application_id: uuid.UUID) -> list[DispatchOut]:
-    not_implemented(2, "apply")
+async def dispatches(application_id: uuid.UUID, session: SessionDep) -> list[DispatchOut]:
+    """Every dispatch attempt, newest first: what was reserved, handed over, sent (with evidence), failed,
+    cancelled or is uncertain."""
+    await _load(session, application_id)
+    rows = await session.scalars(select(DispatchAttempt).where(DispatchAttempt.application_id == application_id)
+                                 .order_by(DispatchAttempt.created_at.desc()))
+    attempts = list(rows)
+    deferred = await _deferrals(session, attempts)
+    return [_dispatch_out(a, deferred) for a in attempts]
+
+
+@router.post("/applications/{application_id}/dispatches", response_model=DispatchCreateOut,
+             name="applications_dispatch_create")
+async def create_dispatch(application_id: uuid.UUID, body: DispatchCreateIn, principal: PrincipalDep,
+                          session: SessionDep) -> DispatchCreateOut:
+    """Send the current approved packet: a submit permit (every gate), then the attempt, in one transaction.
+    Email waits ``automation.email_send_delay_minutes`` (cancellable) and is sent by the worker; the manual
+    channel hands the kit to the owner at once."""
+    await _load(session, application_id)
+    try:
+        result = await apply_dispatch.queue(session, application_id, actor=principal.actor)
+    except apply_dispatch.DispatchError as exc:
+        raise _coded(exc) from exc
+    attempt = result.attempt
+    if attempt is not None and attempt.channel == Channel.manual:
+        attempt_id = attempt.id
+        await session.commit()
+        await apply_dispatch.run(session, attempt_id)
+        attempt = await session.get(DispatchAttempt, attempt_id, populate_existing=True)
+    elif attempt is not None:
+        await session.refresh(attempt)
+    await _changed(session, application_id)
+    return DispatchCreateOut(status=result.status, reason=result.reason,  # type: ignore[arg-type]
+                             dispatch=_dispatch_out(attempt) if attempt else None,
+                             gates=[GateResult(**g) for g in result.gates], pending_action_id=result.pending_action_id,
+                             code=result.code)
 
 
 @router.post("/applications/{application_id}/dispatches/{dispatch_id}/cancel", response_model=DispatchOut,
-             name="applications_cancel_dispatch")
-async def cancel_dispatch(application_id: uuid.UUID, dispatch_id: uuid.UUID) -> DispatchOut:
-    not_implemented(2, "apply")
+             name="applications_cancel_dispatch", responses={409: {"description": "Already handed over"}})
+async def cancel_dispatch(application_id: uuid.UUID, dispatch_id: uuid.UUID, principal: PrincipalDep,
+                          session: SessionDep) -> DispatchOut:
+    """Cancel a queued send before it is handed to its channel (during the send delay)."""
+    attempt = await _attempt(session, application_id, dispatch_id)
+    app = await apply_outcomes.lock_application(session, application_id)
+    try:
+        await apply_outcomes.cancel(session, attempt, app, "cancelled by the owner", actor=principal.actor,
+                                    now=utcnow())
+    except apply_outcomes.OutcomeError as exc:
+        raise _coded(exc) from exc
+    await _changed(session, application_id)
+    await session.refresh(attempt)
+    return _dispatch_out(attempt)
+
+
+@router.post("/applications/{application_id}/dispatches/{dispatch_id}/reconcile", response_model=ReconcileOut,
+             name="applications_reconcile_dispatch", responses={409: {"description": "Not uncertain"}})
+async def reconcile_dispatch(application_id: uuid.UUID, dispatch_id: uuid.UUID, body: ReconcileIn,
+                             principal: PrincipalDep, session: SessionDep) -> ReconcileOut:
+    """Settle an uncertain send: ask its channel now, or say it went out (with the reference) or did not.
+    An uncertain send is never resent automatically."""
+    attempt = await _attempt(session, application_id, dispatch_id)
+    try:
+        result = await apply_reconcile.decide(session, attempt, body.decision, actor=principal.actor,
+                                              reference=body.reference, note=body.note)
+    except apply_outcomes.OutcomeError as exc:
+        raise _coded(exc) from exc
+    await _changed(session, application_id)
+    await session.refresh(attempt)
+    return ReconcileOut(result=result, dispatch=_dispatch_out(attempt))  # type: ignore[arg-type]
 
 
 @router.get("/applications/{application_id}/handoff", response_model=ManualHandoffOut,
             name="applications_manual_handoff")
-async def manual_handoff(application_id: uuid.UUID) -> ManualHandoffOut:
-    not_implemented(2, "apply")
+async def manual_handoff(application_id: uuid.UUID, session: SessionDep) -> ManualHandoffOut:
+    """The manual handoff kit for the current packet: posting link, files, answers sheet, remaining steps."""
+    app = await _load(session, application_id)
+    try:
+        built = await apply_handoff.kit(session, app)
+    except apply_handoff.HandoffError as exc:
+        raise _coded(exc) from exc
+    return ManualHandoffOut(posting_url=built.posting_url, files=built.files, answers=built.answers,
+                            remaining_steps=built.remaining_steps)
 
 
 @router.post("/applications/{application_id}/mark-submitted", response_model=ApplicationDetail,
-             name="applications_mark_submitted")
-async def mark_submitted(application_id: uuid.UUID, body: MarkSubmittedIn) -> ApplicationDetail:
-    not_implemented(2, "apply")
+             name="applications_mark_submitted", responses={409: {"description": "Nothing approved to submit"}})
+async def mark_submitted(application_id: uuid.UUID, body: MarkSubmittedIn, principal: PrincipalDep,
+                         session: SessionDep) -> ApplicationDetail:
+    """The owner submitted it: closes the open send (manual hand-off, or an uncertain one) as sent with the
+    owner's evidence, or sends the approved manual packet through permit and attempt first. Duplicate
+    protection then holds exactly as after an automatic send."""
+    app = await _load(session, application_id)
+    try:
+        await apply_handoff.mark_submitted(session, app, reference=body.reference, note=body.note,
+                                           actor=principal.actor)
+    except apply_handoff.HandoffError as exc:
+        raise _coded(exc) from exc
+    except apply_outcomes.OutcomeError as exc:
+        raise _coded(exc) from exc
+    await _changed(session, app.id)
+    return await _detail(session, app.id)
 
 
 @router.get("/applications/{application_id}/releases", response_model=list[ReleaseRecord],
@@ -823,14 +1329,49 @@ async def contacts_delete(item_id: uuid.UUID, principal: PrincipalDep, session: 
 
 
 @router.get("/mail-threads", response_model=Page[MailThreadOut], name="mail_threads_list")
-async def mail_threads(application_id: uuid.UUID | None = None, needs_review: bool | None = None,
-                       cursor: str | None = None) -> Page[MailThreadOut]:
-    not_implemented(2, "mail")
+async def mail_threads(session: SessionDep, application_id: uuid.UUID | None = None,
+                       needs_review: bool | None = None, cursor: str | None = None,
+                       limit: int = Query(default=50, ge=1, le=200)) -> Page[MailThreadOut]:
+    offset = int(cursor) if cursor and cursor.isdigit() else 0
+    stmt = select(MailThread).order_by(MailThread.last_message_at.desc().nulls_last(), MailThread.id)
+    if application_id is not None:
+        stmt = stmt.where(MailThread.application_id == application_id)
+    if needs_review is not None:
+        stmt = stmt.where(MailThread.needs_review.is_(needs_review))
+    rows = list(await session.scalars(stmt.offset(offset).limit(limit + 1)))
+    return Page[MailThreadOut](items=[MailThreadOut.model_validate(t) for t in rows[:limit]],
+                               next_cursor=str(offset + limit) if len(rows) > limit else None)
 
 
 @router.put("/mail-threads/{thread_id}", response_model=MailThreadOut, name="mail_threads_link")
-async def link_mail_thread(thread_id: uuid.UUID, body: MailThreadLink) -> MailThreadOut:
-    not_implemented(2, "mail")
+async def link_mail_thread(thread_id: uuid.UUID, body: MailThreadLink, session: SessionDep,
+                           principal: PrincipalDep) -> MailThreadOut:
+    """The owner settles a review: link the thread to an application (or unlink it) and/or fix its kind.
+    Linking applies the same proposal rules as an automatic match, but never silently changes a stage."""
+    thread = await session.get(MailThread, thread_id)
+    if thread is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="mail thread not found")
+    app = None
+    if body.application_id is not None:
+        app = await session.get(Application, body.application_id)
+        if app is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail="application not found")
+    thread.application_id = body.application_id
+    if body.classification is not None:
+        thread.classification = MailClassification(body.classification)
+    thread.match_confidence = 1.0 if app is not None else None
+    thread.needs_review = False
+    await audit.record(session, actor=principal.actor, action="mail_thread.linked", subject_type="mail_thread",
+                       subject_id=thread.id, detail={"application_id": str(body.application_id) if app else None,
+                                                     "classification": thread.classification.value})
+    if app is not None and thread.provider_message_ids:
+        res = SyncResult()
+        values = await settings_service.values(session)
+        await act_on_thread(session, thread, app, thread.classification.value, thread.provider_message_ids[-1],
+                            list(values["mail.auto_apply_classes"]), res)
+    await session.flush()
+    await session.refresh(thread)
+    return MailThreadOut.model_validate(thread)
 
 
 @router.get("/jobs/{job_id}/interview-pack", response_model=InterviewPackOut, name="interview_pack_get")
@@ -867,11 +1408,31 @@ async def autopilot_state(session: SessionDep) -> AutopilotState:
 @router.put("/autopilot", response_model=AutopilotState, name="autopilot_set")
 async def autopilot_set(body: AutopilotWrite, principal: PrincipalDep, session: SessionDep) -> AutopilotState:
     """Pause stops every new outward action at once and cancels queued sends; the response
-    lists what was cancelled, paused, and already out. Resume clears the pause. Audited."""
-    return await autopilot.set_paused(session, body.paused, actor=principal.actor)
+    lists what was cancelled, paused, and already out. Resume clears the pause (409 while paused for a
+    restore: use resume-after-restore). Audited."""
+    try:
+        return await autopilot.set_paused(session, body.paused, actor=principal.actor, reason=body.reason)
+    except autopilot.ResumeRefused as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail={"code": "restore_paused", "reason": str(exc)}) from exc
 
 
-@router.post("/autopilot/resume-after-restore", response_model=Ok, name="autopilot_resume_after_restore")
-async def resume_after_restore() -> Ok:
-    """A restored instance starts paused and reconciles its outbox first (18.3)."""
-    not_implemented(2, "apply")
+@router.get("/autopilot/restore", response_model=RestoreStateOut, name="autopilot_restore_state")
+async def restore_state(session: SessionDep) -> RestoreStateOut:
+    """Paused for a restore from backup: what is still to reconcile before sending can resume (18.3)."""
+    st = await apply_restore.state(session)
+    return RestoreStateOut(active=st.active, entered_at=st.entered_at, backup_taken_at=st.backup_taken_at,
+                           outstanding=[_dispatch_out(a) for a in st.outstanding],
+                           held_application_ids=st.held_application_ids)
+
+
+@router.post("/autopilot/resume-after-restore", response_model=Ok, name="autopilot_resume_after_restore",
+             responses={409: {"description": "Sends from before the backup are not reconciled yet"}})
+async def resume_after_restore(principal: PrincipalDep, session: SessionDep) -> Ok:
+    """A restored instance starts paused and reconciles its outbox first (18.3). Refused (409, with the
+    outstanding dispatch ids) until every send in flight at backup time is settled."""
+    try:
+        await apply_restore.resume(session, actor=principal.actor)
+    except apply_restore.RestoreError as exc:
+        raise HTTPException(exc.status, detail={"code": "restore_unreconciled", "reason": exc.message,
+                                                "outstanding": [str(i) for i in exc.outstanding]}) from exc
+    return Ok()

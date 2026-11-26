@@ -528,6 +528,9 @@
           "404": {
             "description": "Unknown setting"
           },
+          "409": {
+            "description": "Changed only by its own endpoint"
+          },
           "422": {
             "description": "Invalid value"
           }
@@ -951,6 +954,82 @@
             "description": "Server-sent events: `event: <type>` / `data: {data, at}`",
             "content": {
               "text/event-stream": {}
+            }
+          }
+        }
+      }
+    },
+    "/api/health/live": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Live",
+        "description": "Liveness: the process answers. Touches nothing, so a database outage does not restart the web tier.",
+        "operationId": "health_live",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Live"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/ready": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Ready",
+        "description": "Readiness: the database answers and is migrated. A stale worker does not make the web tier unready.",
+        "operationId": "health_ready",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ready"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database down or not migrated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ready"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health/detail": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Detail",
+        "description": "Worker heartbeat age, last successful sweep and backup, disk, queue depth, per-connection status.",
+        "operationId": "health_detail",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetailedHealth"
+                }
+              }
             }
           }
         }
@@ -7079,6 +7158,63 @@
         }
       }
     },
+    "/api/jobs/{job_id}/apply-email": {
+      "put": {
+        "tags": [
+          "jobs"
+        ],
+        "summary": "Jobs Set Apply Email",
+        "description": "Set, correct or confirm where this role's application email goes (audited ``job.apply_email_set``).\nAn address found in a posting stays unconfirmed until the owner confirms it here (or its domain is a\ntrusted site); only a usable address is sent to. A changed address retires a packet addressed elsewhere.",
+        "operationId": "jobs_set_apply_email",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplyEmailIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Not an email address, or nothing to confirm ({code, reason})"
+          }
+        }
+      }
+    },
     "/api/jobs/capture": {
       "post": {
         "tags": [
@@ -9947,6 +10083,7 @@
           "applications"
         ],
         "summary": "Applications Tailor",
+        "description": "Queue a tailored draft. Idempotent per spec version and Kit facts: asking again returns the same\nrequest (``queued`` is false once it is done).",
         "operationId": "applications_tailor",
         "parameters": [
           {
@@ -9981,6 +10118,9 @@
               }
             }
           },
+          "409": {
+            "description": "The application can no longer be tailored"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -9995,6 +10135,74 @@
       }
     },
     "/api/applications/{application_id}/spec": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Get Spec",
+        "operationId": "applications_get_spec",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "version",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Version"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SpecStateOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": [
           "applications"
@@ -10045,6 +10253,9 @@
               }
             }
           },
+          "409": {
+            "description": "The documents can no longer be edited"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -10064,6 +10275,7 @@
           "applications"
         ],
         "summary": "Applications Check",
+        "description": "Re-run every check on the latest spec version, including the model claim check when enabled.",
         "operationId": "applications_check",
         "parameters": [
           {
@@ -10102,6 +10314,192 @@
               }
             }
           },
+          "409": {
+            "description": "There is no draft to check"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/documents": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Documents",
+        "description": "Every file rendered for this application (newest first), including ones from earlier spec versions.",
+        "operationId": "applications_documents",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DocumentOut"
+                  },
+                  "title": "Response Applications Documents"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/documents/render": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Render Documents",
+        "description": "Render the current spec. The same spec and template return the files already stored (no new rows).",
+        "operationId": "applications_render_documents",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenderIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/document-templates": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Document Templates List",
+        "description": "The cv and letter templates a render can use (built-ins, then the owner's Kit templates; a Kit row with a\nbuilt-in key overrides it), with effective limits, and the default per kind (for ``application_id``, the\ntrack's choice wins over the documents setting).",
+        "operationId": "document_templates_list",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DocumentTemplatesOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -10121,6 +10519,7 @@
           "applications"
         ],
         "summary": "Applications Document",
+        "description": "Download the current spec's document, rendering it first when it is not stored yet.\n\nWarnings travel in the ``X-Render-Warnings`` header as a count; the render endpoint lists them.",
         "operationId": "applications_document",
         "parameters": [
           {
@@ -10155,12 +10554,31 @@
               "enum": [
                 "pdf",
                 "docx",
+                "txt",
                 "html"
               ],
               "type": "string",
               "default": "pdf",
               "title": "Fmt"
             }
+          },
+          {
+            "name": "template",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Template key",
+              "title": "Template"
+            },
+            "description": "Template key"
           }
         ],
         "responses": {
@@ -10171,7 +10589,71 @@
                 "schema": {}
               },
               "application/pdf": {},
-              "text/html": {}
+              "text/html": {},
+              "text/plain": {},
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document": {}
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/document-files/{document_id}": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Document File",
+        "description": "Download a stored file exactly as rendered (what a packet's hash refers to), whatever the spec says now.",
+        "operationId": "applications_document_file",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "document_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Document Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
             }
           },
           "501": {
@@ -10203,6 +10685,7 @@
           "applications"
         ],
         "summary": "Applications Packets",
+        "description": "Every packet version, newest first (invalidated ones say why).",
         "operationId": "applications_packets",
         "parameters": [
           {
@@ -10254,12 +10737,202 @@
         }
       }
     },
+    "/api/applications/{application_id}/packet": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Packet Get",
+        "description": "The current packet: exactly what would be sent.",
+        "operationId": "applications_packet_get",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacketOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No current packet"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Packet Build",
+        "description": "Snapshot what would be sent. Identical contents return the current packet; any change makes a new\nversion and invalidates the old one and its approval. Then the automation policy runs: automatic\napproval when every gate passes, an approval request when the mode lets the system apply.",
+        "operationId": "applications_packet_build",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PacketBuildIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacketBuildOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The application has gone out"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/packet/prepare": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Packet Prepare",
+        "description": "Prepare the packet exactly as the pipeline does (``app.apply.prepare.prepare_packet``): render the\nchecked spec's CV and letter, pick the channel (email to a usable application address when a mailbox is\nconnected, else manual; ``channel: manual`` always hands it to the owner), build, then let the automation\npolicy act (an approval request, or automatic approval).",
+        "operationId": "applications_packet_prepare",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PacketPrepareIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PacketPrepareOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing built: {code, reason} (spec not checked, answers waiting, nowhere to apply, or the application has gone out)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/{application_id}/receipt": {
       "get": {
         "tags": [
           "applications"
         ],
         "summary": "Applications Receipt",
+        "description": "The approval receipt for the current packet, with the gates an approval would check.",
         "operationId": "applications_receipt",
         "parameters": [
           {
@@ -10313,6 +10986,7 @@
           "applications"
         ],
         "summary": "Applications Approve",
+        "description": "Approve exactly this packet (version and hash) for this channel. Refused (409, with the gates) when\nthe packet changed, the role is excluded or held in its employer group, a document check blocks, or\nthe mode does not let the system apply.",
         "operationId": "applications_approve",
         "parameters": [
           {
@@ -10373,12 +11047,147 @@
         }
       }
     },
+    "/api/applications/{application_id}/reject": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Reject",
+        "description": "Say no at approval: the role is skipped and the next role in its employer group is promoted.",
+        "operationId": "applications_reject",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot be rejected now"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/request-changes": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Request Changes",
+        "description": "Retire the packet and send the application back to tailoring with a note.",
+        "operationId": "applications_request_changes",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestChangesIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationDetail"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Cannot be changed now"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/applications/{application_id}/dispatches": {
       "get": {
         "tags": [
           "applications"
         ],
         "summary": "Applications Dispatches",
+        "description": "Every dispatch attempt, newest first: what was reserved, handed over, sent (with evidence), failed,\ncancelled or is uncertain.",
         "operationId": "applications_dispatches",
         "parameters": [
           {
@@ -10428,6 +11237,68 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Dispatch Create",
+        "description": "Send the current approved packet: a submit permit (every gate), then the attempt, in one transaction.\nEmail waits ``automation.email_send_delay_minutes`` (cancellable) and is sent by the worker; the manual\nchannel hands the kit to the owner at once.",
+        "operationId": "applications_dispatch_create",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DispatchCreateIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DispatchCreateOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/applications/{application_id}/dispatches/{dispatch_id}/cancel": {
@@ -10436,6 +11307,7 @@
           "applications"
         ],
         "summary": "Applications Cancel Dispatch",
+        "description": "Cancel a queued send before it is handed to its channel (during the send delay).",
         "operationId": "applications_cancel_dispatch",
         "parameters": [
           {
@@ -10480,6 +11352,86 @@
               }
             }
           },
+          "409": {
+            "description": "Already handed over"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/applications/{application_id}/dispatches/{dispatch_id}/reconcile": {
+      "post": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Applications Reconcile Dispatch",
+        "description": "Settle an uncertain send: ask its channel now, or say it went out (with the reference) or did not.\nAn uncertain send is never resent automatically.",
+        "operationId": "applications_reconcile_dispatch",
+        "parameters": [
+          {
+            "name": "application_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Application Id"
+            }
+          },
+          {
+            "name": "dispatch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dispatch Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReconcileIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReconcileOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not uncertain"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -10499,6 +11451,7 @@
           "applications"
         ],
         "summary": "Applications Manual Handoff",
+        "description": "The manual handoff kit for the current packet: posting link, files, answers sheet, remaining steps.",
         "operationId": "applications_manual_handoff",
         "parameters": [
           {
@@ -10552,6 +11505,7 @@
           "applications"
         ],
         "summary": "Applications Mark Submitted",
+        "description": "The owner submitted it: closes the open send (manual hand-off, or an uncertain one) as sent with the\nowner's evidence, or sends the approved manual packet through permit and attempt first. Duplicate\nprotection then holds exactly as after an automatic send.",
         "operationId": "applications_mark_submitted",
         "parameters": [
           {
@@ -10595,6 +11549,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Nothing approved to submit"
           },
           "422": {
             "description": "Validation Error",
@@ -10966,6 +11923,18 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
           }
         ],
         "responses": {
@@ -11008,6 +11977,7 @@
           "applications"
         ],
         "summary": "Mail Threads Link",
+        "description": "The owner settles a review: link the thread to an application (or unlink it) and/or fix its kind.\nLinking applies the same proposal rules as an automatic match, but never silently changes a stage.",
         "operationId": "mail_threads_link",
         "parameters": [
           {
@@ -11331,7 +12301,7 @@
           "applications"
         ],
         "summary": "Autopilot Set",
-        "description": "Pause stops every new outward action at once and cancels queued sends; the response\nlists what was cancelled, paused, and already out. Resume clears the pause. Audited.",
+        "description": "Pause stops every new outward action at once and cancels queued sends; the response\nlists what was cancelled, paused, and already out. Resume clears the pause (409 while paused for a\nrestore: use resume-after-restore). Audited.",
         "operationId": "autopilot_set",
         "requestBody": {
           "content": {
@@ -11377,13 +12347,45 @@
         }
       }
     },
+    "/api/autopilot/restore": {
+      "get": {
+        "tags": [
+          "applications"
+        ],
+        "summary": "Autopilot Restore State",
+        "description": "Paused for a restore from backup: what is still to reconcile before sending can resume (18.3).",
+        "operationId": "autopilot_restore_state",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreStateOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/autopilot/resume-after-restore": {
       "post": {
         "tags": [
           "applications"
         ],
         "summary": "Autopilot Resume After Restore",
-        "description": "A restored instance starts paused and reconciles its outbox first (18.3).",
+        "description": "A restored instance starts paused and reconciles its outbox first (18.3). Refused (409, with the\noutstanding dispatch ids) until every send in flight at backup time is settled.",
         "operationId": "autopilot_resume_after_restore",
         "responses": {
           "200": {
@@ -11405,6 +12407,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Sends from before the backup are not reconciled yet"
           }
         }
       }
@@ -11826,7 +12831,7 @@
           "pending_actions"
         ],
         "summary": "Pending Actions Resolve",
-        "description": "'I've signed in, continue' returns the task to the same runner (8.4). Wave 2 (apply) handles the\ntypes that need a runner; dismissing and answering an unknown question work now.",
+        "description": "Settle a decision: ``dismissed``; ``answered`` (unknown question); ``approved`` (approve the packet the\naction names, if it is still current); ``chosen`` (conflict choice, with ``chosen_job_id``); ``continue``\n('I've signed in, continue': the task returns to the same runner, 8.4). ``confirmed``\n(``confirm_submission``): the uncertain send went out; settles it as sent with the owner's evidence\n(``reference`` if given). ``approved`` on an action whose ``detail.kind`` is a registered proposal (for\nexample ``mail_stage_proposal``) applies that proposal; 501 when its module is not in this build. To\nsay an uncertain send did not go out, use the dispatch's ``reconcile`` (``not_sent``).",
         "operationId": "pending_actions_resolve",
         "parameters": [
           {
@@ -12465,7 +13470,7 @@
           "connections"
         ],
         "summary": "Connections Create",
-        "description": "LLM providers (wave 1). Keys are encrypted at rest and only ever returned masked.",
+        "description": "LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are\nencrypted at rest and only ever returned masked.",
         "operationId": "connections_create",
         "requestBody": {
           "content": {
@@ -13185,6 +14190,7 @@
           "data"
         ],
         "summary": "Data Export Preview",
+        "description": "What would be exported. A share setup is scanned for personal details first (18.5).",
         "operationId": "data_export_preview",
         "requestBody": {
           "content": {
@@ -13268,6 +14274,9 @@
               }
             }
           },
+          "409": {
+            "description": "Personal details found in a share setup"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -13281,13 +14290,93 @@
         }
       }
     },
+    "/api/data/exports/{export_id}": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Data Export Download",
+        "operationId": "data_export_download",
+        "parameters": [
+          {
+            "name": "export_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Export Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or expired export"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/data/onboarding": {
+      "get": {
+        "tags": [
+          "data"
+        ],
+        "summary": "Data Onboarding",
+        "description": "Which wizard steps are done, computed from the data (13).",
+        "operationId": "data_onboarding",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingOut"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Specified; implemented in a later wave",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/data/import": {
       "post": {
         "tags": [
           "data"
         ],
         "summary": "Data Import Preview",
-        "description": "Validate and diff; nothing is written until commit. Imported items land as needs_review.",
+        "description": "Validate and diff; nothing is written to the database until commit. Imported items land as needs_review.",
         "operationId": "data_import_preview",
         "requestBody": {
           "content": {
@@ -13320,15 +14409,11 @@
               }
             }
           },
+          "413": {
+            "description": "Upload too large"
+          },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "Not importable"
           }
         }
       }
@@ -13339,6 +14424,7 @@
           "data"
         ],
         "summary": "Data Import Commit",
+        "description": "Apply a previewed import in one transaction (everything or nothing). Re-validates the staged bytes.",
         "operationId": "data_import_commit",
         "requestBody": {
           "content": {
@@ -13371,15 +14457,11 @@
               }
             }
           },
+          "404": {
+            "description": "Unknown or expired import"
+          },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "Not importable"
           }
         }
       }
@@ -13390,6 +14472,7 @@
           "data"
         ],
         "summary": "Data Backups List",
+        "description": "Backups on this server (newest first), plus the copy in the remote store where one was made.",
         "operationId": "data_backups_list",
         "responses": {
           "200": {
@@ -13423,6 +14506,7 @@
           "data"
         ],
         "summary": "Data Backups Create",
+        "description": "Back up now (the same job as the nightly one). Returns when the archive is written.",
         "operationId": "data_backups_create",
         "responses": {
           "202": {
@@ -13454,6 +14538,7 @@
           "data"
         ],
         "summary": "Data Retention Run",
+        "description": "Run retention now: role text and archive rules, old notifications, temp files, surplus backups.\nDuplicate-protection history, the audit and applications are never deleted.",
         "operationId": "data_retention_run",
         "responses": {
           "202": {
@@ -13485,6 +14570,7 @@
           "data"
         ],
         "summary": "Data Config History",
+        "description": "Versioned configuration changes, newest first: rules, prompts, rubrics, routing, automation policy\n(``kind`` = their kinds) and every settings change (``kind=setting``).",
         "operationId": "data_config_history",
         "parameters": [
           {
@@ -15377,6 +16463,187 @@
         "title": "AppliedMyselfIn",
         "description": "\"I applied myself\": counts at once for duplicates, employer limits and follow-ups. No evidence is\ncreated; the application is marked owner-attested."
       },
+      "ApplyChannelCandidate": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "browser",
+              "manual"
+            ],
+            "title": "Channel"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel",
+          "available",
+          "reason"
+        ],
+        "title": "ApplyChannelCandidate"
+      },
+      "ApplyEmailIn": {
+        "properties": {
+          "address": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 320
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Address"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "ApplyEmailIn",
+        "description": "Set, correct or confirm the application address. ``address`` null keeps (or goes back to) the\nposting's own address; ``confirmed`` confirms the resulting address, false withdraws a confirmation."
+      },
+      "ApplyEmailOut": {
+        "properties": {
+          "address": {
+            "type": "string",
+            "title": "Address"
+          },
+          "found_in": {
+            "type": "string",
+            "enum": [
+              "posting_text",
+              "posting_link",
+              "owner"
+            ],
+            "title": "Found In",
+            "description": "posting_text: quoted in the posting (see evidence); posting_link: its mailto link; owner: set by the owner"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence",
+            "description": "The posting's sentence that gives the address"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "title": "Confirmed"
+          },
+          "confirmed_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed By"
+          },
+          "confirmed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmed At"
+          },
+          "trusted_domain": {
+            "type": "boolean",
+            "title": "Trusted Domain",
+            "description": "The address's domain is on the trusted-sites list"
+          },
+          "usable": {
+            "type": "boolean",
+            "title": "Usable",
+            "description": "confirmed or trusted_domain: the email channel may send to it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "address",
+          "found_in",
+          "confirmed",
+          "trusted_domain",
+          "usable"
+        ],
+        "title": "ApplyEmailOut",
+        "description": "The role's application address and where it came from (``app.apply.target``). Usable for the email\nchannel only when ``confirmed`` by the owner or on a ``trusted_domain``: unknown is not yes."
+      },
+      "ApprovalStatusOut": {
+        "properties": {
+          "approved": {
+            "type": "boolean",
+            "title": "Approved"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "granted",
+              "wait_for_owner",
+              "denied"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "pending_action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Action Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Why not approved: a machine code (CONTRACTS, wave 2 send-flow); None when approved"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approved",
+          "status",
+          "reason"
+        ],
+        "title": "ApprovalStatusOut"
+      },
       "ApproveIn": {
         "properties": {
           "packet_version": {
@@ -15821,6 +17088,30 @@
             ],
             "title": "Paused At"
           },
+          "paused_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paused By",
+            "description": "Who paused (owner, system or a runner name)"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "description": "Why it was paused, as given"
+          },
           "summary": {
             "$ref": "#/components/schemas/PauseSummary",
             "description": "What the last pause did. Empty until something has been queued"
@@ -15839,6 +17130,18 @@
           "paused": {
             "type": "boolean",
             "title": "Paused"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "type": "object",
@@ -17165,6 +18468,64 @@
         ],
         "title": "CompareOut"
       },
+      "Component": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "warn",
+              "down",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "Component"
+      },
       "ConditionResult": {
         "properties": {
           "matched": {
@@ -17470,6 +18831,53 @@
           "label"
         ],
         "title": "ConnectionCreate"
+      },
+      "ConnectionHealth": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "health": {
+            "type": "string",
+            "title": "Health"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "label",
+          "enabled",
+          "health",
+          "last_checked_at"
+        ],
+        "title": "ConnectionHealth"
       },
       "ConnectionOut": {
         "properties": {
@@ -18077,6 +19485,63 @@
         "title": "DecisionGroup",
         "description": "Shared blockers grouped on Today (18.4): 'signing in here unlocks two applications'."
       },
+      "DetailedHealth": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "degraded",
+              "down"
+            ],
+            "title": "Status"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Time"
+          },
+          "components": {
+            "items": {
+              "$ref": "#/components/schemas/Component"
+            },
+            "type": "array",
+            "title": "Components"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/QueueDepth"
+          },
+          "connections": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectionHealth"
+            },
+            "type": "array",
+            "title": "Connections"
+          },
+          "workers": {
+            "items": {
+              "$ref": "#/components/schemas/WorkerHealth"
+            },
+            "type": "array",
+            "title": "Workers",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "version",
+          "time",
+          "components",
+          "queue",
+          "connections"
+        ],
+        "title": "DetailedHealth"
+      },
       "DetectIn": {
         "properties": {
           "url": {
@@ -18156,6 +19621,76 @@
         },
         "type": "object",
         "title": "DismissIn"
+      },
+      "DispatchCreateIn": {
+        "properties": {},
+        "type": "object",
+        "title": "DispatchCreateIn",
+        "description": "Queue the current approved packet now (permit, then the attempt; email waits the send delay)."
+      },
+      "DispatchCreateOut": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "wait_for_owner",
+              "denied"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "dispatch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DispatchOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gates": {
+            "items": {
+              "$ref": "#/components/schemas/GateResult"
+            },
+            "type": "array",
+            "title": "Gates"
+          },
+          "pending_action_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Action Id"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code",
+            "description": "Why not queued: a machine code (CONTRACTS, wave 2 send-flow)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "reason"
+        ],
+        "title": "DispatchCreateOut"
       },
       "DispatchOut": {
         "properties": {
@@ -18258,6 +19793,78 @@
               }
             ],
             "title": "Error"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At",
+            "description": "Handed to the channel (in flight from here)"
+          },
+          "evidence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Evidence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "uncertain": {
+            "type": "boolean",
+            "title": "Uncertain",
+            "description": "Handed over with no final outcome: reconcile, never resend",
+            "default": false
+          },
+          "reconcile_attempts": {
+            "type": "integer",
+            "title": "Reconcile Attempts",
+            "default": 0
+          },
+          "last_reconciled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Reconciled At"
+          },
+          "deferred_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "quiet_hours"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deferred Reason",
+            "description": "Queued but postponed by the send-time check (quiet hours); null otherwise"
+          },
+          "deferred_until": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deferred Until",
+            "description": "When a deferred send becomes due again"
           }
         },
         "type": "object",
@@ -18276,6 +19883,214 @@
           "error"
         ],
         "title": "DispatchOut"
+      },
+      "DocumentOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cv",
+              "letter"
+            ],
+            "title": "Kind"
+          },
+          "fmt": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "docx",
+              "txt",
+              "html"
+            ],
+            "title": "Fmt"
+          },
+          "template_key": {
+            "type": "string",
+            "title": "Template Key"
+          },
+          "spec_hash": {
+            "type": "string",
+            "title": "Spec Hash",
+            "description": "sha256 of the canonical spec this file was rendered from"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash",
+            "description": "sha256 of the stored file; packets bind to this"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes"
+          },
+          "mime_type": {
+            "type": "string",
+            "title": "Mime Type"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RenderWarning"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "application_id",
+          "kind",
+          "fmt",
+          "template_key",
+          "spec_hash",
+          "content_hash",
+          "size_bytes",
+          "mime_type",
+          "page_count",
+          "warnings"
+        ],
+        "title": "DocumentOut"
+      },
+      "DocumentTemplatesOut": {
+        "properties": {
+          "templates": {
+            "items": {
+              "$ref": "#/components/schemas/TemplateOptionOut"
+            },
+            "type": "array",
+            "title": "Templates"
+          },
+          "defaults": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TemplateDefaultOut"
+            },
+            "propertyNames": {
+              "enum": [
+                "cv",
+                "letter"
+              ]
+            },
+            "type": "object",
+            "title": "Defaults"
+          }
+        },
+        "type": "object",
+        "required": [
+          "templates",
+          "defaults"
+        ],
+        "title": "DocumentTemplatesOut"
+      },
+      "DraftAnswer": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "value",
+              "ask_owner",
+              "do_not_answer"
+            ],
+            "title": "Outcome"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "select": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Select"
+          },
+          "answer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Id"
+          },
+          "material": {
+            "type": "boolean",
+            "title": "Material",
+            "default": false
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "pending_action_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pending Action Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "question",
+          "outcome"
+        ],
+        "title": "DraftAnswer",
+        "description": "A screening question and what the answer bank says about it (5.4). Only ``outcome == \"value\"``\ncarries an answer; ``ask_owner`` raised a pending action, ``do_not_answer`` is a ``never`` answer."
       },
       "DryRunOut": {
         "properties": {
@@ -18895,6 +20710,12 @@
               "personal_backup"
             ],
             "title": "Kind"
+          },
+          "acknowledge_personal_details": {
+            "type": "boolean",
+            "title": "Acknowledge Personal Details",
+            "description": "Share setup only: export even though the preview found personal details",
+            "default": false
           }
         },
         "type": "object",
@@ -19357,6 +21178,22 @@
               }
             ],
             "title": "Detail"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "fail",
+                  "unknown"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
           }
         },
         "additionalProperties": false,
@@ -19365,7 +21202,8 @@
           "gate",
           "passed"
         ],
-        "title": "GateResult"
+        "title": "GateResult",
+        "description": "One gate's result. ``outcome`` is the three-state answer (unknown is never a pass); ``passed`` is\nkept for compatibility and is true only when ``outcome`` is ``pass``."
       },
       "Group-Input": {
         "properties": {
@@ -20685,6 +22523,23 @@
             "type": "string",
             "title": "Apply Method"
           },
+          "apply_email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApplyEmailOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "apply_channel_candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ApplyChannelCandidate"
+            },
+            "type": "array",
+            "title": "Apply Channel Candidates"
+          },
           "requirements": {
             "items": {
               "$ref": "#/components/schemas/Requirement"
@@ -21417,6 +23272,17 @@
         ],
         "title": "LimitRule"
       },
+      "Live": {
+        "properties": {
+          "alive": {
+            "type": "boolean",
+            "title": "Alive",
+            "default": true
+          }
+        },
+        "type": "object",
+        "title": "Live"
+      },
       "LocationRule": {
         "properties": {
           "place": {
@@ -21496,6 +23362,7 @@
                   "confirmation",
                   "rejection",
                   "interview",
+                  "information_request",
                   "other"
                 ]
               },
@@ -21558,6 +23425,7 @@
               "confirmation",
               "rejection",
               "interview",
+              "information_request",
               "other"
             ],
             "title": "Classification"
@@ -21576,6 +23444,29 @@
           "needs_review": {
             "type": "boolean",
             "title": "Needs Review"
+          },
+          "sender": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sender"
+          },
+          "last_message_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Message At"
           }
         },
         "type": "object",
@@ -21610,7 +23501,7 @@
             },
             "type": "array",
             "title": "Files",
-            "description": "Signed download URLs for the final PDFs"
+            "description": "Download links for the final files (behind the owner's session), or the share links the packet records"
           },
           "answers": {
             "items": {
@@ -21823,6 +23714,68 @@
         ],
         "title": "OmitField"
       },
+      "OnboardingOut": {
+        "properties": {
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/OnboardingStepOut"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "complete": {
+            "type": "boolean",
+            "title": "Complete"
+          },
+          "next_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Step",
+            "description": "Key of the first step not done, or null"
+          }
+        },
+        "type": "object",
+        "required": [
+          "steps",
+          "complete",
+          "next_step"
+        ],
+        "title": "OnboardingOut"
+      },
+      "OnboardingStepOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "done": {
+            "type": "boolean",
+            "title": "Done"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "done",
+          "detail"
+        ],
+        "title": "OnboardingStepOut"
+      },
       "Override": {
         "properties": {
           "by": {
@@ -21956,6 +23909,161 @@
         ],
         "title": "PacketAnswer"
       },
+      "PacketAnswerIn": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Question"
+          },
+          "answer_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Id"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "question"
+        ],
+        "title": "PacketAnswerIn",
+        "description": "An answer from the bank (``answer_id``: value and materiality are read from the bank) or typed for\nthis packet only (``value``; counted as material)."
+      },
+      "PacketBuildIn": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "browser",
+              "manual"
+            ],
+            "title": "Channel"
+          },
+          "destination_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination Url",
+            "description": "Apply URL (browser, manual)"
+          },
+          "sending_identity": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Sending Identity",
+            "description": "Mailbox or name the application is sent as"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/PacketAnswerIn"
+            },
+            "type": "array",
+            "title": "Answers"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PacketEmail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/PacketFile"
+            },
+            "type": "array",
+            "title": "Files"
+          },
+          "link_permissions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Link Permissions"
+          },
+          "requisition": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requisition"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel",
+          "sending_identity"
+        ],
+        "title": "PacketBuildIn",
+        "description": "What would be sent. The server sets the destination domain, ``verified`` and ``trusted``, the\nrequisition (from the job unless given) and the job version."
+      },
+      "PacketBuildOut": {
+        "properties": {
+          "packet": {
+            "$ref": "#/components/schemas/PacketOut"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "False when the contents were identical to the current packet"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/PacketChange"
+            },
+            "type": "array",
+            "title": "Changes",
+            "description": "What changed from the previous version"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalStatusOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the automation policy did with the new packet (None: nothing to do)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "packet",
+          "created"
+        ],
+        "title": "PacketBuildOut"
+      },
       "PacketChange": {
         "properties": {
           "path": {
@@ -22032,6 +24140,35 @@
             },
             "type": "array",
             "title": "Link Permissions"
+          },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "email",
+                  "browser",
+                  "manual"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel",
+            "description": "The channel this packet is sent through"
+          },
+          "job_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Version",
+            "description": "Content hash of the job as it was packed"
           }
         },
         "additionalProperties": false,
@@ -22254,6 +24391,91 @@
           "invalidated_reason"
         ],
         "title": "PacketOut"
+      },
+      "PacketPrepareIn": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "manual"
+            ],
+            "title": "Channel",
+            "default": "auto"
+          },
+          "cv_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cv Template"
+          },
+          "letter_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letter Template"
+          }
+        },
+        "type": "object",
+        "title": "PacketPrepareIn",
+        "description": "Prepare the packet the way the pipeline does. ``auto``: email when the role's application address is\nusable (confirmed, or a trusted domain) and a mailbox is connected, else manual. ``manual``: the owner\napplies. Template keys override the track and documents settings (``GET /api/document-templates``)."
+      },
+      "PacketPrepareOut": {
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "email",
+              "manual"
+            ],
+            "title": "Channel"
+          },
+          "packet": {
+            "$ref": "#/components/schemas/PacketOut"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "Created",
+            "description": "False when the contents were identical to the current packet"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/PacketChange"
+            },
+            "type": "array",
+            "title": "Changes"
+          },
+          "approval": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ApprovalStatusOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the automation policy did with the new packet (None: nothing to do)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "channel",
+          "packet",
+          "created"
+        ],
+        "title": "PacketPrepareOut"
       },
       "Page_AliasOut_": {
         "properties": {
@@ -24470,6 +26692,27 @@
         ],
         "title": "ProposedAction"
       },
+      "QueueDepth": {
+        "properties": {
+          "waiting": {
+            "type": "integer",
+            "title": "Waiting",
+            "default": 0
+          },
+          "running": {
+            "type": "integer",
+            "title": "Running",
+            "default": 0
+          },
+          "failed": {
+            "type": "integer",
+            "title": "Failed",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "QueueDepth"
+      },
       "RangeFilter": {
         "properties": {
           "type": {
@@ -24541,6 +26784,29 @@
         "additionalProperties": false,
         "type": "object",
         "title": "RateLimit"
+      },
+      "Ready": {
+        "properties": {
+          "ready": {
+            "type": "boolean",
+            "title": "Ready"
+          },
+          "database": {
+            "type": "boolean",
+            "title": "Database"
+          },
+          "migrated": {
+            "type": "boolean",
+            "title": "Migrated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ready",
+          "database",
+          "migrated"
+        ],
+        "title": "Ready"
       },
       "ReceiptOut": {
         "properties": {
@@ -24690,6 +26956,71 @@
           "content_changed"
         ],
         "title": "RecheckOut"
+      },
+      "ReconcileIn": {
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "check",
+              "sent",
+              "not_sent"
+            ],
+            "title": "Decision",
+            "description": "check: ask the channel now; sent: it went out (reference kept as evidence); not_sent: it never left (the role goes back to ready; nothing is resent automatically)"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 500
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "title": "ReconcileIn"
+      },
+      "ReconcileOut": {
+        "properties": {
+          "result": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "not_sent",
+              "waiting"
+            ],
+            "title": "Result"
+          },
+          "dispatch": {
+            "$ref": "#/components/schemas/DispatchOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "result",
+          "dispatch"
+        ],
+        "title": "ReconcileOut"
       },
       "ReferenceIn": {
         "properties": {
@@ -24909,6 +27240,23 @@
         ],
         "title": "Reframe"
       },
+      "RejectIn": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "title": "RejectIn"
+      },
       "ReleaseHeldIn": {
         "properties": {
           "reason": {
@@ -24949,6 +27297,126 @@
         ],
         "title": "ReleaseRecord",
         "description": "What a runner was given and what it reports having entered (18.1)."
+      },
+      "RenderIn": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cv",
+              "letter"
+            ],
+            "title": "Kind"
+          },
+          "template_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Template Key",
+            "description": "Template key; default from the documents settings"
+          },
+          "formats": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "pdf",
+                "docx",
+                "txt",
+                "html"
+              ]
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Formats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "RenderIn"
+      },
+      "RenderOut": {
+        "properties": {
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentOut"
+            },
+            "type": "array",
+            "title": "Documents"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RenderWarning"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "Page limit, overflow and omission notices for the Studio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "documents",
+          "warnings"
+        ],
+        "title": "RenderOut"
+      },
+      "RenderWarning": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "detail": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Detail"
+          },
+          "severity": {
+            "type": "string",
+            "const": "warn",
+            "title": "Severity",
+            "default": "warn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "RenderWarning"
+      },
+      "RequestChangesIn": {
+        "properties": {
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Note"
+          }
+        },
+        "type": "object",
+        "required": [
+          "note"
+        ],
+        "title": "RequestChangesIn"
       },
       "RequireWording": {
         "properties": {
@@ -25148,6 +27616,19 @@
             ],
             "title": "Chosen Application Id"
           },
+          "chosen_job_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chosen Job Id",
+            "description": "conflict_choice: the role chosen (one of the two in the action's detail)"
+          },
           "note": {
             "anyOf": [
               {
@@ -25158,6 +27639,19 @@
               }
             ],
             "title": "Note"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference",
+            "description": "confirmed: the employer's reference number, kept as evidence"
           }
         },
         "type": "object",
@@ -25165,6 +27659,59 @@
           "resolution"
         ],
         "title": "ResolveIn"
+      },
+      "RestoreStateOut": {
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "title": "Active"
+          },
+          "entered_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entered At"
+          },
+          "backup_taken_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Taken At"
+          },
+          "outstanding": {
+            "items": {
+              "$ref": "#/components/schemas/DispatchOut"
+            },
+            "type": "array",
+            "title": "Outstanding",
+            "description": "Sends from before the backup still to reconcile"
+          },
+          "held_application_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Held Application Ids",
+            "description": "Approvals withdrawn at restore, to approve again"
+          }
+        },
+        "type": "object",
+        "required": [
+          "active"
+        ],
+        "title": "RestoreStateOut"
       },
       "ReviewDecision": {
         "properties": {
@@ -27466,6 +30013,146 @@
         ],
         "title": "SpecItem"
       },
+      "SpecStateOut": {
+        "properties": {
+          "application_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Application Id"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version",
+            "description": "Spec version shown; null before the first draft"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "tailor",
+                  "owner"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin"
+          },
+          "content_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Hash"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ApplicationSpec-Output"
+          },
+          "check_results": {
+            "items": {
+              "$ref": "#/components/schemas/CheckResult"
+            },
+            "type": "array",
+            "title": "Check Results"
+          },
+          "checked": {
+            "type": "boolean",
+            "title": "Checked",
+            "description": "The stored checks ran on exactly this content and these Kit facts"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pass",
+                  "warn",
+                  "block"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status",
+            "description": "Worst stored result (an unwaived block is block)"
+          },
+          "stale_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Stale Reasons"
+          },
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/DraftAnswer"
+            },
+            "type": "array",
+            "title": "Answers",
+            "description": "Screening questions and what the answer bank says"
+          },
+          "tailoring": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "running",
+                  "paused",
+                  "done",
+                  "failed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tailoring"
+          },
+          "tailoring_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tailoring Error"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/SpecVersionSummary"
+            },
+            "type": "array",
+            "title": "Versions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "application_id",
+          "version",
+          "spec",
+          "check_results",
+          "checked"
+        ],
+        "title": "SpecStateOut",
+        "description": "The Studio's view of the documents: the spec, its checks and whether they still apply."
+      },
       "SpecUpdate": {
         "properties": {
           "spec": {
@@ -27477,6 +30164,54 @@
           "spec"
         ],
         "title": "SpecUpdate"
+      },
+      "SpecVersionSummary": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "tailor",
+              "owner"
+            ],
+            "title": "Origin"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "created_by": {
+            "type": "string",
+            "title": "Created By"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "warn",
+              "block"
+            ],
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version",
+          "origin",
+          "content_hash",
+          "created_at",
+          "created_by",
+          "status"
+        ],
+        "title": "SpecVersionSummary"
       },
       "SpendBucket": {
         "properties": {
@@ -28013,6 +30748,29 @@
         ],
         "title": "TailorOut"
       },
+      "TemplateDefaultOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "track",
+              "setting"
+            ],
+            "title": "Source",
+            "description": "track: the role's track picks it; setting: documents.cv_template / documents.letter_template"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "source"
+        ],
+        "title": "TemplateDefaultOut"
+      },
       "TemplateIn": {
         "properties": {
           "key": {
@@ -28116,6 +30874,58 @@
         "additionalProperties": false,
         "type": "object",
         "title": "TemplateLimits"
+      },
+      "TemplateOptionOut": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "cv",
+              "letter"
+            ],
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "builtin": {
+            "type": "boolean",
+            "title": "Builtin",
+            "description": "Ships with the app (classic, compact, modern, letter-plain)"
+          },
+          "overridden": {
+            "type": "boolean",
+            "title": "Overridden",
+            "description": "A Kit template row with this built-in key changes it"
+          },
+          "section_order": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Section Order"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/TemplateLimits",
+            "description": "Effective limits: the template's own, else the documents settings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "kind",
+          "name",
+          "builtin",
+          "overridden",
+          "section_order",
+          "limits"
+        ],
+        "title": "TemplateOptionOut"
       },
       "TemplateOut": {
         "properties": {
@@ -29074,6 +31884,32 @@
               }
             ],
             "title": "Tone Notes"
+          },
+          "cv_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,59}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cv Template",
+            "description": "CV template key for this track; null uses the documents setting"
+          },
+          "letter_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,59}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letter Template",
+            "description": "Letter template key; null uses the documents setting"
           }
         },
         "type": "object",
@@ -29178,6 +32014,32 @@
               }
             ],
             "title": "Tone Notes"
+          },
+          "cv_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,59}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cv Template",
+            "description": "CV template key for this track; null uses the documents setting"
+          },
+          "letter_template": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]{0,59}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Letter Template",
+            "description": "Letter template key; null uses the documents setting"
           }
         },
         "type": "object",

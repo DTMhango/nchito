@@ -15,9 +15,13 @@ x-app: &app
     BASE_URL: ${BASE_URL:-http://localhost:8000}
     APP_NAME: ${APP_NAME:-Nchito}
     FILES_DIR: /data/files
+    BACKUP_DIR: /data/backups
+    GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+    GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
     LOG_LEVEL: ${LOG_LEVEL:-INFO}
   volumes:
     - files:/data/files
+    - backups:/data/backups
 
 services:
   db:
@@ -70,3 +74,4 @@ services:
 volumes:
   pgdata:
   files:
+  backups:

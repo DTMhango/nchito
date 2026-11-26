@@ -15,6 +15,7 @@ from app.models.applications import (
     SubmitPermit,
 )
 from app.models.base import Base
+from app.models.documents import ApplicationDocument
 from app.models.kit import (
     Answer,
     Experience,
@@ -65,7 +66,8 @@ from app.models.search import (
 )
 
 __all__ = [
-    "AgentTask", "Answer", "ApiToken", "Application", "ApplicationEvent", "ApplicationPacket", "Assessment",
+    "AgentTask", "Answer", "ApiToken", "Application", "ApplicationDocument", "ApplicationEvent",
+    "ApplicationPacket", "Assessment",
     "AuditEvent", "AuthSession", "Base", "Campaign", "ConfigRevision", "Connection", "Contact", "CustomFacet",
     "DispatchAttempt", "EmployerAlias", "Experience", "Fact", "Guardrail", "GuardrailWaiver", "InterviewPack",
     "InterviewRound", "Job", "JobSighting", "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread", "Notification",

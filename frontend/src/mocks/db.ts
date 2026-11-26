@@ -44,6 +44,8 @@ function seed(
     autopilot: {
       paused: false,
       paused_at: null,
+      paused_by: null,
+      reason: null,
       summary: { cancelled: [], paused: [], already_out: [] },
     },
     captured: [],

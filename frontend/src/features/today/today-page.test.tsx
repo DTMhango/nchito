@@ -73,6 +73,30 @@ describe("Today: Needs you", () => {
     expect(answered.every((a) => a.status === "resolved")).toBe(true)
   })
 
+  it("opens the pending action a link names, with its answer form ready", async () => {
+    const question = open().find((a) => a.type === "unknown_question")!
+    renderApp(`/today?action=${question.id}`)
+    const needs = await screen.findByRole("region", { name: "Needs you" })
+    const focused = await waitFor(() => {
+      const el = needs.querySelector<HTMLElement>("[data-focused]")
+      expect(el).not.toBeNull()
+      return el!
+    })
+    expect(focused).toHaveAttribute("aria-current", "true")
+    expect(
+      within(focused).getByRole("form", { name: /answer the question/i })
+    ).toBeInTheDocument()
+    // only that decision opens
+    expect(needs.querySelectorAll("[data-focused]")).toHaveLength(1)
+  })
+
+  it("says so when the linked action no longer waits", async () => {
+    renderApp("/today?action=c0000000-0000-4000-8000-000000009999")
+    expect(
+      await screen.findByText(/That question is no longer waiting for you/)
+    ).toBeInTheDocument()
+  })
+
   it("lists the same pending actions in the bell", async () => {
     const user = userEvent.setup()
     renderApp("/today")

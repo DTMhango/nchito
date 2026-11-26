@@ -1461,6 +1461,34 @@
           ],
           "default": null,
           "title": "Tone Notes"
+        },
+        "cv_template": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{0,59}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "CV template key for this track; null uses the documents setting",
+          "title": "Cv Template"
+        },
+        "letter_template": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9][a-z0-9_-]{0,59}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Letter template key; null uses the documents setting",
+          "title": "Letter Template"
         }
       },
       "required": [

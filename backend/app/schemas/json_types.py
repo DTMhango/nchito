@@ -247,6 +247,20 @@ class ApplicationSpec(Shape):
     requirement_match: list[RequirementMatch] = Field(default_factory=list)
 
 
+class DraftAnswer(Shape):
+    """A screening question and what the answer bank says about it (5.4). Only ``outcome == "value"``
+    carries an answer; ``ask_owner`` raised a pending action, ``do_not_answer`` is a ``never`` answer."""
+
+    question: str
+    outcome: Literal["value", "ask_owner", "do_not_answer"]
+    value: str | None = None
+    select: str | None = None
+    answer_id: str | None = None
+    material: bool = False
+    reason: str = ""
+    pending_action_id: str | None = None
+
+
 class CheckResult(Shape):
     check: str
     status: Literal["pass", "warn", "block"]
@@ -256,9 +270,21 @@ class CheckResult(Shape):
 
 
 class GateResult(Shape):
+    """One gate's result. ``outcome`` is the three-state answer (unknown is never a pass); ``passed`` is
+    kept for compatibility and is true only when ``outcome`` is ``pass``."""
+
     gate: str
     passed: bool
     detail: str | None = None
+    outcome: Literal["pass", "fail", "unknown"] | None = None
+
+    @model_validator(mode="after")
+    def _consistent(self) -> GateResult:
+        if self.outcome is None:
+            self.outcome = "pass" if self.passed else "fail"
+        elif self.passed != (self.outcome == "pass"):
+            raise ValueError("passed must be true exactly when outcome is pass")
+        return self
 
 
 class PacketDestination(Shape):
@@ -300,6 +326,8 @@ class PacketContents(Shape):
     email: PacketEmail | None = None
     files: list[PacketFile] = Field(default_factory=list)
     link_permissions: list[str] = Field(default_factory=list)
+    channel: ChannelName | None = Field(default=None, description="The channel this packet is sent through")
+    job_version: str | None = Field(default=None, description="Content hash of the job as it was packed")
 
 
 class SubmittedSnapshot(Shape):

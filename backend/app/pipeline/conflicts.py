@@ -262,8 +262,10 @@ async def _raise_choice(session: AsyncSession, group_key: str, title: str, detai
         if all(item["group_key"] != group_key for item in sink):
             sink.append({"group_key": group_key, "title": title, "detail": detail})
         return
+    # Open, or already decided by the owner (resolved / dismissed): never ask the same choice twice.
     exists = await session.scalar(select(PendingAction.id).where(
-        PendingAction.group_key == group_key, PendingAction.status == PendingStatus.open).limit(1))
+        PendingAction.group_key == group_key,
+        PendingAction.status.in_((PendingStatus.open, PendingStatus.resolved, PendingStatus.dismissed))).limit(1))
     if exists is None:
         session.add(PendingAction(type=PendingActionType.conflict_choice, group_key=group_key, title=title,
                                   detail=detail))

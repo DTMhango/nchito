@@ -16,6 +16,8 @@ Deployment choices (database URL, secrets, base URL) live in env (``app.core.con
 from __future__ import annotations
 
 import re
+import string
+from collections.abc import Callable
 from typing import Any
 
 from app.core.config import get_config
@@ -45,19 +47,27 @@ GROUPS: dict[str, str] = {
     "tracking": "Tracking",
     "answers": "Answer bank",
     "reconcile": "Reconciliation",
+    "mail": "Mail",
     "ai": "AI",
     "budget": "Budget",
     "documents": "Documents",
+    "tailoring": "Tailoring and checks",
     "retention": "Retention",
     "backups": "Backups",
     "notifications": "Notifications",
+    "health": "Health",
     "runners": "Runners",
+    "data": "Data import and export",
 }
 
 AUTOMATION_MODES = ("save_only", "prepare", "ask_then_apply", "auto_apply")
 UNKNOWN_POLICIES = ("review", "pass_with_penalty", "pass_blocks_auto", "fail")
 ANSWER_SCOPES = ("this_application", "this_employer", "this_country", "all_matching")
 NOTIFICATION_CHANNELS = ("telegram", "email", "webhook")
+# Notification kinds the owner can switch on or off (the digest is governed by notifications.digest).
+NOTIFIABLE_KINDS = ("pending_action", "pending_action_stale", "application_sent", "reply_received", "run_failed",
+                    "budget", "health", "backup")
+TITLE_FIELDS = frozenset({"title", "app_name", "date", "count"})
 
 _DEFS: list[SettingDef] = []
 
@@ -132,6 +142,22 @@ def _model(key: str, label: str, description: str, default: str, example: str) -
 def _cron(key: str, label: str, description: str, default: str, example: str) -> None:
     _add(key, "cron", label, description, default, example, str, validators=(cron_expr,),
          invalid_example="every day at six", has_invalid_example=True)
+
+
+def _title_template(allowed: frozenset[str]) -> Callable[[Any], None]:
+    """A wording template may use only the named ``{fields}`` and must not be empty."""
+
+    def check(value: Any) -> None:
+        non_empty(value)
+        try:
+            fields = {name for _, name, _, _ in string.Formatter().parse(str(value)) if name is not None}
+        except ValueError as exc:
+            raise SettingValueError(f"not a valid template: {exc}") from exc
+        unknown = fields - allowed
+        if unknown:
+            raise SettingValueError(f"unknown field(s) {sorted(unknown)}; allowed: {sorted(allowed)}")
+
+    return check
 
 
 # ---------------------------------------------------------------------------------------
@@ -233,6 +259,11 @@ _add("automation.quiet_hours_start", "time", "Quiet hours start",
      "21:00", "22:30", str, validators=(time_of_day,), invalid_example="25:00", has_invalid_example=True)
 _add("automation.quiet_hours_end", "time", "Quiet hours end", "Outward actions may resume at this time.",
      "07:00", "06:00", str, validators=(time_of_day,), invalid_example="7am", has_invalid_example=True)
+_add("automation.email_subject_template", "string", "Application email subject",
+     "Subject of an application sent by email. Fields: {role}, {employer}, {requisition}.",
+     "Application: {role}", "{role} application ({requisition})", str,
+     validators=(_title_template(frozenset({"role", "employer", "requisition"})), max_length(200)),
+     invalid_example="Application: {salary}", has_invalid_example=True)
 _int("automation.email_send_delay_minutes", "Email send delay",
      "Emails wait in the outbox this long and can be cancelled.", 10, 30, 0, 1440, "minutes")
 _enum("automation.unknown_question", "Unknown form question",
@@ -247,6 +278,24 @@ _int("automation.open_check_max_age_hours", "Open-check freshness",
      "A role must have been confirmed open within this many hours to be applied to automatically.",
      24, 12, 1, 168, "hours")
 _int("automation.agent_max_steps", "Agent step limit", "Maximum steps an agent task may take.", 80, 120, 5, 500)
+_int("automation.permit_valid_minutes", "Submit permit validity",
+     "A submit permit is single use and expires this many minutes after it is granted.", 10, 5, 1, 60, "minutes")
+_enum("automation.permit_unknown_open", "Posting not confirmed open",
+      "At permit time, when the role has not been confirmed open recently: refuse until it is rechecked, or let an "
+      "application the owner approved go ahead. Automatic approvals always need a recent check.",
+      "refuse", "allow_when_owner_approved", ("refuse", "allow_when_owner_approved"))
+_int("automation.dispatch_max_retries", "Send retries",
+     "How many times a send that definitely failed before leaving (for example the mailbox refused it) is tried "
+     "again, each time with a new permit. An uncertain send is never retried.", 1, 2, 0, 5)
+_add("automation.receipt_pay_terms", "list", "Receipt: pay questions",
+     "Words that put a form answer under 'pay' on the approval receipt.",
+     ["salary", "pay", "compensation", "remuneration", "rate"], ["salary", "expected pay"], list[str],
+     validators=(unique_items,), invalid_example=["salary", "salary"], has_invalid_example=True)
+_add("automation.receipt_work_rights_terms", "list", "Receipt: work-rights questions",
+     "Words that put a form answer under 'work rights' on the approval receipt.",
+     ["visa", "sponsor", "right to work", "work permit", "authorised", "authorized", "relocat"],
+     ["visa", "work permit"], list[str], validators=(unique_items,), invalid_example=["visa", "visa"],
+     has_invalid_example=True)
 
 # Tracking (4, 18.4)
 _int("tracking.imminent_deadline_days", "Imminent deadline",
@@ -269,6 +318,85 @@ _add("answers.match_similarity", "float", "Question match similarity",
 # Reconciliation (8.5)
 _int("reconcile.confirmation_wait_hours", "Wait for confirmation",
      "Watch the mailbox this long for a confirmation before asking the owner.", 24, 48, 1, 336, "hours")
+_int("reconcile.check_every_minutes", "Reconcile interval",
+     "How often an uncertain send is checked again with its channel (sent items, confirmations).",
+     15, 30, 1, 1440, "minutes")
+_int("reconcile.in_flight_timeout_minutes", "In-flight timeout",
+     "A send handed to its channel with no outcome recorded after this long (a worker stopped) becomes "
+     "uncertain. It is reconciled, never resent.", 15, 30, 1, 1440, "minutes")
+
+# Mail (8.5, 12)
+MAIL_AUTO_CLASSES = ("confirmation", "rejection", "interview")
+_int("mail.check_interval_minutes", "Mailbox check interval",
+     "How often each connected mailbox is read for replies.", 10, 30, 1, 1440, "minutes")
+_int("mail.initial_lookback_days", "First check lookback",
+     "How far back the first check of a new mailbox (or alert source) reads.", 14, 30, 1, 365, "days")
+_int("mail.max_messages_per_check", "Messages per check",
+     "Most messages read from a mailbox in one check.", 200, 50, 1, 1000)
+_add("mail.auto_link_confidence", "float", "Link replies automatically at",
+     "A reply matched to an application at or above this confidence is linked; below it goes to review.",
+     0.8, 0.9, float, minimum=0.5, maximum=1.0, invalid_example=0.1, has_invalid_example=True)
+_add("mail.auto_apply_classes", "list", "Apply stage changes from mail",
+     "Reply kinds whose stage change is applied without asking. Empty: every change waits for the owner.",
+     [], ["confirmation"], list[str], choices=MAIL_AUTO_CLASSES, validators=(unique_items,),
+     invalid_example=["offer"], has_invalid_example=True)
+_bool("mail.llm_classify", "Use AI for unclear replies",
+      "When the plain rules cannot tell what a reply is, ask the classify-email model (budgeted).", True)
+_int("mail.llm_body_max_chars", "Reply text sent to AI",
+     "Longest part of a reply's text given to the model, as untrusted data.", 6000, 3000, 500, 50_000, "characters")
+
+def _patterns_check(value: Any) -> None:
+    for item in value:
+        if not str(item).strip():
+            raise SettingValueError("phrases cannot be blank")
+        try:
+            re.compile(str(item))
+        except re.error as exc:
+            raise SettingValueError(f"{item!r} is not a valid pattern: {exc}") from exc
+
+
+def _phrases(key: str, label: str, description: str, default: list[str], example: list[str]) -> None:
+    _add(key, "list", label, description + " Each entry is a case-insensitive regular expression.", default, example,
+         list[str], validators=(unique_items, _patterns_check), invalid_example=["(unclosed"],
+         has_invalid_example=True)
+
+
+_phrases("mail.rejection_phrases", "Rejection wording", "Wording that marks a reply as a rejection.", [
+    r"\bunfortunately\b", r"regret to (inform|tell|let)", r"not (been )?(selected|successful|shortlisted)",
+    r"(will|would) not be (moving|proceeding|progressing) (forward|further|with)",
+    r"decided to (move|go|proceed) (forward )?with (other|another|different)", r"pursue (other|another) candidate",
+    r"position (has been|is now) filled", r"your application was unsuccessful",
+    r"not (be )?(taking|moving) .{0,30}forward"], [r"\bunfortunately\b"])
+_phrases("mail.interview_phrases", "Interview wording", "Wording that marks a reply as an interview invitation.", [
+    r"invit\w+ you to (an? |a )?(\w+ )?interview", r"interview (invitation|invite|request)",
+    r"(schedule|arrange|set up|book) (an? |your |a )?(\w+ )?(interview|call|phone screen|chat|meeting)",
+    r"(would|like) to (speak|talk|meet) with you", r"calendly\.com", r"your availability (for|this|next)",
+    r"available for (an? )?(interview|call|chat)"], [r"interview (invitation|invite)"])
+_phrases("mail.info_request_phrases", "Information request wording",
+         "Wording that marks a reply as a request for more information or documents.", [
+             r"(please|kindly) (provide|send|share|submit|upload|attach|supply)\b",
+             r"could you (please )?(provide|send|share|submit)",
+             r"we (still )?need (some |the |your )?(additional |further |more )?"
+             r"(information|documents|details|certificates)",
+             r"(additional|further|missing) (information|documents|details) (is|are)? ?(required|needed)"],
+         [r"please (provide|send)"])
+_phrases("mail.confirmation_phrases", "Acknowledgement wording",
+         "Wording that marks a reply as a confirmation that the application arrived.", [
+             r"(thank you|thanks) for (applying|your application|your interest|submitting)",
+             r"we (have |'ve )?(successfully )?received your (application|cv|resume)",
+             r"your application (has been |was )?(successfully )?(received|submitted|sent)",
+             r"application (received|confirmation)",
+             r"successfully (applied|submitted)"], [r"thank you for applying"])
+_phrases("mail.auto_reply_phrases", "Automatic reply wording", "Wording of out-of-office and automatic replies.",
+         [r"out of (the )?office", r"automatic reply", r"auto-?reply", r"away from (my|the) (desk|office)"],
+         [r"out of (the )?office"])
+_phrases("mail.bounce_subject_phrases", "Delivery failure subjects", "Subjects of delivery failure notices.",
+         [r"delivery status notification", r"undeliverable", r"delivery (has )?failed",
+          r"mail delivery (failed|subsystem)", r"returned mail", r"could not be delivered"], [r"undeliverable"])
+_add("mail.bounce_senders", "list", "Delivery failure senders",
+     "Sender names (the part before @) that send delivery failure notices.", ["mailer-daemon", "postmaster"],
+     ["mailer-daemon"], list[str], validators=(unique_items, _patterns_check),
+     invalid_example=["mailer-daemon", "mailer-daemon"], has_invalid_example=True)
 
 # AI (11)
 _enum("ai.provider", "Provider", "Default LLM provider.", "anthropic", "openai_compatible",
@@ -329,12 +457,71 @@ _int("documents.letter_pages", "Letter pages", "Maximum cover letter length.", 1
 _int("documents.letter_paragraphs", "Letter paragraphs", "Maximum cover letter paragraphs.", 4, 5, 1, 10)
 _add("documents.cv_template", "string", "CV template", "Default CV template (by template key).",
      "classic", "modern", str, validators=(slug,), invalid_example="Not A Key", has_invalid_example=True)
+_add("documents.letter_template", "string", "Letter template", "Default cover letter template (by template key).",
+     "letter-plain", "letter-formal", str, validators=(slug,), invalid_example="Not A Key", has_invalid_example=True)
+_add("documents.letter_salutation", "string", "Letter salutation",
+     "Opening line when the letter has no named recipient.", "Dear Hiring Manager,", "Dear Hiring Team,", str,
+     validators=(non_empty, max_length(80)), invalid_example="", has_invalid_example=True)
+_add("documents.letter_signoff", "string", "Letter sign-off", "Closing line before the name.",
+     "Kind regards,", "Yours sincerely,", str, validators=(non_empty, max_length(80)), invalid_example="",
+     has_invalid_example=True)
+
+# Tailoring and checks (9, 18.5)
+def _terms(key: str, label: str, description: str, default: list[str], example: list[str]) -> None:
+    _add(key, "list", label, description, default, example, list[str], validators=(unique_items, _no_blank_items),
+         invalid_example=["led", "led"], has_invalid_example=True)
+
+
+def _no_blank_items(value: Any) -> None:
+    if any(not str(v).strip() for v in value):
+        raise SettingValueError("terms cannot be blank")
+
+
+_int("tailoring.max_facts", "Facts sent per draft",
+     "Most Kit facts selected for one tailored draft (lead facts first, then the best keyword matches).",
+     60, 40, 5, 500, "facts")
+_bool("tailoring.claim_check_enabled", "Model claim check",
+      "After the code checks, a second model pass looks for unsupported claims. It can only add warnings or "
+      "blocks; it never clears a code check.", True)
+_enum("tailoring.claim_check_severity", "Model claim check result",
+      "What a sentence flagged by the model claim check does.", "warn", "block", ("warn", "block"))
+_terms("tailoring.ownership_weak_terms", "Supporting-role wording",
+       "Wording that marks a supporting role in a fact. A draft that turns it into leading wording is claim drift.",
+       ["contributed to", "supported", "assisted", "helped", "participated in", "worked on", "part of"],
+       ["contributed to", "supported"])
+_terms("tailoring.ownership_strong_terms", "Leading-role wording",
+       "Wording that claims ownership. Allowed only when a cited fact uses leading wording too.",
+       ["led", "owned", "headed", "directed", "spearheaded", "drove", "managed", "ran", "founded"],
+       ["led", "owned"])
+_terms("tailoring.scope_terms", "Scope wording",
+       "Wording that widens scope. A draft may use it only when a cited fact does.",
+       ["company-wide", "organisation-wide", "organization-wide", "group-wide", "enterprise-wide", "global",
+        "globally", "worldwide", "nationwide", "across the business"],
+       ["global", "company-wide"])
+_terms("tailoring.period_terms", "Period wording",
+       "Wording that states a period for a figure. A draft may use it only when a cited fact does.",
+       ["per month", "monthly", "per year", "annually", "per annum", "a year", "a month", "per week", "weekly",
+        "per quarter", "quarterly", "per day", "daily"],
+       ["per month", "per year"])
+_terms("tailoring.qualification_terms", "Qualification words",
+       "Words that name a degree, certificate or membership. A draft may use one only when a cited fact does.",
+       ["bachelor", "bsc", "b.sc", "master", "masters", "msc", "m.sc", "mba", "phd", "doctorate", "diploma",
+        "certificate", "certified", "certification", "chartered", "acca", "cima", "cfa", "cpa", "frm", "pmp",
+        "fellow"],
+       ["mba", "phd", "cfa"])
 
 # Retention (14)
 _int("retention.below_threshold_text_days", "Below-threshold text",
      "Drop full posting text of below-threshold roles after this many days.", 30, 14, 1, 3650, "days")
 _int("retention.unsubmitted_archive_days", "Archive unsubmitted roles",
      "Archive roles never applied to after this many days.", 60, 90, 1, 3650, "days")
+_cron("retention.cron", "Retention schedule", "When the retention job runs.", "30 4 * * *", "0 5 * * 0")
+_int("retention.notifications_days", "Keep notifications",
+     "Delete notifications older than this many days. Applications, the audit and duplicate-protection "
+     "history are never deleted.", 90, 30, 7, 3650, "days")
+_int("retention.temp_files_days", "Keep temporary files",
+     "Delete files in the temporary folder older than this many days. Submitted snapshots and the vault are "
+     "never touched.", 7, 1, 1, 365, "days")
 
 # Backups (14)
 _cron("backups.cron", "Backup schedule", "When the nightly backup runs.", "0 2 * * *", "30 3 * * *")
@@ -348,12 +535,77 @@ _add("notifications.channels", "list", "Channels",
      "Where notifications go. Empty until a channel is connected.",
      [], ["telegram"], list[str], choices=NOTIFICATION_CHANNELS, validators=(unique_items,),
      invalid_example=["pigeon"], has_invalid_example=True)
+_add("notifications.events", "list", "Events that notify",
+     "Which kinds of event send a message to the channels. The digest has its own setting.",
+     ["pending_action", "pending_action_stale", "reply_received", "run_failed", "budget", "health", "backup"],
+     ["pending_action"], list[str], choices=NOTIFIABLE_KINDS, validators=(unique_items,),
+     invalid_example=["everything"], has_invalid_example=True)
+_bool("notifications.quiet_hours_enabled", "Notification quiet hours",
+      "Hold messages during quiet hours and send them when quiet hours end.", True)
+_add("notifications.quiet_hours_start", "time", "Notification quiet hours start",
+     "No message is sent after this time (owner's time zone).",
+     "21:00", "22:30", str, validators=(time_of_day,), invalid_example="25:00", has_invalid_example=True)
+_add("notifications.quiet_hours_end", "time", "Notification quiet hours end",
+     "Held messages are sent from this time.",
+     "07:00", "06:00", str, validators=(time_of_day,), invalid_example="7am", has_invalid_example=True)
+_enum("notifications.detail_level", "Message detail",
+      "titles: role and employer names appear in messages. generic: messages only say that something needs you.",
+      "titles", "generic", ("titles", "generic"))
+_add("notifications.needs_you_title", "string", "Wording: needs you",
+     "Title of a message about something waiting for you. Fields: {title}, {app_name}, {date}, {count}.",
+     "Needs you: {title}", "{app_name}: {title}", str, validators=(_title_template(TITLE_FIELDS), max_length(120)),
+     invalid_example="Needs you: {nonsense}", has_invalid_example=True)
+_add("notifications.alert_title", "string", "Wording: other alerts",
+     "Title of replies, failures, budget and health messages. Fields: {title}, {app_name}, {date}, {count}.",
+     "{title}", "{app_name}: {title}", str, validators=(_title_template(TITLE_FIELDS), max_length(120)),
+     invalid_example="{missing", has_invalid_example=True)
+_add("notifications.digest_title", "string", "Wording: digest title",
+     "Title of the digest. Fields: {app_name}, {date}, {count}.",
+     "{app_name} digest for {date}", "Daily summary, {date}", str,
+     validators=(_title_template(frozenset({"app_name", "date", "count"})), max_length(120)),
+     invalid_example="Digest {title}", has_invalid_example=True)
+_add("notifications.digest_time", "time", "Morning digest time",
+     "When the digest is sent if the digest setting is 'morning' (owner's time zone).",
+     "07:30", "08:15", str, validators=(time_of_day,), invalid_example="7.30", has_invalid_example=True)
+_bool("notifications.digest_skip_empty", "Skip an empty digest",
+      "Send no digest on a day with nothing to report.", True)
+_int("notifications.digest_max_items", "Digest list length", "Most roles or actions listed per digest section.",
+     5, 10, 1, 25)
+_int("notifications.lookback_hours", "Notification look-back",
+     "Only events newer than this are sent, so enabling a channel does not flood it with old items.",
+     48, 24, 1, 720, "hours")
+_int("notifications.retry_attempts", "Delivery attempts", "Give up on a message after this many failed attempts.",
+     3, 5, 1, 20)
+_int("notifications.retry_minutes", "Retry wait",
+     "Wait this long before the second attempt; each further wait doubles.", 10, 5, 1, 1440, "minutes")
+
+# Health
+_int("health.sweep_stale_hours", "Sweep overdue after",
+     "Raise an alert when no sweep has succeeded for this long.", 36, 72, 1, 720, "hours")
+_int("health.backup_stale_hours", "Backup overdue after",
+     "Raise an alert when no backup has succeeded for this long.", 36, 72, 1, 720, "hours")
+_int("health.disk_min_free_mb", "Low disk space", "Raise an alert when the files volume has less free space.",
+     500, 2000, 10, 10_000_000, "MB")
 
 # Runners (8.3)
 _bool("runners.server_runner_enabled", "Server runner",
       "Run the optional server browser runner. It costs API tokens.", False)
 _int("runners.stale_after_minutes", "Runner offline after",
      "Show a runner as offline when not seen for this long.", 15, 30, 1, 1440, "minutes")
+
+# Data import and export (kit-io)
+_int("data.import_max_zip_mb", "Largest upload", "Refuse an uploaded kit or old-kit zip larger than this.",
+     50, 20, 1, 500, "MB")
+_int("data.import_max_file_mb", "Largest file in a zip", "Refuse a zip holding a file larger than this once unpacked.",
+     25, 10, 1, 200, "MB")
+_int("data.import_max_files", "Most files in a zip", "Refuse a zip with more files than this.", 500, 100, 1, 5000)
+_int("data.export_link_minutes", "Export link lifetime", "How long a prepared export stays downloadable.",
+     60, 15, 1, 1440, "minutes")
+_int("data.import_staging_hours", "Import preview lifetime",
+     "How long a previewed import waits for confirmation before it is discarded.", 24, 48, 1, 168, "hours")
+_bool("data.old_kit_ai_extraction", "AI for unrecognised old-kit files",
+      "Send old-kit files the built-in parser does not recognise to your chosen AI provider, as data, to propose "
+      "facts. Off means only the built-in parser runs.", False)
 
 
 REGISTRY: dict[str, SettingDef] = {d.key: d for d in _DEFS}

@@ -21,6 +21,11 @@ export type ContactIn = S["ContactIn"]
 export type PendingAction = S["PendingActionOut"]
 export type AuditEvent = S["AuditEventOut"]
 export type JobFacets = S["JobFacets"]
+export type MailThread = S["MailThreadOut"]
+export type ApplyEmailIn = S["ApplyEmailIn"]
+export type ApplyEmailOut = S["ApplyEmailOut"]
+export type ApplyChannelCandidate = S["ApplyChannelCandidate"]
+export type DispatchOut = S["DispatchOut"]
 
 export const jobKeys = {
   job: (id: string) => ["jobs", id] as const,
@@ -28,6 +33,7 @@ export const jobKeys = {
   assessments: (id: string) => ["jobs", id, "assessments"] as const,
   application: (id: string) => ["applications", id] as const,
   timeline: (id: string) => ["applications", id, "timeline"] as const,
+  mail: (id: string) => ["applications", id, "mail-threads"] as const,
   pending: ["pending-actions"] as const,
   audit: (id: string) => ["jobs", id, "audit"] as const,
   contacts: ["contacts"] as const,
@@ -88,6 +94,21 @@ export const timelineQuery = (appId: string | null | undefined) =>
           params: { path: { application_id: appId! } },
         })
       ),
+  })
+
+/** Mail threads linked to one application, newest first (CONTRACTS, wave 2 email). */
+export const mailThreadsQuery = (appId: string | null | undefined) =>
+  queryOptions({
+    queryKey: jobKeys.mail(appId ?? "none"),
+    enabled: !!appId,
+    queryFn: async () =>
+      (
+        await unwrap(
+          gen.GET("/api/mail-threads", {
+            params: { query: { application_id: appId!, limit: 100 } },
+          })
+        )
+      ).items,
   })
 
 export const pendingActionsQuery = () =>
@@ -174,6 +195,13 @@ export const fixEmployer = (
       body: { canonical_employer, remember_alias },
     })
   )
+/**
+ * Set, correct, confirm or clear where this role's application email goes. `address` null goes
+ * back to the posting's own address; `confirmed: false` withdraws a confirmation. 422
+ * `{code: invalid_address | no_address, reason}`.
+ */
+export const setApplyEmail = (id: string, body: ApplyEmailIn) =>
+  unwrap(gen.PUT("/api/jobs/{job_id}/apply-email", { ...path(id), body }))
 export const appliedMyself = (id: string, body: S["AppliedMyselfIn"]) =>
   unwrap(gen.POST("/api/jobs/{job_id}/applied-myself", { ...path(id), body }))
 

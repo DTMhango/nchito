@@ -2,7 +2,8 @@
 
 Wave 1 (tracking): list, detail, decisions grouped by shared blocker, dismiss, snooze, and answering
 an unknown question into the answer bank. Resolving the other types (sign-in continue, approvals,
-confirmations) is the apply stream's, wave 2: ``resolve`` answers 501 for them.
+confirmations) is the apply stream's (wave 2): approvals, conflict choices and "continue" resolve here;
+confirming a submission belongs to reconciliation.
 """
 
 from __future__ import annotations
@@ -16,9 +17,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.common import NOT_IMPLEMENTED_RESPONSES, Page, Timestamps, not_implemented
+from app.api.common import NOT_IMPLEMENTED_RESPONSES, Page, Timestamps
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.apply import stages
+from app.apply import owner_actions, resolvers, stages
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.events import publish
@@ -72,7 +73,11 @@ class ResolveIn(BaseModel):
     answer_scope: ScopeT | None = Field(
         default=None, description="Default from answers.routine_default_scope / material_default_scope")
     chosen_application_id: uuid.UUID | None = None
+    chosen_job_id: uuid.UUID | None = Field(
+        default=None, description="conflict_choice: the role chosen (one of the two in the action's detail)")
     note: str | None = None
+    reference: str | None = Field(default=None, max_length=200,
+                                  description="confirmed: the employer's reference number, kept as evidence")
 
 
 class DismissIn(BaseModel):
@@ -364,17 +369,46 @@ async def answer(action_id: uuid.UUID, body: AnswerIn, principal: PrincipalDep,
 @router.post("/{action_id}/resolve", response_model=PendingActionOut, name="pending_actions_resolve")
 async def resolve(action_id: uuid.UUID, body: ResolveIn, principal: PrincipalDep,
                   session: SessionDep) -> PendingActionOut:
-    """'I've signed in, continue' returns the task to the same runner (8.4). Wave 2 (apply) handles the
-    types that need a runner; dismissing and answering an unknown question work now."""
+    """Settle a decision: ``dismissed``; ``answered`` (unknown question); ``approved`` (approve the packet the
+    action names, if it is still current); ``chosen`` (conflict choice, with ``chosen_job_id``); ``continue``
+    ('I've signed in, continue': the task returns to the same runner, 8.4). ``confirmed``
+    (``confirm_submission``): the uncertain send went out; settles it as sent with the owner's evidence
+    (``reference`` if given). ``approved`` on an action whose ``detail.kind`` is a registered proposal (for
+    example ``mail_stage_proposal``) applies that proposal; 501 when its module is not in this build. To
+    say an uncertain send did not go out, use the dispatch's ``reconcile`` (``not_sent``)."""
     action = await _load(session, action_id)
-    if body.resolution == "dismissed":
-        await _dismiss(session, action, body.note, principal.actor)
-    elif body.resolution == "answered" and action.type == PendingActionType.unknown_question:
-        if not body.answer_value:
-            raise HTTPException(422, detail="answer_value is required")
-        await _answer(session, action, body.answer_value, body.answer_scope, body.note, principal.actor)
-    else:
-        not_implemented(2, "apply")
+    kind = action.type
+    try:
+        if body.resolution == "dismissed":
+            await _dismiss(session, action, body.note, principal.actor)
+        elif body.resolution == "answered" and kind == PendingActionType.unknown_question:
+            if not body.answer_value:
+                raise HTTPException(422, detail="answer_value is required")
+            await _answer(session, action, body.answer_value, body.answer_scope, body.note, principal.actor)
+        elif body.resolution == "approved" and resolvers.handles(action):
+            _require_open(action)
+            await owner_actions.apply_proposal(session, action, actor=principal.actor)
+        elif body.resolution == "approved" and kind == PendingActionType.approve:
+            _require_open(action)
+            await owner_actions.approve_from_action(session, action, actor=principal.actor)
+        elif body.resolution == "chosen" and kind == PendingActionType.conflict_choice:
+            _require_open(action)
+            await owner_actions.choose(session, action, body.chosen_job_id, actor=principal.actor, note=body.note)
+        elif body.resolution == "continue" and kind in owner_actions.CONTINUABLE:
+            _require_open(action)
+            await owner_actions.continue_task(session, action, actor=principal.actor, note=body.note)
+        elif body.resolution == "confirmed" and kind == PendingActionType.confirm_submission:
+            _require_open(action)
+            await owner_actions.confirm_submission(session, action, actor=principal.actor,
+                                                   reference=body.reference, note=body.note)
+        else:
+            raise HTTPException(422, detail=f"'{body.resolution}' does not resolve a {kind.value} action")
+    except owner_actions.ResolveError as exc:
+        raise HTTPException(exc.status, detail=exc.message) from exc
+    except stages.IllegalTransition as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, detail=exc.reason) from exc
+    await publish(session, "pending_action.resolved", {"pending_action_id": str(action.id)})
+    await session.refresh(action)
     return (await _outs(session, [action]))[0]
 
 

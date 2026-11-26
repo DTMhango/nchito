@@ -5,6 +5,9 @@ import { EmptyState } from "@/components/empty-state"
 import { SectionHeader } from "@/components/page-header"
 import { applicationQuery, pendingActionsQuery, type JobDetail } from "../api"
 import { dateText } from "../format"
+import { dispatchesQuery } from "@/features/autopilot/api"
+import { CHANNEL_LABEL, dispatchView } from "@/features/autopilot/logic"
+import { meQuery } from "@/lib/api/endpoints"
 
 export function ApplicationTab({ job }: { job: JobDetail }) {
   const app = useQuery(applicationQuery(job.application_id))
@@ -50,6 +53,8 @@ export function ApplicationTab({ job }: { job: JobDetail }) {
           <Row label="Next step" value={a.next_step ?? "None"} />
         </dl>
       </section>
+
+      <Sends applicationId={a.id} />
 
       <section aria-label="Answers given" className="grid gap-2">
         <SectionHeader title="Answers given on the form" />
@@ -118,6 +123,38 @@ export function ApplicationTab({ job }: { job: JobDetail }) {
         )}
       </section>
     </div>
+  )
+}
+
+/** Each send attempt and what it means; a quiet-hours hold comes from the dispatch itself. */
+function Sends({ applicationId }: { applicationId: string }) {
+  const q = useQuery(dispatchesQuery(applicationId))
+  const tz = useQuery(meQuery()).data?.timezone
+  const list = q.data ?? []
+  if (list.length === 0) return null
+  return (
+    <section aria-label="Sends" className="grid gap-2">
+      <SectionHeader title="Sends" />
+      <ul className="grid gap-1.5 panel p-4">
+        {list.map((d) => {
+          const v = dispatchView(d, tz)
+          return (
+            <li
+              key={d.id}
+              data-kind={v.kind}
+              className="grid gap-0.5 border-t border-border py-2 text-sm first:border-t-0"
+            >
+              <span className="flex flex-wrap items-center gap-2">
+                <Chip tone={v.tone}>{v.label}</Chip>
+                <span className="font-medium">{CHANNEL_LABEL[d.channel]}</span>
+                <span className="text-faint">{dateText(d.created_at)}</span>
+              </span>
+              <span className="text-muted-foreground">{v.explain}</span>
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 

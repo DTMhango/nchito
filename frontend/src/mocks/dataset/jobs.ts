@@ -21,6 +21,59 @@ export type MockJob = JobDetail & {
   snoozed_until?: string | null
 }
 
+type ApplyEmail = NonNullable<JobDetail["apply_email"]>
+
+/** Where a role can be applied to, as `app.apply.target` reports it (a mailbox is connected). */
+export function channelCandidates(
+  email: ApplyEmail | null,
+  applyUrl: string | null
+): JobDetail["apply_channel_candidates"] {
+  return [
+    {
+      channel: "email",
+      available: !!email?.usable,
+      reason: !email
+        ? "No application address is known for this role."
+        : email.usable
+          ? `Sends to ${email.address} from your connected mailbox.`
+          : `${email.address} is not confirmed yet. Confirm it to send by email.`,
+    },
+    {
+      channel: "browser",
+      available: false,
+      reason: "No browser runner is set up for this site.",
+    },
+    {
+      channel: "manual",
+      available: !!(applyUrl || email),
+      reason: applyUrl
+        ? "You apply yourself through the posting's link."
+        : "You apply yourself.",
+    },
+  ]
+}
+
+/** Every third role asks for applications by email: an address quoted in the posting, unconfirmed. */
+function applyTarget(method: string, slug: string, applyUrl: string) {
+  const apply_email: ApplyEmail | null =
+    method === "email"
+      ? {
+          address: `careers@${slug}.example.com`,
+          found_in: "posting_text",
+          evidence: `Send your CV and a cover letter to careers@${slug}.example.com by the closing date.`,
+          confirmed: false,
+          confirmed_by: null,
+          confirmed_at: null,
+          trusted_domain: false,
+          usable: false,
+        }
+      : null
+  return {
+    apply_email,
+    apply_channel_candidates: channelCandidates(apply_email, applyUrl),
+  }
+}
+
 const DAY = 86_400_000
 const NOW = Date.parse("2026-11-26T08:00:00Z")
 const iso = (daysAgo: number) => new Date(NOW - daysAgo * DAY).toISOString()
@@ -1034,6 +1087,11 @@ function buildJobs(): MockJob[] {
       },
       apply_url: `https://careers.example.com/${slug}/${i + 1}`,
       apply_method: cyc(["portal", "email", "easy_apply"], i),
+      ...applyTarget(
+        cyc(["portal", "email", "easy_apply"], i),
+        slug,
+        `https://careers.example.com/${slug}/${i + 1}`
+      ),
       requirements: [
         ...(facets.required_skills ?? []).map((s) => ({
           text: `Strong ${s}`,

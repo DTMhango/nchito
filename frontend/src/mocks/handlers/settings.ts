@@ -94,6 +94,21 @@ export function resetSettingsMock() {
   ]
   revisions = [
     {
+      id: "r4",
+      kind: "setting",
+      subject_id: null,
+      version: 2,
+      author: "owner",
+      created_at: iso(0, 8),
+      diff: {
+        key: "notifications.quiet_hours_start",
+        old: "21:00",
+        new: "22:00",
+      },
+      rollback_of: null,
+      note: null,
+    },
+    {
       id: "r3",
       kind: "rubric",
       subject_id: "rubric-1",
@@ -148,6 +163,12 @@ function checkValue(r: Row, v: unknown): string | null {
   }
   if (r.kind === "enum" && !r.choices?.includes(String(v)))
     return "Not one of the allowed options."
+  if (r.kind === "time" && !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(v)))
+    return "Use a 24-hour time such as 07:30."
+  if (r.kind === "list" && r.choices && Array.isArray(v)) {
+    const wrong = v.filter((x) => !r.choices?.includes(String(x)))
+    if (wrong.length) return `Not allowed: ${wrong.join(", ")}.`
+  }
   return null
 }
 
@@ -219,27 +240,9 @@ export const settingsHandlers = [
       next_cursor: null,
     })
   }),
-  http.post(
-    "*/api/data/config-history/:id/rollback",
-    async ({ params, request }) => {
-      if (!signedIn()) return unauthorized()
-      const target = revisions.find((r) => r.id === String(params.id))
-      if (!target) return bad("Revision not found.", 404)
-      const { note } = (await request.json()) as { note?: string | null }
-      const rev: ConfigRevision = {
-        id: crypto.randomUUID(),
-        kind: target.kind,
-        subject_id: target.subject_id,
-        version: Math.max(...revisions.map((r) => r.version)) + 1,
-        author: "owner",
-        created_at: new Date().toISOString(),
-        diff: target.diff,
-        rollback_of: target.id,
-        note: note ?? null,
-      }
-      revisions.unshift(rev)
-      return HttpResponse.json(rev)
-    }
+  // Rollback is not built on the server yet (501), so the mock answers the same.
+  http.post("*/api/data/config-history/:id/rollback", () =>
+    signedIn() ? bad("Rollback is not available yet.", 501) : unauthorized()
   ),
 
   // ---- security ----

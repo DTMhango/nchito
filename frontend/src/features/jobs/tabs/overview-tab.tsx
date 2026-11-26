@@ -3,6 +3,7 @@ import { SectionHeader } from "@/components/page-header"
 import { Chip } from "@/components/chip"
 import { EvidencePopover } from "@/components/evidence-popover"
 import { assessmentsQuery, type JobDetail } from "../api"
+import { ApplyAddressPanel } from "../apply-address"
 import { ConflictStatus } from "../conflict-status"
 import {
   dateText,
@@ -103,6 +104,14 @@ export function OverviewTab({ job }: { job: JobDetail }) {
             </div>
           )
         })}
+      </section>
+
+      <section aria-label="How to apply" className="grid gap-2">
+        <SectionHeader
+          title="How to apply"
+          aside="Only an address you confirm is ever emailed"
+        />
+        <ApplyAddressPanel job={job} />
       </section>
 
       <section aria-label="Why it fits" className="grid gap-2">

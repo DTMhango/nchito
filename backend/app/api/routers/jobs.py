@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, ApiModel, Page, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
+from app.apply import target as apply_target
 from app.core import audit
 from app.core.clock import utcnow
 from app.core.conditions import ConditionResult, ConditionSet, Group, ValueFilter, evaluate, explain
@@ -107,6 +108,36 @@ class JobSummary(Timestamps):
     source: str | None = Field(default=None, description="Name of the first sighting's source")
 
 
+class ApplyEmailOut(BaseModel):
+    """The role's application address and where it came from (``app.apply.target``). Usable for the email
+    channel only when ``confirmed`` by the owner or on a ``trusted_domain``: unknown is not yes."""
+
+    address: str
+    found_in: Literal["posting_text", "posting_link", "owner"] = Field(
+        description="posting_text: quoted in the posting (see evidence); posting_link: its mailto link; owner: "
+                    "set by the owner")
+    evidence: str | None = Field(default=None, description="The posting's sentence that gives the address")
+    confirmed: bool
+    confirmed_by: str | None = None
+    confirmed_at: datetime | None = None
+    trusted_domain: bool = Field(description="The address's domain is on the trusted-sites list")
+    usable: bool = Field(description="confirmed or trusted_domain: the email channel may send to it")
+
+
+class ApplyChannelCandidate(BaseModel):
+    channel: Literal["email", "browser", "manual"]
+    available: bool
+    reason: str
+
+
+class ApplyEmailIn(BaseModel):
+    """Set, correct or confirm the application address. ``address`` null keeps (or goes back to) the
+    posting's own address; ``confirmed`` confirms the resulting address, false withdraws a confirmation."""
+
+    address: str | None = Field(default=None, max_length=320)
+    confirmed: bool = True
+
+
 class JobDetail(JobSummary):
     recruiter: str | None = None
     requisition_id: str | None = None
@@ -116,6 +147,8 @@ class JobDetail(JobSummary):
     custom_facets: dict[str, CustomFacetValue]
     apply_url: str | None = None
     apply_method: str
+    apply_email: ApplyEmailOut | None = None
+    apply_channel_candidates: list[ApplyChannelCandidate] = Field(default_factory=list)
     requirements: list[Requirement]
     raw_text: str | None = None
     sightings: list[SightingOut]
@@ -350,6 +383,12 @@ async def _job(session: SessionDep, job_id: uuid.UUID) -> Job:
     return job
 
 
+def apply_email_out(e: apply_target.ApplyEmail) -> ApplyEmailOut:
+    return ApplyEmailOut(address=e.address, found_in=e.found_in, evidence=e.evidence, confirmed=e.confirmed,
+                         confirmed_by=e.confirmed_by, confirmed_at=e.confirmed_at, trusted_domain=e.trusted_domain,
+                         usable=e.usable)
+
+
 async def job_detail(session: SessionDep, job: Job) -> JobDetail:
     await session.flush()
     await session.refresh(job)
@@ -358,7 +397,11 @@ async def job_detail(session: SessionDep, job: Job) -> JobDetail:
                                        .order_by(JobSighting.first_seen_at))).all()
     app_id = await session.scalar(select(Application.id).where(Application.job_id == job.id)
                                   .order_by(Application.created_at.desc()).limit(1))
+    email = await apply_target.apply_email(session, job)
     return JobDetail.model_validate({
+        "apply_email": None if email is None else apply_email_out(email),
+        "apply_channel_candidates": [ApplyChannelCandidate(channel=c.channel, available=c.available, reason=c.reason)
+                                     for c in await apply_target.candidates(session, job)],
         **_summary_data(job, record), "recruiter": job.recruiter, "requisition_id": job.requisition_id,
         "function": job.function, "level": job.level, "facets": job.facets, "custom_facets": job.custom_facets,
         "apply_url": job.apply_url, "apply_method": job.apply_method, "requirements": job.requirements,
@@ -431,6 +474,23 @@ async def patch_job(job_id: uuid.UUID, body: JobPatch, session: SessionDep, prin
         await conflicts.on_job_changed(session, job)
     await audit.record(session, actor=principal.actor, action="job.updated", subject_type="job", subject_id=job.id,
                        detail={k: str(v) for k, v in changes.items()})
+    return await job_detail(session, job)
+
+
+@router.put("/jobs/{job_id}/apply-email", response_model=JobDetail, name="jobs_set_apply_email",
+            responses={422: {"description": "Not an email address, or nothing to confirm ({code, reason})"}})
+async def set_apply_email(job_id: uuid.UUID, body: ApplyEmailIn, session: SessionDep,
+                          principal: PrincipalDep) -> JobDetail:
+    """Set, correct or confirm where this role's application email goes (audited ``job.apply_email_set``).
+    An address found in a posting stays unconfirmed until the owner confirms it here (or its domain is a
+    trusted site); only a usable address is sent to. A changed address retires a packet addressed elsewhere."""
+    job = await _job(session, job_id)
+    try:
+        await apply_target.set_email(session, job, address=body.address, confirmed=body.confirmed,
+                                     actor=principal.actor)
+    except apply_target.TargetError as exc:
+        raise HTTPException(exc.status, detail={"code": exc.code, "reason": exc.message}) from exc
+    await publish(session, "job.updated", {"id": str(job.id)})
     return await job_detail(session, job)
 
 
