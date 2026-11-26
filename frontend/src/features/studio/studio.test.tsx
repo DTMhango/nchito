@@ -10,6 +10,9 @@ import {
   STUDIO_FRESH,
 } from "@/mocks/dataset/studio"
 import { markStale, studioMock } from "@/mocks/handlers/studio"
+import { applicationsMock } from "@/mocks/handlers/applications"
+import { matchesMock } from "@/mocks/handlers/matches"
+import type { MockJob } from "@/mocks/dataset/jobs"
 
 // The whole app mounts per test; give a busy machine room.
 configure({ asyncUtilTimeout: 8000 })
@@ -294,9 +297,14 @@ describe("Studio", { timeout: 30_000 }, () => {
     const user = userEvent.setup()
     makeSendable()
     server.use(
-      http.post("*/api/applications/:id/packet", () =>
+      http.post("*/api/applications/:id/packet/prepare", () =>
         HttpResponse.json(
-          { detail: "the spec changed after its check" },
+          {
+            detail: {
+              code: "check_stale",
+              reason: "the spec changed after its check",
+            },
+          },
           { status: 409 }
         )
       )
@@ -314,4 +322,203 @@ describe("Studio", { timeout: 30_000 }, () => {
     ).toBeInTheDocument()
     expect(router.state.location.pathname).toBe("/studio")
   })
+
+  it("prepares for a manual hand-off when the owner applies themself, with the picked template", async () => {
+    const user = userEvent.setup()
+    makeSendable()
+    const bodies = recordPrepare()
+    const { router } = renderApp(`/studio?application=${STUDIO_DRAFTED}`)
+    await screen.findByRole("option", { name: "Modern" })
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Template" }),
+      "modern"
+    )
+    const manual = screen.getByRole("button", { name: "Apply myself instead" })
+    await waitFor(() => expect(manual).toBeEnabled())
+    await user.click(manual)
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/approvals/${STUDIO_DRAFTED}`
+      )
+    )
+    expect(bodies[0]).toEqual({
+      channel: "manual",
+      cv_template: "modern",
+      letter_template: "letter-plain",
+    })
+    expect(
+      studioMock().entries[STUDIO_DRAFTED].packets[0].contents.channel
+    ).toBe("manual")
+  })
+
+  it("sends by email when the role's address is confirmed", async () => {
+    const user = userEvent.setup()
+    makeSendable()
+    const job = draftedJob()
+    job.apply_email = address({ confirmed: true, usable: true })
+    const bodies = recordPrepare()
+    renderApp(`/studio?application=${STUDIO_DRAFTED}`)
+    const send = await screen.findByRole("button", {
+      name: "Send for approval",
+    })
+    await waitFor(() => expect(send).toBeEnabled())
+    expect(
+      screen.queryByRole("group", { name: "Unconfirmed application address" })
+    ).not.toBeInTheDocument()
+    await user.click(send)
+    await waitFor(() => expect(bodies[0]?.channel).toBe("auto"))
+    await waitFor(() =>
+      expect(
+        studioMock().entries[STUDIO_DRAFTED].packets[0]?.contents.email?.to
+      ).toEqual(["careers@drafted.example.com"])
+    )
+  })
+
+  it("shows an unconfirmed address near the send bar and confirms it there", async () => {
+    const user = userEvent.setup()
+    const job = draftedJob()
+    job.apply_email = address({})
+    await open(STUDIO_DRAFTED)
+    const notice = await screen.findByRole("group", {
+      name: "Unconfirmed application address",
+    })
+    expect(notice).toHaveTextContent("careers@drafted.example.com")
+    expect(notice).toHaveTextContent("Send your CV to careers@drafted")
+    await user.click(
+      within(notice).getByRole("button", { name: "Confirm the address" })
+    )
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("group", {
+          name: "Unconfirmed application address",
+        })
+      ).not.toBeInTheDocument()
+    )
+    expect(job.apply_email?.usable).toBe(true)
+  })
+
+  it("reads a refusal by its code and offers the matching step", async () => {
+    const user = userEvent.setup()
+    makeSendable()
+    server.use(
+      http.post("*/api/applications/:id/packet/prepare", () =>
+        HttpResponse.json(
+          {
+            detail: {
+              code: "email_unconfirmed",
+              reason: "recipient_confirmed: unknown",
+            },
+          },
+          { status: 409 }
+        )
+      )
+    )
+    renderApp(`/studio?application=${STUDIO_DRAFTED}`)
+    const send = await screen.findByRole("button", {
+      name: "Send for approval",
+    })
+    await waitFor(() => expect(send).toBeEnabled())
+    await user.click(send)
+    const alert = (
+      await screen.findByText(/The application address is not confirmed/)
+    ).closest("[role=alert]") as HTMLElement
+    expect(alert).toHaveAttribute("data-code", "email_unconfirmed")
+    expect(
+      within(alert).getByText("recipient_confirmed: unknown")
+    ).toBeVisible()
+    expect(
+      within(alert).getByRole("link", { name: "Confirm the address" })
+    ).toHaveAttribute(
+      "href",
+      expect.stringContaining(`/jobs/${draftedJob().id}`)
+    )
+  })
+
+  it("takes the templates and their default from the server", async () => {
+    server.use(
+      http.get("*/api/document-templates", () =>
+        HttpResponse.json({
+          templates: [
+            tpl("cv", "classic", "Classic"),
+            tpl("cv", "board", "Board pack", 1),
+            tpl("letter", "letter-plain", "Plain letter"),
+          ],
+          defaults: {
+            cv: { key: "board", source: "track" },
+            letter: { key: "letter-plain", source: "setting" },
+          },
+        })
+      )
+    )
+    await open(STUDIO_DRAFTED)
+    const picker = await screen.findByRole("combobox", { name: "Template" })
+    await waitFor(() => expect(picker).toHaveValue("board"))
+    expect(
+      within(picker)
+        .getAllByRole("option")
+        .map((o) => o.textContent)
+    ).toEqual(["Classic", "Board pack (default)"])
+    expect(screen.getByTestId("template-source")).toHaveTextContent(
+      "Default: Board pack, set by this role's track."
+    )
+    expect(screen.getByText(/limit 1 page$/)).toBeInTheDocument()
+  })
+
+  it("links a question waiting on the owner to its pending action on Today", async () => {
+    const user = userEvent.setup()
+    const { router } = renderApp(`/studio?application=${STUDIO_DRAFTED}`)
+    await user.click(
+      await screen.findByRole("tab", { name: /Screening answers/ })
+    )
+    const relocate = await screen.findByRole("group", {
+      name: "Are you willing to relocate to Kitwe?",
+    })
+    await user.click(
+      within(relocate).getByRole("link", {
+        name: "Answer the question on Today",
+      })
+    )
+    await waitFor(() => expect(router.state.location.pathname).toBe("/today"))
+    expect(router.state.location.search).toEqual({
+      action: "c0000000-0000-4000-8000-000000000402",
+    })
+  })
 })
+
+const draftedJob = () => {
+  const app = applicationsMock().apps.find((a) => a.id === STUDIO_DRAFTED)!
+  return matchesMock.get().jobs.find((j) => j.id === app.job_id)!
+}
+const address = (
+  o: Partial<NonNullable<MockJob["apply_email"]>>
+): NonNullable<MockJob["apply_email"]> => ({
+  address: "careers@drafted.example.com",
+  found_in: "posting_text",
+  evidence: "Send your CV to careers@drafted.example.com.",
+  confirmed: false,
+  confirmed_by: null,
+  confirmed_at: null,
+  trusted_domain: false,
+  usable: false,
+  ...o,
+})
+const tpl = (kind: "cv" | "letter", key: string, name: string, pages = 2) => ({
+  key,
+  kind,
+  name,
+  builtin: key !== "board",
+  overridden: false,
+  section_order: [],
+  limits: { pages },
+})
+/** Record each prepare body, then let the mock answer. */
+function recordPrepare() {
+  const bodies: Record<string, unknown>[] = []
+  server.use(
+    http.post("*/api/applications/:id/packet/prepare", async ({ request }) => {
+      bodies.push((await request.clone().json()) as Record<string, unknown>)
+      return undefined
+    })
+  )
+  return bodies
+}

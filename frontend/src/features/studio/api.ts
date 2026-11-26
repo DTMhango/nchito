@@ -21,14 +21,14 @@ export type JobDetail = Schemas["JobDetail"]
 export type Requirement = Schemas["Requirement"]
 export type RunOut = Schemas["RunOut"]
 export type PacketOut = Schemas["PacketOut"]
-export type PacketBuildIn = Schemas["PacketBuildIn"]
-export type PacketBuildOut = Schemas["PacketBuildOut"]
-export type PacketFile = Schemas["PacketFile"]
+export type PacketPrepareIn = Schemas["PacketPrepareIn"]
+export type PacketPrepareOut = Schemas["PacketPrepareOut"]
 export type PendingAction = Schemas["PendingActionOut"]
 export type FactOut = Schemas["FactOut"]
 export type FactIn = Schemas["FactIn"]
 export type GuardrailOut = Schemas["GuardrailOut"]
-export type TemplateOut = Schemas["TemplateOut"]
+export type DocumentTemplates = Schemas["DocumentTemplatesOut"]
+export type TemplateOption = Schemas["TemplateOptionOut"]
 export type ExperienceOut = Schemas["ExperienceOut"]
 export type DocumentOut = Schemas["DocumentOut"]
 export type RenderIn = Schemas["RenderIn"]
@@ -50,6 +50,7 @@ export const studioKeys = {
   run: (id: string) => ["studio", "run", id] as const,
   pending: ["studio", "pending-actions"] as const,
   picker: ["studio", "picker"] as const,
+  templates: (id: string) => ["studio", "templates", id] as const,
 }
 
 const path = (id: string) => ({ params: { path: { application_id: id } } })
@@ -188,22 +189,30 @@ export const renderQuery = (
       renderDocuments(id, { kind, template_key: template, formats: ["pdf"] }),
   })
 
-/** Snapshot what would be sent; the approval policy runs on it. */
-export const buildPacket = (id: string, body: PacketBuildIn) =>
+/**
+ * "Send for approval": the server renders the checked CV and letter, picks the channel (email
+ * to a usable address with a connected mailbox, else manual), builds the packet and runs the
+ * approval policy, exactly as the pipeline does. 409 `{code, reason}` when nothing is built.
+ */
+export const preparePacket = (id: string, body: PacketPrepareIn) =>
   unwrap(
-    api.POST("/api/applications/{application_id}/packet", {
+    api.POST("/api/applications/{application_id}/packet/prepare", {
       ...path(id),
       body,
     })
   )
 
-export const mailConnectionsQuery = () =>
+/** The templates a render can use and the default per kind for this application. */
+export const documentTemplatesQuery = (applicationId: string) =>
   queryOptions({
-    queryKey: ["studio", "connections"] as const,
-    queryFn: () => unwrap(api.GET("/api/connections")),
-    retry: false,
+    queryKey: studioKeys.templates(applicationId),
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/document-templates", {
+          params: { query: { application_id: applicationId } },
+        })
+      ),
   })
-
 export const createDraftFact = (body: FactIn) =>
   unwrap(api.POST("/api/kit/facts", { body }))
 

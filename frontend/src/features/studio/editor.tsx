@@ -6,16 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Chip } from "@/components/chip"
 import { modKey } from "@/components/key-hint"
-import {
-  campaignQuery,
-  settingsByKey,
-  settingsQuery,
-  tracksQuery,
-} from "@/features/campaigns/api"
 import { listQuery } from "@/features/kit/api"
 import { meQuery } from "@/lib/api/endpoints"
 import {
   createDraftFact,
+  documentTemplatesQuery,
   jobQuery,
   type ApplicationDetail,
   type ExperienceOut,
@@ -23,7 +18,6 @@ import {
   type GuardrailOut,
   type RenderKind,
   type SpecState,
-  type TemplateOut,
 } from "./api"
 import { AnswersPanel } from "./answers-panel"
 import { ChecksPanel } from "./checks-panel"
@@ -43,7 +37,7 @@ import { JobPane } from "./job-pane"
 import { PreviewPane, type PreviewDoc } from "./preview-pane"
 import { SendBar } from "./send-bar"
 import { CvEditor, LetterEditor } from "./spec-editor"
-import { SETTING_KEY, defaultTemplate } from "./templates"
+import { defaultTemplate } from "./templates"
 import { useDraft } from "./use-draft"
 
 const SAVE_TEXT = {
@@ -53,28 +47,6 @@ const SAVE_TEXT = {
   saved: "Saved",
   error: "Not saved",
 } as const
-
-/** The template that applies per document: this role's track, else the documents setting. */
-function useTemplateDefaults(app: ApplicationDetail) {
-  const campaign = useQuery({
-    ...campaignQuery(app.campaign_id ?? "none"),
-    enabled: !!app.campaign_id,
-  })
-  const tracks = useQuery(tracksQuery())
-  const settings = useQuery(settingsQuery())
-  const track = (tracks.data ?? []).find(
-    (t) => t.id === campaign.data?.track_id
-  )
-  const values = settingsByKey(settings.data?.groups)
-  return {
-    cv: defaultTemplate("cv", track?.cv_template, values[SETTING_KEY.cv]),
-    letter: defaultTemplate(
-      "letter",
-      track?.letter_template,
-      values[SETTING_KEY.letter]
-    ),
-  }
-}
 
 export function Editor({
   app,
@@ -90,16 +62,20 @@ export function Editor({
   const job = useQuery(jobQuery(app.job_id))
   const facts = useQuery(listQuery<FactOut>("facts"))
   const guardrails = useQuery(listQuery<GuardrailOut>("guardrails"))
-  const templates = useQuery(listQuery<TemplateOut>("templates"))
+  const templates = useQuery(documentTemplatesQuery(app.id))
   const experiences = useQuery(listQuery<ExperienceOut>("experiences"))
   const me = useQuery(meQuery())
-  const defaults = useTemplateDefaults(app)
+  const defaults = {
+    cv: defaultTemplate("cv", templates.data),
+    letter: defaultTemplate("letter", templates.data),
+  }
   const [tab, setTab] = useState<PreviewDoc>("cv")
   const [picked, setPicked] = useState<Partial<Record<RenderKind, string>>>({})
   const [adding, setAdding] = useState<string | null>(null)
+  // Until the server's list arrives nothing is picked: the server's own default applies.
   const chosen = {
-    cv: picked.cv ?? defaults.cv.key,
-    letter: picked.letter ?? defaults.letter.key,
+    cv: picked.cv ?? defaults.cv?.key ?? "",
+    letter: picked.letter ?? defaults.letter?.key ?? "",
   }
 
   const index = useMemo(() => indexFacts(facts.data ?? []), [facts.data])
@@ -257,7 +233,7 @@ export function Editor({
             draft={d.draft}
             owner={me.data?.display_name ?? "Your name"}
             experiences={experiences.data ?? []}
-            kitTemplates={templates.data ?? []}
+            templates={templates.data}
             chosen={chosen}
             defaults={defaults}
             onTemplate={(kind, key) =>
@@ -274,13 +250,13 @@ export function Editor({
 
       <SendBar
         app={app}
+        job={job.data}
         draft={d}
-        state={state}
         index={index}
         keywords={keywords}
         answers={answers}
         templates={chosen}
-        ownerEmail={me.data?.email}
+        onOpenAnswers={() => setTab("answers")}
       />
     </div>
   )

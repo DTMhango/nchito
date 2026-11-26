@@ -21,6 +21,7 @@ import { toDetail } from "../dataset/applications"
 import { applicationsMock } from "./applications"
 import { kitStore, kitWaivers } from "./kit"
 import { matchesMock } from "./matches"
+import { settingRow } from "../dataset/settings"
 
 type Spec = Schemas["ApplicationSpec-Output"]
 type CheckResult = Schemas["CheckResult"]
@@ -382,6 +383,165 @@ function packetFrom(
 
 const conflict = (detail: string) =>
   HttpResponse.json({ detail }, { status: 409 })
+/** A coded refusal (`app/apply/errors.py`): clients switch on `code`. */
+const refused = (code: string, reason: string, status = 409) =>
+  HttpResponse.json({ detail: { code, reason } }, { status })
+
+type TemplateOption = Schemas["TemplateOptionOut"]
+const BUILT_IN_KEYS = ["classic", "compact", "modern", "letter-plain"]
+/** Built-ins in shipped order, then the Kit's own (a Kit row with a built-in key overrides it). */
+function templateList(): TemplateOption[] {
+  const rows = kitStore().templates as unknown as (TemplateOption & {
+    kind: string
+  })[]
+  const builtIns: TemplateOption[] = BUILT_IN_KEYS.map((key) => {
+    const row = rows.find((r) => r.key === key)
+    return {
+      key,
+      kind: key.startsWith("letter") ? "letter" : "cv",
+      name:
+        row?.name ??
+        (key === "letter-plain"
+          ? "Plain letter"
+          : key[0].toUpperCase() + key.slice(1)),
+      builtin: true,
+      overridden: !!row && !row.builtin,
+      section_order: row?.section_order ?? [],
+      limits: row?.limits ?? { pages: 2 },
+    }
+  })
+  const own = rows
+    .filter((r) => !BUILT_IN_KEYS.includes(r.key))
+    .filter((r) => r.kind === "cv" || r.kind === "letter")
+    .map((r) => ({
+      key: r.key,
+      kind: r.kind as "cv" | "letter",
+      name: r.name,
+      builtin: false,
+      overridden: false,
+      section_order: r.section_order ?? [],
+      limits: r.limits ?? {},
+    }))
+  return [...builtIns, ...own]
+}
+function templateDefault(kind: "cv" | "letter") {
+  const v = settingRow(`documents.${kind}_template`)?.value
+  return {
+    key:
+      typeof v === "string" && v
+        ? v
+        : kind === "cv"
+          ? "classic"
+          : "letter-plain",
+    source: "setting" as const,
+  }
+}
+
+const jobOf = (id: string) => {
+  const a = summaryOf(id)
+  return matchesMock.get().jobs.find((j) => j.id === a?.job_id)
+}
+
+/** What the pipeline's `prepare_packet` does: checked spec only, render, pick the channel, build. */
+function prepare(
+  id: string,
+  e: StudioEntry,
+  body: {
+    channel?: "auto" | "manual"
+    cv_template?: string | null
+    letter_template?: string | null
+  }
+) {
+  const a = summaryOf(id)!
+  if (!["shortlisted", "tailoring", "ready"].includes(a.stage))
+    return refused(
+      "illegal_stage",
+      `an application in ${a.stage} cannot be repacked`
+    )
+  const st = specState(id, e)
+  if (!st.version) return refused("no_spec", "there is no tailored spec yet")
+  if (!st.checked) return refused("check_stale", "the spec's checks are stale")
+  if (st.status === "block")
+    return refused("check_blocking", "a check blocks sending")
+  if (e.answers.some((x) => x.outcome === "ask_owner"))
+    return refused(
+      "answers_waiting",
+      "a form question is waiting for the owner"
+    )
+  const known = templateList().map((t) => t.key)
+  for (const k of [body.cv_template, body.letter_template])
+    if (k && !known.includes(k))
+      return refused("unknown_template", `no template ${k}`)
+  const job = jobOf(id)
+  const address = job?.apply_email
+  const channel: "email" | "manual" =
+    body.channel !== "manual" && address?.usable ? "email" : "manual"
+  if (channel === "manual" && !job?.apply_url && !address)
+    return refused("no_destination", "the posting gives no link and no address")
+  const files = (["cv", "letter"] as const).map((kind) => {
+    const template =
+      (kind === "cv" ? body.cv_template : body.letter_template) ??
+      templateDefault(kind).key
+    const pdf = render(id, e, {
+      kind,
+      template_key: template,
+      formats: ["pdf"],
+    }).documents[0]
+    return {
+      name: kind === "cv" ? "CV.pdf" : "Cover_letter.pdf",
+      kind,
+      sha256: pdf.content_hash,
+      document_id: pdf.id,
+    }
+  })
+  const destination =
+    channel === "email"
+      ? `mailto:${address!.address}`
+      : (job?.apply_url ?? `mailto:${address!.address}`)
+  const packet = packetFrom(id, e, {
+    channel,
+    destination_url: destination.startsWith("mailto:") ? null : destination,
+    sending_identity: "me@example.com",
+    answers: e.answers
+      .filter((x) => x.outcome === "value")
+      .map((x) => ({
+        question: x.question,
+        answer_id: x.answer_id ?? null,
+        value: x.value,
+      })),
+    files,
+    email:
+      channel === "email"
+        ? {
+            to: [address!.address],
+            subject: `Application: ${a.title}`,
+            body: "Please find my CV and cover letter attached.",
+          }
+        : null,
+  })
+  for (const p of e.packets)
+    if (!p.invalidated_at)
+      Object.assign(p, {
+        invalidated_at: packet.created_at,
+        invalidated_reason: `replaced by version ${packet.version}`,
+      })
+  e.packets.unshift(packet)
+  a.stage = "ready"
+  a.channel = channel
+  return HttpResponse.json({
+    channel,
+    packet,
+    created: true,
+    changes: [],
+    approval: {
+      approved: false,
+      status: "wait_for_owner",
+      reason: "waiting for your approval",
+      pending_action_id: null,
+      code: "always_ask_first",
+    },
+  })
+}
 /** Stages after which the documents and packet are fixed. */
 const GONE = new Set([
   "applying",
@@ -498,14 +658,18 @@ export const studioHandlers = [
     const a = summaryOf(id)
     if (!e || !a) return undefined
     if (!["shortlisted", "tailoring", "ready"].includes(a.stage))
-      return conflict(`an application in ${a.stage} cannot be repacked`)
+      return refused(
+        "illegal_stage",
+        `an application in ${a.stage} cannot be repacked`
+      )
     const body = (await request.json()) as PacketBuildIn
     const st = specState(id, e)
     const generated = (body.files ?? []).some(
       (f) => f.kind === "cv" || f.kind === "letter"
     )
     if (generated && (!st.checked || st.status === "block"))
-      return conflict(
+      return refused(
+        st.checked ? "check_blocking" : "check_stale",
         "the documents' checks are out of date or blocking; run the checks again"
       )
     const packet = packetFrom(id, e, body)
@@ -526,6 +690,30 @@ export const studioHandlers = [
         status: "wait_for_owner",
         reason: "waiting for your approval",
         pending_action_id: null,
+      },
+    })
+  }),
+  http.post(
+    "*/api/applications/:id/packet/prepare",
+    async ({ params, request }) => {
+      if (!db.get().session) return unauthorized()
+      const id = String(params.id)
+      const e = state.entries[id]
+      if (!e || !summaryOf(id)) return undefined
+      return prepare(
+        id,
+        e,
+        (await request.json()) as Parameters<typeof prepare>[2]
+      )
+    }
+  ),
+  http.get("*/api/document-templates", () => {
+    if (!db.get().session) return unauthorized()
+    return HttpResponse.json({
+      templates: templateList(),
+      defaults: {
+        cv: templateDefault("cv"),
+        letter: templateDefault("letter"),
       },
     })
   }),

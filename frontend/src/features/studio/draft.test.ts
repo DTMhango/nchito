@@ -3,8 +3,9 @@ import type {
   CheckResult,
   DraftAnswer,
   FactOut,
+  DocumentTemplates,
   GuardrailOut,
-  TemplateOut,
+  TemplateOption,
 } from "./api"
 import {
   answerStanding,
@@ -136,38 +137,43 @@ describe("the job side", () => {
 })
 
 describe("templates", () => {
-  it("lists the built-ins, renamed or extended by Kit rows", () => {
-    const rows = [
-      { kind: "cv", key: "compact", name: "Tight", limits: { pages: 1 } },
-      { kind: "cv", key: "board", name: "Board pack", limits: {} },
-      { kind: "letter", key: "letter-plain", name: "Mine", limits: {} },
-    ] as TemplateOut[]
-    expect(templateOptions("cv", rows)).toEqual([
-      { key: "classic", name: "Classic", pages: null },
-      { key: "compact", name: "Tight", pages: 1 },
-      { key: "modern", name: "Modern", pages: null },
-      { key: "board", name: "Board pack", pages: null },
+  const option = (kind: "cv" | "letter", key: string, name: string) =>
+    ({
+      kind,
+      key,
+      name,
+      builtin: true,
+      overridden: false,
+      section_order: [],
+      limits: {},
+    }) as TemplateOption
+  const data: DocumentTemplates = {
+    templates: [
+      option("cv", "classic", "Classic"),
+      option("cv", "board", "Board pack"),
+      option("letter", "letter-plain", "Plain letter"),
+    ],
+    defaults: { cv: { key: "board", source: "track" } },
+  }
+  it("lists the server's templates per kind, in its order", () => {
+    expect(templateOptions("cv", data).map((t) => t.key)).toEqual([
+      "classic",
+      "board",
     ])
-    expect(templateOptions("letter", []).map((t) => t.key)).toEqual([
-      "letter-plain",
-    ])
+    expect(templateOptions("letter", undefined)).toEqual([])
   })
-  it("defaults to the track's template, then the setting, then the first built-in", () => {
-    expect(defaultTemplate("cv", "modern", "compact")).toEqual({
-      key: "modern",
+  it("takes the default from the server, else the first template listed", () => {
+    expect(defaultTemplate("cv", data)).toEqual({
+      key: "board",
       source: "track",
     })
-    expect(defaultTemplate("cv", null, "compact")).toEqual({
-      key: "compact",
-      source: "setting",
-    })
-    expect(defaultTemplate("letter", null, undefined)).toEqual({
+    expect(defaultTemplate("letter", data)).toEqual({
       key: "letter-plain",
-      source: "built-in",
+      source: null,
     })
+    expect(defaultTemplate("cv", undefined)).toBeNull()
   })
 })
-
 describe("checks", () => {
   const rule = (id: string, strictness: GuardrailOut["strictness"]) =>
     ({ id, name: id, strictness }) as GuardrailOut

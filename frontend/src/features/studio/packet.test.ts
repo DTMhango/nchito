@@ -1,65 +1,32 @@
 import { describe, expect, it } from "vitest"
 import { ApiError } from "@/lib/api/client"
-import type { Schemas } from "@/lib/api/types"
-import type { DraftAnswer } from "./api"
-import { packetAnswers, sendError, sendingIdentity } from "./packet"
+import { prepareBody, sendError } from "./packet"
 
-const answer = (o: Partial<DraftAnswer>): DraftAnswer => ({
-  question: "Q",
-  outcome: "value",
-  value: "One month",
-  select: null,
-  answer_id: null,
-  material: false,
-  reason: "",
-  pending_action_id: null,
-  ...o,
-})
-const mailbox = (o: Partial<Schemas["ConnectionOut"]>) =>
-  ({
-    provider: "imap_smtp",
-    enabled: true,
-    config: { from_address: "jobs@example.com" },
-    ...o,
-  }) as Schemas["ConnectionOut"]
-
-describe("packet build", () => {
-  it("sends only answers with a value, by bank id when there is one", () => {
-    expect(
-      packetAnswers([
-        answer({ question: "A", answer_id: "an-1" }),
-        answer({ question: "B" }),
-        answer({ question: "C", outcome: "ask_owner", value: "Yes" }),
-        answer({ question: "D", outcome: "do_not_answer" }),
-      ])
-    ).toEqual([
-      { question: "A", answer_id: "an-1" },
-      { question: "B", value: "One month" },
-    ])
+describe("prepare", () => {
+  it("sends the picked templates and the channel, and leaves an unpicked one to the server", () => {
+    expect(prepareBody({ cv: "compact", letter: "" }, "manual")).toEqual({
+      channel: "manual",
+      cv_template: "compact",
+      letter_template: null,
+    })
   })
-  it("sends as the connected mailbox, else the owner's address", () => {
-    expect(sendingIdentity([mailbox({})], "me@example.com")).toBe(
-      "jobs@example.com"
-    )
-    expect(
-      sendingIdentity(
-        [mailbox({ enabled: false }), mailbox({ provider: "anthropic" })],
-        "me@example.com"
-      )
-    ).toBe("me@example.com")
-    expect(sendingIdentity([], undefined)).toBeNull()
-  })
-  it("says plainly when the application has already gone out", () => {
-    const gone = sendError(
+  it("reads a refusal by its code, whatever the words", () => {
+    const stale = sendError(
       new ApiError(409, {
-        detail: "an application in submitted cannot be repacked",
+        detail: { code: "check_stale", reason: "anything at all" },
       })
     )
-    expect(gone).toEqual({
-      text: expect.stringMatching(/already gone out/),
-      recheck: false,
+    expect(stale).toMatchObject({
+      code: "check_stale",
+      action: "recheck",
+      reason: "anything at all",
     })
-    const stale = sendError(new ApiError(409, { detail: "spec not checked" }))
-    expect(stale.recheck).toBe(true)
+    const gone = sendError(
+      new ApiError(409, {
+        detail: { code: "illegal_stage", reason: "cannot be repacked" },
+      })
+    )
+    expect(gone.text).toMatch(/already moved on/)
+    expect(gone.action).toBeNull()
   })
 })

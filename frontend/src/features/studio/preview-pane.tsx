@@ -3,7 +3,13 @@ import { useQuery } from "@tanstack/react-query"
 import { AlertTriangle, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { PaperPage, PaperPreview } from "@/components/paper-preview"
-import type { DocFormat, ExperienceOut, RenderKind, TemplateOut } from "./api"
+import type {
+  DocFormat,
+  DocumentTemplates,
+  ExperienceOut,
+  RenderKind,
+  TemplateOption,
+} from "./api"
 import { documentUrl, renderQuery } from "./api"
 import type { Draft, ScreeningRow } from "./draft"
 import { needsOwner } from "./draft"
@@ -23,7 +29,7 @@ function CvPages({
   experiences,
 }: {
   draft: Draft
-  template: TemplateOut | undefined
+  template: TemplateOption | undefined
   owner: string
   experiences: ExperienceOut[]
 }) {
@@ -185,7 +191,7 @@ export function PreviewPane({
   draft,
   owner,
   experiences,
-  kitTemplates,
+  templates,
   chosen,
   defaults,
   onTemplate,
@@ -199,10 +205,11 @@ export function PreviewPane({
   draft: Draft
   owner: string
   experiences: ExperienceOut[]
-  kitTemplates: TemplateOut[]
+  /** The server's templates and defaults (`GET /api/document-templates`). */
+  templates: DocumentTemplates | undefined
   /** The template picked here for each document (the default applies until one is picked). */
   chosen: Record<RenderKind, string>
-  defaults: Record<RenderKind, DefaultTemplate>
+  defaults: Record<RenderKind, DefaultTemplate | null>
   onTemplate: (kind: RenderKind, key: string) => void
   answers: ScreeningRow[]
   applicationId: string
@@ -212,12 +219,10 @@ export function PreviewPane({
   saving: boolean
 }) {
   const kind = doc === "answers" ? null : doc
-  const options = kind ? templateOptions(kind, kitTemplates) : []
-  const key = kind ? chosen[kind] : undefined
+  const options = kind ? templateOptions(kind, templates) : []
+  const key = (kind ? chosen[kind] : undefined) || undefined
   const option = options.find((t) => t.key === key)
-  const row = kind
-    ? kitTemplates.find((t) => t.kind === kind && t.key === key)
-    : undefined
+  const fallback = kind ? defaults[kind] : null
   const open = answers.filter(needsOwner).length
 
   const download = (fmt: DocFormat) => async (e: MouseEvent) => {
@@ -234,13 +239,14 @@ export function PreviewPane({
             Template
             <select
               className={SELECT}
-              value={key}
+              value={key ?? ""}
+              disabled={options.length === 0}
               onChange={(e) => onTemplate(kind, e.target.value)}
             >
               {options.map((t) => (
                 <option key={t.key} value={t.key}>
                   {t.name}
-                  {t.key === defaults[kind].key ? " (default)" : ""}
+                  {t.key === fallback?.key ? " (default)" : ""}
                 </option>
               ))}
             </select>
@@ -252,17 +258,16 @@ export function PreviewPane({
         )}
         <span className="ml-auto num text-xs text-faint">
           A4
-          {option?.pages
-            ? ` · limit ${option.pages} page${option.pages === 1 ? "" : "s"}`
+          {option?.limits.pages
+            ? ` · limit ${option.limits.pages} page${option.limits.pages === 1 ? "" : "s"}`
             : ""}
         </span>
       </div>
-      {kind && (
+      {fallback && (
         <p className="text-xs text-faint" data-testid="template-source">
           Default:{" "}
-          {options.find((t) => t.key === defaults[kind].key)?.name ??
-            defaults[kind].key}
-          , {SOURCE_TEXT[defaults[kind].source]}.
+          {options.find((t) => t.key === fallback.key)?.name ?? fallback.key}
+          {fallback.source ? `, ${SOURCE_TEXT[fallback.source]}` : ""}.
         </p>
       )}
 
@@ -287,7 +292,7 @@ export function PreviewPane({
         {doc === "cv" && (
           <CvPages
             draft={draft}
-            template={row}
+            template={option}
             owner={owner}
             experiences={experiences}
           />
