@@ -132,7 +132,7 @@ async def test_plain_bullet_lists_under_bare_headings_are_read_and_unclear_pay_i
     assert [r.place for r in lists.criteria.locations] == ["Livingstone", "Kitwe"]
     assert lists.criteria.work_models == ["hybrid"]
     assert lists.criteria.pay_floors == []
-    notes = [a for a in result.kit.answers if a.patterns.canonical.startswith("Pay floor") and "second criteria" in a.patterns.canonical]
+    notes = [a for a in result.kit.answers if a.patterns.canonical.startswith("Pay floor") and "second criteria" in a.patterns.canonical]  # noqa: E501
     assert len(notes) == 1 and "540k" in notes[0].value and "30k a month" in notes[0].value
     assert all(a.answer_class == "ask_first" for a in notes) and notes[0].review_after == oldkit.today()
 
