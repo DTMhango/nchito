@@ -21,6 +21,10 @@ MoneyPeriod = Literal["year", "month", "week", "day", "hour"]
 UnknownPolicy = Literal["review", "pass_with_penalty", "pass_blocks_auto", "fail"]
 AutomationMode = Literal["save_only", "prepare", "ask_then_apply", "auto_apply"]
 ChannelName = Literal["email", "browser", "manual"]
+# Interview rounds and mock interviews (wave 4)
+RoundKind = Literal["screen", "technical", "panel", "final", "other"]
+MockMode = Literal["behavioural", "technical", "role", "mixed", "tough"]
+MockStatus = Literal["active", "paused", "failed", "done"]
 
 
 # ----- Job facets (6.1) ---------------------------------------------------------------------

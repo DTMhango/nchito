@@ -627,6 +627,57 @@ _add("interview.research_note", "string", "Research note",
      "Company notes are from the posting and your notes only.", str, validators=(non_empty, max_length(300)),
      invalid_example="", has_invalid_example=True)
 
+# Mock interview (10.3a practice, wave 4)
+_RUBRIC_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,29}$")
+
+
+def _rubric_lines(value: Any) -> None:
+    keys: list[str] = []
+    for item in value:
+        key, _, label = str(item).partition("|")
+        if not _RUBRIC_KEY_RE.match(key.strip()) or not label.strip():
+            raise SettingValueError(f"{item!r}: write 'key|What it measures' (key: lower case letters, digits, _)")
+        keys.append(key.strip())
+    if len(set(keys)) != len(keys):
+        raise SettingValueError("each rubric key once")
+
+
+_model("interview.mock.model_interviewer", "Model: mock interviewer",
+       "Asks the questions and follow-up probes in a mock interview.", "claude-sonnet-5-5", "claude-haiku-5-5")
+_model("interview.mock.model_feedback", "Model: mock interview feedback",
+       "Scores the answers and writes the feedback at the end of a mock interview.", "claude-sonnet-5-5",
+       "claude-opus-5-5")
+_int("interview.mock.default_length", "Questions per mock interview",
+     "How many main questions a mock interview asks unless you choose otherwise.", 5, 3, 1, 30, "questions")
+_int("interview.mock.max_length", "Longest mock interview", "Most main questions one mock interview may ask.",
+     12, 8, 1, 30, "questions")
+_int("interview.mock.max_probes", "Follow-up probes per question",
+     "How many follow-up probes the interviewer may ask on one question before moving on.", 1, 2, 0, 3, "probes")
+_int("interview.mock.answer_max_chars", "Mock answer length", "Longest answer accepted in a mock interview.",
+     6000, 3000, 200, 20_000, "characters")
+_add("interview.mock.rubric", "list", "Mock interview rubric",
+     "The dimensions each answer is scored on, one per line as 'key|What it measures'.",
+     ["structure|Structure: situation, task, action, result", "relevance|Relevance to the posting's requirements",
+      "specificity|Specificity: concrete actions and results", "delivery|Concise and clear delivery"],
+     ["structure|Structure (STAR)", "relevance|Relevance"], list[str],
+     validators=(non_empty, _rubric_lines), invalid_example=["Structure"], has_invalid_example=True)
+_int("interview.mock.score_max", "Top score", "Scores run from 1 to this number on every rubric dimension.",
+     5, 10, 3, 10, "points")
+_int("interview.mock.weak_below", "Weak below",
+     "A question category whose average score is below this is shown as weak and practised next.", 3, 4, 1, 10,
+     "points")
+_int("interview.mock.practise_next", "Practise next", "How many questions 'practise these next' suggests.",
+     3, 5, 1, 10, "questions")
+_bool("interview.mock.feedback_each_default", "Feedback after each answer",
+      "Default for new mock interviews: feedback after every answer as well as at the end.", False)
+_int("interview.mock.budget_headroom_pct", "Session budget headroom",
+     "A mock interview may spend up to its estimate times this percentage before it pauses and asks you.",
+     120, 150, 100, 300, "%")
+_add("interview.mock.unverified_prompt", "string", "Unverified statement prompt",
+     "Shown next to something you said in a mock answer that is not in your Kit.",
+     "Is this accurate? Add it to your library as a draft fact?", "Not in your Kit yet: add it as a draft fact?",
+     str, validators=(non_empty, max_length(160)), invalid_example="", has_invalid_example=True)
+
 # Retention (14)
 _int("retention.below_threshold_text_days", "Below-threshold text",
      "Drop full posting text of below-threshold roles after this many days.", 30, 14, 1, 3650, "days")
@@ -844,3 +895,7 @@ def cross_check(values: dict[str, Any]) -> None:
         raise SettingValueError("thresholds must satisfy shortlist <= tailor <= auto-apply")
     if values["automation.daily_cap"] > values["automation.weekly_cap"]:
         raise SettingValueError("the daily cap cannot exceed the weekly cap")
+    if values["interview.mock.default_length"] > values["interview.mock.max_length"]:
+        raise SettingValueError("the mock interview length cannot exceed the longest mock interview")
+    if values["interview.mock.weak_below"] > values["interview.mock.score_max"]:
+        raise SettingValueError("'weak below' cannot exceed the top score")
