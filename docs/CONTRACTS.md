@@ -951,3 +951,11 @@ Code: `backend/app/pipeline/interview/` (`service`, `truth`, `basis`, `paysheet`
   situation?, task?, action?, result?, base_version?}` -> new checked `stories` version (409 `version_conflict`).
 - **Exit tests** `tests/integration/test_wave3_exit.py` (in-process MCP client, fakes only); the module docstring
   lists which test covers each 18.6 release gate.
+
+## Wave 3 closing fixes
+
+- **Blocker kind.** Every pending action raised for a runner blocker has `detail.kind` (and so `PendingActionOut.kind`)
+  equal to the exact blocker kind: `sign_in`, `create_account`, `verification_code`, `captcha`, `assessment`,
+  `declaration`, `unsupported_form`, `redirect_off_domain`, `page_instruction` (also `unknown_question`), whether
+  raised by the gateway or by `accounts`; `?kind=` filters on it. Migration `0018_blocker_kind` rewrites old rows whose
+  kind was the generic `blocker`.

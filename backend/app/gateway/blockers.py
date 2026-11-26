@@ -70,7 +70,7 @@ async def raise_blocker(session: AsyncSession, token: ApiToken, body: RaiseBlock
     app = await session.get(Application, task.application_id) if task.application_id else None
     job = await session.get(Job, app.job_id) if app else None
     url = clip(body.url, 2000)
-    detail = {"kind": "blocker", "blocker": body.type, "detail": clip(body.detail), "url": url,
+    detail = {"kind": body.type, "blocker": body.type, "detail": clip(body.detail), "url": url,
               "url_domain": packets.domain_of(url) if url else None, "runner": token.name,
               "runner_kind": token.runner_kind, "task_type": task.type.value,
               "released": task.released.get("given") or [], "dry_run": is_dry_run(task)}

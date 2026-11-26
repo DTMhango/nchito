@@ -463,3 +463,24 @@ async def test_new_blocker_types_and_change_actions_are_listed_for_today(owner_c
     assert r.status_code == 200 and [a["kind"] for a in r.json()["items"]] == ["unsupported_form"]
     r = await owner_client.get("/api/pending-actions", params={"kind": "posting_changed"})
     assert r.status_code == 200 and [a["title"] for a in r.json()["items"]] == ["The posting changed"]
+
+
+async def test_pending_action_kind_is_the_exact_blocker_kind_and_filters(owner_client):
+    """Every blocker the gateway raises carries its own kind (never a generic "blocker"), so ``?kind=`` finds it."""
+    kinds = ["captcha", "page_instruction", "assessment", "unsupported_form"]
+    for kind in kinds:
+        app_id, _ = await approved_app(employer=f"{kind.title()} Example")
+        runner, _ = await make_token(f"pc-{kind}")
+        task_id = await claim(runner)
+        await call(runner, "raise_blocker", task_id=task_id, type=kind, detail="needs the owner", url=URL)
+    runner, _ = await make_token("pc-redirect")
+    await approved_app(employer="Redirect Example")
+    task_id = await claim(runner)
+    await permit(runner, task_id, url="https://elsewhere.example.org/form")  # raises redirect_off_domain
+    for kind in [*kinds, "redirect_off_domain"]:
+        r = await owner_client.get("/api/pending-actions", params={"kind": kind})
+        assert r.status_code == 200
+        items = r.json()["items"]
+        assert len(items) == 1 and items[0]["kind"] == kind == items[0]["detail"]["kind"], (kind, items)
+    r = await owner_client.get("/api/pending-actions", params={"kind": "blocker"})
+    assert r.json()["items"] == []
