@@ -360,15 +360,85 @@ class Contact(Base, Entity):
     origin: Mapped[str] = mapped_column(String(20), nullable=False, default="owner")
 
 
+class InterviewPackStatus(enum.StrEnum):
+    idle = "idle"  # offered or created, nothing generated yet
+    queued = "queued"
+    running = "running"
+    paused = "paused"  # budget refusal; resumes when the cap allows
+    done = "done"
+    failed = "failed"
+
+
 class InterviewPack(Base, Entity):
+    """The interview pack for one role (DESIGN.md 10.3a), built for its application. Section content lives
+    in versioned ``InterviewSectionVersion`` rows; ``sections`` mirrors the current version of each."""
+
     __tablename__ = "interview_pack"
 
     job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("job.id", ondelete="CASCADE"), unique=True)
     application_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("application.id", ondelete="SET NULL"))
     sections: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict,
-                                                     doc="section key -> {content, fact_ids, sources}")
+                                                     doc="section key -> current version summary and content")
     generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     model: Mapped[str | None] = mapped_column(String(128))
+    status: Mapped[InterviewPackStatus] = mapped_column(str_enum(InterviewPackStatus), nullable=False,
+                                                        default=InterviewPackStatus.idle, server_default="idle")
+    generation: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0",
+                                            doc="Bumped per generation request; versions record it (no duplicates)")
+    pending_sections: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list, server_default="[]")
+    basis: Mapped[dict[str, Any] | None] = mapped_column(JSONB, doc="What the pack was built from (packet, spec)")
+    notes: Mapped[dict[str, str]] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}",
+                                                  doc="Owner notes per section key")
+    estimate_micros: Mapped[int | None] = mapped_column(BigInteger)
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
+    paused_mark: Mapped[dict[str, Any] | None] = mapped_column(JSONB, doc="Budget state when it paused")
+    error: Mapped[str | None] = mapped_column(Text)
+    offered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    requested_by: Mapped[str | None] = mapped_column(String(120))
+
+
+class InterviewSectionVersion(Base, Entity):
+    """One version of one pack section. Never updated: a regeneration or an owner edit adds a version."""
+
+    __tablename__ = "interview_section_version"
+    __table_args__ = (
+        UniqueConstraint("pack_id", "section", "version", name="interview_section_version_no"),
+        UniqueConstraint("pack_id", "section", "request_key", name="interview_section_request"),
+    )
+
+    pack_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("interview_pack.id", ondelete="CASCADE"), index=True)
+    section: Mapped[str] = mapped_column(String(40), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    origin: Mapped[str] = mapped_column(String(20), nullable=False, doc="generated, code or owner")
+    request_key: Mapped[str | None] = mapped_column(String(80), doc="gen<n>: one version per generation")
+    content: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    fact_ids: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list)
+    check_results: Mapped[list[CheckResult]] = mapped_column(PydanticJSON(list[CheckResult]), nullable=False,
+                                                             default=list)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, doc="pass, warn or block")
+    flagged: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False,
+                                          doc="Failed the truth checks after its retries; never shown as fine")
+    model: Mapped[str | None] = mapped_column(String(128))
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    created_by: Mapped[str] = mapped_column(String(120), nullable=False)
+
+
+class InterviewPractice(Base, Entity):
+    """Practice: a question, the owner's draft answer and the model's feedback (budgeted)."""
+
+    __tablename__ = "interview_practice"
+
+    pack_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("interview_pack.id", ondelete="CASCADE"), index=True)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str | None] = mapped_column(String(30))
+    draft_answer: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False, doc="done, paused (budget) or failed")
+    feedback: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    check_results: Mapped[list[CheckResult]] = mapped_column(PydanticJSON(list[CheckResult]), nullable=False,
+                                                             default=list)
+    model: Mapped[str | None] = mapped_column(String(128))
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    error: Mapped[str | None] = mapped_column(Text)
 
 
 class InterviewRound(Base, Entity):
