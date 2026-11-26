@@ -25,7 +25,7 @@ from app.llm.service import LLMService
 from app.models.applications import InterviewPack, InterviewPractice, InterviewRound
 from app.models.search import Job
 from app.pipeline.interview import export, practice, service
-from app.schemas.json_types import CheckResult
+from app.schemas.json_types import CheckResult, RoundKind
 
 router = APIRouter(prefix="/api", tags=["interview"], dependencies=[RequireOwner])
 
@@ -125,8 +125,10 @@ class InterviewRoundIn(ApiModel):
     format: str | None = None
     interviewers: list[str] = Field(default_factory=list)
     checklist: list[str] = Field(default_factory=list)
-    notes: str | None = None
+    notes: str | None = Field(default=None, description="The owner's notes, including pasted interviewer notes")
     learnt: str | None = None
+    kind: RoundKind | None = Field(default=None, description="Screen, technical, panel, final or other")
+    focus: list[str] = Field(default_factory=list, description="What this round concentrates on")
 
 
 class InterviewRoundOut(InterviewRoundIn, Timestamps):
