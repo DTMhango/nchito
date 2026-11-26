@@ -6,7 +6,8 @@ sweep is driven by the owner's list as well as by any boards typed into the sour
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import inspect
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from app.models.search import Source, WatchedEmployer
@@ -56,11 +57,16 @@ def spec_of(rate: RateLimit) -> RateLimitSpec:
     return RateLimitSpec(requests_per_minute=rate.requests_per_minute, burst=rate.burst)
 
 
-def build_connector(source: Source, transport: HttpFetcher | None = None) -> SourceConnector:
-    """A connector for ``source`` whose requests honour the source's own rate limit."""
+def build_connector(source: Source, transport: HttpFetcher | None = None, *,
+                    extras: Mapping[str, Any] | None = None) -> SourceConnector:
+    """A connector for ``source`` whose requests honour the source's own rate limit. ``extras`` holds what some
+    connectors take besides the fetcher (``api_key``, ``llm``, live ``settings``); each connector is given only
+    the ones its constructor accepts."""
     cls = connector_class(source.connector)
     inner = transport or HttpxFetcher()
-    return cls(polite(inner, spec_of(source.rate_limit)))  # type: ignore[call-arg]
+    accepted = inspect.signature(cls.__init__).parameters
+    kwargs = {k: v for k, v in (extras or {}).items() if k in accepted and v is not None}
+    return cls(polite(inner, spec_of(source.rate_limit)), **kwargs)  # type: ignore[call-arg]
 
 
 def known_connectors() -> list[str]:

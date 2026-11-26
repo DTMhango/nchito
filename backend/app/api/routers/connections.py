@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.common import NOT_IMPLEMENTED_RESPONSES, Timestamps, not_implemented
 from app.api.deps import PrincipalDep, RequireOwner, SessionDep
-from app.connect import mail_connections
+from app.connect import mail_connections, search_api
 from app.connect import records as ops_records
 from app.connect.mailbox import MailError
 from app.core import audit
@@ -33,7 +33,7 @@ tokens_router = APIRouter(prefix="/api/tokens", tags=["tokens"], dependencies=[R
                           responses=NOT_IMPLEMENTED_RESPONSES)
 
 ProviderT = Literal["anthropic", "openai_compatible", "gmail", "imap_smtp", "gdrive", "msgraph", "onedrive",
-                    "telegram", "webhook", "s3"]
+                    "telegram", "webhook", "s3", "search_api"]
 
 
 class ConnectionOut(Timestamps):
@@ -125,7 +125,7 @@ async def _get_llm(session: AsyncSession, connection_id: uuid.UUID) -> Connectio
     if conn is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail="connection not found")
     if not (provider_records.is_llm(conn.provider.value) or mail_connections.is_mail(conn.provider.value)
-            or ops_records.is_ops(conn.provider.value)):
+            or ops_records.is_ops(conn.provider.value) or search_api.is_search(conn.provider.value)):
         not_implemented(2, "connect")
     return conn
 
@@ -140,7 +140,16 @@ async def list_connections(session: SessionDep) -> list[ConnectionOut]:
                          name="connections_create")
 async def create_connection(body: ConnectionCreate, session: SessionDep, principal: PrincipalDep) -> ConnectionOut:
     """LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are
-    encrypted at rest and only ever returned masked."""
+    encrypted at rest and only ever returned masked. ``search_api``: the web search source's key (secret
+    ``api_key``; config ``endpoint`` and the response shape)."""
+    if search_api.is_search(body.provider):
+        try:
+            conn = await search_api.create(session, label=body.label, config=body.config, secrets=body.secrets,
+                                           actor=principal.actor)
+        except ValueError as exc:
+            raise HTTPException(422, detail=str(exc)) from exc
+        await session.refresh(conn)
+        return _out(conn)
     if ops_records.is_ops(body.provider):
         try:
             conn = await ops_records.create(session, provider=body.provider, label=body.label, config=body.config,
@@ -167,6 +176,14 @@ async def update_connection(connection_id: uuid.UUID, body: ConnectionUpdate, se
                             principal: PrincipalDep) -> ConnectionOut:
     """Omitted fields stay; a blank secret value keeps the stored one."""
     conn = await _get_llm(session, connection_id)
+    if search_api.is_search(conn.provider.value):
+        try:
+            await search_api.update(session, conn, label=body.label, config=body.config, secrets=body.secrets,
+                                    enabled=body.enabled, actor=principal.actor)
+        except ValueError as exc:
+            raise HTTPException(422, detail=str(exc)) from exc
+        await session.refresh(conn)
+        return _out(conn)
     if ops_records.is_ops(conn.provider.value):
         try:
             await ops_records.update(session, conn, label=body.label, config=body.config, secrets_in=body.secrets,
@@ -201,6 +218,13 @@ async def test_connection(connection_id: uuid.UUID, session: SessionDep, princip
     conn = await _get_llm(session, connection_id)
     if ops_records.is_ops(conn.provider.value):
         ok, detail = await ops_records.run_test(session, conn)
+        return ConnectionTestOut(ok=ok, detail=detail)
+    if search_api.is_search(conn.provider.value):
+        ok, detail = await search_api.run_test(conn)
+        conn.health = "ok" if ok else "failing"
+        conn.last_checked_at = utcnow()
+        await audit.record(session, actor=principal.actor, action="connection.tested", subject_type="connection",
+                           subject_id=conn.id, detail={"provider": conn.provider.value, "ok": ok})
         return ConnectionTestOut(ok=ok, detail=detail)
     if mail_connections.is_mail(conn.provider.value):
         ok, detail = await mail_connections.test(conn)

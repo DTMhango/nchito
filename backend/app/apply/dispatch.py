@@ -223,7 +223,13 @@ async def _sources_changed(session: AsyncSession, app: Application, packet: Appl
         return [exc.message]
     if packets.content_hash(fresh) == packet.content_hash:
         return None
-    return [c["path"] for c in packets.diff(packet.contents, fresh)] or ["contents"]
+    paths = [c["path"] for c in packets.diff(packet.contents, fresh)] or ["contents"]
+    if "job_version" in paths:
+        # A reworded posting is not a change to what was approved (the material-change rule, 18.4).
+        job = await session.get(Job, app.job_id)
+        if job is not None and (await gates._job_version(session, job, packet))[0] == "pass":
+            paths = [p for p in paths if p != "job_version"]
+    return paths or None
 
 
 async def recheck(session: AsyncSession, attempt: DispatchAttempt, app: Application, *, now: datetime

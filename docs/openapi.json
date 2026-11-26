@@ -13763,7 +13763,7 @@
           "connections"
         ],
         "summary": "Connections Create",
-        "description": "LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are\nencrypted at rest and only ever returned masked.",
+        "description": "LLM providers, IMAP/SMTP mailboxes (Gmail connects through OAuth), Telegram and webhook records. Secrets are\nencrypted at rest and only ever returned masked. ``search_api``: the web search source's key (secret\n``api_key``; config ``endpoint`` and the response shape).",
         "operationId": "connections_create",
         "requestBody": {
           "content": {
@@ -20292,7 +20292,8 @@
               "onedrive",
               "telegram",
               "webhook",
-              "s3"
+              "s3",
+              "search_api"
             ],
             "title": "Provider"
           },
@@ -20397,7 +20398,8 @@
               "onedrive",
               "telegram",
               "webhook",
-              "s3"
+              "s3",
+              "search_api"
             ],
             "title": "Provider"
           },
