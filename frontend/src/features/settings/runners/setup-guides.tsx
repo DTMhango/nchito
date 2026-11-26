@@ -11,7 +11,7 @@ import {
 } from "./setup-constants"
 
 const Code = ({ children }: { children: ReactNode }) => (
-  <pre className="overflow-x-auto rounded-md border border-border bg-sunken p-2.5 text-sm">
+  <pre className="my-1.5 min-w-0 overflow-x-auto rounded-md border border-border bg-sunken p-2.5 text-sm">
     <code>{children}</code>
   </pre>
 )
@@ -70,13 +70,13 @@ export function SetupGuides() {
         <summary className="cursor-pointer text-md">
           Use my PC (Claude Code + Chrome)
         </summary>
-        <div className="mt-3 grid gap-2 text-sm">
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2 text-sm">
           <p className="text-muted-foreground">
             Uses your own Chrome, so portals you have signed into stay signed
             in. It runs in a visible window and stops at logins and CAPTCHAs for
             you.
           </p>
-          <ol className="grid list-decimal gap-2 pl-5">
+          <ol className="grid list-decimal grid-cols-[minmax(0,1fr)] gap-2 pl-5">
             <li>
               Create a token above with <b>Where it runs</b> set to Your PC.
               Copy it.
@@ -129,13 +129,13 @@ export function SetupGuides() {
       </details>
       <details className="panel p-4">
         <summary className="cursor-pointer text-md">Server runner</summary>
-        <div className="mt-3 grid gap-2 text-sm">
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)] gap-2 text-sm">
           <p className="rounded-md bg-warn-soft p-2.5 text-warn">
             This costs money. A server runner uses an Anthropic API key, so
             every task spends paid tokens. It has its own budget line and is{" "}
             <b>off by default</b>.
           </p>
-          <ol className="grid list-decimal gap-2 pl-5">
+          <ol className="grid list-decimal grid-cols-[minmax(0,1fr)] gap-2 pl-5">
             <li>
               Create a token above with <b>Where it runs</b> set to Server. Copy
               it. Turn on the setting <code>{SERVER_RUNNER_SETTING}</code>.

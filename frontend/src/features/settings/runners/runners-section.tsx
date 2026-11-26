@@ -192,7 +192,7 @@ function RunnerLimits({ runner }: { runner: RunnerStatus }) {
       <div className="flex flex-wrap items-center gap-2">
         <h5 className="eyebrow">Limits</h5>
         <span className="text-sm text-faint">
-          The same for every {KIND_LABEL[runner.runner_kind].toLowerCase()}{" "}
+          The same for every {runner.runner_kind === "pc" ? "PC" : "server"}{" "}
           runner.
         </span>
         <a

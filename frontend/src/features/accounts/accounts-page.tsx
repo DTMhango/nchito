@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
+import { View } from "@/components/view"
 import { NativeSelect } from "@/features/campaigns/bits"
 import { errorText, runnersQuery } from "@/features/autopilot/api"
 import {
@@ -53,7 +54,7 @@ export function AccountsPage() {
     onError: (e) => toast.error(errorText(e)),
   })
   return (
-    <div className="grid gap-5">
+    <View className="grid content-start gap-5">
       <PageHeader
         title="Portal accounts"
         description="Employer portals that need an account. You create the account and sign in yourself, in the browser your runner uses. This list only keeps track of where you got to. No passwords are stored or asked for here."
@@ -115,7 +116,7 @@ export function AccountsPage() {
           ))}
         </ul>
       )}
-    </div>
+    </View>
   )
 }
 

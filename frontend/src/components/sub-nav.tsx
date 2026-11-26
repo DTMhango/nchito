@@ -1,8 +1,11 @@
-import type { ComponentProps, ReactNode } from "react"
+import { useEffect, useRef, type ComponentProps, type ReactNode } from "react"
 import { createLink } from "@tanstack/react-router"
 import { cn } from "@/lib/utils"
 
-/** Horizontal underline tabs made of links (mockup `.tabs`). Scrolls sideways on phones. */
+/**
+ * Horizontal underline tabs made of links (mockup `.tabs`). Scrolls sideways on narrow
+ * screens, keeping the active tab in view (the scrollbar is hidden).
+ */
 export function SubNav({
   label,
   children,
@@ -12,8 +15,25 @@ export function SubNav({
   children: ReactNode
   className?: string
 }) {
+  const ref = useRef<HTMLElement>(null)
+  const shown = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    const nav = ref.current
+    const active = nav?.querySelector<HTMLElement>('[data-status="active"]')
+    if (!nav || !active || active === shown.current) return
+    shown.current = active
+    const a = active.getBoundingClientRect()
+    const left = a.left - nav.getBoundingClientRect().left + nav.scrollLeft
+    // Centre it, so a late font or layout shift still leaves it fully visible.
+    if (
+      left < nav.scrollLeft ||
+      left + a.width > nav.scrollLeft + nav.clientWidth
+    )
+      nav.scrollLeft = left - (nav.clientWidth - a.width) / 2
+  })
   return (
     <nav
+      ref={ref}
       aria-label={label}
       className={cn(
         "flex [scrollbar-width:none] gap-0.5 overflow-x-auto border-b border-border",

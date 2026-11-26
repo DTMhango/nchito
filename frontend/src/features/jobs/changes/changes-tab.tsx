@@ -108,7 +108,9 @@ function ChangeRow({ c, jobId }: { c: JobChange; jobId: string }) {
           >
             <span className="flex flex-wrap items-center gap-1.5">
               <Chip tone={KIND[f.kind].tone}>{KIND[f.kind].label}</Chip>
-              {!f.material && c.material && <Chip tone="line">wording</Chip>}
+              {!f.material && c.material && f.kind !== "wording" && (
+                <Chip tone="line">wording</Chip>
+              )}
               <span className="text-sm">{f.summary}</span>
             </span>
             {f.kind !== "wording" && <Diff c={f} />}

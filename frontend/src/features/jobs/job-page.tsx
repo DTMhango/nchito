@@ -174,7 +174,7 @@ function JobHeader({ job }: { job: JobDetail }) {
         {job.best_score != null && (
           <ScoreRing score={job.best_score} size={64} />
         )}
-        <div className="grid min-w-0 flex-1 gap-1.5">
+        <div className="grid min-w-0 flex-1 basis-72 gap-1.5">
           <span className="eyebrow">{job.canonical_employer}</span>
           <h2 className="text-2xl">{job.title}</h2>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">

@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/empty-state"
 import { PageHeader, SectionHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
+import { View } from "@/components/view"
 import { appKeys } from "@/features/applications/api"
 import {
   errorText,
@@ -50,7 +51,7 @@ const KIND_PHRASE = {
 export function HandoffPage({ actionId }: { actionId: string }) {
   const one = useQuery(pendingActionQuery(actionId))
   return (
-    <div className="grid max-w-3xl gap-5">
+    <View className="grid max-w-3xl content-start gap-5">
       <PageHeader
         eyebrow="Handoff"
         title={one.data ? one.data.title : "Handoff"}
@@ -69,7 +70,7 @@ export function HandoffPage({ actionId }: { actionId: string }) {
         />
       )}
       {one.data && <HandoffDetail action={one.data} />}
-    </div>
+    </View>
   )
 }
 

@@ -32,7 +32,7 @@ import {
 } from "./connectors"
 
 const SELECT =
-  "h-9 w-full min-w-0 rounded-md border field-focus border-input bg-surface px-2 text-base text-foreground outline-none"
+  "h-8 w-full min-w-0 rounded-md border field-focus border-input bg-surface px-2 text-base text-foreground outline-none"
 
 /** The `sources` settings group, flattened (empty while loading). */
 export function useSourceSettings(): SettingOut[] {

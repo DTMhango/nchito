@@ -31,7 +31,7 @@ export function AppShell() {
   }, [])
 
   return (
-    <div className="grid h-dvh grid-cols-1 pr-[max(16px,env(safe-area-inset-right,0px))] pl-[max(16px,env(safe-area-inset-left,0px))] md:grid-cols-[auto_minmax(0,1fr)]">
+    <div className="grid h-dvh grid-cols-1 grid-rows-[minmax(0,1fr)] pr-[max(16px,env(safe-area-inset-right,0px))] pl-[max(16px,env(safe-area-inset-left,0px))] md:grid-cols-[auto_minmax(0,1fr)]">
       <a
         href="#main"
         className="sr-only z-50 rounded-sm bg-surface px-3 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"

@@ -49,7 +49,7 @@ export function Sidebar({
       aria-label="Main navigation"
       data-collapsed={collapsed || undefined}
       className={cn(
-        "group/side flex min-w-0 flex-col gap-4.5 border-r border-border py-3.5 pr-3 transition-[width] duration-200 max-md:hidden",
+        "group/side flex min-h-0 min-w-0 [scrollbar-width:thin] flex-col gap-4.5 overflow-y-auto border-r border-border py-3.5 pr-3 transition-[width] duration-200 max-md:hidden",
         collapsed ? "w-16" : "w-[228px]"
       )}
     >
