@@ -290,6 +290,8 @@ _int("budget.agent_task_ceiling_minor", "Agent task ceiling", "Maximum spend for
 
 # Documents (9)
 _int("documents.cv_pages", "CV pages", "Maximum CV length.", 2, 3, 1, 6, "pages")
+_int("documents.vault_max_upload_mb", "Vault upload limit", "Largest file the vault accepts.", 25, 10, 1, 200,
+     "MB")
 _int("documents.letter_pages", "Letter pages", "Maximum cover letter length.", 1, 2, 1, 3, "pages")
 _int("documents.letter_paragraphs", "Letter paragraphs", "Maximum cover letter paragraphs.", 4, 5, 1, 10)
 _add("documents.cv_template", "string", "CV template", "Default CV template (by template key).",
