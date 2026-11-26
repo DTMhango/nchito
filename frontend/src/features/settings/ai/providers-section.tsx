@@ -1,3 +1,4 @@
+import { costOf } from "@/lib/cost"
 import { useState, type FormEvent } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { KeyRound, PlugZap, Trash2 } from "lucide-react"
@@ -14,7 +15,6 @@ import {
   createConnection,
   deleteConnection,
   LLM_PROVIDERS,
-  money,
   testConnection,
   type Connection,
 } from "./api"
@@ -42,7 +42,7 @@ export function ProvidersSection() {
     mutationFn: testConnection,
     onSuccess: (r) => {
       if (r.ok)
-        toast.success(`Provider works. The test cost ${money(r.cost_minor)}.`)
+        toast.success(`Provider works. The test cost ${costOf(r, "cost")}.`)
       else toast.error(r.detail ?? "The test failed.")
       void refresh()
       void queryClient.invalidateQueries({ queryKey: aiKeys.spend })

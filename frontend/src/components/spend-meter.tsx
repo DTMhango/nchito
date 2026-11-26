@@ -1,41 +1,38 @@
 import { Link } from "@tanstack/react-router"
+import { formatCost } from "@/lib/cost"
 import { cn } from "@/lib/utils"
 
 type SpendMeterProps = {
-  /** Month-to-date spend in minor units (cents). */
-  spentMinor: number
-  /** Monthly cap in minor units, or null when no cap is set (paid work stays off). */
-  capMinor: number | null
+  /** Month-to-date spend in micros (1 USD = 1,000,000). */
+  spentMicros: number
+  /** Monthly cap in micros, or null when no cap is set (paid work stays off). */
+  capMicros: number | null
   currency?: string
   className?: string
 }
 
-const fmt = (minor: number, currency: string) =>
-  new Intl.NumberFormat("en", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-  }).format(minor / 100)
+const fmt = (micros: number, currency: string) =>
+  formatCost(micros, { currency, compact: true })
 
 /**
  * AI spend this month against the cap (DESIGN 11, budget ledger). Without a cap nothing paid
  * runs, so the meter says so and links to the setting.
  */
 export function SpendMeter({
-  spentMinor,
-  capMinor,
+  spentMicros,
+  capMicros,
   currency = "USD",
   className,
 }: SpendMeterProps) {
-  const pct = capMinor ? Math.min(100, (spentMinor / capMinor) * 100) : 0
+  const pct = capMicros ? Math.min(100, (spentMicros / capMicros) * 100) : 0
   const warn = pct >= 80
   return (
     <div className={cn("grid gap-1.5 rounded-sm bg-sunken p-2.5", className)}>
       <span className="eyebrow">AI spend this month</span>
       <div className="flex items-baseline justify-between gap-2 text-[0.86rem]">
-        <span className="num font-semibold">{fmt(spentMinor, currency)}</span>
-        {capMinor ? (
-          <span className="num text-faint">of {fmt(capMinor, currency)}</span>
+        <span className="num font-semibold">{fmt(spentMicros, currency)}</span>
+        {capMicros ? (
+          <span className="num text-faint">of {fmt(capMicros, currency)}</span>
         ) : (
           <Link to="/settings/ai" className="text-xs">
             Set a cap
@@ -49,7 +46,7 @@ export function SpendMeter({
         aria-valuemax={100}
         aria-valuenow={Math.round(pct)}
         aria-valuetext={
-          capMinor
+          capMicros
             ? `${Math.round(pct)}% of the monthly cap`
             : "No cap set. Paid AI work is off until you set one."
         }
@@ -63,7 +60,7 @@ export function SpendMeter({
           style={{ width: `${pct}%` }}
         />
       </div>
-      {!capMinor && (
+      {!capMicros && (
         <span className="text-xs text-faint">
           No cap set, so paid AI work is off.
         </span>

@@ -122,14 +122,6 @@ export const settingQuery = (key: string) =>
     queryFn: () => getSetting(key),
   })
 
-/** Money in minor units, formatted for display. */
-export const money = (minor: number, currency = "USD") =>
-  new Intl.NumberFormat("en", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-  }).format(minor / 100)
-
 export const STAGE_LABELS: Record<string, string> = {
   extract: "Extract and normalise",
   classify_email: "Classify email",

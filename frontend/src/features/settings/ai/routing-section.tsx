@@ -1,3 +1,4 @@
+import { costOf } from "@/lib/cost"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -8,7 +9,6 @@ import { SectionHeader } from "@/components/page-header"
 import {
   activateRoute,
   aiKeys,
-  money,
   pricesQuery,
   routingQuery,
   stageLabel,
@@ -56,7 +56,7 @@ function RouteRow({ route }: { route: Route }) {
       if (r.ok) {
         setTestedOk(r.model ?? model.trim())
         toast.success(
-          `${stageLabel(route.stage)}: ${r.model} works (${money(r.cost_minor, r.currency ?? "USD")}).`
+          `${stageLabel(route.stage)}: ${r.model} works (${costOf(r, "cost", { currency: r.currency ?? "USD" })}).`
         )
       } else toast.error(r.detail ?? "The test failed.")
       refresh()

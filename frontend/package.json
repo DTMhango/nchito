@@ -17,7 +17,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"scripts/**/*.mjs\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "icons": "node scripts/make-icons.mjs",
-    "shots": "node scripts/screenshots.mjs"
+    "shots": "node scripts/screenshots.mjs",
+    "gen:api": "openapi-typescript ../docs/openapi.json -o src/lib/api/schema.d.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -72,6 +73,7 @@
     "globals": "^17",
     "jsdom": "^31.0.1",
     "msw": "^3.0.7",
+    "openapi-typescript": "^7.13.0",
     "playwright": "^1.65.1",
     "prettier": "^3.10.1",
     "prettier-plugin-tailwindcss": "^0.8.1",
@@ -80,5 +82,10 @@
     "vite": "^8",
     "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.1.2"
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

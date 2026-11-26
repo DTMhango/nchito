@@ -156,7 +156,7 @@ export function TodayPage() {
               title={<span id="spend-title">AI spend</span>}
               className="mb-0"
             />
-            <SpendMeter spentMinor={0} capMinor={null} />
+            <SpendMeter spentMicros={0} capMicros={null} />
           </section>
 
           <aside className="flex items-start gap-3 rounded-lg border border-dashed border-border-strong p-4">

@@ -303,7 +303,7 @@ export const aiHandlers = [
         : state.connections.length === 0
           ? "no enabled anthropic provider: add one in Settings > AI"
           : "Set a monthly cap first: paid calls stay off without one.",
-      cost_minor: ok ? 1 : 0,
+      cost_micros: ok ? 4_200 : 0,
       currency: "USD",
       billed: true,
       latency_ms: ok ? 840 : null,

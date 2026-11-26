@@ -1,3 +1,4 @@
+import { microsOf } from "@/lib/cost"
 import { useEffect } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { SpendMeter } from "@/components/spend-meter"
@@ -27,8 +28,8 @@ export function LiveSpendMeter({ className }: { className?: string }) {
   const { data } = useQuery(spendMeterQuery())
   return (
     <SpendMeter
-      spentMinor={data?.month_to_date_minor ?? 0}
-      capMinor={data?.cap_minor ?? null}
+      spentMicros={microsOf(data, "month_to_date") ?? 0}
+      capMicros={microsOf(data, "cap")}
       currency={data?.currency ?? "USD"}
       className={className}
     />

@@ -1,3 +1,4 @@
+import { costOf, microsOf } from "@/lib/cost"
 import { useState, type FormEvent } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -9,7 +10,6 @@ import { SectionHeader } from "@/components/page-header"
 import { Sparkbar } from "@/components/sparkbar"
 import {
   aiKeys,
-  money,
   putSetting,
   settingQuery,
   spendQuery,
@@ -143,7 +143,9 @@ export function SpendSection() {
       <SpendTiles s={data} />
       {data.daily.length > 0 && (
         <Sparkbar
-          values={data.daily.map((d) => d.billed_minor / 100)}
+          values={data.daily.map(
+            (d) => (microsOf(d, "billed") ?? 0) / 1_000_000
+          )}
           edgeLabels={[
             data.daily[0].day.slice(5),
             data.daily[data.daily.length - 1].day.slice(5),
@@ -175,17 +177,21 @@ function SpendTiles({ s }: { s: SpendSummary }) {
   const tiles: [string, string, string?][] = [
     [
       "Billed",
-      money(s.month_to_date_minor, s.currency),
-      s.cap_minor ? `of ${money(s.cap_minor, s.currency)}` : "no cap set",
+      costOf(s, "month_to_date", { currency: s.currency }),
+      s.cap_minor
+        ? `of ${costOf(s, "cap", { currency: s.currency })}`
+        : "no cap set",
     ],
-    ["Reserved now", money(s.reserved_minor, s.currency)],
+    ["Reserved now", costOf(s, "reserved", { currency: s.currency })],
     [
       "Remaining",
-      s.remaining_minor == null ? "—" : money(s.remaining_minor, s.currency),
+      s.remaining_minor == null
+        ? "—"
+        : costOf(s, "remaining", { currency: s.currency }),
     ],
     [
       "Subscription (not billed)",
-      money(s.estimated_unbilled_minor, s.currency),
+      costOf(s, "estimated_unbilled", { currency: s.currency }),
       "estimated",
     ],
   ]
@@ -224,9 +230,9 @@ function Breakdown({
             <li key={r.key} className="flex justify-between gap-3">
               <span className="truncate">{label(r.key)}</span>
               <span className="num whitespace-nowrap text-muted-foreground">
-                {money(r.billed_minor, currency)}
-                {r.unbilled_minor > 0 &&
-                  ` + ${money(r.unbilled_minor, currency)} est.`}
+                {costOf(r, "billed", { currency })}
+                {(microsOf(r, "unbilled") ?? 0) > 0 &&
+                  ` + ${costOf(r, "unbilled", { currency })} est.`}
                 {` · ${r.calls} calls`}
               </span>
             </li>

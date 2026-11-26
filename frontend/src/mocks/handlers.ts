@@ -9,6 +9,7 @@ import type {
 } from "@/lib/api/types"
 import { db } from "./db"
 import { aiHandlers } from "./handlers/ai"
+import { kitHandlers } from "./handlers/kit"
 
 const latency = () =>
   import.meta.env.MODE === "test" ? Promise.resolve() : delay(120)
@@ -18,6 +19,7 @@ const notFound = (what: string) =>
   HttpResponse.json({ detail: `${what} not found.` }, { status: 404 })
 
 export const handlers = [
+  ...kitHandlers,
   http.get("*/api/health", () =>
     HttpResponse.json({ status: "ok", mock: true })
   ),
