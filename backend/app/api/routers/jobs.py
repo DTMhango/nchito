@@ -541,10 +541,30 @@ async def release_held(job_id: uuid.UUID, body: ReleaseHeldIn, session: SessionD
     return await job_detail(session, job)
 
 
-@router.post("/jobs/{job_id}/recheck", response_model=JobDetail, name="jobs_recheck")
-async def recheck(job_id: uuid.UUID) -> JobDetail:
-    """Needs the source connectors' open check (sources stream); then ``conflicts.on_job_changed``."""
-    not_implemented(WAVE, AREA)
+class RecheckOut(BaseModel):
+    job: JobDetail
+    availability_before: Literal["open", "closed", "unknown"]
+    availability_after: Literal["open", "closed", "unknown"]
+    content_changed: bool
+    changed_fields: list[str] = Field(default_factory=list)
+    reassessed: bool = False
+    note: str | None = Field(default=None, description="Why nothing was re-read, when that is so")
+
+
+@router.post("/jobs/{job_id}/recheck", response_model=RecheckOut, name="jobs_recheck")
+async def recheck(job_id: uuid.UUID, session: SessionDep, principal: PrincipalDep) -> RecheckOut:
+    """Re-read the posting through its source. A failed check is ``unknown``, never ``closed``. A
+    material change (text, title, pay, deadline, apply link, place) is re-extracted and reassessed."""
+    from app.pipeline import orchestrator
+    from app.pipeline import recheck as recheck_pipeline
+
+    job = await _job(session, job_id)
+    factory = orchestrator.DEPS.llm_factory
+    llm = await factory(session, None) if factory is not None else await scoring.client_for(session)
+    result = await recheck_pipeline.recheck_job(session, job, actor=principal.actor, llm=llm)
+    return RecheckOut(job=await job_detail(session, job), availability_before=result.availability_before,  # type: ignore[arg-type]
+                      availability_after=result.availability_after, content_changed=result.content_changed,  # type: ignore[arg-type]
+                      changed_fields=result.changed_fields, reassessed=result.reassessed, note=result.note)
 
 
 # ----- views, tag rules, custom facets, aliases --------------------------------------------
