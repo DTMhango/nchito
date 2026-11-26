@@ -38,7 +38,8 @@ from datetime import datetime, time, timedelta
 from typing import Any, Literal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, type_coerce
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.apply import stages
@@ -104,14 +105,18 @@ def window_starts(now: datetime, tz_name: str) -> tuple[datetime, datetime]:
 
 async def sent_counts(session: AsyncSession, now: datetime, tz_name: str) -> dict[str, int]:
     day, week = window_starts(now, tz_name)
-    attempts = (await session.execute(select(DispatchAttempt.created_at).where(
+    # Applications only: messages about an application (wave 4 follow-ups) have caps of their own.
+    application_packet = ~type_coerce(ApplicationPacket.contents, JSONB).has_key("message_kind")
+    attempts = (await session.execute(select(DispatchAttempt.created_at)
+        .join(ApplicationPacket, ApplicationPacket.id == DispatchAttempt.packet_id).where(
         DispatchAttempt.status.in_(SENT_OR_IN_FLIGHT), DispatchAttempt.channel != "manual",
-        DispatchAttempt.created_at >= week))).scalars().all()
+        DispatchAttempt.created_at >= week, application_packet))).scalars().all()
     permits = (await session.execute(
         select(SubmitPermit.issued_at, ApplicationPacket.contents)
         .join(ApplicationPacket, ApplicationPacket.id == SubmitPermit.packet_id)
         .where(SubmitPermit.used_at.is_(None), SubmitPermit.expires_at > now))).all()
-    outstanding = [issued for issued, contents in permits if contents.channel != "manual"]
+    outstanding = [issued for issued, contents in permits
+                   if contents.channel != "manual" and contents.message_kind is None]
     stamps = [*attempts, *outstanding]
     return {"sent_today": sum(1 for t in stamps if t >= day), "sent_week": sum(1 for t in stamps if t >= week)}
 
@@ -257,7 +262,8 @@ async def evaluate(session: AsyncSession, app: Application, packet: ApplicationP
     current = None
     if packet is not None:
         current = await session.scalar(select(ApplicationPacket.id).where(
-            ApplicationPacket.application_id == app.id, ApplicationPacket.invalidated_at.is_(None))
+            ApplicationPacket.application_id == app.id, ApplicationPacket.invalidated_at.is_(None),
+            ~type_coerce(ApplicationPacket.contents, JSONB).has_key("message_kind"))
             .order_by(ApplicationPacket.version.desc()).limit(1))
     if packet is None:
         checks["packet_current"] = ("fail", "no packet built")

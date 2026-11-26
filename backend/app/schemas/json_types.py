@@ -21,6 +21,13 @@ MoneyPeriod = Literal["year", "month", "week", "day", "hour"]
 UnknownPolicy = Literal["review", "pass_with_penalty", "pass_blocks_auto", "fail"]
 AutomationMode = Literal["save_only", "prepare", "ask_then_apply", "auto_apply"]
 ChannelName = Literal["email", "browser", "manual"]
+# Wave 4 followups: outbound messages about an existing application.
+MessageKind = Literal["follow_up", "thank_you", "info_reply", "slot_accept", "slot_decline", "withdraw",
+                      "offer_decline"]
+MessageStatus = Literal["draft", "approved", "discarded", "budget_paused", "failed"]
+MessageSendState = Literal["none", "queued", "sending", "sent", "uncertain", "failed", "cancelled"]
+FollowupDueStatus = Literal["upcoming", "due", "snoozed", "not_needed", "drafted", "sent"]
+WindDownChoice = Literal["keep", "pause", "withdraw"]
 
 
 # ----- Job facets (6.1) ---------------------------------------------------------------------
@@ -301,11 +308,31 @@ class PacketAnswer(Shape):
     material: bool = False
 
 
+def _optional_in_output(*names: str) -> Any:
+    """``json_schema_extra`` for fields left out of the JSON when null (``exclude_if``): never required."""
+
+    def fix(schema: dict[str, Any]) -> None:
+        for name in names:  # the frontend generator keeps these optional in response-only schemas
+            schema.get("properties", {}).get(name, {})["x-omitted-when-null"] = True
+        req = [r for r in schema.get("required", []) if r not in names]
+        if req:
+            schema["required"] = req
+        else:
+            schema.pop("required", None)
+
+    return fix
+
+
 class PacketEmail(Shape):
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_optional_in_output("thread_ref"))
+
     to: list[str]
     cc: list[str] = Field(default_factory=list)
     subject: str
     body: str
+    # Wave 4 followups: left out of the canonical JSON when null, so packets built before it hash the same.
+    thread_ref: str | None = Field(default=None, exclude_if=lambda v: v is None,
+                                   description="The mail thread a message replies in (provider thread id)")
 
 
 class PacketFile(Shape):
@@ -319,6 +346,8 @@ class PacketFile(Shape):
 class PacketContents(Shape):
     """Everything an approval or permit binds to (18.2). Hashed canonically."""
 
+    model_config = ConfigDict(extra="forbid", json_schema_extra=_optional_in_output("message_kind"))
+
     requisition: str | None = None
     destination: PacketDestination
     sending_identity: str
@@ -328,6 +357,10 @@ class PacketContents(Shape):
     link_permissions: list[str] = Field(default_factory=list)
     channel: ChannelName | None = Field(default=None, description="The channel this packet is sent through")
     job_version: str | None = Field(default=None, description="Content hash of the job as it was packed")
+    # Wave 4 followups: set only on a message packet (never on the application's own packet); left out of the
+    # canonical JSON when null, so application packets hash exactly as before.
+    message_kind: MessageKind | None = Field(default=None, exclude_if=lambda v: v is None,
+                                             description="Set when the packet is a message about the application")
 
 
 class SubmittedSnapshot(Shape):

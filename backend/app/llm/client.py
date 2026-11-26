@@ -28,7 +28,7 @@ from typing import Literal, Protocol, TypeVar, runtime_checkable
 from pydantic import BaseModel
 
 Stage = Literal["extract", "classify_email", "score", "custom_facet", "tailor", "claim_check", "browser_agent",
-                "interview", "import"]
+                "interview", "import", "followup"]
 
 ResultT = TypeVar("ResultT", bound=BaseModel)
 

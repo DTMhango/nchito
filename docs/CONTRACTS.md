@@ -1167,3 +1167,43 @@ Code: `app/pipeline/events.py` (events, proposals from mail, reminders, debrief)
   `employer_policy.always_ask_first` joins the watched-employer flag.
 - Tables: `employer_policy`, `bulk_operation`, `bulk_item` (migration `0019_bulk`, after `0018_blocker_kind`). Settings:
   `bulk.max_selection`, `bulk.undo_window_minutes`, `bulk.preview_sample_size`, `bulk.allow_approve_reviewed`.
+
+## Wave 4 followups additions
+
+Code: `backend/app/pipeline/followups/` (`context`, `drafting`, `checks`, `sending`, `due`, `campaigns`, `tasks`),
+`backend/app/apply/winddown.py`, router `backend/app/api/routers/followups.py`. Migration `0019_followups`
+(revises `0018_blocker_kind`): tables `outbound_message`, `followup_due`, `wind_down`.
+
+- **Message packets.** A message about an application is an `application_packet` row whose `PacketContents` carries
+  `message_kind` (`MessageKind`: `follow_up | thank_you | info_reply | slot_accept | slot_decline | withdraw |
+  offer_decline`); `PacketEmail` gains `thread_ref` (provider thread id, or the application's Message-ID for
+  IMAP/SMTP). Both fields use `exclude_if=None`, so every packet built before hashes exactly as before (pydantic
+  >= 2.11). `packets.current/history`, the receipt, the gates' current-packet check and the application caps
+  (`gates.sent_counts`) see application packets only (`packets.is_application_packet()`).
+  `packets.build_message` builds one; `permits.grant_message(packet, checks)` issues the single-use permit from the
+  message gates (same table, same `consume`); `permits.revoke` gains `packet_id`. `dispatch.recheck` delegates a
+  message attempt to `followups.sending.recheck`; `outcomes` never moves the application's stage, evidence or
+  confirmations for a message attempt; a failed message is never retried on its own. The email channel passes
+  `thread_ref` as `OutgoingMail.thread_id`.
+- **Message gates:** `global_pause`, `campaign_paused` (both waived only for an owner-approved message while a
+  wind-down is active), `message_current`, `approval_bound`, `message_checks`, `recipient_known`, `quiet_hours`;
+  automatic follow-ups add `auto_follow_ups`, `plain_follow_up`, `recipient_sent_before`, `employer_reply` (any
+  message in a linked thread, or any stage past `submitted`), `followup_cap`.
+- **Campaign pause until a date:** `dispatch.recheck` now cancels a queued application send whose campaign is
+  paused (`campaign_paused`); the `followups_tick` task (every 5 minutes) resumes campaigns whose `paused_until`
+  has come (owner's time zone).
+- **Endpoints.** `GET|POST /api/applications/{id}/messages` (`MessagesOut`, `MessageCreateIn` -> `MessageOut` 201);
+  `GET|PUT /api/messages/{id}` (`MessageEditIn {to, cc, subject, body, confirm_recipients}`); `POST
+  /api/messages/{id}/regenerate|check|approve|send|cancel|discard` (`send` -> `MessageSendOut {status: queued |
+  denied, reason, code, gates, message}`); `GET /api/follow-ups` (`FollowupListOut`), `POST
+  /api/follow-ups/{application_id}/draft|snooze|not-needed`; `GET|POST /api/wind-down` (`WindDownOut`,
+  `WindDownStartIn`), `POST /api/wind-down/choices` (`WindDownChoiceIn {key, choice: keep | pause | withdraw}`),
+  `POST /api/wind-down/reopen`, `GET /api/wind-down/summary` (Markdown).
+- **Error codes** added: `campaign_paused`, `reply_received`, `recipient_unconfirmed`, `recipient_changed`,
+  `not_plain_follow_up`, `followup_cap`, `message_not_draft`, `message_questions`, `no_recipient`,
+  `winddown_active`, `no_winddown`.
+- **Shared aliases** (`json_types`): `MessageKind`, `MessageStatus`, `MessageSendState`, `FollowupDueStatus`,
+  `WindDownChoice`. LLM stage `followup` (routes to `ai.model_tailor`).
+- **Settings** (group `followups`): `due_days`, `max_per_application`, `snooze_days`, `auto_send` (off),
+  `auto_daily_cap`, `max_paragraphs`, `max_facts`, `context_max_chars`, `subject_prefix`, `kind_briefs`,
+  `commitment_topics`.

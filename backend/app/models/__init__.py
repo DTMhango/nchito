@@ -19,6 +19,7 @@ from app.models.bulk import BulkItem, BulkOperation, EmployerPolicy
 from app.models.calendar import CalendarFeed, InterviewEvent
 from app.models.changes import JobChange, JobVersion, JobWatch
 from app.models.documents import ApplicationDocument
+from app.models.followups import FollowupDue, OutboundMessage, WindDown
 from app.models.kit import (
     Answer,
     Experience,
@@ -74,11 +75,11 @@ __all__ = [
     "AgentTask", "Answer", "ApiToken", "Application", "ApplicationDocument", "ApplicationEvent",
     "ApplicationPacket", "Assessment", "AuditEvent", "AuthSession", "Base", "BulkItem", "BulkOperation",
     "CalendarFeed", "Campaign", "ConfigRevision", "Connection", "Contact", "CustomFacet", "DispatchAttempt",
-    "EmployerAlias", "EmployerPolicy", "Experience", "Fact", "Guardrail", "GuardrailWaiver", "InterviewEvent",
-    "InterviewPack", "InterviewRound", "Job", "JobChange", "JobSighting", "JobVersion", "JobWatch", "LedgerEntry",
-    "LlmPrice", "LoginAttempt", "MailThread", "Notification", "Owner", "PayEstimate", "PendingAction", "Person",
-    "PortalAccount", "PreferenceFeedback", "PreferenceSuggestion", "Prompt", "Reference", "Rubric", "Run",
-    "SavedView", "Schedule", "Setting", "SettingRevision", "Skill", "SkillAlias", "Source", "SubmitPermit",
-    "TagRule", "Template", "Theme", "ThemeRevision", "Track", "TrustedSite", "VaultDocument", "WatchedEmployer",
-    "WorkerHeartbeat",
+    "EmployerAlias", "EmployerPolicy", "Experience", "Fact", "FollowupDue", "Guardrail", "GuardrailWaiver",
+    "InterviewEvent", "InterviewPack", "InterviewRound", "Job", "JobChange", "JobSighting", "JobVersion",
+    "JobWatch", "LedgerEntry", "LlmPrice", "LoginAttempt", "MailThread", "Notification", "OutboundMessage", "Owner",
+    "PayEstimate", "PendingAction", "Person", "PortalAccount", "PreferenceFeedback", "PreferenceSuggestion",
+    "Prompt", "Reference", "Rubric", "Run", "SavedView", "Schedule", "Setting", "SettingRevision", "Skill",
+    "SkillAlias", "Source", "SubmitPermit", "TagRule", "Template", "Theme", "ThemeRevision", "Track", "TrustedSite",
+    "VaultDocument", "WatchedEmployer", "WindDown", "WorkerHeartbeat",
 ]
