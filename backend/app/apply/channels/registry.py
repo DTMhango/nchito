@@ -15,7 +15,8 @@ example the email channel (``app/apply/channels/email.py``)::
 
     registry.register("email", _email_channel)
 
-or, with a module-level factory, ``registry.register_lazy("email", "app.apply.channels.email:factory")``.
+or, with a module-level factory, ``registry.register_lazy("email", "app.apply.channels.email:factory")``
+(the built-in registration: the connected mailbox, attachments from the default ``FileStore``).
 
 ``packet_hash`` is the one packet hash (``apply.packets.content_hash``): sha256 of the canonical JSON of
 ``PacketContents`` (``model_dump(mode="json")``, sorted keys, ``(",", ":")`` separators,
@@ -35,7 +36,9 @@ from app.apply.packets import content_hash as packet_hash
 ChannelFactory = Callable[[AsyncSession], Awaitable[Channel]]
 
 _FACTORIES: dict[str, ChannelFactory] = {}
-_LAZY: dict[str, str] = {"manual": "app.apply.channels.manual:factory"}
+# Built-in channels. ``unregister`` of a built-in puts its default back (tests replace and restore them).
+_BUILTIN: dict[str, str] = {"manual": "app.apply.channels.manual:factory", "email": "app.apply.channels.email:factory"}
+_LAZY: dict[str, str] = dict(_BUILTIN)
 
 __all__ = ["ChannelFactory", "ChannelUnavailable", "available", "get", "is_available", "packet_hash", "register",
            "register_lazy", "unregister"]
@@ -60,8 +63,11 @@ def register_lazy(name: str, target: str) -> None:
 
 
 def unregister(name: str) -> None:
+    """Remove a registration; a built-in channel falls back to its default factory."""
     _FACTORIES.pop(name, None)
     _LAZY.pop(name, None)
+    if name in _BUILTIN:
+        _LAZY[name] = _BUILTIN[name]
 
 
 def available() -> list[str]:

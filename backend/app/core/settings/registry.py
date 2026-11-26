@@ -259,6 +259,11 @@ _add("automation.quiet_hours_start", "time", "Quiet hours start",
      "21:00", "22:30", str, validators=(time_of_day,), invalid_example="25:00", has_invalid_example=True)
 _add("automation.quiet_hours_end", "time", "Quiet hours end", "Outward actions may resume at this time.",
      "07:00", "06:00", str, validators=(time_of_day,), invalid_example="7am", has_invalid_example=True)
+_add("automation.email_subject_template", "string", "Application email subject",
+     "Subject of an application sent by email. Fields: {role}, {employer}, {requisition}.",
+     "Application: {role}", "{role} application ({requisition})", str,
+     validators=(_title_template(frozenset({"role", "employer", "requisition"})), max_length(200)),
+     invalid_example="Application: {salary}", has_invalid_example=True)
 _int("automation.email_send_delay_minutes", "Email send delay",
      "Emails wait in the outbox this long and can be cancelled.", 10, 30, 0, 1440, "minutes")
 _enum("automation.unknown_question", "Unknown form question",

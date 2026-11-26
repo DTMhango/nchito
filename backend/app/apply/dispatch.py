@@ -230,6 +230,12 @@ async def recheck(session: AsyncSession, attempt: DispatchAttempt, app: Applicat
         changed = await _sources_changed(session, app, packet)
         if changed:
             fail("packet_sources", f"changed since approval: {', '.join(changed)}")
+    if packet is not None:
+        from app.apply import prepare
+
+        spec_outcome, spec_reason = await prepare.spec_gate(session, app, list(packet.contents.files))
+        if spec_outcome != "pass":
+            fail("spec_checked", spec_reason)
     job = await session.get(Job, app.job_id)
     assert job is not None
     if job.availability == Availability.closed:

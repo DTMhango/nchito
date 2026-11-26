@@ -261,6 +261,10 @@ async def evaluate(session: AsyncSession, app: Application, packet: ApplicationP
         checks["outstanding_permit"] = (("fail", "a permit for this application is already outstanding")
                                         if outstanding else ("pass", "no outstanding permit"))
     checks["document_checks"] = _document_checks(app, approval or "owner")
+    if packet is not None:
+        from app.apply import prepare
+
+        checks["spec_checked"] = await prepare.spec_gate(session, app, list(packet.contents.files))
     checks["duplicate"] = await duplicate_check(session, app, job)
     checks["runner"] = _runner(runner, runner_token_id)
     checks["budget"] = await _budget(session, channel, runner, settings)

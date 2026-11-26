@@ -154,6 +154,7 @@ async def webhook_factory(session: AsyncSession) -> Notifier | None:
 
 register_notifier_factory("telegram", telegram_factory)
 register_notifier_factory("webhook", webhook_factory)
+import app.connect.mail_notifier  # noqa: E402, F401  (registers the email notifier)
 
 
 async def mark_health(session: AsyncSession, provider: str, ok: bool) -> None:

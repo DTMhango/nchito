@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.apply.channels.base import ChannelName, DispatchOutcome, DispatchRequest, Enforcement
 from app.connect import mail_connections
+from app.connect.filestore import FileStore
 from app.connect.mailbox import (
     Attachment,
     MailAuthError,
@@ -43,6 +44,8 @@ from app.core.clock import utcnow
 from app.core.db import get_sessionmaker
 from app.models.applications import ApplicationPacket, DispatchAttempt, DispatchStatus, SubmitPermit
 from app.models.applications import Channel as ChannelEnum
+from app.models.documents import ApplicationDocument
+from app.models.kit import VaultDocument
 from app.schemas.json_types import Evidence, PacketContents, PacketFile
 
 ADDRESS_RE = re.compile(r"^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]+$")
@@ -204,3 +207,37 @@ class EmailChannel:
         if found is None:
             return DispatchOutcome(status="unknown", error="not found in sent items (yet); it is not resent")
         return _sent(found.provider_message_id)
+
+
+# ----- the registered channel ---------------------------------------------------------------------
+
+
+def attachment_loader(store: FileStore, sessionmaker: async_sessionmaker[AsyncSession] | None = None
+                      ) -> AttachmentLoader:
+    """Load a packet file's bytes: a rendered document by its ``application_document`` row, a vault file by
+    its ``vault_document`` row. The channel then checks the sha256 against the packet."""
+
+    async def load(f: PacketFile) -> bytes:
+        if not f.document_id:
+            raise MailConfigError(f"attachment {f.name!r} names no stored document")
+        async with (sessionmaker or get_sessionmaker())() as session:
+            if f.kind == "vault":
+                vault = await session.get(VaultDocument, uuid.UUID(f.document_id))
+                key = vault.file_path if vault is not None else None
+            else:
+                doc = await session.get(ApplicationDocument, uuid.UUID(f.document_id))
+                key = doc.file_key if doc is not None else None
+        if key is None:
+            raise MailConfigError(f"attachment {f.name!r} is not stored")
+        return await store.get(key)
+
+    return load
+
+
+async def factory(session: AsyncSession) -> EmailChannel:
+    """The email channel for ``app.apply.channels.registry``: the connected mailbox that sends as the packet's
+    identity, attachments from the default file store, the one packet hash."""
+    from app.apply.channels.registry import packet_hash as registry_hash
+    from app.connect.local_store import default_file_store
+
+    return EmailChannel(attachments=attachment_loader(default_file_store()), hasher=registry_hash)

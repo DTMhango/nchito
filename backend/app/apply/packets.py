@@ -247,6 +247,11 @@ async def build(session: AsyncSession, app: Application, draft: PacketDraft, *, 
     now = now or utcnow()
     await session.execute(select(Application.id).where(Application.id == app.id).with_for_update())
     contents = await assemble(session, app, draft)
+    from app.apply import prepare  # the spec gate reads the tailoring checks; imported late
+
+    outcome, reason = await prepare.spec_gate(session, app, list(contents.files))
+    if outcome != "pass":
+        raise PacketError(f"cannot build a packet: {reason}", 409)
     digest = content_hash(contents)
     latest = await current(session, app.id)
     if latest is not None and latest.content_hash == digest:
